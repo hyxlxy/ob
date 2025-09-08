@@ -20,6 +20,54 @@ See the Mulan PSL v2 for more details. */
 
 using namespace std;
 
+/**
+ * @brief LIKE操作符的模式匹配函数
+ * @param text 要匹配的文本
+ * @param pattern 模式字符串，支持%（匹配任意字符序列）和_（匹配单个字符）
+ * @return 匹配返回true，否则返回false
+ */
+bool like_match(const char *text, const char *pattern) {
+  if (!text || !pattern) {
+    return false;
+  }
+
+  // 递归实现LIKE匹配
+  while (*pattern) {
+    if (*pattern == '%') {
+      // %匹配任意字符序列（包括空序列）
+      pattern++;
+      if (!*pattern) {
+        return true; // %在末尾，匹配剩余所有字符
+      }
+      // 尝试匹配0个或多个字符
+      while (*text) {
+        if (like_match(text, pattern)) {
+          return true;
+        }
+        text++;
+      }
+      return like_match(text, pattern);
+    } else if (*pattern == '_') {
+      // _匹配单个字符
+      if (!*text) {
+        return false; // 文本已结束但模式还有_
+      }
+      pattern++;
+      text++;
+    } else {
+      // 普通字符，必须完全匹配
+      if (*text != *pattern) {
+        return false;
+      }
+      pattern++;
+      text++;
+    }
+  }
+
+  // 模式已结束，检查文本是否也结束
+  return *text == '\0';
+}
+
 RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
 {
   return tuple.find_cell(TupleCellSpec(table_name(), field_name()), value);
@@ -144,6 +192,14 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
     } break;
     case GREAT_THAN: {
       result = (cmp_result > 0);
+    } break;
+    case LIKE_OP: {
+      if (left.attr_type() != AttrType::CHARS || right.attr_type() != AttrType::CHARS) {
+        LOG_WARN("LIKE operator can only be used with string types");
+        rc = RC::INTERNAL;
+        break;
+      }
+      result = like_match(left.get_string().c_str(), right.get_string().c_str());
     } break;
     default: {
       LOG_WARN("unsupported comparison. %d", comp_);

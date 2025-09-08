@@ -122,10 +122,13 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   }
 
   // merge join conditions with where conditions
-  vector<ConditionSqlNode> all_conditions = select_sql.conditions;
-  for (const auto &join : select_sql.joins) {
-    for (const auto &condition : join.conditions) {
-      all_conditions.push_back(condition);
+  vector<ConditionSqlNode> all_conditions;
+  for (auto &condition : select_sql.conditions) {
+    all_conditions.push_back(std::move(condition));
+  }
+  for (auto &join : select_sql.joins) {
+    for (auto &condition : join.conditions) {
+      all_conditions.push_back(std::move(condition));
     }
   }
 

@@ -14,6 +14,7 @@
 #include "sql/parser/lex_sql.h"
 #include "sql/expr/expression.h"
 #include "common/type/vector_type.h"
+#include "common/type/data_type.h"
 
 using namespace std;
 
@@ -472,8 +473,34 @@ value:
     }
     |SSS {
       char *tmp = common::substr($1,1,strlen($1)-2);
-      $$ = new Value(tmp);
-      free(tmp);
+
+      // 尝试解析为向量类型
+      if (tmp[0] == '[') {
+        Value *vector_value = new Value();
+        RC rc = DataType::type_instance(AttrType::VECTORS)->set_value_from_str(*vector_value, tmp);
+        if (rc == RC::SUCCESS) {
+          $$ = vector_value;
+          free(tmp);
+        } else {
+          delete vector_value;
+          // 如果向量解析失败，作为字符串处理
+          $$ = new Value(tmp);
+          free(tmp);
+        }
+      } else {
+        // 尝试解析为日期类型
+        Value *date_value = new Value();
+        RC rc = DataType::type_instance(AttrType::DATES)->set_value_from_str(*date_value, tmp);
+        if (rc == RC::SUCCESS) {
+          $$ = date_value;
+          free(tmp);
+        } else {
+          delete date_value;
+          // 如果日期解析失败，作为字符串处理
+          $$ = new Value(tmp);
+          free(tmp);
+        }
+      }
     }
     ;
 storage_format:
@@ -684,12 +711,12 @@ condition_list:
     }
     | condition {
       $$ = new vector<ConditionSqlNode>;
-      $$->emplace_back(*$1);
+      $$->emplace_back(std::move(*$1));
       delete $1;
     }
     | condition AND condition_list {
       $$ = $3;
-      $$->emplace_back(*$1);
+      $$->emplace_back(std::move(*$1));
       delete $1;
     }
     ;
@@ -706,7 +733,7 @@ condition:
       delete $1;
       delete $3;
     }
-    | value comp_op value 
+    | value comp_op value
     {
       $$ = new ConditionSqlNode;
       $$->left_is_attr = 0;
@@ -741,6 +768,13 @@ condition:
 
       delete $1;
       delete $3;
+    }
+    | expression comp_op expression
+    {
+      $$ = new ConditionSqlNode;
+      $$->left_expr = unique_ptr<Expression>($1);
+      $$->right_expr = unique_ptr<Expression>($3);
+      $$->comp = $2;
     }
     ;
 

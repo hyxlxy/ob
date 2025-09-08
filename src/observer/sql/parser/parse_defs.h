@@ -95,6 +95,17 @@ struct ConditionSqlNode
                                  ///< 1时，操作符右边是属性名，0时，是属性值
   RelAttrSqlNode right_attr;     ///< right-hand side attribute if right_is_attr = TRUE 右边的属性
   Value          right_value;    ///< right-hand side value if right_is_attr = FALSE
+
+  // 新增：支持表达式比较
+  std::unique_ptr<Expression> left_expr;   ///< left-hand side expression
+  std::unique_ptr<Expression> right_expr;  ///< right-hand side expression
+
+  // 添加移动构造函数和移动赋值操作符
+  ConditionSqlNode() = default;
+  ConditionSqlNode(const ConditionSqlNode&) = delete;
+  ConditionSqlNode& operator=(const ConditionSqlNode&) = delete;
+  ConditionSqlNode(ConditionSqlNode&&) = default;
+  ConditionSqlNode& operator=(ConditionSqlNode&&) = default;
 };
 
 /**

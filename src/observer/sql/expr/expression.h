@@ -25,6 +25,14 @@ See the Mulan PSL v2 for more details. */
 class Tuple;
 
 /**
+ * @brief LIKE操作符的模式匹配函数
+ * @param text 要匹配的文本
+ * @param pattern 模式字符串，支持%（匹配任意字符序列）和_（匹配单个字符）
+ * @return 匹配返回true，否则返回false
+ */
+bool like_match(const char *text, const char *pattern);
+
+/**
  * @defgroup Expression
  * @brief 表达式
  */
