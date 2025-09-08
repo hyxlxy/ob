@@ -65,6 +65,8 @@ public:
 
   Tuple *current_tuple() override;
 
+  RC tuple_schema(TupleSchema &schema) const override;
+
   int table_id() const { return table_->table_id(); }
 
   void set_predicates(vector<unique_ptr<Expression>> &&exprs);

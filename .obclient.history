@@ -518,3 +518,37 @@ CREATE TABLE like_table(id int, name char(30));
 CREATE TABLE TEST (ID INT, C1 VECTOR(3), C2 VECTOR(3));
 ### 2025-09-08 19:11:39.197
 INSERT INTO TEST VALUES(1, '[1,1,1]', '[1,2,3]');
+### 2025-09-08 19:35:14.206
+-- Test date validation
+### 2025-09-08 19:41:01.753
+-- Test date WHERE clause
+### 2025-09-08 19:42:09.853
+-- Test big order by with multiple tables and fields
+### 2025-09-08 19:43:13.885
+-- Test simple order by
+### 2025-09-08 19:44:28.120
+-- Test without order by
+### 2025-09-08 19:49:22.349
+-- echo 1. create table
+### 2025-09-08 19:54:00.066
+CREATE TABLE t(id int);
+### 2025-09-08 19:55:29.852
+-- Test UPDATE statement
+### 2025-09-08 20:03:54.874
+-- Test expression evaluation
+### 2025-09-08 20:07:59.083
+CREATE TABLE test_expr(id int, val int);
+### 2025-09-08 20:07:59.110
+INSERT INTO test_expr VALUES (1, 15);
+### 2025-09-08 20:07:59.113
+INSERT INTO test_expr VALUES (2, 8);
+### 2025-09-08 20:07:59.115
+INSERT INTO test_expr VALUES (3, 20);
+### 2025-09-08 20:07:59.116
+SELECT * FROM test_expr WHERE val - 9 > 5;
+### 2025-09-08 20:10:35.284
+DROP TABLE TEST;
+### 2025-09-08 20:10:35.328
+CREATE TABLE TEST (ID INT, C1 VECTOR(3));
+### 2025-09-08 20:10:35.345
+INSERT INTO TEST VALUES(1, '[1,1,1]');

@@ -493,15 +493,35 @@ value:
           free(tmp);
         }
       } else {
-        // 尝试解析为日期类型
-        Value *date_value = new Value();
-        RC rc = DataType::type_instance(AttrType::DATES)->set_value_from_str(*date_value, tmp);
-        if (rc == RC::SUCCESS) {
-          $$ = date_value;
-          free(tmp);
+        // 检查是否为日期格式（YYYY-MM-DD或YYYY-M-D等）
+        bool looks_like_date = false;
+        int dash_count = 0;
+        for (int i = 0; tmp[i] != '\0'; i++) {
+          if (tmp[i] == '-') {
+            dash_count++;
+          }
+        }
+        // 如果有两个破折号，可能是日期格式
+        if (dash_count == 2) {
+          looks_like_date = true;
+        }
+
+        if (looks_like_date) {
+          // 尝试解析为日期类型
+          Value *date_value = new Value();
+          RC rc = DataType::type_instance(AttrType::DATES)->set_value_from_str(*date_value, tmp);
+          if (rc == RC::SUCCESS) {
+            $$ = date_value;
+            free(tmp);
+          } else {
+            delete date_value;
+            // 如果看起来像日期但解析失败，报错而不是回退到字符串
+            LOG_WARN("Invalid date format: %s", tmp);
+            free(tmp);
+            YYERROR;
+          }
         } else {
-          delete date_value;
-          // 如果日期解析失败，作为字符串处理
+          // 不像日期格式，作为字符串处理
           $$ = new Value(tmp);
           free(tmp);
         }
@@ -726,41 +746,12 @@ condition_list:
     }
     ;
 condition:
-    rel_attr comp_op value
+    expression comp_op expression
     {
       $$ = new ConditionSqlNode;
-      $$->left_is_attr = 1;
-      $$->left_attr = *$1;
-      $$->right_is_attr = 0;
-      $$->right_value = *$3;
+      $$->left_expr.reset($1);
+      $$->right_expr.reset($3);
       $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | value comp_op value
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 0;
-      $$->left_value = *$1;
-      $$->right_is_attr = 0;
-      $$->right_value = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | rel_attr comp_op rel_attr
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 1;
-      $$->left_attr = *$1;
-      $$->right_is_attr = 1;
-      $$->right_attr = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
     }
     | value comp_op rel_attr
     {
@@ -773,13 +764,6 @@ condition:
 
       delete $1;
       delete $3;
-    }
-    | expression comp_op expression
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_expr = unique_ptr<Expression>($1);
-      $$->right_expr = unique_ptr<Expression>($3);
-      $$->comp = $2;
     }
     ;
 
