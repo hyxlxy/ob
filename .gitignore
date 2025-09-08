@@ -37,3 +37,27 @@ src/observer/sql/parser/yacc_sql.hpp
 
 # ignore large performance test data files
 db/src/test/performance_test/table_data/*.csv
+
+# ignore test SQL files
+test_*.sql
+*_test.sql
+
+# ignore database files
+*.db
+miniob/db/
+miniob/
+
+# ignore log files
+*.log
+
+# ignore temporary files
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+*.orig
+
+# ignore editor backup files
+.*.swp
+.*.swo
