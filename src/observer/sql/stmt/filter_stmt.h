@@ -26,21 +26,38 @@ class FieldMeta;
 
 struct FilterObj
 {
-  bool  is_attr;
+  enum Type {
+    ATTR,
+    VALUE,
+    EXPR
+  };
+
+  Type type;
   Field field;
   Value value;
+  const Expression* expr;
 
   void init_attr(const Field &field)
   {
-    is_attr     = true;
+    type = ATTR;
     this->field = field;
   }
 
   void init_value(const Value &value)
   {
-    is_attr     = false;
+    type = VALUE;
     this->value = value;
   }
+
+  void init_expr(const Expression* expression)
+  {
+    type = EXPR;
+    this->expr = expression;
+  }
+
+  bool is_attr() const { return type == ATTR; }
+  bool is_value() const { return type == VALUE; }
+  bool is_expr() const { return type == EXPR; }
 };
 
 class FilterUnit

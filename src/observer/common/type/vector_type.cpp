@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #include <algorithm>
 #include <sstream>
 #include <iomanip>
+#include <numeric>
 
 using namespace std;
 
@@ -85,7 +86,10 @@ RC VectorType::parse_vector_string(const string &str, std::vector<float> &vec)
   }
 
   // 预分配内存以提高性能
-  vec.reserve(1000); // 预分配1000个元素的空间
+  // 估算向量维度：按逗号数量+1估算
+  size_t comma_count = std::count(content.begin(), content.end(), ',');
+  size_t estimated_size = comma_count + 1;
+  vec.reserve(std::min(estimated_size, static_cast<size_t>(MAX_VECTOR_DIMENSION)));
 
   // 按逗号分割
   stringstream ss(content);

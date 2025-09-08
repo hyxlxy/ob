@@ -201,6 +201,14 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
       }
       result = like_match(left.get_string().c_str(), right.get_string().c_str());
     } break;
+    case NOT_LIKE_OP: {
+      if (left.attr_type() != AttrType::CHARS || right.attr_type() != AttrType::CHARS) {
+        LOG_WARN("NOT LIKE operator can only be used with string types");
+        rc = RC::INTERNAL;
+        break;
+      }
+      result = !like_match(left.get_string().c_str(), right.get_string().c_str());
+    } break;
     default: {
       LOG_WARN("unsupported comparison. %d", comp_);
       rc = RC::INTERNAL;

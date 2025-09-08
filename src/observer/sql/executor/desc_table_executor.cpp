@@ -22,6 +22,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/desc_table_stmt.h"
 #include "sql/stmt/update_stmt.h"
 #include "sql/stmt/filter_stmt.h"
+#include "sql/expr/expression.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 #include "storage/record/record_scanner.h"
@@ -119,13 +120,89 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
       // Check if record matches the WHERE condition
       bool match = true;
       FilterStmt *filter_stmt = update_stmt->filter_stmt();
-      for (size_t i = 0; i < filter_stmt->filter_units().size(); i++) {
-        // Simple evaluation - this is a basic implementation
-        // In a complete system, we would use a proper expression evaluator
-        match = true; // For now, assume all records match
-        // TODO: Implement proper filter evaluation
-        break; // Only check first condition for simplicity
+
+      // Evaluate each filter condition
+      for (const FilterUnit *filter_unit : filter_stmt->filter_units()) {
+        Value left_value, right_value;
+
+        // Get left value
+        if (filter_unit->left().is_attr()) {
+          const Field &field = filter_unit->left().field;
+          const FieldMeta *field_meta = field.meta();
+          left_value.set_type(field_meta->type());
+          left_value.set_data(const_cast<char*>(record.data()) + field_meta->offset(), field_meta->len());
+        } else if (filter_unit->left().is_value()) {
+          left_value = filter_unit->left().value;
+        } else if (filter_unit->left().is_expr()) {
+          // For expression evaluation, we need a proper tuple
+          // For now, we'll skip expression evaluation in UPDATE
+          // This is a limitation that should be addressed in a complete implementation
+          LOG_WARN("Expression evaluation in UPDATE WHERE clause not fully implemented");
+          match = false;
+          break;
+        }
+
+        // Get right value
+        if (filter_unit->right().is_attr()) {
+          const Field &field = filter_unit->right().field;
+          const FieldMeta *field_meta = field.meta();
+          right_value.set_type(field_meta->type());
+          right_value.set_data(const_cast<char*>(record.data()) + field_meta->offset(), field_meta->len());
+        } else if (filter_unit->right().is_value()) {
+          right_value = filter_unit->right().value;
+        } else if (filter_unit->right().is_expr()) {
+          // For expression evaluation, we need a proper tuple
+          // For now, we'll skip expression evaluation in UPDATE
+          // This is a limitation that should be addressed in a complete implementation
+          LOG_WARN("Expression evaluation in UPDATE WHERE clause not fully implemented");
+          match = false;
+          break;
+        }
+
+        // Compare values based on operator
+        int cmp_result = left_value.compare(right_value);
+        bool condition_match = false;
+
+        switch (filter_unit->comp()) {
+          case EQUAL_TO:
+            condition_match = (cmp_result == 0);
+            break;
+          case LESS_THAN:
+            condition_match = (cmp_result < 0);
+            break;
+          case GREAT_THAN:
+            condition_match = (cmp_result > 0);
+            break;
+          case LESS_EQUAL:
+            condition_match = (cmp_result <= 0);
+            break;
+          case GREAT_EQUAL:
+            condition_match = (cmp_result >= 0);
+            break;
+          case NOT_EQUAL:
+            condition_match = (cmp_result != 0);
+            break;
+          case LIKE_OP:
+            if (left_value.attr_type() == AttrType::CHARS && right_value.attr_type() == AttrType::CHARS) {
+              condition_match = like_match(left_value.get_string().c_str(), right_value.get_string().c_str());
+            }
+            break;
+          case NOT_LIKE_OP:
+            if (left_value.attr_type() == AttrType::CHARS && right_value.attr_type() == AttrType::CHARS) {
+              condition_match = !like_match(left_value.get_string().c_str(), right_value.get_string().c_str());
+            }
+            break;
+          default:
+            condition_match = false;
+            break;
+        }
+
+        if (!condition_match) {
+          match = false;
+          break; // AND logic - if any condition fails, record doesn't match
+        }
       }
+
       if (match) {
         records_to_update.emplace_back(record);
       }

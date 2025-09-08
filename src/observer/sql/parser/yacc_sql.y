@@ -115,6 +115,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         JOIN
         INNER
         ON
+        NOT
         LIKE
         SET
         LOAD
@@ -471,6 +472,10 @@ value:
       $$ = new Value((float)$1);
       @$ = @1;
     }
+    |vector_literal {
+      $$ = $1;
+      @$ = @1;
+    }
     |SSS {
       char *tmp = common::substr($1,1,strlen($1)-2);
 
@@ -786,6 +791,7 @@ comp_op:
     | GE { $$ = GREAT_EQUAL; }
     | NE { $$ = NOT_EQUAL; }
     | LIKE { $$ = LIKE_OP; }
+    | NOT LIKE { $$ = NOT_LIKE_OP; }
     ;
 
 // your code here

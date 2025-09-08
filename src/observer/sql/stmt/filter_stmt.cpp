@@ -91,38 +91,52 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<st
 
   filter_unit = new FilterUnit;
 
-  if (condition.left_is_attr) {
-    Table           *table = nullptr;
-    const FieldMeta *field = nullptr;
-    rc                     = get_table_and_field(db, default_table, tables, condition.left_attr, table, field);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("cannot find attr");
-      return rc;
-    }
-    FilterObj filter_obj;
-    filter_obj.init_attr(Field(table, field));
-    filter_unit->set_left(filter_obj);
-  } else {
-    FilterObj filter_obj;
-    filter_obj.init_value(condition.left_value);
-    filter_unit->set_left(filter_obj);
-  }
+  // 如果有表达式，优先使用表达式
+  if (condition.left_expr != nullptr && condition.right_expr != nullptr) {
+    // 使用表达式比较
+    FilterObj left_filter_obj;
+    FilterObj right_filter_obj;
 
-  if (condition.right_is_attr) {
-    Table           *table = nullptr;
-    const FieldMeta *field = nullptr;
-    rc                     = get_table_and_field(db, default_table, tables, condition.right_attr, table, field);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("cannot find attr");
-      return rc;
-    }
-    FilterObj filter_obj;
-    filter_obj.init_attr(Field(table, field));
-    filter_unit->set_right(filter_obj);
+    left_filter_obj.init_expr(condition.left_expr.get());
+    right_filter_obj.init_expr(condition.right_expr.get());
+
+    filter_unit->set_left(left_filter_obj);
+    filter_unit->set_right(right_filter_obj);
   } else {
-    FilterObj filter_obj;
-    filter_obj.init_value(condition.right_value);
-    filter_unit->set_right(filter_obj);
+    // 使用传统的属性和值比较
+    if (condition.left_is_attr) {
+      Table           *table = nullptr;
+      const FieldMeta *field = nullptr;
+      rc                     = get_table_and_field(db, default_table, tables, condition.left_attr, table, field);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("cannot find attr");
+        return rc;
+      }
+      FilterObj filter_obj;
+      filter_obj.init_attr(Field(table, field));
+      filter_unit->set_left(filter_obj);
+    } else {
+      FilterObj filter_obj;
+      filter_obj.init_value(condition.left_value);
+      filter_unit->set_left(filter_obj);
+    }
+
+    if (condition.right_is_attr) {
+      Table           *table = nullptr;
+      const FieldMeta *field = nullptr;
+      rc                     = get_table_and_field(db, default_table, tables, condition.right_attr, table, field);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("cannot find attr");
+        return rc;
+      }
+      FilterObj filter_obj;
+      filter_obj.init_attr(Field(table, field));
+      filter_unit->set_right(filter_obj);
+    } else {
+      FilterObj filter_obj;
+      filter_obj.init_value(condition.right_value);
+      filter_unit->set_right(filter_obj);
+    }
   }
 
   filter_unit->set_comp(comp);

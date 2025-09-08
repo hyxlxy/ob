@@ -506,7 +506,15 @@ INSERT INTO classes VALUES (1, 'Math');
 SELECT students.name, classes.class_name FROM students, classes WHERE students.class_id = classes.id;
 ### 2025-09-08 11:18:26.074
 SELECT students.name, classes.class_name FROM students JOIN classes ON students.class_id = classes.id;
-### 2025-09-08 11:55:29.296
-CREATE TABLE date_table(id int, u_date date);
 ### 2025-09-08 11:57:37.186
 -- echo initialization
+### 2025-09-08 19:08:40.307
+CREATE TABLE date_table(id int, u_date date); INSERT INTO date_table VALUES (1,'2020-01-21'); INSERT INTO date_table VALUES (3,'2020-1-01'); SELECT * FROM date_table;
+### 2025-09-08 19:10:30.631
+CREATE TABLE date_table(id int, u_date date);
+### 2025-09-08 19:11:06.462
+CREATE TABLE like_table(id int, name char(30));
+### 2025-09-08 19:11:39.151
+CREATE TABLE TEST (ID INT, C1 VECTOR(3), C2 VECTOR(3));
+### 2025-09-08 19:11:39.197
+INSERT INTO TEST VALUES(1, '[1,1,1]', '[1,2,3]');

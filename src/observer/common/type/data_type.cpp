@@ -130,21 +130,32 @@ bool DateType::is_valid_date(int year, int month, int day)
 
 RC DateType::parse_date_string(const string &date_str, int &date_int)
 {
-  // 期望格式: YYYY-MM-DD
-  if (date_str.length() != 10) {
-    LOG_WARN("Invalid date format: %s, expected YYYY-MM-DD", date_str.c_str());
-    return RC::INVALID_ARGUMENT;
-  }
+  // 支持多种日期格式: YYYY-MM-DD, YYYY-M-DD, YYYY-MM-D, YYYY-M-D
+  size_t first_dash = date_str.find('-');
+  size_t second_dash = date_str.find('-', first_dash + 1);
 
-  if (date_str[4] != '-' || date_str[7] != '-') {
-    LOG_WARN("Invalid date format: %s, expected YYYY-MM-DD", date_str.c_str());
+  if (first_dash == string::npos || second_dash == string::npos) {
+    LOG_WARN("Invalid date format: %s, expected YYYY-MM-DD or similar", date_str.c_str());
     return RC::INVALID_ARGUMENT;
   }
 
   // 解析年、月、日
-  string year_str = date_str.substr(0, 4);
-  string month_str = date_str.substr(5, 2);
-  string day_str = date_str.substr(8, 2);
+  string year_str = date_str.substr(0, first_dash);
+  string month_str = date_str.substr(first_dash + 1, second_dash - first_dash - 1);
+  string day_str = date_str.substr(second_dash + 1);
+
+  // 验证年份长度必须是4位
+  if (year_str.length() != 4) {
+    LOG_WARN("Invalid year format: %s, expected 4 digits", year_str.c_str());
+    return RC::INVALID_ARGUMENT;
+  }
+
+  // 验证月份和日期长度（1-2位）
+  if (month_str.length() == 0 || month_str.length() > 2 ||
+      day_str.length() == 0 || day_str.length() > 2) {
+    LOG_WARN("Invalid month/day format in date: %s", date_str.c_str());
+    return RC::INVALID_ARGUMENT;
+  }
 
   int year, month, day;
   try {
