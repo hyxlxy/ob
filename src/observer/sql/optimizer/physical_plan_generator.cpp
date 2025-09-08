@@ -41,6 +41,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/group_by_physical_operator.h"
 #include "sql/operator/hash_group_by_physical_operator.h"
 #include "sql/operator/scalar_group_by_physical_operator.h"
+#include "sql/operator/sort_logical_operator.h"
+#include "sql/operator/sort_physical_operator.h"
 #include "sql/operator/table_scan_vec_physical_operator.h"
 #include "sql/optimizer/physical_plan_generator.h"
 
@@ -87,11 +89,43 @@ RC PhysicalPlanGenerator::create(LogicalOperator &logical_operator, unique_ptr<P
       return create_plan(static_cast<GroupByLogicalOperator &>(logical_operator), oper, session);
     } break;
 
+    case LogicalOperatorType::SORT: {
+      return create_plan(static_cast<SortLogicalOperator &>(logical_operator), oper, session);
+    } break;
+
     default: {
       ASSERT(false, "unknown logical operator type");
       return RC::INVALID_ARGUMENT;
     }
   }
+  return rc;
+}
+
+RC PhysicalPlanGenerator::create_plan(SortLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper, Session *session)
+{
+  RC rc = RC::SUCCESS;
+
+  vector<unique_ptr<Expression>> order_by_expressions;
+  for (auto &expr : logical_oper.order_by_expressions()) {
+    order_by_expressions.emplace_back(expr->copy());
+  }
+
+  auto sort_oper = make_unique<SortPhysicalOperator>(std::move(order_by_expressions),
+                                                     logical_oper.order_by_directions());
+
+  ASSERT(logical_oper.children().size() == 1, "sort operator should have 1 child");
+
+  LogicalOperator             &child_oper = *logical_oper.children().front();
+  unique_ptr<PhysicalOperator> child_physical_oper;
+  rc = create(child_oper, child_physical_oper, session);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to create child physical operator of sort operator. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  sort_oper->add_child(std::move(child_physical_oper));
+
+  oper = std::move(sort_oper);
   return rc;
 }
 

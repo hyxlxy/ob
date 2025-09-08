@@ -44,10 +44,16 @@ public:
 
   vector<unique_ptr<Expression>> &query_expressions() { return query_expressions_; }
   vector<unique_ptr<Expression>> &group_by() { return group_by_; }
+  Expression                     *having_expr() const { return having_expr_.get(); }
+  vector<unique_ptr<Expression>> &order_by_expressions() { return order_by_expressions_; }
+  vector<OrderDirection>         &order_by_directions() { return order_by_directions_; }
 
 private:
   vector<unique_ptr<Expression>> query_expressions_;
   vector<Table *>                tables_;
   FilterStmt                    *filter_stmt_ = nullptr;
   vector<unique_ptr<Expression>> group_by_;
+  unique_ptr<Expression>         having_expr_;
+  vector<unique_ptr<Expression>> order_by_expressions_;
+  vector<OrderDirection>         order_by_directions_;
 };

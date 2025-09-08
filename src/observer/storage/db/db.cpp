@@ -22,6 +22,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/os/path.h"
 #include "common/global_context.h"
 #include "storage/common/meta_util.h"
+#include <filesystem>
 #include "storage/table/table.h"
 #include "storage/table/table_meta.h"
 #include "storage/trx/trx.h"
@@ -174,6 +175,88 @@ RC Db::create_table(const char *table_name, span<const AttrInfoSqlNode> attribut
   opened_tables_[table_name] = table;
   LOG_INFO("Create table success. table name=%s, table_id:%d", table_name, table_id);
   return RC::SUCCESS;
+}
+
+RC Db::drop_table(const char *table_name)
+{
+  if (nullptr == table_name || common::is_blank(table_name)) {
+    LOG_WARN("Invalid table name");
+    return RC::INVALID_ARGUMENT;
+  }
+
+  // 检查表是否存在
+  auto iter = opened_tables_.find(table_name);
+  if (iter == opened_tables_.end()) {
+    LOG_WARN("Table not found: %s", table_name);
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+
+  Table *table = iter->second;
+
+  // 1. 从内存中移除表
+  opened_tables_.erase(iter);
+
+  // 2. 删除表对象（这会关闭相关的文件句柄）
+  delete table;
+
+  // 3. 删除表相关的所有文件
+  RC rc = RC::SUCCESS;
+
+  // 删除元数据文件
+  string meta_file = table_meta_file(path_.c_str(), table_name);
+  if (filesystem::exists(meta_file)) {
+    if (!filesystem::remove(meta_file)) {
+      LOG_ERROR("Failed to remove table meta file: %s", meta_file.c_str());
+      rc = RC::FILE_REMOVE;
+    } else {
+      LOG_INFO("Removed table meta file: %s", meta_file.c_str());
+    }
+  }
+
+  // 删除数据文件
+  string data_file = table_data_file(path_.c_str(), table_name);
+  if (filesystem::exists(data_file)) {
+    if (!filesystem::remove(data_file)) {
+      LOG_ERROR("Failed to remove table data file: %s", data_file.c_str());
+      rc = RC::FILE_REMOVE;
+    } else {
+      LOG_INFO("Removed table data file: %s", data_file.c_str());
+    }
+  }
+
+  // 删除索引文件（查找所有以table_name开头的.index文件）
+  try {
+    for (const auto& entry : filesystem::directory_iterator(path_)) {
+      if (entry.is_regular_file()) {
+        string filename = entry.path().filename().string();
+        string prefix = string(table_name) + "-";
+        string suffix = TABLE_INDEX_SUFFIX;
+
+        if (filename.length() > prefix.length() + suffix.length() &&
+            filename.substr(0, prefix.length()) == prefix &&
+            filename.substr(filename.length() - suffix.length()) == suffix) {
+
+          if (!filesystem::remove(entry.path())) {
+            LOG_ERROR("Failed to remove index file: %s", entry.path().c_str());
+            rc = RC::FILE_REMOVE;
+          } else {
+            LOG_INFO("Removed index file: %s", entry.path().c_str());
+          }
+        }
+      }
+    }
+  } catch (const filesystem::filesystem_error& ex) {
+    LOG_ERROR("Error while removing index files: %s", ex.what());
+    rc = RC::FILE_REMOVE;
+  }
+
+  if (rc == RC::SUCCESS) {
+    LOG_INFO("Successfully dropped table: %s", table_name);
+  } else {
+    LOG_ERROR("Failed to completely drop table: %s", table_name);
+  }
+
+  return rc;
 }
 
 Table *Db::find_table(const char *table_name) const

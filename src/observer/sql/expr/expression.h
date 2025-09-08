@@ -47,6 +47,7 @@ enum class ExprType
   CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
   ARITHMETIC,   ///< 算术运算
   AGGREGATION,  ///< 聚合运算
+  FUNCTION,     ///< 函数调用
 };
 
 /**
@@ -444,6 +445,37 @@ private:
   unique_ptr<Expression> right_;
 };
 
+/**
+ * @brief 函数表达式
+ * @ingroup Expression
+ * @details 支持各种内置函数，如向量距离函数等
+ */
+class FunctionExpr : public Expression
+{
+public:
+  FunctionExpr(const char *function_name, vector<unique_ptr<Expression>> args);
+  virtual ~FunctionExpr() = default;
+
+  unique_ptr<Expression> copy() const override;
+
+  ExprType type() const override { return ExprType::FUNCTION; }
+  AttrType value_type() const override;
+  int      value_length() const override { return 4; } // 大多数函数返回float
+
+  RC get_value(const Tuple &tuple, Value &value) const override;
+  RC try_get_value(Value &value) const override;
+
+  const char *function_name() const { return function_name_.c_str(); }
+  const vector<unique_ptr<Expression>> &args() const { return args_; }
+
+private:
+  RC try_get_value_with_args(const vector<Value> &arg_values, Value &value) const;
+
+private:
+  string                           function_name_;
+  vector<unique_ptr<Expression>>   args_;
+};
+
 class UnboundAggregateExpr : public Expression
 {
 public:
@@ -455,7 +487,11 @@ public:
 
   unique_ptr<Expression> copy() const override
   {
-    return make_unique<UnboundAggregateExpr>(aggregate_name_.c_str(), child_->copy());
+    if (child_) {
+      return make_unique<UnboundAggregateExpr>(aggregate_name_.c_str(), child_->copy());
+    } else {
+      return make_unique<UnboundAggregateExpr>(aggregate_name_.c_str(), nullptr);
+    }
   }
 
   const char *aggregate_name() const { return aggregate_name_.c_str(); }
@@ -463,7 +499,12 @@ public:
   unique_ptr<Expression> &child() { return child_; }
 
   RC       get_value(const Tuple &tuple, Value &value) const override { return RC::INTERNAL; }
-  AttrType value_type() const override { return child_->value_type(); }
+  AttrType value_type() const override {
+    if (child_) {
+      return child_->value_type();
+    }
+    return AttrType::INTS;
+  }
 
 private:
   string                 aggregate_name_;

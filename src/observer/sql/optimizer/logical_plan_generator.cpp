@@ -26,6 +26,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/project_logical_operator.h"
 #include "sql/operator/table_get_logical_operator.h"
 #include "sql/operator/group_by_logical_operator.h"
+#include "sql/operator/sort_logical_operator.h"
 
 #include "sql/stmt/calc_stmt.h"
 #include "sql/stmt/delete_stmt.h"
@@ -136,6 +137,29 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     }
 
     last_oper = &group_by_oper;
+
+    // HAVING: place predicate after group by
+    unique_ptr<LogicalOperator> having_oper;
+    if (select_stmt->having_expr() != nullptr) {
+      having_oper = make_unique<PredicateLogicalOperator>(select_stmt->having_expr()->copy());
+      having_oper->add_child(std::move(*last_oper));
+      last_oper = &having_oper;
+    }
+  }
+
+  // 创建ORDER BY算子（只有在有子算子的情况下才创建）
+  unique_ptr<LogicalOperator> sort_oper;
+  if (!select_stmt->order_by_expressions().empty() && *last_oper) {
+    vector<unique_ptr<Expression>> order_by_expressions;
+    for (auto &expr : select_stmt->order_by_expressions()) {
+      order_by_expressions.emplace_back(expr->copy());
+    }
+
+    sort_oper = make_unique<SortLogicalOperator>(std::move(order_by_expressions),
+                                                 select_stmt->order_by_directions());
+    sort_oper->add_child(std::move(*last_oper));
+
+    last_oper = &sort_oper;
   }
 
   auto project_oper = make_unique<ProjectLogicalOperator>(std::move(select_stmt->query_expressions()));

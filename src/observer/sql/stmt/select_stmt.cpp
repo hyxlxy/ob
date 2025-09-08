@@ -61,6 +61,25 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     table_map.insert({table_name, table});
   }
 
+  // collect tables in `join` statement
+  for (size_t i = 0; i < select_sql.joins.size(); i++) {
+    const char *table_name = select_sql.joins[i].table_name.c_str();
+    if (nullptr == table_name) {
+      LOG_WARN("invalid argument. join table name is null. index=%d", i);
+      return RC::INVALID_ARGUMENT;
+    }
+
+    Table *table = db->find_table(table_name);
+    if (nullptr == table) {
+      LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+      return RC::SCHEMA_TABLE_NOT_EXIST;
+    }
+
+    binder_context.add_table(table);
+    tables.push_back(table);
+    table_map.insert({table_name, table});
+  }
+
   // collect query fields in `select` statement
   vector<unique_ptr<Expression>> bound_expressions;
   ExpressionBinder expression_binder(binder_context);
@@ -82,9 +101,32 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     }
   }
 
+  // bind having expression with awareness of group by/aggregations (reuse binder)
+  unique_ptr<Expression> having_expr;
+  if (select_sql.having_expr) {
+    vector<unique_ptr<Expression>> temp_bound;
+    unique_ptr<Expression> expr_copy(select_sql.having_expr->copy());
+    RC rc = expression_binder.bind_expression(expr_copy, temp_bound);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to bind having expression. rc=%s", strrc(rc));
+      return rc;
+    }
+    if (!temp_bound.empty()) {
+      having_expr = std::move(temp_bound[0]);
+    }
+  }
+
   Table *default_table = nullptr;
   if (tables.size() == 1) {
     default_table = tables[0];
+  }
+
+  // merge join conditions with where conditions
+  vector<ConditionSqlNode> all_conditions = select_sql.conditions;
+  for (const auto &join : select_sql.joins) {
+    for (const auto &condition : join.conditions) {
+      all_conditions.push_back(condition);
+    }
   }
 
   // create filter statement in `where` statement
@@ -92,12 +134,32 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   RC          rc          = FilterStmt::create(db,
       default_table,
       &table_map,
-      select_sql.conditions.data(),
-      static_cast<int>(select_sql.conditions.size()),
+      all_conditions.data(),
+      static_cast<int>(all_conditions.size()),
       filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
     return rc;
+  }
+
+
+
+  // bind order by expressions
+  vector<unique_ptr<Expression>> order_by_expressions;
+  vector<OrderDirection>         order_by_directions;
+  for (const auto &order_by_item : select_sql.order_by) {
+    unique_ptr<Expression> order_by_expr = order_by_item.expression->copy();
+    vector<unique_ptr<Expression>> temp_bound_expressions;
+    rc = expression_binder.bind_expression(order_by_expr, temp_bound_expressions);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to bind order by expression. rc=%s", strrc(rc));
+      return rc;
+    }
+    // 通常bind_expression会产生一个表达式，我们取第一个
+    if (!temp_bound_expressions.empty()) {
+      order_by_expressions.emplace_back(std::move(temp_bound_expressions[0]));
+    }
+    order_by_directions.emplace_back(order_by_item.direction);
   }
 
   // everything alright
@@ -107,6 +169,9 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->query_expressions_.swap(bound_expressions);
   select_stmt->filter_stmt_ = filter_stmt;
   select_stmt->group_by_.swap(group_by_expressions);
+  select_stmt->having_expr_ = std::move(having_expr);
+  select_stmt->order_by_expressions_.swap(order_by_expressions);
+  select_stmt->order_by_directions_.swap(order_by_directions);
   stmt                      = select_stmt;
   return RC::SUCCESS;
 }

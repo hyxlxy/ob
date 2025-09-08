@@ -30,3 +30,29 @@ public:
 
   RC execute(SQLStageEvent *sql_event);
 };
+
+/**
+ * @brief 删除表的执行器
+ * @ingroup Executor
+ */
+class DropTableExecutor
+{
+public:
+  DropTableExecutor()          = default;
+  virtual ~DropTableExecutor() = default;
+
+  RC execute(SQLStageEvent *sql_event);
+};
+
+/**
+ * @brief 更新记录的执行器
+ * @ingroup Executor
+ */
+class UpdateExecutor
+{
+public:
+  UpdateExecutor()          = default;
+  virtual ~UpdateExecutor() = default;
+
+  RC execute(SQLStageEvent *sql_event);
+};

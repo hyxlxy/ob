@@ -23,3 +23,22 @@ RC DescTableStmt::create(Db *db, const DescTableSqlNode &desc_table, Stmt *&stmt
   stmt = new DescTableStmt(desc_table.relation_name);
   return RC::SUCCESS;
 }
+
+RC DropTableStmt::create(Db *db, const DropTableSqlNode &drop_table, Stmt *&stmt)
+{
+  const char *table_name = drop_table.relation_name.c_str();
+  if (nullptr == db || nullptr == table_name) {
+    LOG_WARN("invalid argument. db=%p, table_name=%p", db, table_name);
+    return RC::INVALID_ARGUMENT;
+  }
+
+  // check whether the table exists
+  Table *table = db->find_table(table_name);
+  if (nullptr == table) {
+    LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+
+  stmt = new DropTableStmt(drop_table.relation_name);
+  return RC::SUCCESS;
+}

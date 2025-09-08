@@ -1,0 +1,486 @@
+### 2025-09-03 21:58:00.957
+-- 测试DATE类型功能
+### 2025-09-03 21:58:00.961
+-- 创建包含DATE字段的表
+### 2025-09-03 21:58:00.961
+CREATE TABLE events (
+### 2025-09-03 21:58:00.962
+    event_date DATE
+### 2025-09-03 21:58:00.962
+INSERT INTO events VALUES (1, 'New Year', '2024-01-01');
+### 2025-09-03 21:58:00.963
+INSERT INTO events VALUES (2, 'Spring Festival', '2024-02-10');
+### 2025-09-03 21:58:00.963
+INSERT INTO events VALUES (3, 'Labor Day', '2024-05-01');
+### 2025-09-03 21:58:00.964
+INSERT INTO events VALUES (4, 'National Day', '2024-10-01');
+### 2025-09-03 21:58:00.965
+-- 查询数据
+### 2025-09-03 21:58:00.965
+SELECT * FROM events;
+### 2025-09-03 21:58:00.966
+-- 测试日期比较
+### 2025-09-03 21:58:00.966
+SELECT * FROM events WHERE event_date > '2024-03-01';
+### 2025-09-03 21:58:00.967
+-- 测试日期排序
+### 2025-09-03 21:58:00.967
+SELECT * FROM events ORDER BY event_date;
+### 2025-09-03 21:58:22.245
+CREATE TABLE test (id INT, birth_date DATE);
+### 2025-09-03 22:12:38.716
+-- 测试DROP TABLE功能
+### 2025-09-03 22:12:38.720
+CREATE TABLE test_table (
+### 2025-09-03 22:12:38.721
+    name CHAR(50),
+### 2025-09-03 22:12:38.722
+-- 插入一些数据
+### 2025-09-03 22:12:38.723
+INSERT INTO test_table VALUES (1, 'Alice', '1990-01-01');
+### 2025-09-03 22:12:38.724
+INSERT INTO test_table VALUES (2, 'Bob', '1985-05-15');
+### 2025-09-03 22:12:38.726
+-- 查看表内容
+### 2025-09-03 22:12:38.728
+-- 创建索引
+### 2025-09-03 22:12:38.728
+CREATE INDEX idx_name ON test_table(name);
+### 2025-09-03 22:12:38.729
+-- 删除表
+### 2025-09-03 22:12:38.729
+DROP TABLE test_table;
+### 2025-09-03 22:12:38.730
+-- 尝试查询已删除的表（应该失败）
+### 2025-09-03 22:12:38.730
+SELECT * FROM test_table;
+### 2025-09-03 22:12:49.703
+DROP TABLE test;
+### 2025-09-03 22:13:24.933
+CREATE TABLE test_drop (id INT, name CHAR(20));
+### 2025-09-03 22:24:40.203
+-- 测试UPDATE功能
+### 2025-09-03 22:24:40.210
+    birth_date DATE
+### 2025-09-03 22:24:40.212
+INSERT INTO students VALUES (1, 'Alice', 20, '2003-01-01');
+### 2025-09-03 22:24:40.212
+INSERT INTO students VALUES (2, 'Bob', 21, '2002-05-15');
+### 2025-09-03 22:24:40.213
+INSERT INTO students VALUES (3, 'Charlie', 19, '2004-12-10');
+### 2025-09-03 22:24:40.214
+-- 测试UPDATE语句（更新所有记录）
+### 2025-09-03 22:24:40.215
+UPDATE students SET age = 25;
+### 2025-09-03 22:24:40.217
+-- 测试UPDATE语句（更新字符串字段）
+### 2025-09-03 22:24:40.217
+UPDATE students SET name = 'Updated';
+### 2025-09-03 22:24:40.217
+-- 查看更新后的数据
+### 2025-09-03 22:24:53.612
+UPDATE test SET name = 'new';
+### 2025-09-03 22:49:24.500
+-- 测试LIKE功能
+### 2025-09-03 22:49:24.507
+-- 创建测试表
+### 2025-09-03 22:49:24.507
+CREATE TABLE users (
+### 2025-09-03 22:49:24.509
+    email CHAR(50)
+### 2025-09-03 22:49:24.509
+-- 插入测试数据
+### 2025-09-03 22:49:24.510
+INSERT INTO users VALUES (1, 'Alice', 'alice@example.com');
+### 2025-09-03 22:49:24.510
+INSERT INTO users VALUES (2, 'Bob', 'bob@test.org');
+### 2025-09-03 22:49:24.511
+INSERT INTO users VALUES (3, 'Charlie', 'charlie@example.com');
+### 2025-09-03 22:49:24.511
+INSERT INTO users VALUES (4, 'David', 'david@company.net');
+### 2025-09-03 22:49:24.512
+INSERT INTO users VALUES (5, 'Eve', 'eve@test.org');
+### 2025-09-03 22:49:24.512
+-- 查看所有数据
+### 2025-09-03 22:49:24.513
+SELECT * FROM users;
+### 2025-09-03 22:49:24.513
+-- 测试LIKE操作 - 以'A'开头的名字
+### 2025-09-03 22:49:24.514
+-- 测试LIKE操作 - 包含'li'的名字
+### 2025-09-03 22:49:24.514
+SELECT * FROM users WHERE name LIKE '%li%';
+### 2025-09-03 22:49:24.514
+-- 测试LIKE操作 - 以'e'结尾的名字
+### 2025-09-03 22:49:24.515
+SELECT * FROM users WHERE name LIKE '%e';
+### 2025-09-03 22:49:24.515
+-- 测试LIKE操作 - 单字符通配符
+### 2025-09-03 22:49:24.515
+SELECT * FROM users WHERE name LIKE '_ob';
+### 2025-09-03 22:49:24.516
+-- 测试LIKE操作 - email域名匹配
+### 2025-09-03 22:49:24.516
+SELECT * FROM users WHERE email LIKE '%@example.com';
+### 2025-09-03 22:49:24.516
+-- 测试LIKE操作 - 复杂模式
+### 2025-09-03 22:49:24.517
+SELECT * FROM users WHERE email LIKE '%@%.org';
+### 2025-09-03 22:50:03.959
+SELECT * FROM test WHERE name LIKE 'A%';
+### 2025-09-03 22:50:11.536
+CREATE TABLE users (id INT, name CHAR(10));
+### 2025-09-03 22:50:11.565
+INSERT INTO users VALUES (1, 'Alice');
+### 2025-09-03 22:50:11.567
+INSERT INTO users VALUES (2, 'Bob');
+### 2025-09-03 22:50:11.568
+SELECT * FROM users WHERE name LIKE 'A%';
+### 2025-09-04 07:21:56.665
+CREATE TABLE test (id INT, value INT);
+### 2025-09-04 07:25:12.030
+-- 测试表达式功能
+### 2025-09-04 07:25:12.034
+-- 1. 测试基本算术表达式
+### 2025-09-04 07:25:12.034
+SELECT 1 + 2;
+### 2025-09-04 07:25:12.035
+SELECT 10 - 3;
+### 2025-09-04 07:25:12.036
+SELECT 4 * 5;
+### 2025-09-04 07:25:12.036
+SELECT 20 / 4;
+### 2025-09-04 07:25:12.037
+SELECT -5;
+### 2025-09-04 07:25:12.037
+-- 2. 测试复杂表达式
+### 2025-09-04 07:25:12.038
+SELECT 1 + 2 * 3;
+### 2025-09-04 07:25:12.038
+SELECT (1 + 2) * 3;
+### 2025-09-04 07:25:12.039
+SELECT 10 / 2 + 3 * 4;
+### 2025-09-04 07:25:12.040
+-- 3. 测试浮点数表达式
+### 2025-09-04 07:25:12.040
+SELECT 3.14 * 2;
+### 2025-09-04 07:25:12.041
+SELECT 10.5 / 2.5;
+### 2025-09-04 07:25:12.041
+-- 4. 测试多个表达式
+### 2025-09-04 07:25:12.041
+SELECT 1 + 1, 2 * 3, 10 / 2;
+### 2025-09-04 07:25:12.042
+-- 5. 测试CALC语句
+### 2025-09-04 07:25:12.042
+CALC 1 + 2 * 3;
+### 2025-09-04 07:25:12.043
+CALC (10 + 5) / 3;
+### 2025-09-04 07:25:12.043
+CALC -7 + 3;
+### 2025-09-04 07:25:12.044
+-- 6. 测试表中的表达式
+### 2025-09-04 07:25:12.044
+CREATE TABLE numbers (a INT, b INT, c FLOAT);
+### 2025-09-04 07:25:12.078
+INSERT INTO numbers VALUES (10, 5, 3.14);
+### 2025-09-04 07:25:12.080
+INSERT INTO numbers VALUES (20, 8, 2.71);
+### 2025-09-04 07:25:12.081
+SELECT * FROM numbers;
+### 2025-09-04 07:25:12.083
+-- 测试表字段的表达式
+### 2025-09-04 07:25:12.083
+SELECT a, b, a + b FROM numbers;
+### 2025-09-04 07:25:12.085
+SELECT a, b, a - b, a * b, a / b FROM numbers;
+### 2025-09-04 07:25:12.087
+SELECT a, c, a * c FROM numbers;
+### 2025-09-04 07:56:23.125
+-- 测试向量基础功能
+### 2025-09-04 07:56:23.131
+-- 1. 测试创建包含向量类型的表
+### 2025-09-04 07:56:23.131
+CREATE TABLE vectors (
+### 2025-09-04 07:56:23.132
+    embedding VECTOR(3)
+### 2025-09-04 07:56:23.133
+DESC vectors;
+### 2025-09-04 07:56:23.133
+-- 2. 测试插入向量数据
+### 2025-09-04 07:56:23.134
+INSERT INTO vectors VALUES (1, 'vec1', '[1.0, 2.0, 3.0]');
+### 2025-09-04 07:56:23.135
+INSERT INTO vectors VALUES (2, 'vec2', '[4.0, 5.0, 6.0]');
+### 2025-09-04 07:56:23.135
+INSERT INTO vectors VALUES (3, 'vec3', '[1.5, 2.5, 3.5]');
+### 2025-09-04 07:56:23.137
+SELECT * FROM vectors;
+### 2025-09-04 07:56:23.137
+-- 3. 测试向量算术运算（如果支持）
+### 2025-09-04 07:56:23.137
+-- SELECT id, name, embedding + embedding FROM vectors;
+### 2025-09-04 07:56:23.138
+-- 4. 测试向量距离函数（如果支持）
+### 2025-09-04 07:56:23.138
+-- SELECT L2_DISTANCE('[1.0, 2.0, 3.0]', '[4.0, 5.0, 6.0]');
+### 2025-09-04 07:58:37.123
+CREATE TABLE test (id INT, vec VECTOR(3));
+### 2025-09-04 07:59:18.698
+CREATE TABLE test (id INT, name CHAR(10));
+### 2025-09-04 07:59:52.442
+SHOW TABLES;
+### 2025-09-04 08:10:30.192
+CREATE TABLE simple_test (id INT);
+### 2025-09-04 08:11:00.921
+CREATE TABLE vector_test (id INT, vec VECTOR(3));
+### 2025-09-04 08:11:26.534
+INSERT INTO vector_test VALUES (1, '[1.0, 2.0, 3.0]');
+### 2025-09-04 08:18:31.190
+SELECT [1.0, 2.0, 3.0];
+### 2025-09-04 08:19:01.468
+SELECT * FROM vector_test;
+### 2025-09-04 08:23:28.298
+-- 测试高维向量功能
+### 2025-09-04 08:23:28.302
+-- 1. 测试创建高维向量表
+### 2025-09-04 08:23:28.302
+CREATE TABLE high_dim_vectors (
+### 2025-09-04 08:23:28.303
+    embedding VECTOR(1000)
+### 2025-09-04 08:23:28.304
+-- 查看表结构
+### 2025-09-04 08:23:28.304
+DESC high_dim_vectors;
+### 2025-09-04 08:23:28.305
+-- 2. 测试插入中等维度向量（100维）
+### 2025-09-04 08:23:28.305
+INSERT INTO high_dim_vectors VALUES (1, 'vec100', '[1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0,11.0,12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0,20.0,21.0,22.0,23.0,24.0,25.0,26.0,27.0,28.0,29.0,30.0,31.0,32.0,33.0,34.0,35.0,36.0,37.0,38.0,39.0,40.0,41.0,42.0,43.0,44.0,45.0,46.0,47.0,48.0,49.0,50.0,51.0,52.0,53.0,54.0,55.0,56.0,57.0,58.0,59.0,60.0,61.0,62.0,63.0,64.0,65.0,66.0,67.0,68.0,69.0,70.0,71.0,72.0,73.0,74.0,75.0,76.0,77.0,78.0,79.0,80.0,81.0,82.0,83.0,84.0,85.0,86.0,87.0,88.0,89.0,90.0,91.0,92.0,93.0,94.0,95.0,96.0,97.0,98.0,99.0,100.0]');
+### 2025-09-04 08:23:28.306
+-- 3. 测试插入小维度向量
+### 2025-09-04 08:23:28.306
+INSERT INTO high_dim_vectors VALUES (2, 'vec3', '[1.0, 2.0, 3.0]');
+### 2025-09-04 08:23:28.306
+-- 查看插入的数据
+### 2025-09-04 08:23:28.307
+SELECT id, name FROM high_dim_vectors;
+### 2025-09-04 08:23:28.308
+-- 4. 测试向量比较（基本功能验证）
+### 2025-09-04 08:23:28.308
+SELECT * FROM high_dim_vectors WHERE id = 1;
+### 2025-09-04 08:23:39.926
+CREATE TABLE test_high_dim (id INT, vec VECTOR(5000));
+### 2025-09-04 08:24:10.027
+CREATE TABLE test_max_dim (id INT, vec VECTOR(16000));
+### 2025-09-04 08:24:38.956
+CREATE TABLE test_over_limit (id INT, vec VECTOR(20000));
+### 2025-09-04 08:58:44.602
+-- 测试ORDER BY功能
+### 2025-09-04 08:58:44.608
+-- 1. 创建数据库和表
+### 2025-09-04 08:58:44.610
+-- 2. 插入测试数据
+### 2025-09-04 08:58:44.612
+-- 3. 查看原始数据
+### 2025-09-04 08:58:44.613
+-- 4. 测试基本ORDER BY（升序）
+### 2025-09-04 08:58:44.613
+SELECT * FROM students ORDER BY age;
+### 2025-09-04 08:58:44.614
+-- 5. 测试ORDER BY ASC（显式升序）
+### 2025-09-04 08:58:44.614
+SELECT * FROM students ORDER BY score ASC;
+### 2025-09-04 08:58:44.614
+-- 6. 测试ORDER BY DESC（降序）
+### 2025-09-04 08:58:44.614
+SELECT * FROM students ORDER BY score DESC;
+### 2025-09-04 08:58:44.615
+-- 7. 测试多字段排序
+### 2025-09-04 08:58:44.615
+SELECT * FROM students ORDER BY age, score DESC;
+### 2025-09-04 08:58:44.616
+-- 8. 测试ORDER BY与投影结合
+### 2025-09-04 08:58:44.617
+SELECT name, score FROM students ORDER BY score DESC;
+### 2025-09-04 09:00:21.098
+SELECT 1 ORDER BY 1;
+### 2025-09-04 09:01:52.794
+SELECT 1;
+### 2025-09-04 09:02:30.806
+-- 简单的ORDER BY测试
+### 2025-09-04 09:02:30.816
+CREATE TABLE test (
+### 2025-09-04 09:02:30.817
+    name CHAR(10)
+### 2025-09-04 09:02:30.818
+INSERT INTO test VALUES (3, 'Charlie');
+### 2025-09-04 09:02:30.820
+INSERT INTO test VALUES (1, 'Alice');
+### 2025-09-04 09:02:30.822
+INSERT INTO test VALUES (2, 'Bob');
+### 2025-09-04 09:02:30.829
+SELECT * FROM test ORDER BY name;
+### 2025-09-04 09:09:06.700
+SELECT * FROM test;
+### 2025-09-04 09:10:22.606
+SELECT * FROM test ORDER;
+### 2025-09-04 09:13:32.577
+SELECT * FROM test ORDER BY id;
+### 2025-09-04 09:26:50.505
+SELECT COUNT(*) FROM test;
+### 2025-09-04 09:27:22.215
+-- 测试聚合函数
+### 2025-09-04 09:27:22.223
+    age INT,
+### 2025-09-04 09:27:22.223
+    score FLOAT
+### 2025-09-04 09:27:22.223
+INSERT INTO students VALUES (1, 'Alice', 20, 85.5);
+### 2025-09-04 09:27:22.224
+INSERT INTO students VALUES (2, 'Bob', 22, 78.0);
+### 2025-09-04 09:27:22.225
+INSERT INTO students VALUES (3, 'Charlie', 19, 92.5);
+### 2025-09-04 09:27:22.225
+INSERT INTO students VALUES (4, 'David', 21, 88.0);
+### 2025-09-04 09:27:22.226
+INSERT INTO students VALUES (5, 'Eve', 20, 95.0);
+### 2025-09-04 09:27:22.227
+-- 测试COUNT(*)
+### 2025-09-04 09:27:22.227
+SELECT COUNT(*) FROM students;
+### 2025-09-04 09:27:22.228
+-- 测试COUNT(column)
+### 2025-09-04 09:27:22.228
+SELECT COUNT(age) FROM students;
+### 2025-09-04 09:27:22.228
+-- 测试SUM
+### 2025-09-04 09:27:22.228
+SELECT SUM(score) FROM students;
+### 2025-09-04 09:27:22.229
+-- 测试AVG
+### 2025-09-04 09:27:22.229
+SELECT AVG(score) FROM students;
+### 2025-09-04 09:27:22.230
+-- 测试MAX
+### 2025-09-04 09:27:22.230
+SELECT MAX(score) FROM students;
+### 2025-09-04 09:27:22.230
+-- 测试MIN
+### 2025-09-04 09:27:22.231
+SELECT MIN(score) FROM students;
+### 2025-09-04 09:27:34.598
+SELECT SUM(id) FROM test;
+### 2025-09-04 09:28:09.899
+SELECT MAX(id) FROM test;
+### 2025-09-04 09:28:42.201
+SELECT MIN(id) FROM test;
+### 2025-09-04 09:33:50.633
+SELECT AVG(id) FROM test;
+### 2025-09-04 09:38:19.964
+SELECT id, COUNT(*) FROM test GROUP BY id;
+### 2025-09-04 09:38:55.680
+SELECT id, SUM(id), AVG(id) FROM test GROUP BY id;
+### 2025-09-04 09:47:08.714
+SELECT id, COUNT(*) FROM test GROUP BY id HAVING COUNT(*) > 1;
+### 2025-09-04 10:00:13.044
+-- 测试JOIN功能
+### 2025-09-04 10:00:13.051
+CREATE DATABASE test_db;
+### 2025-09-04 10:00:13.052
+-- 创建学生表
+### 2025-09-04 10:00:13.053
+CREATE TABLE students (
+### 2025-09-04 10:00:13.054
+    name CHAR(20),
+### 2025-09-04 10:00:13.054
+    class_id INT
+### 2025-09-04 10:00:13.055
+-- 创建班级表
+### 2025-09-04 10:00:13.056
+CREATE TABLE classes (
+### 2025-09-04 10:00:13.056
+    id INT,
+### 2025-09-04 10:00:13.057
+    class_name CHAR(20)
+### 2025-09-04 10:00:13.057
+);
+### 2025-09-04 10:00:13.058
+-- 插入学生数据
+### 2025-09-04 10:00:13.064
+-- 插入班级数据
+### 2025-09-04 10:00:13.067
+-- 查看原始数据
+### 2025-09-04 10:00:13.067
+SELECT * FROM students;
+### 2025-09-04 10:00:13.068
+SELECT * FROM classes;
+### 2025-09-04 10:00:13.069
+-- 测试INNER JOIN
+### 2025-09-04 10:00:13.071
+INNER JOIN classes ON students.class_id = classes.id;
+### 2025-09-04 10:00:13.072
+-- 测试简化的JOIN语法
+### 2025-09-04 10:00:13.072
+SELECT students.name, classes.class_name 
+### 2025-09-04 10:00:13.073
+FROM students 
+### 2025-09-04 10:00:13.074
+JOIN classes ON students.class_id = classes.id;
+### 2025-09-04 10:00:13.074
+EXIT;
+### 2025-09-04 10:00:27.468
+SELECT * FROM students JOIN classes ON students.id = classes.id;
+### 2025-09-04 10:14:51.061
+SELECT COUNT(*), SUM(id), AVG(id) FROM test;
+### 2025-09-04 10:17:07.112
+SELECT s.name, c.class_name FROM students s JOIN classes c ON s.class_id = c.id;
+### 2025-09-04 10:24:01.060
+USE test_db;
+### 2025-09-04 10:24:58.922
+-- setup in default DB
+### 2025-09-04 10:24:58.936
+DROP TABLE students;
+### 2025-09-04 10:24:58.937
+DROP TABLE classes;
+### 2025-09-04 10:24:58.994
+-- Comma style join
+### 2025-09-04 10:24:59.002
+-- Explicit JOIN without alias
+### 2025-09-04 10:28:58.007
+DROP TABLE IF EXISTS students;
+### 2025-09-04 10:28:58.015
+DROP TABLE IF EXISTS classes;
+### 2025-09-04 10:28:58.016
+CREATE TABLE students (id INT, name CHAR(20), class_id INT);
+### 2025-09-04 10:28:58.017
+CREATE TABLE classes (id INT, class_name CHAR(20));
+### 2025-09-04 10:28:58.018
+INSERT INTO students VALUES (1, 'Alice', 1);
+### 2025-09-04 10:28:58.022
+INSERT INTO students VALUES (2, 'Bob', 1);
+### 2025-09-04 10:28:58.024
+INSERT INTO students VALUES (3, 'Charlie', 2);
+### 2025-09-04 10:28:58.027
+INSERT INTO students VALUES (4, 'David', 2);
+### 2025-09-04 10:28:58.028
+INSERT INTO classes VALUES (1, 'Math');
+### 2025-09-04 10:28:58.031
+INSERT INTO classes VALUES (2, 'Science');
+### 2025-09-04 10:28:58.032
+SELECT students.name, classes.class_name FROM students, classes WHERE students.class_id = classes.id;
+### 2025-09-04 10:28:58.040
+SELECT students.name, classes.class_name FROM students JOIN classes ON students.class_id = classes.id;
+### 2025-09-04 10:54:39.401
+DROP TABLE IF EXISTS scores;
+### 2025-09-04 10:54:39.410
+CREATE TABLE scores (cls CHAR(8), uid INT, score INT);
+### 2025-09-04 10:54:39.426
+INSERT INTO scores VALUES ('A',1,80),('A',2,88),('A',3,92),('B',4,60),('B',5,61),('B',6,78);
+### 2025-09-04 10:54:39.430
+-- group by only
+### 2025-09-04 10:54:39.430
+SELECT cls, COUNT(*), SUM(score), AVG(score) FROM scores GROUP BY cls;
+### 2025-09-04 10:54:39.434
+-- having on aggregate
+### 2025-09-04 10:54:39.434
+SELECT cls, COUNT(*) FROM scores GROUP BY cls HAVING COUNT(*) > 2;

@@ -34,3 +34,75 @@ RC SumAggregator::evaluate(Value& result)
   result = value_;
   return RC::SUCCESS;
 }
+
+RC CountAggregator::accumulate(const Value &value)
+{
+  int count = value_.get_int();
+  count++;
+  value_.set_int(count);
+  return RC::SUCCESS;
+}
+
+RC CountAggregator::evaluate(Value& result)
+{
+  result = value_;
+  return RC::SUCCESS;
+}
+
+RC MaxAggregator::accumulate(const Value &value)
+{
+  if (first_) {
+    value_ = value;
+    first_ = false;
+  } else {
+    if (value.compare(value_) > 0) {
+      value_ = value;
+    }
+  }
+  return RC::SUCCESS;
+}
+
+RC MaxAggregator::evaluate(Value& result)
+{
+  result = value_;
+  return RC::SUCCESS;
+}
+
+RC MinAggregator::accumulate(const Value &value)
+{
+  if (first_) {
+    value_ = value;
+    first_ = false;
+  } else {
+    if (value.compare(value_) < 0) {
+      value_ = value;
+    }
+  }
+  return RC::SUCCESS;
+}
+
+RC MinAggregator::evaluate(Value& result)
+{
+  result = value_;
+  return RC::SUCCESS;
+}
+
+RC AvgAggregator::accumulate(const Value &value)
+{
+  Value::add(value, sum_, sum_);
+  count_++;
+  return RC::SUCCESS;
+}
+
+RC AvgAggregator::evaluate(Value& result)
+{
+  if (count_ == 0) {
+    result.set_float(0.0f);
+  } else {
+    // 直接计算平均值，避免使用Value::divide
+    float sum_val = sum_.get_float();
+    float avg_val = sum_val / count_;
+    result.set_float(avg_val);
+  }
+  return RC::SUCCESS;
+}

@@ -51,7 +51,29 @@ enum CompOp
   LESS_THAN,    ///< "<"
   GREAT_EQUAL,  ///< ">="
   GREAT_THAN,   ///< ">"
+  LIKE_OP,      ///< "LIKE"
   NO_OP
+};
+
+/**
+ * @brief 描述排序方向
+ * @ingroup SQLParser
+ */
+enum OrderDirection
+{
+  ASC_ORDER,    ///< 升序
+  DESC_ORDER    ///< 降序
+};
+
+/**
+ * @brief 表示一个排序项
+ * @ingroup SQLParser
+ * @details 排序项包含排序表达式和排序方向
+ */
+struct OrderBySqlNode
+{
+  unique_ptr<Expression> expression;  ///< 排序表达式
+  OrderDirection         direction;   ///< 排序方向
 };
 
 /**
@@ -76,6 +98,27 @@ struct ConditionSqlNode
 };
 
 /**
+ * @brief 表示JOIN类型
+ * @ingroup SQLParser
+ */
+enum JoinType
+{
+  INNER_JOIN    ///< 内连接
+};
+
+/**
+ * @brief 表示一个JOIN操作
+ * @ingroup SQLParser
+ * @details JOIN操作包含连接的表和连接条件
+ */
+struct JoinSqlNode
+{
+  string                     table_name;   ///< 要连接的表名
+  JoinType                   join_type;    ///< 连接类型
+  vector<ConditionSqlNode>   conditions;   ///< 连接条件
+};
+
+/**
  * @brief 描述一个select语句
  * @ingroup SQLParser
  * @details 一个正常的select语句描述起来比这个要复杂很多，这里做了简化。
@@ -90,8 +133,11 @@ struct SelectSqlNode
 {
   vector<unique_ptr<Expression>> expressions;  ///< 查询的表达式
   vector<string>                 relations;    ///< 查询的表
+  vector<JoinSqlNode>            joins;        ///< join操作
   vector<ConditionSqlNode>       conditions;   ///< 查询条件，使用AND串联起来多个条件
   vector<unique_ptr<Expression>> group_by;     ///< group by clause
+  unique_ptr<Expression>         having_expr;  ///< having clause (expression)
+  vector<OrderBySqlNode>         order_by;     ///< order by clause
 };
 
 /**

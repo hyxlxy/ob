@@ -34,7 +34,8 @@ Value::Value(const Value &other)
   this->length_    = other.length_;
   this->own_data_  = other.own_data_;
   switch (this->attr_type_) {
-    case AttrType::CHARS: {
+    case AttrType::CHARS:
+    case AttrType::VECTORS: {
       set_string_from_other(other);
     } break;
 
@@ -64,7 +65,8 @@ Value &Value::operator=(const Value &other)
   this->length_    = other.length_;
   this->own_data_  = other.own_data_;
   switch (this->attr_type_) {
-    case AttrType::CHARS: {
+    case AttrType::CHARS:
+    case AttrType::VECTORS: {
       set_string_from_other(other);
     } break;
 
@@ -94,6 +96,7 @@ void Value::reset()
 {
   switch (attr_type_) {
     case AttrType::CHARS:
+    case AttrType::VECTORS:
       if (own_data_ && value_.pointer_value_ != nullptr) {
         delete[] value_.pointer_value_;
         value_.pointer_value_ = nullptr;
@@ -125,6 +128,16 @@ void Value::set_data(char *data, int length)
       value_.bool_value_ = *(int *)data != 0;
       length_            = length;
     } break;
+    case AttrType::DATES: {
+      value_.int_value_ = *(int *)data;
+      length_           = length;
+    } break;
+    case AttrType::VECTORS: {
+      own_data_ = true;
+      value_.pointer_value_ = new char[length];
+      memcpy(value_.pointer_value_, data, length);
+      length_ = length;
+    } break;
     default: {
       LOG_WARN("unknown data type: %d", attr_type_);
     } break;
@@ -152,6 +165,14 @@ void Value::set_boolean(bool val)
   attr_type_         = AttrType::BOOLEANS;
   value_.bool_value_ = val;
   length_            = sizeof(val);
+}
+
+void Value::set_date(int val)
+{
+  reset();
+  attr_type_        = AttrType::DATES;
+  value_.int_value_ = val;
+  length_           = sizeof(val);
 }
 
 void Value::set_string(const char *s, int len /*= 0*/)
@@ -189,6 +210,17 @@ void Value::set_value(const Value &value)
     } break;
     case AttrType::BOOLEANS: {
       set_boolean(value.get_boolean());
+    } break;
+    case AttrType::DATES: {
+      set_date(value.get_date());
+    } break;
+    case AttrType::VECTORS: {
+      reset();
+      attr_type_ = AttrType::VECTORS;
+      own_data_ = true;
+      length_ = value.length_;
+      value_.pointer_value_ = new char[length_];
+      memcpy(value_.pointer_value_, value.data(), length_);
     } break;
     default: {
       ASSERT(false, "got an invalid value type");
@@ -288,6 +320,19 @@ float Value::get_float() const
 }
 
 string Value::get_string() const { return this->to_string(); }
+
+int Value::get_date() const
+{
+  switch (attr_type_) {
+    case AttrType::DATES: {
+      return value_.int_value_;
+    } break;
+    default: {
+      LOG_WARN("cannot convert from %s to date", attr_type_to_string(attr_type_));
+      return 0;
+    }
+  }
+}
 
 bool Value::get_boolean() const
 {

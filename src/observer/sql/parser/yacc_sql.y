@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <vector>
+#include <string>
 
 #include "common/log/log.h"
 #include "common/lang/string.h"
@@ -11,6 +13,7 @@
 #include "sql/parser/yacc_sql.hpp"
 #include "sql/parser/lex_sql.h"
 #include "sql/expr/expression.h"
+#include "common/type/vector_type.h"
 
 using namespace std;
 
@@ -68,6 +71,14 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         CREATE
         DROP
         GROUP
+        HAVING
+        ORDER
+        ASC
+        COUNT
+        SUM
+        MAX
+        MIN
+        AVG
         TABLE
         TABLES
         INDEX
@@ -81,6 +92,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         UPDATE
         LBRACE
         RBRACE
+        LSQUARE
+        RSQUARE
         COMMA
         TRX_BEGIN
         TRX_COMMIT
@@ -88,6 +101,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         INT_T
         STRING_T
         FLOAT_T
+        DATE_T
         VECTOR_T
         HELP
         EXIT
@@ -97,8 +111,11 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         FROM
         WHERE
         AND
-        SET
+        JOIN
+        INNER
         ON
+        LIKE
+        SET
         LOAD
         DATA
         INFILE
@@ -134,6 +151,11 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   char *                                     cstring;
   int                                        number;
   float                                      floats;
+  vector<float> *                            float_list;
+  vector<OrderBySqlNode> *                   order_by_list;
+  OrderBySqlNode *                           order_by_item;
+  vector<JoinSqlNode> *                      join_list;
+  JoinSqlNode *                              join_item;
 }
 
 %token <number> NUMBER
@@ -160,8 +182,17 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <key_list>            attr_list
 %type <relation_list>       rel_list
 %type <expression>          expression
+%type <expression>          aggregate_expr
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
+%type <expression>          having
+%type <order_by_list>       order_by
+%type <order_by_list>       order_by_item_list
+%type <order_by_item>       order_by_item
+%type <join_list>           join_list
+%type <join_item>           join_item
+%type <value>               vector_literal
+%type <float_list>          number_list
 %type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
 %type <sql_node>            insert_stmt
@@ -370,6 +401,7 @@ type:
     INT_T      { $$ = static_cast<int>(AttrType::INTS); }
     | STRING_T { $$ = static_cast<int>(AttrType::CHARS); }
     | FLOAT_T  { $$ = static_cast<int>(AttrType::FLOATS); }
+    | DATE_T   { $$ = static_cast<int>(AttrType::DATES); }
     | VECTOR_T { $$ = static_cast<int>(AttrType::VECTORS); }
     ;
 primary_key:
@@ -480,7 +512,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_list where group_by
+    SELECT expression_list FROM rel_list join_list where group_by having order_by
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -494,13 +526,40 @@ select_stmt:        /*  select 语句的语法解析树*/
       }
 
       if ($5 != nullptr) {
-        $$->selection.conditions.swap(*$5);
+        $$->selection.joins.swap(*$5);
         delete $5;
       }
 
       if ($6 != nullptr) {
-        $$->selection.group_by.swap(*$6);
+        $$->selection.conditions.swap(*$6);
         delete $6;
+      }
+
+      if ($7 != nullptr) {
+        $$->selection.group_by.swap(*$7);
+        delete $7;
+      }
+
+      if ($8 != nullptr) {
+        $$->selection.having_expr.reset($8);
+      }
+
+      if ($9 != nullptr) {
+        $$->selection.order_by.swap(*$9);
+        delete $9;
+      }
+    }
+    | SELECT expression_list order_by
+    {
+      $$ = new ParsedSqlNode(SCF_SELECT);
+      if ($2 != nullptr) {
+        $$->selection.expressions.swap(*$2);
+        delete $2;
+      }
+
+      if ($3 != nullptr) {
+        $$->selection.order_by.swap(*$3);
+        delete $3;
       }
     }
     ;
@@ -554,6 +613,11 @@ expression:
       $$->set_name(token_name(sql_string, &@$));
       delete $1;
     }
+    | vector_literal {
+      $$ = new ValueExpr(*$1);
+      $$->set_name(token_name(sql_string, &@$));
+      delete $1;
+    }
     | rel_attr {
       RelAttrSqlNode *node = $1;
       $$ = new UnboundFieldExpr(node->relation_name, node->attribute_name);
@@ -562,6 +626,9 @@ expression:
     }
     | '*' {
       $$ = new StarExpr();
+    }
+    | aggregate_expr {
+      $$ = $1;
     }
     // your code here
     ;
@@ -682,6 +749,7 @@ comp_op:
     | LE { $$ = LESS_EQUAL; }
     | GE { $$ = GREAT_EQUAL; }
     | NE { $$ = NOT_EQUAL; }
+    | LIKE { $$ = LIKE_OP; }
     ;
 
 // your code here
@@ -689,6 +757,21 @@ group_by:
     /* empty */
     {
       $$ = nullptr;
+    }
+    | GROUP BY expression_list
+    {
+      $$ = $3;
+    }
+    ;
+
+having:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | HAVING expression
+    {
+      $$ = $2;
     }
     ;
 load_data_stmt:
@@ -718,6 +801,159 @@ set_variable_stmt:
       $$->set_variable.name  = $2;
       $$->set_variable.value = *$4;
       delete $4;
+    }
+    ;
+
+vector_literal:
+    LSQUARE number_list RSQUARE {
+      $$ = new Value();
+
+      // 将number_list转换为向量字符串格式
+      std::string vector_str = "[";
+      if ($2 != nullptr) {
+        for (size_t i = 0; i < $2->size(); i++) {
+          if (i > 0) vector_str += ",";
+          vector_str += std::to_string((*$2)[i]);
+        }
+        delete $2;
+      }
+      vector_str += "]";
+
+      // 使用VectorType解析向量字符串
+      VectorType vector_type;
+      RC rc = vector_type.set_value_from_str(*$$, vector_str);
+      if (rc != RC::SUCCESS) {
+        delete $$;
+        $$ = nullptr;
+        yyerror(&@$, sql_string, sql_result, scanner, "Invalid vector literal");
+      }
+    }
+    ;
+
+number_list:
+    number {
+      $$ = new std::vector<float>();
+      $$->push_back($1);
+    }
+    | number_list COMMA number {
+      $$ = $1;
+      $$->push_back($3);
+    }
+    ;
+
+order_by:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | ORDER BY order_by_item_list
+    {
+      $$ = $3;
+    }
+    ;
+
+order_by_item_list:
+    order_by_item
+    {
+      $$ = new std::vector<OrderBySqlNode>();
+      $$->emplace_back(std::move(*$1));
+      delete $1;
+    }
+    | order_by_item_list COMMA order_by_item
+    {
+      $$ = $1;
+      $$->emplace_back(std::move(*$3));
+      delete $3;
+    }
+    ;
+
+order_by_item:
+    expression
+    {
+      $$ = new OrderBySqlNode();
+      $$->expression = unique_ptr<Expression>($1);
+      $$->direction = ASC_ORDER;  // 默认升序
+    }
+    | expression ASC
+    {
+      $$ = new OrderBySqlNode();
+      $$->expression = unique_ptr<Expression>($1);
+      $$->direction = ASC_ORDER;
+    }
+    | expression DESC
+    {
+      $$ = new OrderBySqlNode();
+      $$->expression = unique_ptr<Expression>($1);
+      $$->direction = DESC_ORDER;
+    }
+    ;
+
+aggregate_expr:
+    COUNT LBRACE '*' RBRACE {
+      $$ = new UnboundAggregateExpr("count", nullptr);
+      $$->set_name(token_name(sql_string, &@$));
+    }
+    | COUNT LBRACE expression RBRACE {
+      $$ = new UnboundAggregateExpr("count", unique_ptr<Expression>($3));
+      $$->set_name(token_name(sql_string, &@$));
+    }
+    | SUM LBRACE expression RBRACE {
+      $$ = new UnboundAggregateExpr("sum", unique_ptr<Expression>($3));
+      $$->set_name(token_name(sql_string, &@$));
+    }
+    | MAX LBRACE expression RBRACE {
+      $$ = new UnboundAggregateExpr("max", unique_ptr<Expression>($3));
+      $$->set_name(token_name(sql_string, &@$));
+    }
+    | MIN LBRACE expression RBRACE {
+      $$ = new UnboundAggregateExpr("min", unique_ptr<Expression>($3));
+      $$->set_name(token_name(sql_string, &@$));
+    }
+    | AVG LBRACE expression RBRACE {
+      $$ = new UnboundAggregateExpr("avg", unique_ptr<Expression>($3));
+      $$->set_name(token_name(sql_string, &@$));
+    }
+    ;
+
+join_list:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | join_list join_item
+    {
+      if ($1 != nullptr) {
+        $$ = $1;
+      } else {
+        $$ = new std::vector<JoinSqlNode>();
+      }
+      $$->emplace_back(std::move(*$2));
+      delete $2;
+    }
+    ;
+
+join_item:
+    INNER JOIN ID ON condition_list
+    {
+      $$ = new JoinSqlNode();
+      $$->table_name = $3;
+      $$->join_type = INNER_JOIN;
+      if ($5 != nullptr) {
+        $$->conditions.swap(*$5);
+        delete $5;
+      }
+      free($3);
+    }
+    | JOIN ID ON condition_list
+    {
+      $$ = new JoinSqlNode();
+      $$->table_name = $2;
+      $$->join_type = INNER_JOIN;  // 默认为INNER JOIN
+      if ($4 != nullptr) {
+        $$->conditions.swap(*$4);
+        delete $4;
+      }
+      free($2);
     }
     ;
 

@@ -15,6 +15,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 #include "sql/expr/tuple.h"
 #include "sql/expr/arithmetic_operator.hpp"
+#include "common/type/vector_type.h"
+#include "common/log/log.h"
 
 using namespace std;
 
@@ -513,6 +515,94 @@ RC ArithmeticExpr::try_get_value(Value &value) const
 
 ////////////////////////////////////////////////////////////////////////////////
 
+FunctionExpr::FunctionExpr(const char *function_name, vector<unique_ptr<Expression>> args)
+    : function_name_(function_name), args_(std::move(args))
+{}
+
+unique_ptr<Expression> FunctionExpr::copy() const
+{
+  vector<unique_ptr<Expression>> args_copy;
+  for (const auto &arg : args_) {
+    args_copy.emplace_back(arg->copy());
+  }
+  return make_unique<FunctionExpr>(function_name_.c_str(), std::move(args_copy));
+}
+
+AttrType FunctionExpr::value_type() const
+{
+  // 大多数向量函数返回float类型
+  return AttrType::FLOATS;
+}
+
+RC FunctionExpr::get_value(const Tuple &tuple, Value &value) const
+{
+  // 获取所有参数的值
+  vector<Value> arg_values;
+  arg_values.reserve(args_.size());
+
+  for (const auto &arg : args_) {
+    Value arg_value;
+    RC rc = arg->get_value(tuple, arg_value);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to get argument value for function %s", function_name_.c_str());
+      return rc;
+    }
+    arg_values.emplace_back(arg_value);
+  }
+
+  return try_get_value_with_args(arg_values, value);
+}
+
+RC FunctionExpr::try_get_value(Value &value) const
+{
+  // 尝试获取所有参数的值
+  vector<Value> arg_values;
+  arg_values.reserve(args_.size());
+
+  for (const auto &arg : args_) {
+    Value arg_value;
+    RC rc = arg->try_get_value(arg_value);
+    if (rc != RC::SUCCESS) {
+      return rc; // 如果任何参数无法获取值，则无法计算函数值
+    }
+    arg_values.emplace_back(arg_value);
+  }
+
+  return try_get_value_with_args(arg_values, value);
+}
+
+RC FunctionExpr::try_get_value_with_args(const vector<Value> &arg_values, Value &value) const
+{
+  if (strcasecmp(function_name_.c_str(), "L2_DISTANCE") == 0) {
+    if (arg_values.size() != 2) {
+      LOG_WARN("L2_DISTANCE function requires exactly 2 arguments, got %zu", arg_values.size());
+      return RC::INVALID_ARGUMENT;
+    }
+    return VectorType::l2_distance(arg_values[0], arg_values[1], value);
+  }
+
+  if (strcasecmp(function_name_.c_str(), "COSINE_DISTANCE") == 0) {
+    if (arg_values.size() != 2) {
+      LOG_WARN("COSINE_DISTANCE function requires exactly 2 arguments, got %zu", arg_values.size());
+      return RC::INVALID_ARGUMENT;
+    }
+    return VectorType::cosine_distance(arg_values[0], arg_values[1], value);
+  }
+
+  if (strcasecmp(function_name_.c_str(), "INNER_PRODUCT") == 0) {
+    if (arg_values.size() != 2) {
+      LOG_WARN("INNER_PRODUCT function requires exactly 2 arguments, got %zu", arg_values.size());
+      return RC::INVALID_ARGUMENT;
+    }
+    return VectorType::inner_product(arg_values[0], arg_values[1], value);
+  }
+
+  LOG_WARN("Unknown function: %s", function_name_.c_str());
+  return RC::UNIMPLEMENTED;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 UnboundAggregateExpr::UnboundAggregateExpr(const char *aggregate_name, Expression *child)
     : aggregate_name_(aggregate_name), child_(child)
 {}
@@ -556,6 +646,22 @@ unique_ptr<Aggregator> AggregateExpr::create_aggregator() const
   switch (aggregate_type_) {
     case Type::SUM: {
       aggregator = make_unique<SumAggregator>();
+      break;
+    }
+    case Type::COUNT: {
+      aggregator = make_unique<CountAggregator>();
+      break;
+    }
+    case Type::MAX: {
+      aggregator = make_unique<MaxAggregator>();
+      break;
+    }
+    case Type::MIN: {
+      aggregator = make_unique<MinAggregator>();
+      break;
+    }
+    case Type::AVG: {
+      aggregator = make_unique<AvgAggregator>();
       break;
     }
     default: {

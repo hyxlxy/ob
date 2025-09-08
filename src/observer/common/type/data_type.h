@@ -100,3 +100,26 @@ protected:
 
   static array<unique_ptr<DataType>, static_cast<int>(AttrType::MAXTYPE)> type_instances_;
 };
+
+/**
+ * @brief 日期类型
+ * @ingroup DataType
+ */
+class DateType : public DataType
+{
+public:
+  DateType() : DataType(AttrType::DATES) {}
+  virtual ~DateType() {}
+
+  int compare(const Value &left, const Value &right) const override;
+  RC cast_to(const Value &val, AttrType type, Value &result) const override;
+  RC set_value_from_str(Value &val, const string &data) const override;
+  RC to_string(const Value &val, string &result) const override;
+  int cast_cost(AttrType type) override;
+
+  static bool is_valid_date(int year, int month, int day);
+  static bool is_leap_year(int year);
+  static int days_in_month(int year, int month);
+  static RC parse_date_string(const string &date_str, int &date_int);
+  static RC format_date_int(int date_int, string &date_str);
+};
