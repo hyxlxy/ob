@@ -34,3 +34,6 @@ src/observer/sql/parser/yacc_sql.hpp
 # ignore documentation and text files
 *.md
 *.txt
+
+# ignore large performance test data files
+db/src/test/performance_test/table_data/*.csv
