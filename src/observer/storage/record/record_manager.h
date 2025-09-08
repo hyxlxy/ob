@@ -401,6 +401,15 @@ public:
 
   RC visit_record(const RID &rid, function<bool(Record &)> updater);
 
+  /**
+   * @brief 更新指定位置的记录
+   *
+   * @param rid         要更新记录的标识符
+   * @param data        新的记录内容
+   * @param record_size 记录大小
+   */
+  RC update_record(const RID &rid, const char *data, int record_size);
+
 private:
   /**
    * @brief 初始化当前没有填满记录的页面，初始化free_pages_成员

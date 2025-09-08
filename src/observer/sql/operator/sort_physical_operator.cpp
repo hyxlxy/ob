@@ -149,13 +149,15 @@ bool SortPhysicalOperator::compare_tuples(const ValueListTuple &left, const Valu
 
     RC rc = order_by_expressions_[i]->get_value(left, left_value);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to get value from left tuple for order by expression %zu", i);
-      return false;
+      LOG_WARN("failed to get value from left tuple for order by expression %zu: %s", i, strrc(rc));
+      // 如果获取值失败，认为left < right，保证排序的一致性
+      return true;
     }
 
     rc = order_by_expressions_[i]->get_value(right, right_value);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to get value from right tuple for order by expression %zu", i);
+      LOG_WARN("failed to get value from right tuple for order by expression %zu: %s", i, strrc(rc));
+      // 如果获取值失败，认为left > right，保证排序的一致性
       return false;
     }
 
@@ -170,6 +172,7 @@ bool SortPhysicalOperator::compare_tuples(const ValueListTuple &left, const Valu
     // 如果相等，继续比较下一个字段
   }
 
-  // 所有字段都相等
+  // 所有字段都相等，为了保证排序的稳定性，返回false
+  // 这样相等的元素会保持原有的相对顺序
   return false;
 }

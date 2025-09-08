@@ -52,8 +52,6 @@ CREATE INDEX idx_name ON test_table(name);
 DROP TABLE test_table;
 ### 2025-09-03 22:12:38.730
 -- 尝试查询已删除的表（应该失败）
-### 2025-09-03 22:12:38.730
-SELECT * FROM test_table;
 ### 2025-09-03 22:12:49.703
 DROP TABLE test;
 ### 2025-09-03 22:13:24.933
@@ -600,3 +598,79 @@ SELECT * FROM students WHERE age - 20 > 0;
 CREATE TABLE test_expr(id int, val int);
 ### 2025-09-08 20:37:46.093
 SELECT * FROM test_expr WHERE val - 20 > 0;
+### 2025-09-08 21:17:57.274
+CREATE TABLE test_table(id int, name char(20), score float);
+### 2025-09-08 21:17:57.295
+INSERT INTO test_table VALUES (1, 'Alice', 85.5);
+### 2025-09-08 21:17:57.296
+INSERT INTO test_table VALUES (2, 'Bob', 92.0);
+### 2025-09-08 21:17:57.297
+INSERT INTO test_table VALUES (3, 'Charlie', 78.5);
+### 2025-09-08 21:17:57.298
+SELECT * FROM test_table;
+### 2025-09-08 21:17:57.300
+SELECT * FROM test_table ORDER BY score DESC;
+### 2025-09-08 21:17:57.303
+UPDATE test_table SET score = 90.0 WHERE id = 1;
+### 2025-09-08 21:17:57.305
+SELECT * FROM test_table WHERE id = 1;
+### 2025-09-08 21:17:57.307
+SELECT * FROM test_table WHERE score - 80 > 5;
+### 2025-09-08 21:24:57.546
+-- 测试修复的功能
+### 2025-09-08 21:24:57.555
+-- 1. 测试big-order-by修复
+### 2025-09-08 21:24:57.555
+CREATE TABLE big_order_by_0(id int, num int, price float, addr char(10), birthday date);
+### 2025-09-08 21:24:57.592
+CREATE TABLE big_order_by_1(id int, num int, price float, addr char(10), birthday date);
+### 2025-09-08 21:24:57.604
+INSERT INTO big_order_by_0 VALUES (2, 20, 2.5, 'B', '2020-01-02');
+### 2025-09-08 21:24:57.606
+INSERT INTO big_order_by_0 VALUES (1, 10, 1.5, 'A', '2020-01-01');
+### 2025-09-08 21:24:57.607
+INSERT INTO big_order_by_1 VALUES (4, 40, 4.5, 'D', '2020-01-04');
+### 2025-09-08 21:24:57.609
+INSERT INTO big_order_by_1 VALUES (3, 30, 3.5, 'C', '2020-01-03');
+### 2025-09-08 21:24:57.610
+-- 测试多表连接ORDER BY
+### 2025-09-08 21:24:57.610
+SELECT * FROM big_order_by_0, big_order_by_1 ORDER BY big_order_by_0.id, big_order_by_1.id;
+### 2025-09-08 21:24:57.613
+DROP TABLE big_order_by_0;
+### 2025-09-08 21:24:57.622
+DROP TABLE big_order_by_1;
+### 2025-09-08 21:24:57.629
+-- 2. 测试UPDATE修复
+### 2025-09-08 21:24:57.629
+CREATE TABLE update_table_1(id int, t_name char(20), col1 int, col2 int);
+### 2025-09-08 21:24:57.636
+CREATE INDEX index_id on update_table_1(id);
+### 2025-09-08 21:24:57.644
+INSERT INTO update_table_1 VALUES (34, 'NWHIX6FR9ZOZAXUYPIS', 45, 40);
+### 2025-09-08 21:24:57.645
+INSERT INTO update_table_1 VALUES (48, 'GB51UKHK77GOIM', 22, 45);
+### 2025-09-08 21:24:57.645
+-- 测试UPDATE语句
+### 2025-09-08 21:24:57.645
+UPDATE update_table_1 SET t_name='6I0CY0JHC6QQ1UV81JLZ' WHERE id=34;
+### 2025-09-08 21:24:57.646
+-- 验证UPDATE结果
+### 2025-09-08 21:24:57.646
+SELECT * FROM update_table_1;
+### 2025-09-08 21:24:57.647
+DROP TABLE update_table_1;
+### 2025-09-08 21:24:57.651
+-- 3. 测试expression修复
+### 2025-09-08 21:24:57.651
+CREATE TABLE exp_table(id int, col1 int, col2 int, col3 float, col4 float);
+### 2025-09-08 21:24:57.652
+INSERT INTO exp_table VALUES (1, 8, 9, 8.95, 5.53);
+### 2025-09-08 21:24:57.652
+INSERT INTO exp_table VALUES (2, 2, 7, 6.98, 5.29);
+### 2025-09-08 21:24:57.652
+INSERT INTO exp_table VALUES (3, 7, 9, 5.52, 2.63);
+### 2025-09-08 21:24:57.653
+-- 测试算术表达式
+### 2025-09-08 21:24:57.653
+SELECT * FROM exp_table WHERE col1 - 3 > 4;

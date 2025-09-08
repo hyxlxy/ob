@@ -253,11 +253,27 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
 {
   size_t       copy_len = field->len();
   const size_t data_len = value.length();
+
   if (field->type() == AttrType::CHARS) {
     if (copy_len > data_len) {
       copy_len = data_len + 1;
     }
+  } else if (field->type() == AttrType::VECTORS) {
+    // 对于向量类型，需要检查数据长度是否超过字段定义的长度
+    if (data_len > copy_len) {
+      LOG_WARN("Vector data length (%zu) exceeds field length (%zu) for field %s",
+               data_len, copy_len, field->name());
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
+    // 对于向量类型，使用实际数据长度
+    copy_len = data_len;
+  } else {
+    // 对于其他类型，使用较小的长度以防止越界
+    if (data_len < copy_len) {
+      copy_len = data_len;
+    }
   }
+
   memcpy(record_data + field->offset(), value.data(), copy_len);
   return RC::SUCCESS;
 }

@@ -60,6 +60,17 @@ RC IntegerType::multiply(const Value &left, const Value &right, Value &result) c
   return RC::SUCCESS;
 }
 
+RC IntegerType::divide(const Value &left, const Value &right, Value &result) const
+{
+  int right_val = right.get_int();
+  if (right_val == 0) {
+    LOG_WARN("Division by zero");
+    return RC::INVALID_ARGUMENT;
+  }
+  result.set_int(left.get_int() / right_val);
+  return RC::SUCCESS;
+}
+
 RC IntegerType::negative(const Value &val, Value &result) const
 {
   result.set_int(-val.get_int());

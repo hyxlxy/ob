@@ -30,7 +30,24 @@ public:
 
   bool equals(const TupleCellSpec &other) const
   {
-    return table_name_ == other.table_name_ && field_name_ == other.field_name_ && alias_ == other.alias_;
+    // 首先检查表名和字段名是否匹配
+    if (table_name_ == other.table_name_ && field_name_ == other.field_name_) {
+      return true;
+    }
+
+    // 如果表名和字段名不匹配，但是alias匹配，也认为是相等的
+    // 这种情况适用于表达式或者别名字段
+    if (!alias_.empty() && !other.alias_.empty() && alias_ == other.alias_) {
+      return true;
+    }
+
+    // 如果一个有表名一个没有，但字段名相同，也认为匹配
+    // 这种情况适用于单表查询时的字段引用
+    if ((table_name_.empty() || other.table_name_.empty()) && field_name_ == other.field_name_) {
+      return true;
+    }
+
+    return false;
   }
 
 private:
