@@ -379,3 +379,59 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
   logical_operator = std::move(group_by_oper);
   return RC::SUCCESS;
 }
+
+bool LogicalPlanGenerator::is_join_condition(Expression *expr, const vector<Table *> &tables)
+{
+  if (expr->type() != ExprType::COMPARISON) {
+    return false;
+  }
+
+  auto comp_expr = dynamic_cast<ComparisonExpr*>(expr);
+  if (!comp_expr) {
+    return false;
+  }
+
+  auto &left = comp_expr->left();
+  auto &right = comp_expr->right();
+
+  // 检查是否是两个字段之间的比较
+  if (left->type() == ExprType::FIELD && right->type() == ExprType::FIELD) {
+    auto left_field = dynamic_cast<FieldExpr*>(left.get());
+    auto right_field = dynamic_cast<FieldExpr*>(right.get());
+
+    if (left_field && right_field) {
+      // 检查是否来自不同的表
+      return left_field->field().table() != right_field->field().table();
+    }
+  }
+
+  return false;
+}
+
+bool LogicalPlanGenerator::involves_tables(Expression *expr, LogicalOperator *left_oper, LogicalOperator *right_oper)
+{
+  if (expr->type() != ExprType::COMPARISON) {
+    return false;
+  }
+
+  auto comp_expr = dynamic_cast<ComparisonExpr*>(expr);
+  if (!comp_expr) {
+    return false;
+  }
+
+  auto &left = comp_expr->left();
+  auto &right = comp_expr->right();
+
+  if (left->type() == ExprType::FIELD && right->type() == ExprType::FIELD) {
+    auto left_field = dynamic_cast<FieldExpr*>(left.get());
+    auto right_field = dynamic_cast<FieldExpr*>(right.get());
+
+    if (left_field && right_field) {
+      // 简化实现：假设当前JOIN涉及的表就是我们需要的
+      // 在实际实现中，可能需要更复杂的逻辑来确定表的归属
+      return true;
+    }
+  }
+
+  return false;
+}

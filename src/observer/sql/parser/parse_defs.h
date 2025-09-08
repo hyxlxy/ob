@@ -119,6 +119,17 @@ struct JoinSqlNode
 };
 
 /**
+ * @brief 表示表引用（包含表列表和JOIN操作）
+ * @ingroup SQLParser
+ * @details 用于组合传统的表列表和JOIN操作
+ */
+struct TableReferencesSqlNode
+{
+  vector<string>       relations;   ///< 表列表
+  vector<JoinSqlNode>  joins;       ///< JOIN操作列表
+};
+
+/**
  * @brief 描述一个select语句
  * @ingroup SQLParser
  * @details 一个正常的select语句描述起来比这个要复杂很多，这里做了简化。

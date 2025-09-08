@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include <vector>
 #include "common/lang/memory.h"
 #include "common/sys/rc.h"
 #include "common/type/attr_type.h"
@@ -26,6 +27,10 @@ class InsertStmt;
 class DeleteStmt;
 class ExplainStmt;
 class LogicalOperator;
+class Expression;
+class Table;
+
+using std::vector;
 
 class LogicalPlanGenerator
 {
@@ -46,4 +51,8 @@ private:
   RC create_group_by_plan(SelectStmt *select_stmt, unique_ptr<LogicalOperator> &logical_operator);
 
   int implicit_cast_cost(AttrType from, AttrType to);
+
+  // JOIN条件处理辅助函数
+  bool is_join_condition(Expression *expr, const vector<Table *> &tables);
+  bool involves_tables(Expression *expr, LogicalOperator *left_oper, LogicalOperator *right_oper);
 };

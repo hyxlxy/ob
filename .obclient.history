@@ -88,8 +88,6 @@ UPDATE test SET name = 'new';
 CREATE TABLE users (
 ### 2025-09-03 22:49:24.509
     email CHAR(50)
-### 2025-09-03 22:49:24.509
--- 插入测试数据
 ### 2025-09-03 22:49:24.510
 INSERT INTO users VALUES (1, 'Alice', 'alice@example.com');
 ### 2025-09-03 22:49:24.510
@@ -228,8 +226,6 @@ SELECT * FROM vectors;
 CREATE TABLE test (id INT, vec VECTOR(3));
 ### 2025-09-04 07:59:18.698
 CREATE TABLE test (id INT, name CHAR(10));
-### 2025-09-04 07:59:52.442
-SHOW TABLES;
 ### 2025-09-04 08:10:30.192
 CREATE TABLE simple_test (id INT);
 ### 2025-09-04 08:11:00.921
@@ -382,60 +378,12 @@ SELECT id, COUNT(*) FROM test GROUP BY id;
 SELECT id, SUM(id), AVG(id) FROM test GROUP BY id;
 ### 2025-09-04 09:47:08.714
 SELECT id, COUNT(*) FROM test GROUP BY id HAVING COUNT(*) > 1;
-### 2025-09-04 10:00:13.044
--- 测试JOIN功能
-### 2025-09-04 10:00:13.051
-CREATE DATABASE test_db;
-### 2025-09-04 10:00:13.052
--- 创建学生表
-### 2025-09-04 10:00:13.053
-CREATE TABLE students (
-### 2025-09-04 10:00:13.054
-    name CHAR(20),
-### 2025-09-04 10:00:13.054
-    class_id INT
-### 2025-09-04 10:00:13.055
--- 创建班级表
-### 2025-09-04 10:00:13.056
-CREATE TABLE classes (
-### 2025-09-04 10:00:13.056
-    id INT,
-### 2025-09-04 10:00:13.057
-    class_name CHAR(20)
-### 2025-09-04 10:00:13.057
-);
-### 2025-09-04 10:00:13.058
--- 插入学生数据
-### 2025-09-04 10:00:13.064
--- 插入班级数据
-### 2025-09-04 10:00:13.067
--- 查看原始数据
-### 2025-09-04 10:00:13.067
-SELECT * FROM students;
-### 2025-09-04 10:00:13.068
-SELECT * FROM classes;
-### 2025-09-04 10:00:13.069
--- 测试INNER JOIN
-### 2025-09-04 10:00:13.071
-INNER JOIN classes ON students.class_id = classes.id;
-### 2025-09-04 10:00:13.072
--- 测试简化的JOIN语法
-### 2025-09-04 10:00:13.072
-SELECT students.name, classes.class_name 
-### 2025-09-04 10:00:13.073
-FROM students 
-### 2025-09-04 10:00:13.074
-JOIN classes ON students.class_id = classes.id;
-### 2025-09-04 10:00:13.074
-EXIT;
 ### 2025-09-04 10:00:27.468
 SELECT * FROM students JOIN classes ON students.id = classes.id;
 ### 2025-09-04 10:14:51.061
 SELECT COUNT(*), SUM(id), AVG(id) FROM test;
 ### 2025-09-04 10:17:07.112
 SELECT s.name, c.class_name FROM students s JOIN classes c ON s.class_id = c.id;
-### 2025-09-04 10:24:01.060
-USE test_db;
 ### 2025-09-04 10:24:58.922
 -- setup in default DB
 ### 2025-09-04 10:24:58.936
@@ -450,26 +398,6 @@ DROP TABLE classes;
 DROP TABLE IF EXISTS students;
 ### 2025-09-04 10:28:58.015
 DROP TABLE IF EXISTS classes;
-### 2025-09-04 10:28:58.016
-CREATE TABLE students (id INT, name CHAR(20), class_id INT);
-### 2025-09-04 10:28:58.017
-CREATE TABLE classes (id INT, class_name CHAR(20));
-### 2025-09-04 10:28:58.018
-INSERT INTO students VALUES (1, 'Alice', 1);
-### 2025-09-04 10:28:58.022
-INSERT INTO students VALUES (2, 'Bob', 1);
-### 2025-09-04 10:28:58.024
-INSERT INTO students VALUES (3, 'Charlie', 2);
-### 2025-09-04 10:28:58.027
-INSERT INTO students VALUES (4, 'David', 2);
-### 2025-09-04 10:28:58.028
-INSERT INTO classes VALUES (1, 'Math');
-### 2025-09-04 10:28:58.031
-INSERT INTO classes VALUES (2, 'Science');
-### 2025-09-04 10:28:58.032
-SELECT students.name, classes.class_name FROM students, classes WHERE students.class_id = classes.id;
-### 2025-09-04 10:28:58.040
-SELECT students.name, classes.class_name FROM students JOIN classes ON students.class_id = classes.id;
 ### 2025-09-04 10:54:39.401
 DROP TABLE IF EXISTS scores;
 ### 2025-09-04 10:54:39.410
@@ -484,3 +412,101 @@ SELECT cls, COUNT(*), SUM(score), AVG(score) FROM scores GROUP BY cls;
 -- having on aggregate
 ### 2025-09-04 10:54:39.434
 SELECT cls, COUNT(*) FROM scores GROUP BY cls HAVING COUNT(*) > 2;
+### 2025-09-08 09:48:25.648
+DESC students;
+### 2025-09-08 09:48:48.674
+DESC classes;
+### 2025-09-08 10:25:12.506
+-- 测试JOIN功能
+### 2025-09-08 10:25:12.518
+CREATE TABLE students (
+### 2025-09-08 10:25:12.519
+    name CHAR(20),
+### 2025-09-08 10:25:12.520
+    class_id INT
+### 2025-09-08 10:25:12.521
+CREATE TABLE classes (
+### 2025-09-08 10:25:12.522
+    id INT,
+### 2025-09-08 10:25:12.522
+    class_name CHAR(20)
+### 2025-09-08 10:25:12.523
+);
+### 2025-09-08 10:25:12.554
+-- 测试INNER JOIN
+### 2025-09-08 10:25:12.555
+INNER JOIN classes ON students.class_id = classes.id;
+### 2025-09-08 10:25:12.556
+-- 测试简化的JOIN语法
+### 2025-09-08 10:25:12.556
+SELECT students.name, classes.class_name 
+### 2025-09-08 10:25:12.557
+FROM students 
+### 2025-09-08 10:25:12.557
+JOIN classes ON students.class_id = classes.id;
+### 2025-09-08 10:34:04.020
+-- 测试多表查询（传统语法）
+### 2025-09-08 10:34:04.058
+-- 测试传统多表查询语法
+### 2025-09-08 10:34:15.814
+-- 测试JOIN功能（单行版本）
+### 2025-09-08 10:34:15.823
+CREATE DATABASE test_db;
+### 2025-09-08 10:34:15.824
+-- 创建学生表
+### 2025-09-08 10:34:15.824
+CREATE TABLE students (id INT, name CHAR(20), class_id INT);
+### 2025-09-08 10:34:15.826
+-- 创建班级表
+### 2025-09-08 10:34:15.826
+CREATE TABLE classes (id INT, class_name CHAR(20));
+### 2025-09-08 10:34:15.827
+-- 插入学生数据
+### 2025-09-08 10:34:15.829
+INSERT INTO students VALUES (2, 'Bob', 1);
+### 2025-09-08 10:34:15.831
+INSERT INTO students VALUES (3, 'Charlie', 2);
+### 2025-09-08 10:34:15.832
+INSERT INTO students VALUES (4, 'David', 2);
+### 2025-09-08 10:34:15.834
+-- 插入班级数据
+### 2025-09-08 10:34:15.836
+INSERT INTO classes VALUES (2, 'Science');
+### 2025-09-08 10:34:15.838
+-- 查看原始数据
+### 2025-09-08 10:34:15.845
+-- 测试INNER JOIN（单行）
+### 2025-09-08 10:34:15.845
+SELECT students.name, classes.class_name FROM students INNER JOIN classes ON students.class_id = classes.id;
+### 2025-09-08 11:05:29.930
+-- 测试基本SELECT语法
+### 2025-09-08 11:05:29.949
+EXIT;
+### 2025-09-08 11:05:41.403
+-- 测试JOIN语法解析
+### 2025-09-08 11:05:41.418
+USE test_db;
+### 2025-09-08 11:12:31.406
+HELP;
+### 2025-09-08 11:13:05.396
+SHOW TABLES;
+### 2025-09-08 11:14:01.644
+SELECT * FROM classes;
+### 2025-09-08 11:14:42.859
+-- 插入测试数据
+### 2025-09-08 11:15:12.853
+SELECT * FROM students JOIN classes ON students.class_id = classes.id;
+### 2025-09-08 11:16:22.482
+SELECT * FROM students;
+### 2025-09-08 11:16:49.573
+INSERT INTO students VALUES (1, 'Alice', 1);
+### 2025-09-08 11:17:28.056
+INSERT INTO classes VALUES (1, 'Math');
+### 2025-09-08 11:17:56.169
+SELECT students.name, classes.class_name FROM students, classes WHERE students.class_id = classes.id;
+### 2025-09-08 11:18:26.074
+SELECT students.name, classes.class_name FROM students JOIN classes ON students.class_id = classes.id;
+### 2025-09-08 11:55:29.296
+CREATE TABLE date_table(id int, u_date date);
+### 2025-09-08 11:57:37.186
+-- echo initialization

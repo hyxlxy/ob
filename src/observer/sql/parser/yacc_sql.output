@@ -143,7 +143,7 @@
    98         | GROUP BY expression_list
 
    99 having: ε
-  100       | HAVING condition_list
+  100       | HAVING expression
 
   101 load_data_stmt: LOAD DATA INFILE SSS INTO TABLE ID
 
@@ -359,7 +359,7 @@
         on right: 60 61 62 64 98
     expression <expression> (108)
         on left: 65 66 67 68 69 70 71 72 73 74 75
-        on right: 63 64 65 66 67 68 69 70 111 112 113 115 116 117 118 119
+        on right: 63 64 65 66 67 68 69 70 100 111 112 113 115 116 117 118 119
     rel_attr <rel_attr> (109)
         on left: 76 77
         on right: 73 86 88 89
@@ -374,7 +374,7 @@
         on right: 58 59 60
     condition_list <condition_list> (113)
         on left: 83 84 85
-        on right: 82 85 100 122 123
+        on right: 82 85 122 123
     condition <condition> (114)
         on left: 86 87 88 89
         on right: 84 85
@@ -384,7 +384,7 @@
     group_by <expression_list> (116)
         on left: 97 98
         on right: 60
-    having <condition_list> (117)
+    having <expression> (117)
         on left: 99 100
         on right: 60
     load_data_stmt <sql_node> (118)
@@ -2602,19 +2602,27 @@
 
 状态 214
 
-  100 having: HAVING • condition_list
+  100 having: HAVING • expression
 
-    NUMBER  偏移，并进入状态 54
-    FLOAT   偏移，并进入状态 55
-    ID      偏移，并进入状态 56
-    SSS     偏移，并进入状态 57
+    COUNT    偏移，并进入状态 47
+    SUM      偏移，并进入状态 48
+    MAX      偏移，并进入状态 49
+    MIN      偏移，并进入状态 50
+    AVG      偏移，并进入状态 51
+    LBRACE   偏移，并进入状态 52
+    LSQUARE  偏移，并进入状态 53
+    NUMBER   偏移，并进入状态 54
+    FLOAT    偏移，并进入状态 55
+    ID       偏移，并进入状态 56
+    SSS      偏移，并进入状态 57
+    '-'      偏移，并进入状态 58
+    '*'      偏移，并进入状态 59
 
-    $default  使用规则 83 以归约 (condition_list)
-
-    value           转到状态 153
-    rel_attr        转到状态 154
-    condition_list  转到状态 225
-    condition       转到状态 156
+    value           转到状态 60
+    expression      转到状态 225
+    rel_attr        转到状态 63
+    vector_literal  转到状态 64
+    aggregate_expr  转到状态 65
 
 
 状态 215
@@ -2707,7 +2715,16 @@
 
 状态 225
 
-  100 having: HAVING condition_list •
+   65 expression: expression • '+' expression
+   66           | expression • '-' expression
+   67           | expression • '*' expression
+   68           | expression • '/' expression
+  100 having: HAVING expression •
+
+    '+'  偏移，并进入状态 95
+    '-'  偏移，并进入状态 96
+    '*'  偏移，并进入状态 97
+    '/'  偏移，并进入状态 98
 
     $default  使用规则 100 以归约 (having)
 
