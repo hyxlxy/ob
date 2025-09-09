@@ -83,3 +83,35 @@ RC FloatType::to_string(const Value &val, string &result) const
   result = ss.str();
   return RC::SUCCESS;
 }
+
+
+RC FloatType::cast_to(const Value &val, AttrType type, Value &result) const
+{
+  switch (type) {
+    case AttrType::FLOATS: {
+      result.set_float(val.get_float());
+      return RC::SUCCESS;
+    }
+    case AttrType::INTS: {
+      // Truncate toward zero (MySQL-style cast)
+      result.set_int(static_cast<int>(val.get_float()));
+      return RC::SUCCESS;
+    }
+    default: {
+      LOG_WARN("unsupported type %d", type);
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
+  }
+}
+
+int FloatType::cast_cost(AttrType type)
+{
+  if (type == AttrType::FLOATS) {
+    return 0;
+  }
+  if (type == AttrType::INTS) {
+    // Prefer promoting INT->FLOAT (1) over demoting FLOAT->INT (2)
+    return 2;
+  }
+  return INT32_MAX;
+}

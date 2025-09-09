@@ -73,6 +73,16 @@ public:
   void set_left(const FilterObj &obj) { left_ = obj; }
   void set_right(const FilterObj &obj) { right_ = obj; }
 
+  // Own and set expression pointers to ensure lifetime safety
+  void set_left_expr(std::unique_ptr<Expression> expr) {
+    left_expr_owner_ = std::move(expr);
+    left_.init_expr(left_expr_owner_.get());
+  }
+  void set_right_expr(std::unique_ptr<Expression> expr) {
+    right_expr_owner_ = std::move(expr);
+    right_.init_expr(right_expr_owner_.get());
+  }
+
   const FilterObj &left() const { return left_; }
   const FilterObj &right() const { return right_; }
 
@@ -80,6 +90,8 @@ private:
   CompOp    comp_ = NO_OP;
   FilterObj left_;
   FilterObj right_;
+  std::unique_ptr<Expression> left_expr_owner_;
+  std::unique_ptr<Expression> right_expr_owner_;
 };
 
 /**

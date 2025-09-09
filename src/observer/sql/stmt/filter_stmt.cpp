@@ -93,15 +93,9 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<st
 
   // 如果有表达式，优先使用表达式
   if (condition.left_expr != nullptr && condition.right_expr != nullptr) {
-    // 使用表达式比较
-    FilterObj left_filter_obj;
-    FilterObj right_filter_obj;
-
-    left_filter_obj.init_expr(condition.left_expr.get());
-    right_filter_obj.init_expr(condition.right_expr.get());
-
-    filter_unit->set_left(left_filter_obj);
-    filter_unit->set_right(right_filter_obj);
+    // 使用表达式比较：复制表达式并由 FilterUnit 持有，避免悬垂指针
+    filter_unit->set_left_expr(condition.left_expr->copy());
+    filter_unit->set_right_expr(condition.right_expr->copy());
   } else {
     // 使用传统的属性和值比较
     if (condition.left_is_attr) {

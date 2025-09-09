@@ -100,3 +100,15 @@ RC IntegerType::to_string(const Value &val, string &result) const
   result = ss.str();
   return RC::SUCCESS;
 }
+
+int IntegerType::cast_cost(AttrType type)
+{
+  if (type == AttrType::INTS) {
+    return 0;
+  }
+  if (type == AttrType::FLOATS) {
+    // Prefer widening INT->FLOAT over FLOAT->INT
+    return 1;
+  }
+  return INT32_MAX;
+}

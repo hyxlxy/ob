@@ -666,3 +666,362 @@ Finish dump configuration
 [2025-09-09 10:27:42.523819 pid:45716 tid:76a1a2b1f7c0 ctx:0 INFO: ~Db@db.cpp:50] >> Db has been closed: sys
 [2025-09-09 10:27:42.539755 pid:45716 tid:76a1a2b1f7c0 ctx:0 INFO: cleanup@mem_pool.h:223] >> Successfully do cleanup, this->name:BufPool.
 [2025-09-09 10:27:42.539968 pid:45716 tid:76a1a2b1f7c0 ctx:0 INFO: cleanup_util@init.cpp:230] >> Shutdown Cleanly!
+[2025-09-09 10:55:46.548669 pid:48055 tid:7587370fa7c0 ctx:0 INFO: init@init.cpp:201] >> Output configuration 
+Begin dump configuration
+[]
+
+Finish dump configuration 
+
+[2025-09-09 10:55:46.548973 pid:48055 tid:7587370fa7c0 ctx:0 WARN: create_db@default_handler.cpp:91] >> Db already exists: sys
+[2025-09-09 10:55:46.549808 pid:48055 tid:7587327ff6c0 ctx:0 INFO: thread_func@thread_pool_executor.cpp:118] >> [ObLsmBackground] thread started
+[2025-09-09 10:55:46.550648 pid:48055 tid:7587370fa7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:128, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:55:46.551163 pid:48055 tid:7587370fa7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:256, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:55:46.551646 pid:48055 tid:7587370fa7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:384, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:55:46.552121 pid:48055 tid:7587370fa7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:512, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:55:46.552609 pid:48055 tid:7587370fa7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:640, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:55:46.553097 pid:48055 tid:7587370fa7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:768, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:55:46.553597 pid:48055 tid:7587370fa7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:896, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:55:46.554091 pid:48055 tid:7587370fa7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1024, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:55:46.554608 pid:48055 tid:7587370fa7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1152, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:55:46.555120 pid:48055 tid:7587370fa7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1280, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:55:46.555612 pid:48055 tid:7587370fa7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1408, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:55:46.556090 pid:48055 tid:7587370fa7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1536, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:55:46.556575 pid:48055 tid:7587370fa7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1664, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:55:46.557056 pid:48055 tid:7587370fa7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1792, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:55:46.557597 pid:48055 tid:7587370fa7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1920, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:55:46.558083 pid:48055 tid:7587370fa7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2048, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:55:46.558571 pid:48055 tid:7587370fa7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2176, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:55:46.559083 pid:48055 tid:7587370fa7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2304, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:55:46.559700 pid:48055 tid:7587370fa7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2432, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:55:46.560460 pid:48055 tid:7587370fa7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2560, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:55:46.560505 pid:48055 tid:7587370fa7c0 ctx:0 INFO: init@mem_pool.h:197] >> Extend one pool, this->size:2560, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:55:46.560520 pid:48055 tid:7587370fa7c0 ctx:0 INFO: BufferPoolManager@disk_buffer_pool.cpp:775] >> buffer pool manager init with memory size 20971520, page num: 2560, pool num: 20
+[2025-09-09 10:55:46.560748 pid:48055 tid:7587370fa7c0 ctx:0 INFO: load_pages@double_write_buffer.cpp:287] >> double write buffer load pages done. page num=2
+[2025-09-09 10:55:46.560876 pid:48055 tid:7587370fa7c0 ctx:0 INFO: init_meta@db.cpp:433] >> Successfully read db meta file. db=sys, file=miniob/db/sys/sys.db, check_point_lsn=0
+[2025-09-09 10:55:46.561640 pid:48055 tid:7587370fa7c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=ID
+[2025-09-09 10:55:46.561681 pid:48055 tid:7587370fa7c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=C1
+[2025-09-09 10:55:46.561709 pid:48055 tid:7587370fa7c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=C2
+[2025-09-09 10:55:46.561730 pid:48055 tid:7587370fa7c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=C3
+[2025-09-09 10:55:46.561866 pid:48055 tid:7587370fa7c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/TEST.data.
+[2025-09-09 10:55:46.561982 pid:48055 tid:7587370fa7c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/TEST.data. file_desc=8, hdr_frame=0x758735d6c808, file header=pageCount:1, allocatedCount:1
+[2025-09-09 10:55:46.562079 pid:48055 tid:7587370fa7c0 ctx:0 INFO: init_free_pages@record_manager.cpp:538] >> record file handler init free pages done. free page num=0, rc=SUCCESS
+[2025-09-09 10:55:46.562106 pid:48055 tid:7587370fa7c0 ctx:0 INFO: init@record_manager.cpp:497] >> open record file handle done. rc=SUCCESS
+[2025-09-09 10:55:46.562134 pid:48055 tid:7587370fa7c0 ctx:0 INFO: open_all_tables@db.cpp:313] >> Open table: TEST, file: TEST.table
+[2025-09-09 10:55:46.562427 pid:48055 tid:7587370fa7c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=id
+[2025-09-09 10:55:46.562460 pid:48055 tid:7587370fa7c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=col1
+[2025-09-09 10:55:46.562487 pid:48055 tid:7587370fa7c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=col2
+[2025-09-09 10:55:46.562579 pid:48055 tid:7587370fa7c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/exp_table.data.
+[2025-09-09 10:55:46.562656 pid:48055 tid:7587370fa7c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/exp_table.data. file_desc=9, hdr_frame=0x758735d6e898, file header=pageCount:1, allocatedCount:1
+[2025-09-09 10:55:46.562693 pid:48055 tid:7587370fa7c0 ctx:0 INFO: init_free_pages@record_manager.cpp:538] >> record file handler init free pages done. free page num=0, rc=SUCCESS
+[2025-09-09 10:55:46.562707 pid:48055 tid:7587370fa7c0 ctx:0 INFO: init@record_manager.cpp:497] >> open record file handle done. rc=SUCCESS
+[2025-09-09 10:55:46.562727 pid:48055 tid:7587370fa7c0 ctx:0 INFO: open_all_tables@db.cpp:313] >> Open table: exp_table, file: exp_table.table
+[2025-09-09 10:55:46.562738 pid:48055 tid:7587370fa7c0 ctx:0 INFO: open_all_tables@db.cpp:316] >> All table have been opened. num=2
+[2025-09-09 10:55:46.565740 pid:48055 tid:7587370fa7c0 ctx:0 INFO: recover@db.cpp:397] >> Successfully recover db. db=sys checkpoint_lsn=0
+[2025-09-09 10:55:46.565829 pid:48055 tid:7587370fa7c0 ctx:0 INFO: init@default_handler.cpp:67] >> Default handler init with miniob success
+[2025-09-09 10:55:46.565848 pid:48055 tid:7587370fa7c0 ctx:0 INFO: init@init.cpp:216] >> Successfully init utility
+[2025-09-09 10:55:46.565970 pid:48055 tid:7587370fa7c0 ctx:0 INFO: start_tcp_server@server.cpp:192] >> Listen on port 6789
+[2025-09-09 10:55:46.565987 pid:48055 tid:7587370fa7c0 ctx:0 INFO: start_tcp_server@server.cpp:195] >> Observer start success
+[2025-09-09 10:55:59.937483 pid:48055 tid:7587370fa7c0 ctx:0 INFO: accept@server.cpp:127] >> Accepted connection from 127.0.0.1:50882
+
+[2025-09-09 10:55:59.938190 pid:48055 tid:75873037e6c0 ctx:0 INFO: operator()@one_thread_per_connection_thread_handler.cpp:70] >> worker thread start. communicator = 0x50b000000a90
+[2025-09-09 10:55:59.950322 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=58): -- Demo SQL for verifying arithmetic expressions in WHERE
+[2025-09-09 10:55:59.951174 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.951375 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=78): -- Creates a sample table and runs checks for constant and column expressions
+[2025-09-09 10:55:59.951664 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.951816 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=25): -- 1) Prepare demo table
+[2025-09-09 10:55:59.952035 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.952170 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=32): DROP TABLE IF EXISTS exp_table;
+[2025-09-09 10:55:59.952494 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: handle_request@parse_stage.cpp:46] >> got multi sql commands but only 1 will be handled
+[2025-09-09 10:55:59.952591 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: create@desc_table_stmt.cpp:38] >> no such table. db=sys, table_name=IF
+[2025-09-09 10:55:59.952624 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: handle_request@resolve_stage.cpp:50] >> failed to create stmt. rc=25:SCHEMA_TABLE_NOT_EXIST
+[2025-09-09 10:55:59.952746 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.952870 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=24): CREATE TABLE exp_table(
+[2025-09-09 10:55:59.953122 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.953274 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=12):   id   INT,
+[2025-09-09 10:55:59.953557 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.953740 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=12):   col1 INT,
+[2025-09-09 10:55:59.954006 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.954128 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=12):   col2 INT,
+[2025-09-09 10:55:59.954374 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.954505 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=14):   col3 FLOAT,
+[2025-09-09 10:55:59.954774 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.954917 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=13):   col4 FLOAT
+[2025-09-09 10:55:59.955231 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.955347 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=3): );
+[2025-09-09 10:55:59.955593 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.955736 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=55): -- 2) Insert sample rows (subset similar to your data)
+[2025-09-09 10:55:59.955973 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.956132 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=52): INSERT INTO exp_table VALUES (1, 8, 5, 3.17, 3.42);
+[2025-09-09 10:55:59.956506 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: create@insert_stmt.cpp:46] >> schema mismatch. value num=5, field num in schema=3
+[2025-09-09 10:55:59.956569 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: handle_request@resolve_stage.cpp:50] >> failed to create stmt. rc=28:SCHEMA_FIELD_MISSING
+[2025-09-09 10:55:59.956703 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.956850 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=52): INSERT INTO exp_table VALUES (3, 3, 1, 3.55, 4.18);
+[2025-09-09 10:55:59.957091 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: create@insert_stmt.cpp:46] >> schema mismatch. value num=5, field num in schema=3
+[2025-09-09 10:55:59.957131 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: handle_request@resolve_stage.cpp:50] >> failed to create stmt. rc=28:SCHEMA_FIELD_MISSING
+[2025-09-09 10:55:59.957280 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.957397 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=52): INSERT INTO exp_table VALUES (3, 6, 2, 2.62, 3.42);
+[2025-09-09 10:55:59.957525 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: create@insert_stmt.cpp:46] >> schema mismatch. value num=5, field num in schema=3
+[2025-09-09 10:55:59.957545 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: handle_request@resolve_stage.cpp:50] >> failed to create stmt. rc=28:SCHEMA_FIELD_MISSING
+[2025-09-09 10:55:59.957614 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.957740 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=52): INSERT INTO exp_table VALUES (3, 7, 8, 5.17, 6.45);
+[2025-09-09 10:55:59.957946 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: create@insert_stmt.cpp:46] >> schema mismatch. value num=5, field num in schema=3
+[2025-09-09 10:55:59.957971 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: handle_request@resolve_stage.cpp:50] >> failed to create stmt. rc=28:SCHEMA_FIELD_MISSING
+[2025-09-09 10:55:59.958060 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.958166 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=52): INSERT INTO exp_table VALUES (3, 8, 3, 6.59, 4.34);
+[2025-09-09 10:55:59.958406 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: create@insert_stmt.cpp:46] >> schema mismatch. value num=5, field num in schema=3
+[2025-09-09 10:55:59.958438 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: handle_request@resolve_stage.cpp:50] >> failed to create stmt. rc=28:SCHEMA_FIELD_MISSING
+[2025-09-09 10:55:59.958523 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.958656 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=52): INSERT INTO exp_table VALUES (4, 6, 8, 5.86, 3.36);
+[2025-09-09 10:55:59.958828 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: create@insert_stmt.cpp:46] >> schema mismatch. value num=5, field num in schema=3
+[2025-09-09 10:55:59.958853 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: handle_request@resolve_stage.cpp:50] >> failed to create stmt. rc=28:SCHEMA_FIELD_MISSING
+[2025-09-09 10:55:59.958949 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.959212 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=52): INSERT INTO exp_table VALUES (6, 6, 8, 9.69, 8.07);
+[2025-09-09 10:55:59.959437 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: create@insert_stmt.cpp:46] >> schema mismatch. value num=5, field num in schema=3
+[2025-09-09 10:55:59.959471 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: handle_request@resolve_stage.cpp:50] >> failed to create stmt. rc=28:SCHEMA_FIELD_MISSING
+[2025-09-09 10:55:59.959606 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.959702 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=52): INSERT INTO exp_table VALUES (6, 6, 9, 3.03, 1.15);
+[2025-09-09 10:55:59.959863 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: create@insert_stmt.cpp:46] >> schema mismatch. value num=5, field num in schema=3
+[2025-09-09 10:55:59.959886 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: handle_request@resolve_stage.cpp:50] >> failed to create stmt. rc=28:SCHEMA_FIELD_MISSING
+[2025-09-09 10:55:59.959950 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.960085 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=52): INSERT INTO exp_table VALUES (9, 7, 3, 7.67, 7.86);
+[2025-09-09 10:55:59.960238 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: create@insert_stmt.cpp:46] >> schema mismatch. value num=5, field num in schema=3
+[2025-09-09 10:55:59.960272 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: handle_request@resolve_stage.cpp:50] >> failed to create stmt. rc=28:SCHEMA_FIELD_MISSING
+[2025-09-09 10:55:59.960338 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.960456 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=19): -- 3) Quick checks
+[2025-09-09 10:55:59.960583 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.960689 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=37): -- 3.1 Arithmetic division semantics
+[2025-09-09 10:55:59.960796 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.960898 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=42): SELECT 9/2;                 -- expect 4.5
+[2025-09-09 10:55:59.961053 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: handle_request@parse_stage.cpp:46] >> got multi sql commands but only 1 will be handled
+[2025-09-09 10:55:59.961745 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.961867 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=48): SELECT 9 = 9/2;             -- expect 0 (false)
+[2025-09-09 10:55:59.961980 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: handle_request@parse_stage.cpp:46] >> got multi sql commands but only 1 will be handled
+[2025-09-09 10:55:59.962277 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.962464 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=52): -- 3.2 WHERE with constant predicate: expect 0 rows
+[2025-09-09 10:55:59.962597 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.962699 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=59): SELECT COUNT(*) FROM exp_table WHERE 9 = 9/2;  -- expect 0
+[2025-09-09 10:55:59.962883 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: handle_request@parse_stage.cpp:46] >> got multi sql commands but only 1 will be handled
+[2025-09-09 10:55:59.963505 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.963639 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=64): SELECT *        FROM exp_table WHERE 9 = 9/2;  -- expect 0 rows
+[2025-09-09 10:55:59.963775 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: handle_request@parse_stage.cpp:46] >> got multi sql commands but only 1 will be handled
+[2025-09-09 10:55:59.964346 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.964457 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=49): -- 3.3 WHERE with true constant: expect all rows
+[2025-09-09 10:55:59.964583 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.964744 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=85): SELECT COUNT(*) FROM exp_table WHERE 9 = 9;    -- expect 9 (number of inserted rows)
+[2025-09-09 10:55:59.965066 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: handle_request@parse_stage.cpp:46] >> got multi sql commands but only 1 will be handled
+[2025-09-09 10:55:59.965925 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.966136 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=35): -- 3.4 Column expressions in WHERE
+[2025-09-09 10:55:59.966424 pid:48055 tid:75873037e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:55:59.966534 pid:48055 tid:75873037e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=81): SELECT COUNT(*) FROM exp_table WHERE col1 - 9 > 9;  -- should work without crash
+[2025-09-09 10:55:59.966865 pid:48055 tid:75873037e6c0 ctx:504000000690 WARN: handle_request@parse_stage.cpp:46] >> got multi sql commands but only 1 will be handled
+[2025-09-09 10:56:40.749618 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: init@init.cpp:201] >> Output configuration 
+Begin dump configuration
+[]
+
+Finish dump configuration 
+
+[2025-09-09 10:56:40.749989 pid:48133 tid:7d68ebb567c0 ctx:0 WARN: create_db@default_handler.cpp:91] >> Db already exists: sys
+[2025-09-09 10:56:40.750976 pid:48133 tid:7d68e71ff6c0 ctx:0 INFO: thread_func@thread_pool_executor.cpp:118] >> [ObLsmBackground] thread started
+[2025-09-09 10:56:40.752072 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:128, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:56:40.753562 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:256, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:56:40.754064 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:384, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:56:40.754639 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:512, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:56:40.755257 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:640, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:56:40.755826 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:768, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:56:40.756415 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:896, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:56:40.756993 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1024, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:56:40.757565 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1152, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:56:40.758364 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1280, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:56:40.759011 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1408, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:56:40.759830 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1536, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:56:40.760539 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1664, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:56:40.761232 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1792, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:56:40.761916 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1920, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:56:40.762603 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2048, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:56:40.763292 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2176, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:56:40.763982 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2304, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:56:40.764594 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2432, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:56:40.765210 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2560, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:56:40.765244 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: init@mem_pool.h:197] >> Extend one pool, this->size:2560, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 10:56:40.765261 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: BufferPoolManager@disk_buffer_pool.cpp:775] >> buffer pool manager init with memory size 20971520, page num: 2560, pool num: 20
+[2025-09-09 10:56:40.765489 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: load_pages@double_write_buffer.cpp:287] >> double write buffer load pages done. page num=2
+[2025-09-09 10:56:40.765632 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: init_meta@db.cpp:433] >> Successfully read db meta file. db=sys, file=miniob/db/sys/sys.db, check_point_lsn=0
+[2025-09-09 10:56:40.766425 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=ID
+[2025-09-09 10:56:40.766468 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=C1
+[2025-09-09 10:56:40.766491 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=C2
+[2025-09-09 10:56:40.766512 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=C3
+[2025-09-09 10:56:40.766654 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/TEST.data.
+[2025-09-09 10:56:40.766752 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/TEST.data. file_desc=8, hdr_frame=0x7d68ea76c808, file header=pageCount:1, allocatedCount:1
+[2025-09-09 10:56:40.766853 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: init_free_pages@record_manager.cpp:538] >> record file handler init free pages done. free page num=0, rc=SUCCESS
+[2025-09-09 10:56:40.766873 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: init@record_manager.cpp:497] >> open record file handle done. rc=SUCCESS
+[2025-09-09 10:56:40.766908 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: open_all_tables@db.cpp:313] >> Open table: TEST, file: TEST.table
+[2025-09-09 10:56:40.767067 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=id
+[2025-09-09 10:56:40.767093 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=col1
+[2025-09-09 10:56:40.767116 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=col2
+[2025-09-09 10:56:40.767221 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/exp_table.data.
+[2025-09-09 10:56:40.767301 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/exp_table.data. file_desc=9, hdr_frame=0x7d68ea76e898, file header=pageCount:1, allocatedCount:1
+[2025-09-09 10:56:40.767337 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: init_free_pages@record_manager.cpp:538] >> record file handler init free pages done. free page num=0, rc=SUCCESS
+[2025-09-09 10:56:40.767355 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: init@record_manager.cpp:497] >> open record file handle done. rc=SUCCESS
+[2025-09-09 10:56:40.767375 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: open_all_tables@db.cpp:313] >> Open table: exp_table, file: exp_table.table
+[2025-09-09 10:56:40.767387 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: open_all_tables@db.cpp:316] >> All table have been opened. num=2
+[2025-09-09 10:56:40.771482 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: recover@db.cpp:397] >> Successfully recover db. db=sys checkpoint_lsn=0
+[2025-09-09 10:56:40.771607 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: init@default_handler.cpp:67] >> Default handler init with miniob success
+[2025-09-09 10:56:40.771634 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: init@init.cpp:216] >> Successfully init utility
+[2025-09-09 10:56:40.771763 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: start_tcp_server@server.cpp:192] >> Listen on port 6789
+[2025-09-09 10:56:40.771781 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: start_tcp_server@server.cpp:195] >> Observer start success
+[2025-09-09 10:56:55.919319 pid:48133 tid:7d68ebb567c0 ctx:0 INFO: accept@server.cpp:127] >> Accepted connection from 127.0.0.1:53435
+
+[2025-09-09 10:56:55.920399 pid:48133 tid:7d68e4d7e6c0 ctx:0 INFO: operator()@one_thread_per_connection_thread_handler.cpp:70] >> worker thread start. communicator = 0x50b000000a90
+[2025-09-09 10:56:55.932487 pid:48133 tid:7d68e4d7e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=76): create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
+[2025-09-09 10:56:55.933089 pid:48133 tid:7d68e4d7e6c0 ctx:504000000690 WARN: create_table@db.cpp:159] >> exp_table has been opened before.
+[2025-09-09 10:56:55.933213 pid:48133 tid:7d68e4d7e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:56:55.933357 pid:48133 tid:7d68e4d7e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=48): insert into exp_table values (8,1,8,2.13,6.85);
+[2025-09-09 10:56:55.933520 pid:48133 tid:7d68e4d7e6c0 ctx:504000000690 WARN: create@insert_stmt.cpp:46] >> schema mismatch. value num=5, field num in schema=3
+[2025-09-09 10:56:55.933542 pid:48133 tid:7d68e4d7e6c0 ctx:504000000690 WARN: handle_request@resolve_stage.cpp:50] >> failed to create stmt. rc=28:SCHEMA_FIELD_MISSING
+[2025-09-09 10:56:55.933604 pid:48133 tid:7d68e4d7e6c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 10:56:55.933688 pid:48133 tid:7d68e4d7e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=44): select * from exp_table where col1 - 9 > 4;
+[2025-09-09 11:00:06.808895 pid:49058 tid:75d26655d7c0 ctx:0 INFO: init@init.cpp:201] >> Output configuration 
+Begin dump configuration
+[]
+
+Finish dump configuration 
+
+[2025-09-09 11:00:06.809214 pid:49058 tid:75d26655d7c0 ctx:0 WARN: create_db@default_handler.cpp:91] >> Db already exists: sys
+[2025-09-09 11:00:06.809928 pid:49058 tid:75d261bff6c0 ctx:0 INFO: thread_func@thread_pool_executor.cpp:118] >> [ObLsmBackground] thread started
+[2025-09-09 11:00:06.810879 pid:49058 tid:75d26655d7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:128, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:00:06.811425 pid:49058 tid:75d26655d7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:256, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:00:06.812069 pid:49058 tid:75d26655d7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:384, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:00:06.812630 pid:49058 tid:75d26655d7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:512, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:00:06.813696 pid:49058 tid:75d26655d7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:640, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:00:06.814429 pid:49058 tid:75d26655d7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:768, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:00:06.815127 pid:49058 tid:75d26655d7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:896, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:00:06.815661 pid:49058 tid:75d26655d7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1024, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:00:06.816216 pid:49058 tid:75d26655d7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1152, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:00:06.816758 pid:49058 tid:75d26655d7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1280, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:00:06.817467 pid:49058 tid:75d26655d7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1408, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:00:06.818067 pid:49058 tid:75d26655d7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1536, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:00:06.818636 pid:49058 tid:75d26655d7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1664, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:00:06.819412 pid:49058 tid:75d26655d7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1792, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:00:06.820002 pid:49058 tid:75d26655d7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1920, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:00:06.820596 pid:49058 tid:75d26655d7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2048, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:00:06.821180 pid:49058 tid:75d26655d7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2176, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:00:06.821738 pid:49058 tid:75d26655d7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2304, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:00:06.822253 pid:49058 tid:75d26655d7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2432, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:00:06.823002 pid:49058 tid:75d26655d7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2560, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:00:06.823074 pid:49058 tid:75d26655d7c0 ctx:0 INFO: init@mem_pool.h:197] >> Extend one pool, this->size:2560, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:00:06.823092 pid:49058 tid:75d26655d7c0 ctx:0 INFO: BufferPoolManager@disk_buffer_pool.cpp:775] >> buffer pool manager init with memory size 20971520, page num: 2560, pool num: 20
+[2025-09-09 11:00:06.823362 pid:49058 tid:75d26655d7c0 ctx:0 INFO: load_pages@double_write_buffer.cpp:287] >> double write buffer load pages done. page num=2
+[2025-09-09 11:00:06.823555 pid:49058 tid:75d26655d7c0 ctx:0 INFO: init_meta@db.cpp:433] >> Successfully read db meta file. db=sys, file=miniob/db/sys/sys.db, check_point_lsn=0
+[2025-09-09 11:00:06.824448 pid:49058 tid:75d26655d7c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=ID
+[2025-09-09 11:00:06.824530 pid:49058 tid:75d26655d7c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=C1
+[2025-09-09 11:00:06.824558 pid:49058 tid:75d26655d7c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=C2
+[2025-09-09 11:00:06.824588 pid:49058 tid:75d26655d7c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=C3
+[2025-09-09 11:00:06.824775 pid:49058 tid:75d26655d7c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/TEST.data.
+[2025-09-09 11:00:06.824907 pid:49058 tid:75d26655d7c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/TEST.data. file_desc=8, hdr_frame=0x75d2633f1808, file header=pageCount:1, allocatedCount:1
+[2025-09-09 11:00:06.825009 pid:49058 tid:75d26655d7c0 ctx:0 INFO: init_free_pages@record_manager.cpp:538] >> record file handler init free pages done. free page num=0, rc=SUCCESS
+[2025-09-09 11:00:06.825031 pid:49058 tid:75d26655d7c0 ctx:0 INFO: init@record_manager.cpp:497] >> open record file handle done. rc=SUCCESS
+[2025-09-09 11:00:06.825074 pid:49058 tid:75d26655d7c0 ctx:0 INFO: open_all_tables@db.cpp:313] >> Open table: TEST, file: TEST.table
+[2025-09-09 11:00:06.825344 pid:49058 tid:75d26655d7c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=id
+[2025-09-09 11:00:06.825390 pid:49058 tid:75d26655d7c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=col1
+[2025-09-09 11:00:06.825418 pid:49058 tid:75d26655d7c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=col2
+[2025-09-09 11:00:06.825542 pid:49058 tid:75d26655d7c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/exp_table.data.
+[2025-09-09 11:00:06.825633 pid:49058 tid:75d26655d7c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/exp_table.data. file_desc=9, hdr_frame=0x75d2633f3898, file header=pageCount:1, allocatedCount:1
+[2025-09-09 11:00:06.825696 pid:49058 tid:75d26655d7c0 ctx:0 INFO: init_free_pages@record_manager.cpp:538] >> record file handler init free pages done. free page num=0, rc=SUCCESS
+[2025-09-09 11:00:06.825727 pid:49058 tid:75d26655d7c0 ctx:0 INFO: init@record_manager.cpp:497] >> open record file handle done. rc=SUCCESS
+[2025-09-09 11:00:06.825761 pid:49058 tid:75d26655d7c0 ctx:0 INFO: open_all_tables@db.cpp:313] >> Open table: exp_table, file: exp_table.table
+[2025-09-09 11:00:06.825777 pid:49058 tid:75d26655d7c0 ctx:0 INFO: open_all_tables@db.cpp:316] >> All table have been opened. num=2
+[2025-09-09 11:00:06.920141 pid:49058 tid:75d26655d7c0 ctx:0 INFO: recover@db.cpp:397] >> Successfully recover db. db=sys checkpoint_lsn=0
+[2025-09-09 11:00:06.920272 pid:49058 tid:75d26655d7c0 ctx:0 INFO: init@default_handler.cpp:67] >> Default handler init with miniob success
+[2025-09-09 11:00:06.920302 pid:49058 tid:75d26655d7c0 ctx:0 INFO: init@init.cpp:216] >> Successfully init utility
+[2025-09-09 11:00:06.920477 pid:49058 tid:75d26655d7c0 ctx:0 INFO: start_tcp_server@server.cpp:192] >> Listen on port 6789
+[2025-09-09 11:00:06.920505 pid:49058 tid:75d26655d7c0 ctx:0 INFO: start_tcp_server@server.cpp:195] >> Observer start success
+[2025-09-09 11:00:19.213578 pid:49058 tid:75d26655d7c0 ctx:0 INFO: accept@server.cpp:127] >> Accepted connection from 127.0.0.1:45219
+
+[2025-09-09 11:00:19.214427 pid:49058 tid:75d25f6776c0 ctx:0 INFO: operator()@one_thread_per_connection_thread_handler.cpp:70] >> worker thread start. communicator = 0x50b000000a90
+[2025-09-09 11:00:19.230941 pid:49058 tid:75d25f6776c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=44): select * from exp_table where col1 - 9 > 4;
+[2025-09-09 11:00:19.232124 pid:49058 tid:75d25f6776c0 ctx:504000000690 WARN: create_plan@logical_plan_generator.cpp:235] >> unsupported cast from floats to ints
+[2025-09-09 11:00:19.232246 pid:49058 tid:75d25f6776c0 ctx:504000000690 WARN: create_plan@logical_plan_generator.cpp:100] >> failed to create predicate logical plan. rc=UNSUPPORTED
+[2025-09-09 11:00:19.232292 pid:49058 tid:75d25f6776c0 ctx:504000000690 WARN: handle_request@optimize_stage.cpp:40] >> failed to create logical plan. rc=UNSUPPORTED
+[2025-09-09 11:00:19.232447 pid:49058 tid:75d25f6776c0 ctx:504000000690 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 11:00:19.232673 pid:49058 tid:75d25f6776c0 ctx:0 INFO: read_event@plain_communicator.cpp:82] >> The peer has been closed 127.0.0.1:45219
+[2025-09-09 11:00:19.232710 pid:49058 tid:75d25f6776c0 ctx:0 ERROR: operator()@one_thread_per_connection_thread_handler.cpp:98] >> handle error. rc = IOERR_CLOSE
+[2025-09-09 11:00:19.232725 pid:49058 tid:75d25f6776c0 ctx:0 INFO: operator()@one_thread_per_connection_thread_handler.cpp:103] >> worker thread stop. communicator = 0x50b000000a90
+[2025-09-09 11:00:19.232860 pid:49058 tid:75d25f6776c0 ctx:0 INFO: close_connection@one_thread_per_connection_thread_handler.cpp:154] >> close connection. communicator = 0x50b000000a90
+[2025-09-09 11:18:35.073974 pid:51210 tid:7623033a37c0 ctx:0 INFO: init@init.cpp:201] >> Output configuration 
+Begin dump configuration
+[]
+
+Finish dump configuration 
+
+[2025-09-09 11:18:35.074525 pid:51210 tid:7623033a37c0 ctx:0 WARN: create_db@default_handler.cpp:91] >> Db already exists: sys
+[2025-09-09 11:18:35.075252 pid:51210 tid:7622fe9ff6c0 ctx:0 INFO: thread_func@thread_pool_executor.cpp:118] >> [ObLsmBackground] thread started
+[2025-09-09 11:18:35.076244 pid:51210 tid:7623033a37c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:128, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:18:35.076800 pid:51210 tid:7623033a37c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:256, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:18:35.077417 pid:51210 tid:7623033a37c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:384, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:18:35.077899 pid:51210 tid:7623033a37c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:512, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:18:35.078373 pid:51210 tid:7623033a37c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:640, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:18:35.078834 pid:51210 tid:7623033a37c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:768, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:18:35.079301 pid:51210 tid:7623033a37c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:896, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:18:35.079770 pid:51210 tid:7623033a37c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1024, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:18:35.080441 pid:51210 tid:7623033a37c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1152, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:18:35.080914 pid:51210 tid:7623033a37c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1280, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:18:35.081383 pid:51210 tid:7623033a37c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1408, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:18:35.081872 pid:51210 tid:7623033a37c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1536, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:18:35.082461 pid:51210 tid:7623033a37c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1664, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:18:35.083014 pid:51210 tid:7623033a37c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1792, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:18:35.083530 pid:51210 tid:7623033a37c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1920, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:18:35.084039 pid:51210 tid:7623033a37c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2048, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:18:35.084552 pid:51210 tid:7623033a37c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2176, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:18:35.085034 pid:51210 tid:7623033a37c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2304, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:18:35.085639 pid:51210 tid:7623033a37c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2432, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:18:35.086352 pid:51210 tid:7623033a37c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2560, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:18:35.086381 pid:51210 tid:7623033a37c0 ctx:0 INFO: init@mem_pool.h:197] >> Extend one pool, this->size:2560, item_num_per_pool:128, this->name:BufPool.
+[2025-09-09 11:18:35.086394 pid:51210 tid:7623033a37c0 ctx:0 INFO: BufferPoolManager@disk_buffer_pool.cpp:775] >> buffer pool manager init with memory size 20971520, page num: 2560, pool num: 20
+[2025-09-09 11:18:35.086636 pid:51210 tid:7623033a37c0 ctx:0 INFO: load_pages@double_write_buffer.cpp:287] >> double write buffer load pages done. page num=2
+[2025-09-09 11:18:35.087043 pid:51210 tid:7623033a37c0 ctx:0 INFO: init_meta@db.cpp:433] >> Successfully read db meta file. db=sys, file=miniob/db/sys/sys.db, check_point_lsn=0
+[2025-09-09 11:18:35.087807 pid:51210 tid:7623033a37c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=ID
+[2025-09-09 11:18:35.087857 pid:51210 tid:7623033a37c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=C1
+[2025-09-09 11:18:35.087883 pid:51210 tid:7623033a37c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=C2
+[2025-09-09 11:18:35.087909 pid:51210 tid:7623033a37c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=C3
+[2025-09-09 11:18:35.088061 pid:51210 tid:7623033a37c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/TEST.data.
+[2025-09-09 11:18:35.088181 pid:51210 tid:7623033a37c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/TEST.data. file_desc=8, hdr_frame=0x762301f6c808, file header=pageCount:1, allocatedCount:1
+[2025-09-09 11:18:35.088289 pid:51210 tid:7623033a37c0 ctx:0 INFO: init_free_pages@record_manager.cpp:538] >> record file handler init free pages done. free page num=0, rc=SUCCESS
+[2025-09-09 11:18:35.088308 pid:51210 tid:7623033a37c0 ctx:0 INFO: init@record_manager.cpp:497] >> open record file handle done. rc=SUCCESS
+[2025-09-09 11:18:35.088345 pid:51210 tid:7623033a37c0 ctx:0 INFO: open_all_tables@db.cpp:313] >> Open table: TEST, file: TEST.table
+[2025-09-09 11:18:35.088522 pid:51210 tid:7623033a37c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=id
+[2025-09-09 11:18:35.088553 pid:51210 tid:7623033a37c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=col1
+[2025-09-09 11:18:35.088580 pid:51210 tid:7623033a37c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=col2
+[2025-09-09 11:18:35.088679 pid:51210 tid:7623033a37c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/exp_table.data.
+[2025-09-09 11:18:35.088755 pid:51210 tid:7623033a37c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/exp_table.data. file_desc=9, hdr_frame=0x762301f6e898, file header=pageCount:1, allocatedCount:1
+[2025-09-09 11:18:35.088798 pid:51210 tid:7623033a37c0 ctx:0 INFO: init_free_pages@record_manager.cpp:538] >> record file handler init free pages done. free page num=0, rc=SUCCESS
+[2025-09-09 11:18:35.088814 pid:51210 tid:7623033a37c0 ctx:0 INFO: init@record_manager.cpp:497] >> open record file handle done. rc=SUCCESS
+[2025-09-09 11:18:35.088841 pid:51210 tid:7623033a37c0 ctx:0 INFO: open_all_tables@db.cpp:313] >> Open table: exp_table, file: exp_table.table
+[2025-09-09 11:18:35.088858 pid:51210 tid:7623033a37c0 ctx:0 INFO: open_all_tables@db.cpp:316] >> All table have been opened. num=2
+[2025-09-09 11:18:35.092528 pid:51210 tid:7623033a37c0 ctx:0 INFO: recover@db.cpp:397] >> Successfully recover db. db=sys checkpoint_lsn=0
+[2025-09-09 11:18:35.092652 pid:51210 tid:7623033a37c0 ctx:0 INFO: init@default_handler.cpp:67] >> Default handler init with miniob success
+[2025-09-09 11:18:35.092676 pid:51210 tid:7623033a37c0 ctx:0 INFO: init@init.cpp:216] >> Successfully init utility
+[2025-09-09 11:18:35.092807 pid:51210 tid:7623033a37c0 ctx:0 ERROR: start_tcp_server@server.cpp:181] >> bind(): can not bind server socket, Address already in use
+[2025-09-09 11:18:35.092846 pid:51210 tid:7623033a37c0 ctx:0 PANIC: serve@server.cpp:258] >> Failed to start network
+[2025-09-09 11:19:01.979200 pid:49058 tid:75d26655d7c0 ctx:0 INFO: accept@server.cpp:127] >> Accepted connection from 127.0.0.1:9445
+
+[2025-09-09 11:19:01.979689 pid:49058 tid:75d25f6776c0 ctx:0 INFO: operator()@one_thread_per_connection_thread_handler.cpp:70] >> worker thread start. communicator = 0x50b000000bf0
+[2025-09-09 11:19:02.021040 pid:49058 tid:75d25f6776c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=76): create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
+[2025-09-09 11:19:02.022204 pid:49058 tid:75d25f6776c0 ctx:504000000710 WARN: create_table@db.cpp:159] >> exp_table has been opened before.
+[2025-09-09 11:19:02.022400 pid:49058 tid:75d25f6776c0 ctx:504000000710 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 11:19:02.022557 pid:49058 tid:75d25f6776c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=46): insert into exp_table VALUES (1,1,1,1.0,1.5);
+[2025-09-09 11:19:02.022754 pid:49058 tid:75d25f6776c0 ctx:504000000710 WARN: create@insert_stmt.cpp:46] >> schema mismatch. value num=5, field num in schema=3
+[2025-09-09 11:19:02.022780 pid:49058 tid:75d25f6776c0 ctx:504000000710 WARN: handle_request@resolve_stage.cpp:50] >> failed to create stmt. rc=28:SCHEMA_FIELD_MISSING
+[2025-09-09 11:19:02.022847 pid:49058 tid:75d25f6776c0 ctx:504000000710 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 11:19:02.022974 pid:49058 tid:75d25f6776c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=47): insert into exp_table VALUES (2,2,-2,5.5,1.0);
+[2025-09-09 11:19:02.023173 pid:49058 tid:75d25f6776c0 ctx:504000000710 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 11:19:02.023294 pid:49058 tid:75d25f6776c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=46): insert into exp_table VALUES (3,3,4,5.0,4.0);
+[2025-09-09 11:19:02.023448 pid:49058 tid:75d25f6776c0 ctx:504000000710 WARN: create@insert_stmt.cpp:46] >> schema mismatch. value num=5, field num in schema=3
+[2025-09-09 11:19:02.023464 pid:49058 tid:75d25f6776c0 ctx:504000000710 WARN: handle_request@resolve_stage.cpp:50] >> failed to create stmt. rc=28:SCHEMA_FIELD_MISSING
+[2025-09-09 11:19:02.023518 pid:49058 tid:75d25f6776c0 ctx:504000000710 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 11:19:02.023610 pid:49058 tid:75d25f6776c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=42): select * from exp_table where col1-2 > 0;
+[2025-09-09 11:19:02.023855 pid:49058 tid:75d25f6776c0 ctx:504000000710 WARN: create_plan@logical_plan_generator.cpp:235] >> unsupported cast from floats to ints
+[2025-09-09 11:19:02.023876 pid:49058 tid:75d25f6776c0 ctx:504000000710 WARN: create_plan@logical_plan_generator.cpp:100] >> failed to create predicate logical plan. rc=UNSUPPORTED
+[2025-09-09 11:19:02.023890 pid:49058 tid:75d25f6776c0 ctx:504000000710 WARN: handle_request@optimize_stage.cpp:40] >> failed to create logical plan. rc=UNSUPPORTED
+[2025-09-09 11:19:02.023952 pid:49058 tid:75d25f6776c0 ctx:504000000710 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-09 11:19:02.024056 pid:49058 tid:75d25f6776c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=12): select 9/2;
+[2025-09-09 11:19:02.024856 pid:49058 tid:75d25f6776c0 ctx:504000000710 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS

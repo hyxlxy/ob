@@ -422,8 +422,6 @@ CREATE TABLE classes (
     id INT,
 ### 2025-09-08 10:25:12.522
     class_name CHAR(20)
-### 2025-09-08 10:25:12.523
-);
 ### 2025-09-08 10:25:12.554
 -- 测试INNER JOIN
 ### 2025-09-08 10:25:12.555
@@ -720,5 +718,75 @@ select * from exp_table where 9 = 9/2;
 select count(*) from exp_table where 9 = 9/2;
 ### 2025-09-09 10:23:04.235
 select 9 = 9/2;
-### 2025-09-09 10:23:04.359
+### 2025-09-09 10:55:59.942
+-- Demo SQL for verifying arithmetic expressions in WHERE
+### 2025-09-09 10:55:59.951
+-- Creates a sample table and runs checks for constant and column expressions
+### 2025-09-09 10:55:59.951
+-- 1) Prepare demo table
+### 2025-09-09 10:55:59.952
+DROP TABLE IF EXISTS exp_table;
+### 2025-09-09 10:55:59.952
+CREATE TABLE exp_table(
+### 2025-09-09 10:55:59.953
+  id   INT,
+### 2025-09-09 10:55:59.953
+  col1 INT,
+### 2025-09-09 10:55:59.954
+  col2 INT,
+### 2025-09-09 10:55:59.954
+  col3 FLOAT,
+### 2025-09-09 10:55:59.954
+  col4 FLOAT
+### 2025-09-09 10:55:59.955
+);
+### 2025-09-09 10:55:59.955
+-- 2) Insert sample rows (subset similar to your data)
+### 2025-09-09 10:55:59.955
+INSERT INTO exp_table VALUES (1, 8, 5, 3.17, 3.42);
+### 2025-09-09 10:55:59.956
+INSERT INTO exp_table VALUES (3, 3, 1, 3.55, 4.18);
+### 2025-09-09 10:55:59.957
+INSERT INTO exp_table VALUES (3, 6, 2, 2.62, 3.42);
+### 2025-09-09 10:55:59.957
+INSERT INTO exp_table VALUES (3, 7, 8, 5.17, 6.45);
+### 2025-09-09 10:55:59.958
+INSERT INTO exp_table VALUES (3, 8, 3, 6.59, 4.34);
+### 2025-09-09 10:55:59.958
+INSERT INTO exp_table VALUES (4, 6, 8, 5.86, 3.36);
+### 2025-09-09 10:55:59.958
+INSERT INTO exp_table VALUES (6, 6, 8, 9.69, 8.07);
+### 2025-09-09 10:55:59.959
+INSERT INTO exp_table VALUES (6, 6, 9, 3.03, 1.15);
+### 2025-09-09 10:55:59.959
+INSERT INTO exp_table VALUES (9, 7, 3, 7.67, 7.86);
+### 2025-09-09 10:55:59.960
+-- 3) Quick checks
+### 2025-09-09 10:55:59.960
+-- 3.1 Arithmetic division semantics
+### 2025-09-09 10:55:59.960
+SELECT 9/2;                 -- expect 4.5
+### 2025-09-09 10:55:59.961
+SELECT 9 = 9/2;             -- expect 0 (false)
+### 2025-09-09 10:55:59.962
+-- 3.2 WHERE with constant predicate: expect 0 rows
+### 2025-09-09 10:55:59.962
+SELECT COUNT(*) FROM exp_table WHERE 9 = 9/2;  -- expect 0
+### 2025-09-09 10:55:59.963
+SELECT *        FROM exp_table WHERE 9 = 9/2;  -- expect 0 rows
+### 2025-09-09 10:55:59.964
+-- 3.3 WHERE with true constant: expect all rows
+### 2025-09-09 10:55:59.964
+SELECT COUNT(*) FROM exp_table WHERE 9 = 9;    -- expect 9 (number of inserted rows)
+### 2025-09-09 10:55:59.965
+-- 3.4 Column expressions in WHERE
+### 2025-09-09 10:55:59.966
+SELECT COUNT(*) FROM exp_table WHERE col1 - 9 > 9;  -- should work without crash
+### 2025-09-09 10:56:55.933
+insert into exp_table values (8,1,8,2.13,6.85);
+### 2025-09-09 11:00:19.218
+select * from exp_table where col1 - 9 > 4;
+### 2025-09-09 11:00:19.232
 exit;
+### 2025-09-09 11:19:02.001
+create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
