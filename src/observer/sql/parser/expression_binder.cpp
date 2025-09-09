@@ -86,6 +86,10 @@ RC ExpressionBinder::bind_expression(unique_ptr<Expression> &expr, vector<unique
       return bind_arithmetic_expression(expr, bound_expressions);
     } break;
 
+    case ExprType::FUNCTION: {
+      return bind_function_expression(expr, bound_expressions);
+    } break;
+
     case ExprType::AGGREGATION: {
       ASSERT(false, "shouldn't be here");
     } break;
@@ -349,10 +353,54 @@ RC ExpressionBinder::bind_arithmetic_expression(
   if (right.get() != right_expr.get()) {
     right_expr.reset(right.release());
   }
-
   bound_expressions.emplace_back(std::move(expr));
   return RC::SUCCESS;
 }
+
+RC ExpressionBinder::bind_function_expression(
+    unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions)
+{
+  if (nullptr == expr) {
+    return RC::SUCCESS;
+  }
+
+  auto func_expr = static_cast<FunctionExpr *>(expr.get());
+
+  // Bind each argument by copying, binding, then collecting back
+  vector<unique_ptr<Expression>> new_args;
+  const auto &old_args = func_expr->args();
+  new_args.reserve(old_args.size());
+
+  for (const auto &arg : old_args) {
+    vector<unique_ptr<Expression>> child_bound_expressions;
+    unique_ptr<Expression>          arg_copy = arg->copy();
+
+    RC rc = bind_expression(arg_copy, child_bound_expressions);
+    if (OB_FAIL(rc)) {
+      return rc;
+    }
+    if (child_bound_expressions.size() != 1) {
+      LOG_WARN("invalid children number of function argument: %d", child_bound_expressions.size());
+      return RC::INVALID_ARGUMENT;
+    }
+
+    unique_ptr<Expression> &bound_child = child_bound_expressions[0];
+    if (bound_child.get() != arg_copy.get()) {
+      arg_copy.reset(bound_child.release());
+    }
+
+    new_args.emplace_back(std::move(arg_copy));
+  }
+
+  // Rebuild the function expression with bound args
+  auto new_func = make_unique<FunctionExpr>(func_expr->function_name(), std::move(new_args));
+  new_func->set_name(func_expr->name());
+
+  expr = std::move(new_func);
+  bound_expressions.emplace_back(std::move(expr));
+  return RC::SUCCESS;
+}
+
 
 RC check_aggregate_expression(AggregateExpr &expression)
 {

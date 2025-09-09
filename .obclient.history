@@ -81,8 +81,6 @@ UPDATE test SET name = 'new';
 ### 2025-09-03 22:49:24.500
 -- 测试LIKE功能
 ### 2025-09-03 22:49:24.507
--- 创建测试表
-### 2025-09-03 22:49:24.507
 CREATE TABLE users (
 ### 2025-09-03 22:49:24.509
     email CHAR(50)
@@ -662,8 +660,6 @@ SELECT * FROM update_table_1;
 DROP TABLE update_table_1;
 ### 2025-09-08 21:24:57.651
 -- 3. 测试expression修复
-### 2025-09-08 21:24:57.651
-CREATE TABLE exp_table(id int, col1 int, col2 int, col3 float, col4 float);
 ### 2025-09-08 21:24:57.652
 INSERT INTO exp_table VALUES (1, 8, 9, 8.95, 5.53);
 ### 2025-09-08 21:24:57.652
@@ -674,3 +670,47 @@ INSERT INTO exp_table VALUES (3, 7, 9, 5.52, 2.63);
 -- 测试算术表达式
 ### 2025-09-08 21:24:57.653
 SELECT * FROM exp_table WHERE col1 - 3 > 4;
+### 2025-09-09 09:48:25.351
+INSERT INTO exp_table VALUES (1, 10, 5);
+### 2025-09-09 09:48:25.364
+INSERT INTO exp_table VALUES (2, 20, 8);
+### 2025-09-09 09:48:25.365
+INSERT INTO exp_table VALUES (3, 3, 15);
+### 2025-09-09 09:48:25.366
+SELECT * FROM exp_table;
+### 2025-09-09 09:48:25.368
+SELECT * FROM exp_table WHERE col1 > 5;
+### 2025-09-09 09:48:25.369
+SELECT * FROM exp_table WHERE col1 + col2 > 15;
+### 2025-09-09 09:49:20.606
+CREATE TABLE TEST (ID INT, C1 VECTOR(3), C2 VECTOR(3), C3 VECTOR(4));
+### 2025-09-09 09:49:20.629
+INSERT INTO TEST VALUES(1, [1,1,1], [1,2,3], [1,2,3,4]);
+### 2025-09-09 09:51:55.895
+-- 测试表达式功能和向量功能
+### 2025-09-09 09:51:55.904
+-- 创建测试表
+### 2025-09-09 09:51:55.905
+CREATE TABLE exp_table(id int, col1 int, col2 int, col3 float, col4 float);
+### 2025-09-09 09:51:55.906
+INSERT INTO exp_table VALUES (8, 3, 4, 2.9, 3.38);
+### 2025-09-09 09:51:55.907
+INSERT INTO exp_table VALUES (8, 6, 2, 7.09, 5.36);
+### 2025-09-09 09:51:55.907
+INSERT INTO exp_table VALUES (4, 4, 4, 3.41, 4.5);
+### 2025-09-09 09:51:55.908
+-- 测试基本表达式功能
+### 2025-09-09 09:51:55.908
+SELECT * FROM exp_table WHERE col1 - 9 > 9;
+### 2025-09-09 09:53:57.371
+INSERT INTO TEST VALUES(20, '[1,1,1]', '[1,2,3]', '[1,2,3,4]');
+### 2025-09-09 09:56:07.209
+INSERT INTO TEST VALUES(21, [2,2,2], [2,3,4], [2,3,4,5]);
+### 2025-09-09 09:56:07.218
+SELECT * FROM TEST WHERE ID=21;
+### 2025-09-09 09:56:07.220
+SELECT C1 + C2 FROM TEST WHERE ID=21;
+### 2025-09-09 09:58:42.159
+SELECT L2_DISTANCE(C1, C2) FROM TEST WHERE ID=21;
+### 2025-09-09 10:02:17.041
+SELECT ID, C1, C2, L2_DISTANCE(C1,C2) FROM TEST WHERE ID=21;

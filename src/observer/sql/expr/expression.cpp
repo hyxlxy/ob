@@ -370,15 +370,24 @@ bool ArithmeticExpr::equal(const Expression &other) const
 }
 AttrType ArithmeticExpr::value_type() const
 {
+  // Unary operator: propagate child's type directly (supports vector NEGATIVE)
   if (!right_) {
     return left_->value_type();
   }
 
-  if (left_->value_type() == AttrType::INTS && right_->value_type() == AttrType::INTS &&
-      arithmetic_type_ != Type::DIV) {
-    return AttrType::INTS;
+  const AttrType lt = left_->value_type();
+  const AttrType rt = right_->value_type();
+
+  // Vector arithmetic: if any operand is a vector, the result is a vector
+  // Supported for +, -, *, / (element-wise) as implemented in VectorType
+  if (lt == AttrType::VECTORS || rt == AttrType::VECTORS) {
+    return AttrType::VECTORS;
   }
 
+  // Scalar arithmetic: keep INT when both are INT and not division; otherwise FLOAT
+  if (lt == AttrType::INTS && rt == AttrType::INTS && arithmetic_type_ != Type::DIV) {
+    return AttrType::INTS;
+  }
   return AttrType::FLOATS;
 }
 

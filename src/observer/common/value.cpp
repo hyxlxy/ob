@@ -230,18 +230,24 @@ void Value::set_value(const Value &value)
 
 void Value::set_string_from_other(const Value &other)
 {
-  ASSERT(attr_type_ == AttrType::CHARS, "attr type is not CHARS");
+  ASSERT(attr_type_ == AttrType::CHARS || attr_type_ == AttrType::VECTORS, "attr type is not CHARS/VECTORS");
   if (own_data_ && other.value_.pointer_value_ != nullptr && length_ != 0) {
-    this->value_.pointer_value_ = new char[this->length_ + 1];
-    memcpy(this->value_.pointer_value_, other.value_.pointer_value_, this->length_);
-    this->value_.pointer_value_[this->length_] = '\0';
+    if (attr_type_ == AttrType::CHARS) {
+      this->value_.pointer_value_ = new char[this->length_ + 1];
+      memcpy(this->value_.pointer_value_, other.value_.pointer_value_, this->length_);
+      this->value_.pointer_value_[this->length_] = '\0';
+    } else { // VECTORS: raw byte buffer, no terminator
+      this->value_.pointer_value_ = new char[this->length_];
+      memcpy(this->value_.pointer_value_, other.value_.pointer_value_, this->length_);
+    }
   }
 }
 
 const char *Value::data() const
 {
   switch (attr_type_) {
-    case AttrType::CHARS: {
+    case AttrType::CHARS:
+    case AttrType::VECTORS: {
       return value_.pointer_value_;
     } break;
     default: {

@@ -381,19 +381,29 @@ attr_def_list:
     ;
     
 attr_def:
-    ID type LBRACE number RBRACE 
+    ID type LBRACE number RBRACE
     {
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
-      $$->length = $4;
+      // For VECTOR(n), store bytes for [dimension(int32) + n float32 values]
+      if ($$->type == AttrType::VECTORS) {
+        $$->length = static_cast<int>(sizeof(int) + ($4 * sizeof(float)));
+      } else {
+        $$->length = $4;
+      }
     }
     | ID type
     {
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
-      $$->length = 4;
+      // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension)
+      if ($$->type == AttrType::VECTORS) {
+        $$->length = static_cast<int>(sizeof(int));
+      } else {
+        $$->length = 4;
+      }
     }
     ;
 number:
@@ -670,6 +680,21 @@ expression:
       $$->set_name(token_name(sql_string, &@$));
       delete $1;
     }
+    // function call: e.g., L2_DISTANCE(expr, expr)
+    | ID LBRACE RBRACE {
+      std::vector<std::unique_ptr<Expression>> args;
+      $$ = new FunctionExpr($1, std::move(args));
+      $$->set_name(token_name(sql_string, &@$));
+    }
+    | ID LBRACE expression_list RBRACE {
+      std::vector<std::unique_ptr<Expression>> args;
+      if ($3 != nullptr) {
+        args.swap(*$3);
+        delete $3;
+      }
+      $$ = new FunctionExpr($1, std::move(args));
+      $$->set_name(token_name(sql_string, &@$));
+    }
     | rel_attr {
       RelAttrSqlNode *node = $1;
       $$ = new UnboundFieldExpr(node->relation_name, node->attribute_name);
@@ -682,7 +707,6 @@ expression:
     | aggregate_expr {
       $$ = $1;
     }
-    // your code here
     ;
 
 rel_attr:

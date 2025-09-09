@@ -474,14 +474,16 @@ public:
   RC try_get_value(Value &value) const override;
 
   const char *function_name() const { return function_name_.c_str(); }
+  // Provide both const and non-const accessors to allow tree rewrites
+  vector<unique_ptr<Expression>> &args() { return args_; }
   const vector<unique_ptr<Expression>> &args() const { return args_; }
 
 private:
   RC try_get_value_with_args(const vector<Value> &arg_values, Value &value) const;
 
 private:
-  string                           function_name_;
-  vector<unique_ptr<Expression>>   args_;
+  string                         function_name_;
+  vector<unique_ptr<Expression>> args_;
 };
 
 class UnboundAggregateExpr : public Expression
