@@ -51,18 +51,38 @@ int compare_string(void *arg1, int arg1_max_length, void *arg2, int arg2_max_len
   const char *s1     = (const char *)arg1;
   const char *s2     = (const char *)arg2;
   int         maxlen = min(arg1_max_length, arg2_max_length);
-  int         result = strncmp(s1, s2, maxlen);
-  if (0 != result) {
+
+  // Compare common prefix
+  int result = strncmp(s1, s2, maxlen);
+  if (result != 0) {
     return result < 0 ? -1 : 1;
   }
 
+  // If one side has extra bytes, check if the extra bytes are all padding
+  // Treat trailing '\0' and ' ' (space) as padding for fixed-length CHAR comparisons.
+  auto all_padding = [](const char *p, int n) {
+    for (int i = 0; i < n; i++) {
+      if (p[i] != '\0' && p[i] != ' ') {
+        return false;
+      }
+    }
+    return true;
+  };
+
   if (arg1_max_length > maxlen) {
+    if (all_padding(s1 + maxlen, arg1_max_length - maxlen)) {
+      return 0; // equal after ignoring padding
+    }
     return 1;
   }
 
   if (arg2_max_length > maxlen) {
+    if (all_padding(s2 + maxlen, arg2_max_length - maxlen)) {
+      return 0; // equal after ignoring padding
+    }
     return -1;
   }
+
   return 0;
 }
 
