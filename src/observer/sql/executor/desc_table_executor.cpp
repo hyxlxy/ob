@@ -224,10 +224,15 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
     // Create new record with updated field
     Record new_record;
     new_record.set_rid(old_record.rid());
-    new_record.set_data(old_record.data(), old_record.len());
+    // Make an owned copy of the old record's data to avoid mutating the original buffer
+    RC copy_rc = new_record.copy_data(old_record.data(), old_record.len());
+    if (copy_rc != RC::SUCCESS) {
+      LOG_WARN("failed to copy record data. table=%s, rc=%s", table->name(), strrc(copy_rc));
+      return copy_rc;
+    }
 
     // Update the specific field in the new record
-    char *record_data = const_cast<char *>(new_record.data());
+    char *record_data = new_record.data();
 
     // Handle different field types properly
     if (field_meta->type() == AttrType::CHARS) {
