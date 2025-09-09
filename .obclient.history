@@ -714,3 +714,11 @@ SELECT C1 + C2 FROM TEST WHERE ID=21;
 SELECT L2_DISTANCE(C1, C2) FROM TEST WHERE ID=21;
 ### 2025-09-09 10:02:17.041
 SELECT ID, C1, C2, L2_DISTANCE(C1,C2) FROM TEST WHERE ID=21;
+### 2025-09-09 10:19:19.765
+select * from exp_table where 9 = 9/2;
+### 2025-09-09 10:22:49.800
+select count(*) from exp_table where 9 = 9/2;
+### 2025-09-09 10:23:04.235
+select 9 = 9/2;
+### 2025-09-09 10:23:04.359
+exit;
