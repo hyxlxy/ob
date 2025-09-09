@@ -17,6 +17,11 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/arithmetic_operator.hpp"
 #include "common/type/vector_type.h"
 #include "common/log/log.h"
+#include "common/lang/limits.h"
+
+#include <type_traits>
+
+#include "observer/common/null_like.h"
 
 using namespace std;
 
@@ -171,9 +176,16 @@ ComparisonExpr::~ComparisonExpr() {}
 
 RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &result) const
 {
-  RC  rc         = RC::SUCCESS;
+  RC rc = RC::SUCCESS;
+  result = false;
+
+  // NULL-like numeric handling: if either side is a special NULL-like numeric (e.g. division-by-zero),
+  // the comparison yields UNKNOWN -> treated as false in WHERE.
+  if (is_null_like_numeric(left) || is_null_like_numeric(right)) {
+    return rc; // result=false
+  }
+
   int cmp_result = left.compare(right);
-  result         = false;
   switch (comp_) {
     case EQUAL_TO: {
       result = (0 == cmp_result);
@@ -303,17 +315,36 @@ RC ComparisonExpr::compare_column(const Column &left, const Column &right, vecto
 
   bool left_const  = left.column_type() == Column::Type::CONSTANT_COLUMN;
   bool right_const = right.column_type() == Column::Type::CONSTANT_COLUMN;
+  int n = 0;
   if (left_const && right_const) {
+    n = left.count();
     compare_result<T, true, true>((T *)left.data(), (T *)right.data(), left.count(), result, comp_);
   } else if (left_const && !right_const) {
+    n = right.count();
     compare_result<T, true, false>((T *)left.data(), (T *)right.data(), right.count(), result, comp_);
   } else if (!left_const && right_const) {
+    n = left.count();
     compare_result<T, false, true>((T *)left.data(), (T *)right.data(), left.count(), result, comp_);
   } else {
+    n = left.count();
     compare_result<T, false, false>((T *)left.data(), (T *)right.data(), left.count(), result, comp_);
+  }
+  // Apply NULL-like mask for float comparisons: if either side equals sentinel, force false
+  if constexpr (std::is_same<T, float>::value) {
+    const float null_like = numeric_limits<float>::max();
+    const float *lptr = (const float *)left.data();
+    const float *rptr = (const float *)right.data();
+    for (int i = 0; i < n; i++) {
+      const float lv = left_const ? lptr[0] : lptr[i];
+      const float rv = right_const ? rptr[0] : rptr[i];
+      if (lv == null_like || rv == null_like) {
+        result[i] &= 0;
+      }
+    }
   }
   return rc;
 }
+
 
 ////////////////////////////////////////////////////////////////////////////////
 ConjunctionExpr::ConjunctionExpr(Type type, vector<unique_ptr<Expression>> &children)
@@ -486,8 +517,17 @@ RC ArithmeticExpr::execute_calc(
         binary_operator<LEFT_CONSTANT, RIGHT_CONSTANT, int, DivideOperator>(
             (int *)left.data(), (int *)right.data(), (int *)result.data(), result.capacity());
       } else if (attr_type == AttrType::FLOATS) {
-        binary_operator<LEFT_CONSTANT, RIGHT_CONSTANT, float, DivideOperator>(
-            (float *)left.data(), (float *)right.data(), (float *)result.data(), result.capacity());
+        // Division with NULL-like handling on vectorized path: right==0 -> sentinel (numeric_limits<float>::max())
+        float *lptr = (float *)left.data();
+        float *rptr = (float *)right.data();
+        float *optr = (float *)result.data();
+        const int n = result.capacity();
+        const float null_like = numeric_limits<float>::max();
+        for (int i = 0; i < n; i++) {
+          const float lv = LEFT_CONSTANT ? lptr[0] : lptr[i];
+          const float rv = RIGHT_CONSTANT ? rptr[0] : rptr[i];
+          optr[i] = (rv == 0.0f ? null_like : (lv / rv));
+        }
       } else {
         rc = RC::UNIMPLEMENTED;
       }
@@ -550,10 +590,16 @@ RC ArithmeticExpr::get_column(Chunk &chunk, Column &column)
     LOG_WARN("failed to get column of left expression. rc=%s", strrc(rc));
     return rc;
   }
-  rc = right_->get_column(chunk, right_column);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to get column of right expression. rc=%s", strrc(rc));
-    return rc;
+  // 对于一元运算（NEGATIVE），right_ 可能为空，此时仅使用 left_column
+  if (right_) {
+    rc = right_->get_column(chunk, right_column);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to get column of right expression. rc=%s", strrc(rc));
+      return rc;
+    }
+  } else {
+    // 占位：对于一元运算，右列未使用。为了重用下游计算接口，这里将 right_column 引用为 left_column。
+    right_column.reference(left_column);
   }
   return calc_column(left_column, right_column, column);
 }

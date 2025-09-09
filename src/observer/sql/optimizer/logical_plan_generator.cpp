@@ -233,6 +233,7 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
 {
   RC                                  rc = RC::SUCCESS;
   vector<unique_ptr<Expression>> cmp_exprs;
+  bool always_false = false;  // 常量折叠：若任一比较恒为假（AND 语义），整体恒假
   const vector<FilterUnit *>    &filter_units = filter_stmt->filter_units();
   for (const FilterUnit *filter_unit : filter_units) {
     const FilterObj &filter_obj_left  = filter_unit->left();
@@ -345,12 +346,32 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
       }
     }
 
+    // Constant predicate folding: if both sides are constants, evaluate immediately
+    if (left->type() == ExprType::VALUE && right->type() == ExprType::VALUE) {
+      auto tmp = make_unique<ComparisonExpr>(filter_unit->comp(), left->copy(), right->copy());
+      Value folded;
+      RC frc = tmp->try_get_value(folded);
+      if (frc == RC::SUCCESS) {
+        if (!folded.get_boolean()) {
+          always_false = true; // AND 语义下，出现恒假即可确定整体恒假
+        }
+        // 恒真则直接丢弃该条件，不加入 cmp_exprs
+        continue;
+      }
+      // 如果无法在计划期计算，退化为运行期计算
+    }
+
     ComparisonExpr *cmp_expr = new ComparisonExpr(filter_unit->comp(), std::move(left), std::move(right));
     cmp_exprs.emplace_back(cmp_expr);
   }
 
   unique_ptr<PredicateLogicalOperator> predicate_oper;
-  if (!cmp_exprs.empty()) {
+  if (always_false) {
+    // 整体恒假：构造一个恒为 false 的布尔谓词，执行期将不会输出任何行
+    Value v(false);
+    unique_ptr<Expression> false_expr = make_unique<ValueExpr>(v);
+    predicate_oper = unique_ptr<PredicateLogicalOperator>(new PredicateLogicalOperator(std::move(false_expr)));
+  } else if (!cmp_exprs.empty()) {
     unique_ptr<ConjunctionExpr> conjunction_expr(new ConjunctionExpr(ConjunctionExpr::Type::AND, cmp_exprs));
 
     // Bind the full predicate expression tree
@@ -368,6 +389,8 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
     }
 
     predicate_oper = unique_ptr<PredicateLogicalOperator>(new PredicateLogicalOperator(std::move(pred_expr)));
+  } else {
+    // 全部恒真：不需要谓词算子
   }
 
   logical_operator = std::move(predicate_oper);

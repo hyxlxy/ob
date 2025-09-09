@@ -61,3 +61,7 @@ miniob/
 # ignore editor backup files
 .*.swp
 .*.swo
+
+
+# ignore local reference code (do not commit)
+cankao/
