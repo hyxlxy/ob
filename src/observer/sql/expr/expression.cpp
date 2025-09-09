@@ -292,17 +292,61 @@ RC ComparisonExpr::eval(Chunk &chunk, vector<uint8_t> &select)
     LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
     return rc;
   }
-  if (left_column.attr_type() != right_column.attr_type()) {
-    LOG_WARN("cannot compare columns with different types");
+  // Determine common type for comparison (MySQL-style numeric promotion)
+  AttrType ltype = left_column.attr_type();
+  AttrType rtype = right_column.attr_type();
+  AttrType comm  = AttrType::UNDEFINED;
+  if ((ltype == AttrType::INTS || ltype == AttrType::FLOATS) && (rtype == AttrType::INTS || rtype == AttrType::FLOATS)) {
+    comm = (ltype == AttrType::FLOATS || rtype == AttrType::FLOATS) ? AttrType::FLOATS : AttrType::INTS;
+  } else if (ltype == AttrType::CHARS && rtype == AttrType::CHARS) {
+    comm = AttrType::CHARS;
+  } else {
+    LOG_WARN("unsupported compare types %d vs %d", ltype, rtype);
     return RC::INTERNAL;
   }
-  if (left_column.attr_type() == AttrType::INTS) {
-    rc = compare_column<int>(left_column, right_column, select);
-  } else if (left_column.attr_type() == AttrType::FLOATS) {
-    rc = compare_column<float>(left_column, right_column, select);
+
+  // Cast columns to common type if needed
+  auto cast_one = [&](const Column &src, Column &dst, AttrType to_type) {
+    if (src.attr_type() == to_type) { dst.reference(src); return; }
+    dst.init(to_type, src.attr_len(), src.count());
+    dst.set_column_type(src.column_type());
+    const int n = src.count();
+    for (int i = 0; i < n; i++) {
+      Value v = src.get_value(src.column_type() == Column::Type::CONSTANT_COLUMN ? 0 : i);
+      Value cv;
+      RC c = Value::cast_to(v, to_type, cv);
+      if (c != RC::SUCCESS) { cv.set_type(to_type); }
+      if (to_type == AttrType::FLOATS) {
+        float f = cv.get_float();
+        dst.append(reinterpret_cast<char *>(&f), 1);
+      } else if (to_type == AttrType::INTS) {
+        int x = cv.get_int();
+        dst.append(reinterpret_cast<char *>(&x), 1);
+      } else if (to_type == AttrType::CHARS) {
+        // For CHARS, rely on get_value already padded; append raw bytes
+        auto s = cv.get_string();
+        int len = dst.attr_len();
+        std::string buf(len, '\0');
+        memcpy(buf.data(), s.data(), std::min((int)s.size(), len));
+        dst.append(buf.data(), 1);
+      }
+    }
+    dst.set_count(n);
+  };
+
+  Column lc, rcc;
+  const Column *lp = &left_column;
+  const Column *rp = &right_column;
+  if (ltype != comm) { cast_one(left_column, lc, comm); lp = &lc; }
+  if (rtype != comm) { cast_one(right_column, rcc, comm); rp = &rcc; }
+
+  if (comm == AttrType::INTS) {
+    rc = compare_column<int>(*lp, *rp, select);
+  } else if (comm == AttrType::FLOATS) {
+    rc = compare_column<float>(*lp, *rp, select);
   } else {
-    // TODO: support string compare
-    LOG_WARN("unsupported data type %d", left_column.attr_type());
+    // TODO: string comparison with LIKE/normal operators already handled in scalar path
+    LOG_WARN("unsupported vector compare for type %d", comm);
     return RC::INTERNAL;
   }
   return rc;
