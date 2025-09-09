@@ -609,21 +609,72 @@ RC ArithmeticExpr::calc_column(const Column &left_column, const Column &right_co
   RC rc = RC::SUCCESS;
 
   const AttrType target_type = value_type();
-  column.init(target_type, left_column.attr_len(), max(left_column.count(), right_column.count()));
-  bool left_const  = left_column.column_type() == Column::Type::CONSTANT_COLUMN;
-  bool right_const = right_column.column_type() == Column::Type::CONSTANT_COLUMN;
+
+  // Prepare left/right columns with target_type to avoid reinterpreting int memory as float, etc.
+  auto cast_one = [&](const Column &src, Column &dst) -> void {
+    if (src.attr_type() == target_type) {
+      dst.reference(src);
+      return;
+    }
+    // initialize destination with same length per element (ints/floats both 4 in this system)
+    dst.init(target_type, src.attr_len(), src.count());
+    dst.set_column_type(src.column_type());
+    // materialize with per-row cast
+    const int n = src.count();
+    for (int i = 0; i < n; i++) {
+      Value v = src.get_value(src.column_type() == Column::Type::CONSTANT_COLUMN ? 0 : i);
+      Value cv;
+      RC crc = Value::cast_to(v, target_type, cv);
+      if (crc != RC::SUCCESS) {
+        // best-effort: keep default 0 on cast failure
+        cv.set_type(target_type);
+      }
+      if (target_type == AttrType::FLOATS) {
+        float f = cv.get_float();
+        dst.append(reinterpret_cast<char *>(&f), 1);
+      } else if (target_type == AttrType::INTS) {
+        int x = cv.get_int();
+        dst.append(reinterpret_cast<char *>(&x), 1);
+      } else {
+        // fallback: append zero
+        int x = 0;
+        dst.append(reinterpret_cast<char *>(&x), 1);
+      }
+    }
+    dst.set_count(n);
+  };
+
+  Column lcast;
+  Column rcast;
+  const Column *lptr = &left_column;
+  const Column *rptr = &right_column;
+
+  if (left_column.attr_type() != target_type) {
+    cast_one(left_column, lcast);
+    lptr = &lcast;
+  }
+  if (right_column.attr_type() != target_type) {
+    cast_one(right_column, rcast);
+    rptr = &rcast;
+  }
+
+  // initialize result column
+  column.init(target_type, lptr->attr_len(), std::max(lptr->count(), rptr->count()));
+
+  bool left_const  = lptr->column_type() == Column::Type::CONSTANT_COLUMN;
+  bool right_const = rptr->column_type() == Column::Type::CONSTANT_COLUMN;
   if (left_const && right_const) {
     column.set_column_type(Column::Type::CONSTANT_COLUMN);
-    rc = execute_calc<true, true>(left_column, right_column, column, arithmetic_type_, target_type);
+    rc = execute_calc<true, true>(*lptr, *rptr, column, arithmetic_type_, target_type);
   } else if (left_const && !right_const) {
     column.set_column_type(Column::Type::NORMAL_COLUMN);
-    rc = execute_calc<true, false>(left_column, right_column, column, arithmetic_type_, target_type);
+    rc = execute_calc<true, false>(*lptr, *rptr, column, arithmetic_type_, target_type);
   } else if (!left_const && right_const) {
     column.set_column_type(Column::Type::NORMAL_COLUMN);
-    rc = execute_calc<false, true>(left_column, right_column, column, arithmetic_type_, target_type);
+    rc = execute_calc<false, true>(*lptr, *rptr, column, arithmetic_type_, target_type);
   } else {
     column.set_column_type(Column::Type::NORMAL_COLUMN);
-    rc = execute_calc<false, false>(left_column, right_column, column, arithmetic_type_, target_type);
+    rc = execute_calc<false, false>(*lptr, *rptr, column, arithmetic_type_, target_type);
   }
   return rc;
 }
