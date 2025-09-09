@@ -48,6 +48,10 @@ public:
   RC tuple_schema(TupleSchema &schema) const override;
 
 private:
+  // When there is no child (SELECT constant expressions without FROM),
+  // we should still output exactly one row. Use this flag to emit once.
+  bool produced_one_row_without_child_ = false;
+
   vector<unique_ptr<Expression>>          expressions_;
   ExpressionTuple<unique_ptr<Expression>> tuple_;
 };

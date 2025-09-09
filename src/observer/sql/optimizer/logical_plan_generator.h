@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/memory.h"
 #include "common/sys/rc.h"
 #include "common/type/attr_type.h"
+#include "sql/parser/expression_binder.h"
 
 class Stmt;
 class CalcStmt;
@@ -55,4 +56,8 @@ private:
   // JOIN条件处理辅助函数
   bool is_join_condition(Expression *expr, const vector<Table *> &tables);
   bool involves_tables(Expression *expr, LogicalOperator *left_oper, LogicalOperator *right_oper);
+
+private:
+  BinderContext binder_context_;
+  bool          binder_ctx_initialized_ = false;
 };

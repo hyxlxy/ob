@@ -91,6 +91,14 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 {
   unique_ptr<LogicalOperator> *last_oper = nullptr;
 
+  // Initialize binder context with tables for this SELECT
+  binder_context_ = BinderContext();
+  binder_ctx_initialized_ = true;
+  const vector<Table *> &tables = select_stmt->tables();
+  for (Table *table : tables) {
+    binder_context_.add_table(table);
+  }
+
   unique_ptr<LogicalOperator> table_oper(nullptr);
   last_oper = &table_oper;
   unique_ptr<LogicalOperator> predicate_oper;
@@ -101,7 +109,6 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     return rc;
   }
 
-  const vector<Table *> &tables = select_stmt->tables();
   for (Table *table : tables) {
 
     unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY));
@@ -141,7 +148,20 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     // HAVING: place predicate after group by
     unique_ptr<LogicalOperator> having_oper;
     if (select_stmt->having_expr() != nullptr) {
-      having_oper = make_unique<PredicateLogicalOperator>(select_stmt->having_expr()->copy());
+      // bind having expression
+      unique_ptr<Expression> having_expr = select_stmt->having_expr()->copy();
+      if (binder_ctx_initialized_) {
+        ExpressionBinder binder(binder_context_);
+        vector<unique_ptr<Expression>> bound;
+        RC brc = binder.bind_expression(having_expr, bound);
+        if (OB_FAIL(brc)) {
+          return brc;
+        }
+        if (bound.size() == 1) {
+          having_expr = std::move(bound[0]);
+        }
+      }
+      having_oper = make_unique<PredicateLogicalOperator>(std::move(having_expr));
       having_oper->add_child(std::move(*last_oper));
       last_oper = &having_oper;
     }
@@ -152,7 +172,19 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   if (!select_stmt->order_by_expressions().empty() && *last_oper) {
     vector<unique_ptr<Expression>> order_by_expressions;
     for (auto &expr : select_stmt->order_by_expressions()) {
-      order_by_expressions.emplace_back(expr->copy());
+      unique_ptr<Expression> ob = expr->copy();
+      if (binder_ctx_initialized_) {
+        ExpressionBinder binder(binder_context_);
+        vector<unique_ptr<Expression>> bound;
+        RC brc = binder.bind_expression(ob, bound);
+        if (OB_FAIL(brc)) {
+          return brc;
+        }
+        if (bound.size() == 1) {
+          ob = std::move(bound[0]);
+        }
+      }
+      order_by_expressions.emplace_back(std::move(ob));
     }
 
     sort_oper = make_unique<SortLogicalOperator>(std::move(order_by_expressions),
@@ -162,7 +194,33 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     last_oper = &sort_oper;
   }
 
-  auto project_oper = make_unique<ProjectLogicalOperator>(std::move(select_stmt->query_expressions()));
+  // Bind projection expressions
+  vector<unique_ptr<Expression>> proj_exprs = std::move(select_stmt->query_expressions());
+  if (binder_ctx_initialized_) {
+    ExpressionBinder binder(binder_context_);
+    for (auto &expr : proj_exprs) {
+      vector<unique_ptr<Expression>> bound;
+      RC brc = binder.bind_expression(expr, bound);
+      if (OB_FAIL(brc)) {
+        return brc;
+      }
+      if (!bound.empty()) {
+        // For SELECT list, star may expand to multiple expressions.
+        // Replace current expr with the first, and append the rest.
+        auto first = std::move(bound[0]);
+        // if more than one, insert after current
+        if (bound.size() > 1) {
+          // insert remaining after first
+          for (size_t i = 1; i < bound.size(); ++i) {
+            proj_exprs.emplace_back(std::move(bound[i]));
+          }
+        }
+        expr = std::move(first);
+      }
+    }
+  }
+
+  auto project_oper = make_unique<ProjectLogicalOperator>(std::move(proj_exprs));
   if (*last_oper) {
     project_oper->add_child(std::move(*last_oper));
   }
@@ -198,6 +256,27 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
       right = filter_obj_right.expr->copy();
     }
 
+    // Bind expressions to actual table fields if context is available
+    if (binder_ctx_initialized_) {
+      ExpressionBinder binder(binder_context_);
+      vector<unique_ptr<Expression>> bound_left;
+      vector<unique_ptr<Expression>> bound_right;
+      if (left) {
+        RC brc = binder.bind_expression(left, bound_left);
+        if (OB_FAIL(brc)) return brc;
+        if (bound_left.size() == 1) {
+          left = std::move(bound_left[0]);
+        }
+      }
+      if (right) {
+        RC brc = binder.bind_expression(right, bound_right);
+        if (OB_FAIL(brc)) return brc;
+        if (bound_right.size() == 1) {
+          right = std::move(bound_right[0]);
+        }
+      }
+    }
+
     if (left->value_type() != right->value_type()) {
       auto left_to_right_cost = implicit_cast_cost(left->value_type(), right->value_type());
       auto right_to_left_cost = implicit_cast_cost(right->value_type(), left->value_type());
@@ -231,9 +310,38 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
         }
 
       } else {
-        rc = RC::UNSUPPORTED;
-        LOG_WARN("unsupported cast from %s to %s", attr_type_to_string(left->value_type()), attr_type_to_string(right->value_type()));
-        return rc;
+        // Fallback: if both sides are numeric, promote to FLOATS instead of failing
+        auto is_numeric = [](AttrType t) { return t == AttrType::INTS || t == AttrType::FLOATS; };
+        if (is_numeric(left->value_type()) && is_numeric(right->value_type())) {
+          // Cast the INT side to FLOAT
+          if (left->value_type() == AttrType::INTS && right->value_type() == AttrType::FLOATS) {
+            ExprType lt = left->type();
+            auto cast_expr = make_unique<CastExpr>(std::move(left), AttrType::FLOATS);
+            if (lt == ExprType::VALUE) {
+              Value lval;
+              RC lrc = cast_expr->try_get_value(lval);
+              if (OB_FAIL(lrc)) return lrc;
+              left = make_unique<ValueExpr>(lval);
+            } else {
+              left = std::move(cast_expr);
+            }
+          } else if (left->value_type() == AttrType::FLOATS && right->value_type() == AttrType::INTS) {
+            ExprType rt = right->type();
+            auto cast_expr = make_unique<CastExpr>(std::move(right), AttrType::FLOATS);
+            if (rt == ExprType::VALUE) {
+              Value rval;
+              RC rrc = cast_expr->try_get_value(rval);
+              if (OB_FAIL(rrc)) return rrc;
+              right = make_unique<ValueExpr>(rval);
+            } else {
+              right = std::move(cast_expr);
+            }
+          }
+        } else {
+          rc = RC::UNSUPPORTED;
+          LOG_WARN("unsupported cast from %s to %s", attr_type_to_string(left->value_type()), attr_type_to_string(right->value_type()));
+          return rc;
+        }
       }
     }
 
@@ -244,7 +352,22 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
   unique_ptr<PredicateLogicalOperator> predicate_oper;
   if (!cmp_exprs.empty()) {
     unique_ptr<ConjunctionExpr> conjunction_expr(new ConjunctionExpr(ConjunctionExpr::Type::AND, cmp_exprs));
-    predicate_oper = unique_ptr<PredicateLogicalOperator>(new PredicateLogicalOperator(std::move(conjunction_expr)));
+
+    // Bind the full predicate expression tree
+    unique_ptr<Expression> pred_expr(conjunction_expr.release());
+    if (binder_ctx_initialized_) {
+      ExpressionBinder binder(binder_context_);
+      vector<unique_ptr<Expression>> bound;
+      RC brc = binder.bind_expression(pred_expr, bound);
+      if (OB_FAIL(brc)) {
+        return brc;
+      }
+      if (bound.size() == 1) {
+        pred_expr = std::move(bound[0]);
+      }
+    }
+
+    predicate_oper = unique_ptr<PredicateLogicalOperator>(new PredicateLogicalOperator(std::move(pred_expr)));
   }
 
   logical_operator = std::move(predicate_oper);

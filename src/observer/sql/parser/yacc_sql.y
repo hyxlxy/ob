@@ -478,9 +478,17 @@ value:
       $$ = new Value((int)$1);
       @$ = @1;
     }
+    | '-' NUMBER {
+      $$ = new Value((int)(-$2));
+      @$ = @2;
+    }
     |FLOAT {
       $$ = new Value((float)$1);
       @$ = @1;
+    }
+    | '-' FLOAT {
+      $$ = new Value((float)(-$2));
+      @$ = @2;
     }
     |vector_literal {
       $$ = $1;

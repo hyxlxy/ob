@@ -26,6 +26,9 @@ ProjectPhysicalOperator::ProjectPhysicalOperator(vector<unique_ptr<Expression>> 
 
 RC ProjectPhysicalOperator::open(Trx *trx)
 {
+  // Reset one-shot emission flag for SELECT without FROM
+  produced_one_row_without_child_ = false;
+
   if (children_.empty()) {
     return RC::SUCCESS;
   }
@@ -43,7 +46,12 @@ RC ProjectPhysicalOperator::open(Trx *trx)
 RC ProjectPhysicalOperator::next()
 {
   if (children_.empty()) {
-    return RC::RECORD_EOF;
+    // Emit exactly one tuple for constant-only SELECT list (no FROM)
+    if (produced_one_row_without_child_) {
+      return RC::RECORD_EOF;
+    }
+    produced_one_row_without_child_ = true;
+    return RC::SUCCESS;
   }
   return children_[0]->next();
 }
@@ -57,7 +65,12 @@ RC ProjectPhysicalOperator::close()
 }
 Tuple *ProjectPhysicalOperator::current_tuple()
 {
-  tuple_.set_tuple(children_[0]->current_tuple());
+  if (children_.empty()) {
+    // No child: evaluate expressions against no input tuple (constants only)
+    tuple_.set_tuple(nullptr);
+  } else {
+    tuple_.set_tuple(children_[0]->current_tuple());
+  }
   return &tuple_;
 }
 
