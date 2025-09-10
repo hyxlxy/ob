@@ -834,3 +834,5 @@ insert into exp_table VALUES (5, 7, 8, 3.74, 7.63);
 insert into exp_table VALUES (1, 9, 1, 9.94, 8.02);
 ### 2025-09-10 08:22:13.701
 select * from exp_table where 6 = 7/1;
+### 2025-09-10 09:53:17.231
+-- create and populate table

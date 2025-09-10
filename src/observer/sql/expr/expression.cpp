@@ -718,7 +718,8 @@ RC ArithmeticExpr::calc_column(const Column &left_column, const Column &right_co
   }
 
   // initialize result column
-  column.init(target_type, lptr->attr_len(), std::max(lptr->count(), rptr->count()));
+  const int out_n = std::max(lptr->count(), rptr->count());
+  column.init(target_type, lptr->attr_len(), out_n);
 
   bool left_const  = lptr->column_type() == Column::Type::CONSTANT_COLUMN;
   bool right_const = rptr->column_type() == Column::Type::CONSTANT_COLUMN;
@@ -735,6 +736,8 @@ RC ArithmeticExpr::calc_column(const Column &left_column, const Column &right_co
     column.set_column_type(Column::Type::NORMAL_COLUMN);
     rc = execute_calc<false, false>(*lptr, *rptr, column, arithmetic_type_, target_type);
   }
+  // Important: set output row count so downstream comparisons see correct length
+  column.set_count(out_n);
   return rc;
 }
 

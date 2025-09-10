@@ -1,0 +1,119 @@
+[2025-09-10 09:53:14.185598 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: init@init.cpp:201] >> Output configuration 
+Begin dump configuration
+[]
+
+Finish dump configuration 
+
+[2025-09-10 09:53:14.186238 pid:24462 tid:77bb73ef97c0 ctx:0 WARN: create_db@default_handler.cpp:91] >> Db already exists: sys
+[2025-09-10 09:53:14.187181 pid:24462 tid:77bb6f5ff6c0 ctx:0 INFO: thread_func@thread_pool_executor.cpp:118] >> [ObLsmBackground] thread started
+[2025-09-10 09:53:14.188968 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:128, item_num_per_pool:128, this->name:BufPool.
+[2025-09-10 09:53:14.189533 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:256, item_num_per_pool:128, this->name:BufPool.
+[2025-09-10 09:53:14.190068 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:384, item_num_per_pool:128, this->name:BufPool.
+[2025-09-10 09:53:14.190664 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:512, item_num_per_pool:128, this->name:BufPool.
+[2025-09-10 09:53:14.191181 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:640, item_num_per_pool:128, this->name:BufPool.
+[2025-09-10 09:53:14.191701 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:768, item_num_per_pool:128, this->name:BufPool.
+[2025-09-10 09:53:14.192432 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:896, item_num_per_pool:128, this->name:BufPool.
+[2025-09-10 09:53:14.193086 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1024, item_num_per_pool:128, this->name:BufPool.
+[2025-09-10 09:53:14.193765 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1152, item_num_per_pool:128, this->name:BufPool.
+[2025-09-10 09:53:14.194396 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1280, item_num_per_pool:128, this->name:BufPool.
+[2025-09-10 09:53:14.194990 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1408, item_num_per_pool:128, this->name:BufPool.
+[2025-09-10 09:53:14.195707 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1536, item_num_per_pool:128, this->name:BufPool.
+[2025-09-10 09:53:14.196213 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1664, item_num_per_pool:128, this->name:BufPool.
+[2025-09-10 09:53:14.196796 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1792, item_num_per_pool:128, this->name:BufPool.
+[2025-09-10 09:53:14.197466 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1920, item_num_per_pool:128, this->name:BufPool.
+[2025-09-10 09:53:14.198130 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2048, item_num_per_pool:128, this->name:BufPool.
+[2025-09-10 09:53:14.198683 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2176, item_num_per_pool:128, this->name:BufPool.
+[2025-09-10 09:53:14.199474 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2304, item_num_per_pool:128, this->name:BufPool.
+[2025-09-10 09:53:14.200466 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2432, item_num_per_pool:128, this->name:BufPool.
+[2025-09-10 09:53:14.201195 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2560, item_num_per_pool:128, this->name:BufPool.
+[2025-09-10 09:53:14.201258 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: init@mem_pool.h:197] >> Extend one pool, this->size:2560, item_num_per_pool:128, this->name:BufPool.
+[2025-09-10 09:53:14.201274 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: BufferPoolManager@disk_buffer_pool.cpp:775] >> buffer pool manager init with memory size 20971520, page num: 2560, pool num: 20
+[2025-09-10 09:53:14.202340 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: load_pages@double_write_buffer.cpp:287] >> double write buffer load pages done. page num=3
+[2025-09-10 09:53:14.202834 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: init_meta@db.cpp:433] >> Successfully read db meta file. db=sys, file=miniob/db/sys/sys.db, check_point_lsn=0
+[2025-09-10 09:53:14.204564 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=ID
+[2025-09-10 09:53:14.204636 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=C1
+[2025-09-10 09:53:14.204656 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=C2
+[2025-09-10 09:53:14.204673 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=C3
+[2025-09-10 09:53:14.204837 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/TEST.data.
+[2025-09-10 09:53:14.205738 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/TEST.data. file_desc=8, hdr_frame=0x77bb72b6c808, file header=pageCount:1, allocatedCount:1
+[2025-09-10 09:53:14.205930 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: init_free_pages@record_manager.cpp:538] >> record file handler init free pages done. free page num=0, rc=SUCCESS
+[2025-09-10 09:53:14.205964 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: init@record_manager.cpp:497] >> open record file handle done. rc=SUCCESS
+[2025-09-10 09:53:14.205998 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: open_all_tables@db.cpp:313] >> Open table: TEST, file: TEST.table
+[2025-09-10 09:53:14.206594 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=id
+[2025-09-10 09:53:14.206642 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=col1
+[2025-09-10 09:53:14.206664 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=col2
+[2025-09-10 09:53:14.206693 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=col3
+[2025-09-10 09:53:14.206711 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: init@field_meta.cpp:57] >> Init a field with name=col4
+[2025-09-10 09:53:14.206876 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/exp_table.data.
+[2025-09-10 09:53:14.207280 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/exp_table.data. file_desc=9, hdr_frame=0x77bb72b6e898, file header=pageCount:2, allocatedCount:2
+[2025-09-10 09:53:14.207496 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: init_free_pages@record_manager.cpp:538] >> record file handler init free pages done. free page num=1, rc=SUCCESS
+[2025-09-10 09:53:14.207520 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: init@record_manager.cpp:497] >> open record file handle done. rc=SUCCESS
+[2025-09-10 09:53:14.207547 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: open_all_tables@db.cpp:313] >> Open table: exp_table, file: exp_table.table
+[2025-09-10 09:53:14.207561 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: open_all_tables@db.cpp:316] >> All table have been opened. num=2
+[2025-09-10 09:53:14.221461 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: recover@db.cpp:397] >> Successfully recover db. db=sys checkpoint_lsn=0
+[2025-09-10 09:53:14.221588 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: init@default_handler.cpp:67] >> Default handler init with miniob success
+[2025-09-10 09:53:14.221614 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: init@init.cpp:216] >> Successfully init utility
+[2025-09-10 09:53:14.221743 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: start_tcp_server@server.cpp:192] >> Listen on port 6789
+[2025-09-10 09:53:14.221763 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: start_tcp_server@server.cpp:195] >> Observer start success
+[2025-09-10 09:53:17.217967 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: accept@server.cpp:127] >> Accepted connection from 127.0.0.1:38554
+
+[2025-09-10 09:53:17.218614 pid:24462 tid:77bb6d17e6c0 ctx:0 INFO: operator()@one_thread_per_connection_thread_handler.cpp:70] >> worker thread start. communicator = 0x50b000000bf0
+[2025-09-10 09:53:17.244106 pid:24462 tid:77bb6d17e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=29): -- create and populate table
+[2025-09-10 09:53:17.244480 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-10 09:53:17.244572 pid:24462 tid:77bb6d17e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=76): CREATE TABLE exp_table(id int, col1 int, col2 int, col3 float, col4 float);
+[2025-09-10 09:53:17.244878 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 WARN: create_table@db.cpp:159] >> exp_table has been opened before.
+[2025-09-10 09:53:17.244932 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-10 09:53:17.245007 pid:24462 tid:77bb6d17e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=51): INSERT INTO exp_table VALUES (8, 1, 5, 2.0, 8.15);
+[2025-09-10 09:53:17.245639 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-10 09:53:17.245726 pid:24462 tid:77bb6d17e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=52): INSERT INTO exp_table VALUES (3, 4, 1, 1.57, 7.92);
+[2025-09-10 09:53:17.246089 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-10 09:53:17.246167 pid:24462 tid:77bb6d17e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=51): INSERT INTO exp_table VALUES (2, 7, 5, 2.8, 8.15);
+[2025-09-10 09:53:17.246482 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-10 09:53:17.246547 pid:24462 tid:77bb6d17e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=39): -- query should NOT include col1=1 row
+[2025-09-10 09:53:17.246646 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-10 09:53:17.246736 pid:24462 tid:77bb6d17e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=44): SELECT * FROM exp_table WHERE 0 < col1 - 3;
+[2025-09-10 09:53:17.246909 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 WARN: handle_request@parse_stage.cpp:46] >> got multi sql commands but only 1 will be handled
+[2025-09-10 09:53:17.248723 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-10 09:53:17.248855 pid:24462 tid:77bb6d17e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=11): -- cleanup
+[2025-09-10 09:53:17.248961 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-10 09:53:17.249017 pid:24462 tid:77bb6d17e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=22): DROP TABLE exp_table;
+[2025-09-10 09:53:17.249316 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/exp_table.data, page count=1
+[2025-09-10 09:53:17.249368 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 9:miniob/db/sys/exp_table.data.
+[2025-09-10 09:53:17.249399 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-10 09:53:17.249413 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: exp_table
+[2025-09-10 09:53:17.249573 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 INFO: drop_table@db.cpp:212] >> Removed table meta file: miniob/db/sys/exp_table.table
+[2025-09-10 09:53:17.249964 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 INFO: drop_table@db.cpp:223] >> Removed table data file: miniob/db/sys/exp_table.data
+[2025-09-10 09:53:17.250140 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 INFO: drop_table@db.cpp:254] >> Successfully dropped table: exp_table
+[2025-09-10 09:53:17.250259 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 INFO: sync@heap_table_engine.cpp:298] >> Sync table over. table=TEST
+[2025-09-10 09:53:17.250271 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 INFO: sync@db.cpp:340] >> Successfully sync table db:sys, table:TEST.
+[2025-09-10 09:53:17.252805 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 INFO: sync@db.cpp:345] >> double write buffer flush pages ret=SUCCESS
+[2025-09-10 09:53:17.253334 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 INFO: flush_meta@db.cpp:478] >> Successfully write db meta file. db=sys, file=miniob/db/sys/sys.db.tmp, check_point_lsn=0
+[2025-09-10 09:53:17.253432 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 INFO: sync@db.cpp:364] >> Successfully sync db. db=sys
+[2025-09-10 09:53:17.253461 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 INFO: execute@command_executor.cpp:111] >> sync db after ddl. rc=0
+[2025-09-10 09:53:17.253600 pid:24462 tid:77bb6d17e6c0 ctx:504000000750 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
+[2025-09-10 09:54:17.217902 pid:24462 tid:77bb73ef97c0 ctx:0 WARN: serve@server.cpp:271] >> [listen socket] poll error. fd = 10, ret = -1, error=Interrupted system call
+[2025-09-10 09:54:17.218059 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:170] >> begin to await stop one thread per connection thread handler
+[2025-09-10 09:54:17.218270 pid:24462 tid:77bb6be746c0 ctx:0 INFO: quit_thread_func@main.cpp:156] >> Receive signal: 15
+[2025-09-10 09:54:17.218385 pid:24462 tid:77bb6be746c0 ctx:0 INFO: shutdown@server.cpp:299] >> NetServer shutting down
+[2025-09-10 09:54:17.220869 pid:24462 tid:77bb6d17e6c0 ctx:0 INFO: read_event@plain_communicator.cpp:82] >> The peer has been closed 127.0.0.1:38554
+[2025-09-10 09:54:17.220960 pid:24462 tid:77bb6d17e6c0 ctx:0 ERROR: operator()@one_thread_per_connection_thread_handler.cpp:98] >> handle error. rc = IOERR_CLOSE
+[2025-09-10 09:54:17.220976 pid:24462 tid:77bb6d17e6c0 ctx:0 INFO: operator()@one_thread_per_connection_thread_handler.cpp:103] >> worker thread stop. communicator = 0x50b000000bf0
+[2025-09-10 09:54:17.221104 pid:24462 tid:77bb6d17e6c0 ctx:0 INFO: close_connection@one_thread_per_connection_thread_handler.cpp:154] >> close connection. communicator = 0x50b000000bf0
+[2025-09-10 09:54:17.318217 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:174] >> end to await stop one thread per connection thread handler
+[2025-09-10 09:54:17.318373 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:170] >> begin to await stop one thread per connection thread handler
+[2025-09-10 09:54:17.318424 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:174] >> end to await stop one thread per connection thread handler
+[2025-09-10 09:54:17.318492 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: serve@server.cpp:293] >> NetServer quit
+[2025-09-10 09:54:17.318537 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: main@main.cpp:203] >> Server stopped
+[2025-09-10 09:54:17.318976 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: sync@heap_table_engine.cpp:298] >> Sync table over. table=TEST
+[2025-09-10 09:54:17.319041 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: sync@db.cpp:340] >> Successfully sync table db:sys, table:TEST.
+[2025-09-10 09:54:17.322997 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: sync@db.cpp:345] >> double write buffer flush pages ret=SUCCESS
+[2025-09-10 09:54:17.323475 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: flush_meta@db.cpp:478] >> Successfully write db meta file. db=sys, file=miniob/db/sys/sys.db.tmp, check_point_lsn=0
+[2025-09-10 09:54:17.323560 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: sync@db.cpp:364] >> Successfully sync db. db=sys
+[2025-09-10 09:54:17.323768 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/TEST.data, page count=0
+[2025-09-10 09:54:17.323818 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 8:miniob/db/sys/TEST.data.
+[2025-09-10 09:54:17.323924 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-10 09:54:17.323975 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: TEST
+[2025-09-10 09:54:17.330507 pid:24462 tid:77bb6f5ff6c0 ctx:0 INFO: thread_func@thread_pool_executor.cpp:176] >> [ObLsmBackground] thread exit
+[2025-09-10 09:54:17.524318 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: ~Db@db.cpp:50] >> Db has been closed: sys
+[2025-09-10 09:54:17.536881 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: cleanup@mem_pool.h:223] >> Successfully do cleanup, this->name:BufPool.
+[2025-09-10 09:54:17.537076 pid:24462 tid:77bb73ef97c0 ctx:0 INFO: cleanup_util@init.cpp:230] >> Shutdown Cleanly!
