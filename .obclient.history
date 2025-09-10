@@ -812,10 +812,6 @@ select * from exp_table where col1*col2 < 0;
 insert into exp_table values (4, 2, 2, -2, 5.5);
 ### 2025-09-09 14:32:41.114
 q
-### 2025-09-09 21:40:30.404
-create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
-### 2025-09-09 21:40:30.430
-create table exp_table2(id int, col1 int);
 ### 2025-09-09 21:40:30.434
 insert into exp_table VALUES (3, 8, 9, 9.42, 9.24);
 ### 2025-09-09 21:40:30.436
@@ -826,3 +822,15 @@ insert into exp_table VALUES (8, 5, 4, 2.32, 6.19);
 select * from exp_table where 7 = 3/5;
 ### 2025-09-09 21:40:48.183
 select count(*) from exp_table where 7 = 14/2;
+### 2025-09-10 08:22:13.654
+create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
+### 2025-09-10 08:22:13.693
+create table exp_table2(id int, col1 int);
+### 2025-09-10 08:22:13.697
+insert into exp_table VALUES (4, 6, 2, 9.39, 6.95);
+### 2025-09-10 08:22:13.699
+insert into exp_table VALUES (5, 7, 8, 3.74, 7.63);
+### 2025-09-10 08:22:13.700
+insert into exp_table VALUES (1, 9, 1, 9.94, 8.02);
+### 2025-09-10 08:22:13.701
+select * from exp_table where 6 = 7/1;

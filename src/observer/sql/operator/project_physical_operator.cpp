@@ -46,9 +46,17 @@ RC ProjectPhysicalOperator::open(Trx *trx)
 RC ProjectPhysicalOperator::next()
 {
   if (children_.empty()) {
-    // Emit exactly one tuple for constant-only SELECT list (no FROM)
+    // Only emit one row when the projection is constant-foldable (SELECT without FROM)
     if (produced_one_row_without_child_) {
       return RC::RECORD_EOF;
+    }
+    // Check all expressions are constant-foldable
+    for (const auto &expr : expressions_) {
+      Value v;
+      if (expr->try_get_value(v) != RC::SUCCESS) {
+        // Not a constant-only projection -> no row should be produced
+        return RC::RECORD_EOF;
+      }
     }
     produced_one_row_without_child_ = true;
     return RC::SUCCESS;

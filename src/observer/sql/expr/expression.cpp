@@ -278,7 +278,24 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
 
 RC ComparisonExpr::eval(Chunk &chunk, vector<uint8_t> &select)
 {
-  RC     rc = RC::SUCCESS;
+  RC rc = RC::SUCCESS;
+
+  // Fast path: both sides are constant-foldable -> compute once and broadcast
+  {
+    Value lv, rv;
+    RC lc = left_->try_get_value(lv);
+    RC rc2 = right_->try_get_value(rv);
+    if (lc == RC::SUCCESS && rc2 == RC::SUCCESS) {
+      bool b = false;
+      rc = compare_value(lv, rv, b);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
+      std::fill(select.begin(), select.end(), static_cast<uint8_t>(b ? 1 : 0));
+      return RC::SUCCESS;
+    }
+  }
+
   Column left_column;
   Column right_column;
 
@@ -323,7 +340,6 @@ RC ComparisonExpr::eval(Chunk &chunk, vector<uint8_t> &select)
         int x = cv.get_int();
         dst.append(reinterpret_cast<char *>(&x), 1);
       } else if (to_type == AttrType::CHARS) {
-        // For CHARS, rely on get_value already padded; append raw bytes
         auto s = cv.get_string();
         int len = dst.attr_len();
         std::string buf(len, '\0');
@@ -345,7 +361,6 @@ RC ComparisonExpr::eval(Chunk &chunk, vector<uint8_t> &select)
   } else if (comm == AttrType::FLOATS) {
     rc = compare_column<float>(*lp, *rp, select);
   } else {
-    // TODO: string comparison with LIKE/normal operators already handled in scalar path
     LOG_WARN("unsupported vector compare for type %d", comm);
     return RC::INTERNAL;
   }

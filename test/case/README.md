@@ -10,7 +10,7 @@ python3 miniob_test.py
 ```bash
 python3 miniob_test.py --test-cases=`case-name` --report-only
 ```
-
+python3 miniob_test.py --test-cases='primary-expression' --report-only
 > 把`case-name` 换成你想测试的用例名称。
 > 如果要运行多个测试用例，则在 --test-cases 参数中使用 ',' 分隔写多个即可
 
@@ -21,7 +21,7 @@ python3 miniob_test.py --test-cases=`case-name` --report-only
 运行 basic 测试用例
 ```bash
 python3 miniob_test.py --test-cases=basic
-```
+```w
 
 注意：MiniOB 的题目要求是运行结果与 MySQL8.0 的结果一致，因此删除了过时的结果文件。如果不清楚某个测试用例的预期结果，参考 MySQL8.0 的运行结果即可。
 

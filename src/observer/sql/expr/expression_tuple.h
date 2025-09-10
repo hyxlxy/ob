@@ -37,6 +37,12 @@ public:
     }
 
     const ExprPointerType &expression = expressions_[index];
+
+    // Fast path: if we have a child tuple and this expression is STAR, passthrough to child
+    if (child_tuple_ != nullptr && expression->type() == ExprType::STAR) {
+      return child_tuple_->cell_at(index, cell);
+    }
+
     return get_value(expression, cell);
   }
 
@@ -47,7 +53,13 @@ public:
     }
 
     const ExprPointerType &expression = expressions_[index];
-    spec                              = TupleCellSpec(expression->name());
+
+    // If STAR remains here (not expanded by binder), forward spec from child tuple
+    if (child_tuple_ != nullptr && expression->type() == ExprType::STAR) {
+      return child_tuple_->spec_at(index, spec);
+    }
+
+    spec = TupleCellSpec(expression->name());
     return RC::SUCCESS;
   }
 
@@ -80,6 +92,11 @@ private:
       rc = expression->get_value(*child_tuple_, value);
     } else {
       rc = expression->try_get_value(value);
+    }
+    if (rc != RC::SUCCESS) {
+      // Help diagnose which expression failed to produce a value
+      LOG_WARN("ExpressionTuple get_value failed. expr_type=%d name=%s child_tuple_null=%d rc=%s",
+               static_cast<int>(expression->type()), expression->name(), child_tuple_ == nullptr, strrc(rc));
     }
     return rc;
   }
