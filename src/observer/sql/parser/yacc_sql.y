@@ -173,6 +173,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <number>              type
 %type <condition>           condition
 %type <value>               value
+%type <value>               insert_value
 %type <number>              number
 %type <relation_with_alias> relation
 %type <comp>                comp_op
@@ -180,6 +181,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
 %type <value_list>          value_list
+%type <value_list>          insert_value_list
 %type <condition_list>      where
 %type <condition_list>      condition_list
 %type <cstring>             storage_format
@@ -449,7 +451,7 @@ attr_list:
     ;
 
 insert_stmt:        /*insert   语句的语法解析树*/
-    INSERT INTO ID VALUES LBRACE value value_list RBRACE
+    INSERT INTO ID VALUES LBRACE insert_value insert_value_list RBRACE
     {
       $$ = new ParsedSqlNode(SCF_INSERT);
       $$->insertion.relation_name = $3;
@@ -463,12 +465,12 @@ insert_stmt:        /*insert   语句的语法解析树*/
     }
     ;
 
-value_list:
+insert_value_list:
     /* empty */
     {
       $$ = nullptr;
     }
-    | COMMA value value_list  {
+    | COMMA insert_value insert_value_list  {
       if ($3 != nullptr) {
         $$ = $3;
       } else {
@@ -478,22 +480,27 @@ value_list:
       delete $2;
     }
     ;
+
+insert_value:
+    value
+    | '-' NUMBER {
+      $$ = new Value(-(int)$2);
+      @$ = @2;
+    }
+    | '-' FLOAT {
+      $$ = new Value(-(float)$2);
+      @$ = @2;
+    }
+    ;
+
 value:
     NUMBER {
       $$ = new Value((int)$1);
       @$ = @1;
     }
-    | '-' NUMBER {
-      $$ = new Value((int)(-$2));
-      @$ = @2;
-    }
     |FLOAT {
       $$ = new Value((float)$1);
       @$ = @1;
-    }
-    | '-' FLOAT {
-      $$ = new Value((float)(-$2));
-      @$ = @2;
     }
     |vector_literal {
       $$ = $1;
@@ -828,55 +835,7 @@ condition_list:
     }
     ;
 condition:
-    rel_attr comp_op value
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 1;
-      $$->left_attr = *$1;
-      $$->right_is_attr = 0;
-      $$->right_value = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | value comp_op value
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 0;
-      $$->left_value = *$1;
-      $$->right_is_attr = 0;
-      $$->right_value = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | rel_attr comp_op rel_attr
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 1;
-      $$->left_attr = *$1;
-      $$->right_is_attr = 1;
-      $$->right_attr = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | value comp_op rel_attr
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 0;
-      $$->left_value = *$1;
-      $$->right_is_attr = 1;
-      $$->right_attr = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | expression comp_op expression
+    expression comp_op expression
     {
       $$ = new ConditionSqlNode;
       $$->left_expr.reset($1);

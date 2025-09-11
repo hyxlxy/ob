@@ -104,6 +104,12 @@ public:
   virtual RC get_column(Chunk &chunk, Column &column) { return RC::UNIMPLEMENTED; }
 
   /**
+   * @brief Validate expression before execution to catch unsupported patterns early.
+   * Default: SUCCESS. Specific expressions may override.
+   */
+  virtual RC validate() const { return RC::SUCCESS; }
+
+  /**
    * @brief 表达式的类型
    * 可以根据表达式类型来转换为具体的子类
    */
@@ -308,6 +314,7 @@ public:
   ExprType type() const override { return ExprType::COMPARISON; }
   RC       get_value(const Tuple &tuple, Value &value) const override;
   AttrType value_type() const override { return AttrType::BOOLEANS; }
+  RC       validate() const override;
   CompOp   comp() const { return comp_; }
 
   unique_ptr<Expression> copy() const override
@@ -376,6 +383,7 @@ public:
   ExprType type() const override { return ExprType::CONJUNCTION; }
   AttrType value_type() const override { return AttrType::BOOLEANS; }
   RC       get_value(const Tuple &tuple, Value &value) const override;
+  RC       validate() const override;
 
   Type conjunction_type() const { return conjunction_type_; }
 
@@ -433,6 +441,8 @@ public:
   RC get_column(Chunk &chunk, Column &column) override;
 
   RC try_get_value(Value &value) const override;
+
+  RC validate() const override;
 
   Type arithmetic_type() const { return arithmetic_type_; }
 

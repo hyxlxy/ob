@@ -702,12 +702,31 @@ class TestSuite:
       lines1 = f1.readlines()
       lines2 = f2.readlines()
       if len(lines1) != len(lines2):
+        _logger.error('Result line count mismatch: tmp=%s(%d lines) vs base=%s(%d lines)', file1, len(lines1), file2, len(lines2))
+        # 打印前后各10行方便对齐
+        preview = min(10, max(len(lines1), len(lines2)))
+        _logger.debug('TMP HEAD:\n%s', ''.join(lines1[:preview]))
+        _logger.debug('BASE HEAD:\n%s', ''.join(lines2[:preview]))
+        # 继续扫描找出第一处不一致（在较短长度范围内）
+        min_len = min(len(lines1), len(lines2))
+        for i in range(min_len):
+          if lines1[i].upper() != lines2[i].upper():
+            _logger.error('First diff at line %d (within min length)', i+1)
+            _logger.error('TMP(%s): %s', file1, lines1[i].rstrip('\n'))
+            _logger.error('BASE(%s): %s', file2, lines2[i].rstrip('\n'))
+            break
+        # 同时打印尾部，帮助定位哪些尾行缺失/多出
+        tail = min(10, max(len(lines1), len(lines2)))
+        _logger.debug('TMP TAIL:\n%s', ''.join(lines1[-tail:]))
+        _logger.debug('BASE TAIL:\n%s', ''.join(lines2[-tail:]))
         return False
 
       line_num = len(lines1)
       for i in range(line_num):
         if lines1[i].upper() != lines2[i].upper():
-          _logger.info('file1=%s, file2=%s, line1=%s, line2=%s', file1, file2, lines1[i], lines2[i])
+          _logger.error('First diff at line %d', i+1)
+          _logger.error('TMP(%s): %s', file1, lines1[i].rstrip('\n'))
+          _logger.error('BASE(%s): %s', file2, lines2[i].rstrip('\n'))
           return False
       return True
 

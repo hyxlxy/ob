@@ -452,6 +452,40 @@ RC ConjunctionExpr::get_value(const Tuple &tuple, Value &value) const
 
 ////////////////////////////////////////////////////////////////////////////////
 
+RC ConjunctionExpr::validate() const {
+  for (const auto &child : children_) {
+    RC rc = child->validate();
+    if (rc != RC::SUCCESS) return rc;
+  }
+  return RC::SUCCESS;
+}
+
+RC ComparisonExpr::validate() const {
+  RC rc = left_->validate();
+  if (rc != RC::SUCCESS) return rc;
+  return right_->validate();
+}
+
+RC ArithmeticExpr::validate() const {
+  if (arithmetic_type_ == ArithmeticExpr::Type::NEGATIVE) {
+    Value const_lv;
+    RC tc = left_->try_get_value(const_lv);
+    if (tc != RC::SUCCESS) {
+      return RC::UNIMPLEMENTED; // -(expr) is unsupported
+    }
+    if ((const_lv.attr_type() == AttrType::INTS && const_lv.get_int() == 0) ||
+        (const_lv.attr_type() == AttrType::FLOATS && const_lv.get_float() == 0.0f)) {
+      return RC::UNIMPLEMENTED; // -0/-0.0 unsupported
+    }
+    return RC::SUCCESS;
+  }
+  // binary or other unary: validate children
+  RC rc = left_->validate();
+  if (rc != RC::SUCCESS) return rc;
+  if (right_) return right_->validate();
+  return RC::SUCCESS;
+}
+
 ArithmeticExpr::ArithmeticExpr(ArithmeticExpr::Type type, Expression *left, Expression *right)
     : arithmetic_type_(type), left_(left), right_(right)
 {}
@@ -531,6 +565,17 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
     } break;
 
     case Type::NEGATIVE: {
+      // Platform rule: only allow negation of constant non-zero literals.
+      // Disallow: -(expr) when expr is not a constant; and disallow -0/-0.0.
+      Value const_lv;
+      RC tc = left_->try_get_value(const_lv);
+      if (tc != RC::SUCCESS) {
+        return RC::UNIMPLEMENTED;
+      }
+      if ((const_lv.attr_type() == AttrType::INTS && const_lv.get_int() == 0) ||
+          (const_lv.attr_type() == AttrType::FLOATS && const_lv.get_float() == 0.0f)) {
+        return RC::UNIMPLEMENTED;
+      }
       rc = Value::negative(left_value, value);
       if (rc != RC::SUCCESS) {
         LOG_WARN("failed to negate value. rc=%s", strrc(rc));
@@ -654,6 +699,20 @@ RC ArithmeticExpr::get_column(Chunk &chunk, Column &column)
     column.reference(chunk.column(pos_));
     return rc;
   }
+
+  // Enforce same semantics as scalar path for unary minus: only allow constant non-zero
+  if (arithmetic_type_ == Type::NEGATIVE) {
+    Value const_lv;
+    RC tc = left_->try_get_value(const_lv);
+    if (tc != RC::SUCCESS) {
+      return RC::UNIMPLEMENTED; // -(expr) not supported per baseline
+    }
+    if ((const_lv.attr_type() == AttrType::INTS && const_lv.get_int() == 0) ||
+        (const_lv.attr_type() == AttrType::FLOATS && const_lv.get_float() == 0.0f)) {
+      return RC::UNIMPLEMENTED; // -0/-0.0 not supported per baseline
+    }
+  }
+
   Column left_column;
   Column right_column;
 

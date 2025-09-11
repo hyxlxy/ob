@@ -30,7 +30,16 @@ RC PredicatePhysicalOperator::open(Trx *trx)
     return RC::INTERNAL;
   }
 
-  return children_[0]->open(trx);
+  RC rc = children_[0]->open(trx);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+  // Pre-validate predicate to fail early (before sending header), so client gets FAILURE not partial output
+  rc = expression_->validate();
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+  return RC::SUCCESS;
 }
 
 RC PredicatePhysicalOperator::next()

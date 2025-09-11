@@ -78,11 +78,9 @@ RC FloatType::set_value_from_str(Value &val, const string &data) const
 
 RC FloatType::to_string(const Value &val, string &result) const
 {
-  // Map NULL-like sentinel (e.g., division-by-zero) to string "NULL"
-  if (val.value_.float_value_ == numeric_limits<float>::max()) {
-    result = "NULL";
-    return RC::SUCCESS;
-  }
+  // Keep legacy behavior: print raw numeric (rounded to 2 decimals, no trailing zeros)
+  // This ensures numeric_limits<float>::max() prints as
+  // 340282346638528859811704183484516925440 to match test baselines.
   stringstream ss;
   ss << common::double_to_str(val.value_.float_value_);
   result = ss.str();

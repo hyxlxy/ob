@@ -5,8 +5,6 @@
 ### 2025-09-10 11:38:03.596
 -- 1) Prepare demo table
 ### 2025-09-10 11:38:03.597
-DROP TABLE IF EXISTS exp_table;
-### 2025-09-10 11:38:03.597
 CREATE TABLE exp_table(
 ### 2025-09-10 11:38:03.597
   id   INT,
@@ -88,8 +86,6 @@ SELECT * FROM exp_table WHERE col1 - col2 > 5;
 -- 测试表达式功能和向量功能
 ### 2025-09-10 11:38:33.194
 -- 创建测试表
-### 2025-09-10 11:38:33.194
-CREATE TABLE exp_table(id int, col1 int, col2 int, col3 float, col4 float);
 ### 2025-09-10 11:38:33.194
 INSERT INTO exp_table VALUES (8, 3, 4, 2.9, 3.38);
 ### 2025-09-10 11:38:33.195
@@ -294,5 +290,63 @@ SELECT * FROM T1 WHERE (1/0) = 0;
 SELECT * FROM T1 WHERE -1 < 0;
 ### 2025-09-11 09:20:10.276
 SELECT * FROM T1 WHERE 0 < -1;
-### 2025-09-11 09:20:10.277
+### 2025-09-11 09:35:10.869
+INSERT INTO exp_table VALUES (6, 6, 3, 5.26, 3.36);
+### 2025-09-11 09:35:10.870
+INSERT INTO exp_table VALUES (9, 9, 6, 3.03, 5.53);
+### 2025-09-11 09:35:10.870
+INSERT INTO exp_table VALUES (9, 5, 4, 2.58, 8.16);
+### 2025-09-11 09:35:10.870
+INSERT INTO exp_table VALUES (3, 1, 2, 9.63, 4.36);
+### 2025-09-11 09:35:10.871
+INSERT INTO exp_table VALUES (9, 2, 1, 3.55, 1.38);
+### 2025-09-11 09:35:10.871
+SELECT * FROM exp_table WHERE 0 < col1 - 4;
+### 2025-09-11 09:35:10.873
+SELECT * FROM exp_table WHERE col1 > 4;
+### 2025-09-11 09:45:02.843
+select 1<2;
+### 2025-09-11 09:53:00.994
+SELECT id,3*col1/(col2+2) FROM exp_table WHERE 3*col1/(col2+2)+1/0 > 1;
+### 2025-09-11 09:53:00.998
+SELECT * FROM exp_table WHERE 5/4*8 < 4+col2*col3/2;
+### 2025-09-11 09:53:00.999
+SELECT * FROM exp_table WHERE 5/4*8 < (4+col2)*col3/2;
+### 2025-09-11 10:11:49.780
+SELECT id,-(col2*(-1)+1)+(col4+2)*(col1+col3*2),(4+col2)*col3/2 FROM exp_table WHERE -(col2*(-1)+1)+(col4+2)*(col1+col3*2) > (4+col2)*col3/2;
+### 2025-09-11 10:39:27.763
+DROP TABLE IF EXISTS exp_table;
+### 2025-09-11 10:39:27.772
+CREATE TABLE exp_table(id int, col1 int, col2 int, col3 float, col4 float);
+### 2025-09-11 10:39:27.773
+INSERT INTO exp_table VALUES (1, 1, 1, 1.0, 1.5);
+### 2025-09-11 10:39:27.774
+INSERT INTO exp_table VALUES (2, 2, -2, 5.5, 1.0);
+### 2025-09-11 10:39:27.774
+INSERT INTO exp_table VALUES (3, 3, 4, 5.0, 4.0);
+### 2025-09-11 10:39:27.775
+SELECT * FROM exp_table WHERE -0 < col1-col2;
+### 2025-09-11 10:39:27.777
+SELECT * FROM exp_table WHERE 0 < -2+col1;
+### 2025-09-11 10:48:24.897
+select 0 < -2+1;
+### 2025-09-11 10:48:24.902
+select 0 < (-2)+1;
+### 2025-09-11 10:48:24.902
+select 0 < -(2)+1;
+### 2025-09-11 10:48:24.903
+select 0 < -2 + 1;
+### 2025-09-11 10:50:46.295
+drop table if exists exp_table;
+### 2025-09-11 10:50:46.300
+create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
+### 2025-09-11 10:50:46.300
+insert into exp_table values (1,1,1,1.0,1.5);
+### 2025-09-11 10:50:46.301
+insert into exp_table values (2,2,-2,5.5,1.0);
+### 2025-09-11 10:50:46.301
+insert into exp_table values (3,3,4,5.0,4.0);
+### 2025-09-11 10:50:46.301
+select * from exp_table where 0 < -2+col1;
+### 2025-09-11 10:50:46.304
 exit;

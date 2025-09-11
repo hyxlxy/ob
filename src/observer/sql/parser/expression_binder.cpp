@@ -182,7 +182,10 @@ RC ExpressionBinder::bind_unbound_field_expression(
     FieldExpr *field_expr = new FieldExpr(field);
     const char *alias_name = expr->name();
 
-    if (alias_name != nullptr && alias_name[0] != '\0') {
+    // Prefer explicit alias if present (and not a qualified token like "tbl.col").
+    // Otherwise, default to bare field name to match baseline header format.
+    bool has_explicit_alias = (alias_name != nullptr && alias_name[0] != '\0' && strchr(alias_name, '.') == nullptr);
+    if (has_explicit_alias) {
       field_expr->set_name(alias_name);
     } else {
       field_expr->set_name(field_name);
