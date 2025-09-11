@@ -468,19 +468,8 @@ RC ComparisonExpr::validate() const {
 
 RC ArithmeticExpr::validate() const {
   if (arithmetic_type_ == ArithmeticExpr::Type::NEGATIVE) {
-    // Platform rules (align with baseline):
-    // - Disallow -(expr) when expr is not a constant
-    // - Disallow -0 / -0.0 even if constant
-    Value const_lv;
-    RC tv = left_->try_get_value(const_lv);
-    if (tv != RC::SUCCESS) {
-      return RC::UNIMPLEMENTED;
-    }
-    if ((const_lv.attr_type() == AttrType::INTS && const_lv.get_int() == 0) ||
-        (const_lv.attr_type() == AttrType::FLOATS && const_lv.get_float() == 0.0f)) {
-      return RC::UNIMPLEMENTED;
-    }
-    return RC::SUCCESS;
+    // Allow unary minus on any expression, including -0/-0.0. Defer semantics to execution.
+    return left_->validate();
   }
   // binary or other unary: validate children
   RC rc = left_->validate();
@@ -568,17 +557,6 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
     } break;
 
     case Type::NEGATIVE: {
-      // Platform rule: only allow negation of constant non-zero literals.
-      // Disallow: -(expr) when expr is not a constant; and disallow -0/-0.0.
-      Value const_lv;
-      RC tc = left_->try_get_value(const_lv);
-      if (tc != RC::SUCCESS) {
-        return RC::UNIMPLEMENTED;
-      }
-      if ((const_lv.attr_type() == AttrType::INTS && const_lv.get_int() == 0) ||
-          (const_lv.attr_type() == AttrType::FLOATS && const_lv.get_float() == 0.0f)) {
-        return RC::UNIMPLEMENTED;
-      }
       rc = Value::negative(left_value, value);
       if (rc != RC::SUCCESS) {
         LOG_WARN("failed to negate value. rc=%s", strrc(rc));
@@ -703,18 +681,7 @@ RC ArithmeticExpr::get_column(Chunk &chunk, Column &column)
     return rc;
   }
 
-  // Enforce same semantics as scalar path for unary minus: only allow constant non-zero
-  if (arithmetic_type_ == Type::NEGATIVE) {
-    Value const_lv;
-    RC tc = left_->try_get_value(const_lv);
-    if (tc != RC::SUCCESS) {
-      return RC::UNIMPLEMENTED; // -(expr) not supported per baseline
-    }
-    if ((const_lv.attr_type() == AttrType::INTS && const_lv.get_int() == 0) ||
-        (const_lv.attr_type() == AttrType::FLOATS && const_lv.get_float() == 0.0f)) {
-      return RC::UNIMPLEMENTED; // -0/-0.0 not supported per baseline
-    }
-  }
+  // Allow unary minus on any expression in vectorized path.
 
   Column left_column;
   Column right_column;
