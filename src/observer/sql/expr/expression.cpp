@@ -291,7 +291,11 @@ RC ComparisonExpr::eval(Chunk &chunk, vector<uint8_t> &select)
       if (rc != RC::SUCCESS) {
         return rc;
       }
-      std::fill(select.begin(), select.end(), static_cast<uint8_t>(b ? 1 : 0));
+      // Combine with existing mask (AND semantics across multiple predicates)
+      const uint8_t bit = static_cast<uint8_t>(b ? 1 : 0);
+      for (size_t i = 0; i < select.size(); i++) {
+        select[i] &= bit;
+      }
       return RC::SUCCESS;
     }
   }
@@ -356,15 +360,24 @@ RC ComparisonExpr::eval(Chunk &chunk, vector<uint8_t> &select)
   if (ltype != comm) { cast_one(left_column, lc, comm); lp = &lc; }
   if (rtype != comm) { cast_one(right_column, rcc, comm); rp = &rcc; }
 
-  if (comm == AttrType::INTS) {
-    rc = compare_column<int>(*lp, *rp, select);
-  } else if (comm == AttrType::FLOATS) {
-    rc = compare_column<float>(*lp, *rp, select);
-  } else {
-    LOG_WARN("unsupported vector compare for type %d", comm);
-    return RC::INTERNAL;
+  // Robust per-row evaluation (handles constants/vectors uniformly and respects NULL-like)
+  const bool lconst = lp->column_type() == Column::Type::CONSTANT_COLUMN;
+  const bool rconst = rp->column_type() == Column::Type::CONSTANT_COLUMN;
+  const int n = std::max(lp->count(), rp->count());
+  if ((int)select.size() < n) {
+    select.resize(n, 1);
   }
-  return rc;
+  for (int i = 0; i < n; i++) {
+    Value lv = lp->get_value(lconst ? 0 : i);
+    Value rv = rp->get_value(rconst ? 0 : i);
+    bool b = false;
+    RC c = compare_value(lv, rv, b);
+    if (c != RC::SUCCESS) {
+      return c;
+    }
+    select[i] &= static_cast<uint8_t>(b ? 1 : 0);
+  }
+  return RC::SUCCESS;
 }
 
 template <typename T>

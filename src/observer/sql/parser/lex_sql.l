@@ -41,7 +41,7 @@ while (0);
 #include "yacc_sql.hpp"
 
 #ifndef register
-#define register 
+#define register
 #endif // register
 
 extern int atoi();
@@ -127,6 +127,7 @@ BY                                      RETURN_TOKEN(BY);
 HAVING                                  RETURN_TOKEN(HAVING);
 ORDER                                   RETURN_TOKEN(ORDER);
 ASC                                     RETURN_TOKEN(ASC);
+AS                                     RETURN_TOKEN(AS);
 COUNT                                   RETURN_TOKEN(COUNT);
 SUM                                     RETURN_TOKEN(SUM);
 MAX                                     RETURN_TOKEN(MAX);

@@ -786,8 +786,6 @@ insert into exp_table values (8,1,8,2.13,6.85);
 select * from exp_table where col1 - 9 > 4;
 ### 2025-09-09 11:00:19.232
 exit;
-### 2025-09-09 11:53:44.812
-INSERT INTO exp_table VALUES (1, 10, 5);
 ### 2025-09-09 11:56:23.070
 create table if not exists t(a int, b int);
 ### 2025-09-09 11:58:26.624
@@ -836,3 +834,5 @@ insert into exp_table VALUES (1, 9, 1, 9.94, 8.02);
 select * from exp_table where 6 = 7/1;
 ### 2025-09-10 09:53:17.231
 -- create and populate table
+### 2025-09-10 11:21:31.024
+INSERT INTO exp_table VALUES (1, 10, 5);

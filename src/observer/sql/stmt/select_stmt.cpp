@@ -45,6 +45,10 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   unordered_map<string, Table *> table_map;
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
     const char *table_name = select_sql.relations[i].c_str();
+    const char *alias_name = nullptr;
+    if (i < select_sql.relation_aliases.size() && !select_sql.relation_aliases[i].empty()) {
+      alias_name = select_sql.relation_aliases[i].c_str();
+    }
     if (nullptr == table_name) {
       LOG_WARN("invalid argument. relation name is null. index=%d", i);
       return RC::INVALID_ARGUMENT;
@@ -57,13 +61,23 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     }
 
     binder_context.add_table(table);
+    if (alias_name != nullptr) {
+      binder_context.add_table_with_name(table, alias_name);
+    }
     tables.push_back(table);
     table_map.insert({table_name, table});
+    if (alias_name != nullptr) {
+      table_map.insert({alias_name, table});
+    }
   }
 
   // collect tables in `join` statement
   for (size_t i = 0; i < select_sql.joins.size(); i++) {
     const char *table_name = select_sql.joins[i].table_name.c_str();
+    const char *alias_name = nullptr;
+    if (!select_sql.joins[i].alias.empty()) {
+      alias_name = select_sql.joins[i].alias.c_str();
+    }
     if (nullptr == table_name) {
       LOG_WARN("invalid argument. join table name is null. index=%d", i);
       return RC::INVALID_ARGUMENT;
@@ -76,8 +90,14 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     }
 
     binder_context.add_table(table);
+    if (alias_name != nullptr) {
+      binder_context.add_table_with_name(table, alias_name);
+    }
     tables.push_back(table);
     table_map.insert({table_name, table});
+    if (alias_name != nullptr) {
+      table_map.insert({alias_name, table});
+    }
   }
 
   // collect query fields in `select` statement

@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include <unordered_map>
 #include "sql/expr/expression.h"
 
 class BinderContext
@@ -22,14 +23,28 @@ public:
   BinderContext()          = default;
   virtual ~BinderContext() = default;
 
-  void add_table(Table *table) { query_tables_.push_back(table); }
+  // Add a table into current query context and register its real name
+  void add_table(Table *table) {
+    query_tables_.push_back(table);
+    if (table != nullptr) {
+      name_to_table_[table->name()] = table;
+    }
+  }
+
+  // Register an additional name (e.g., alias) for a table
+  void add_table_with_name(Table *table, const char *name) {
+    if (table != nullptr && name != nullptr) {
+      name_to_table_[name] = table;
+    }
+  }
 
   Table *find_table(const char *table_name) const;
 
   const vector<Table *> &query_tables() const { return query_tables_; }
 
 private:
-  vector<Table *> query_tables_;
+  vector<Table *>                query_tables_;
+  std::unordered_map<string, Table *> name_to_table_;
 };
 
 /**

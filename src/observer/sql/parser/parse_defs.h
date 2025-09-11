@@ -126,6 +126,7 @@ enum JoinType
 struct JoinSqlNode
 {
   string                     table_name;   ///< 要连接的表名
+  string                     alias;        ///< 可选的表别名
   JoinType                   join_type;    ///< 连接类型
   vector<ConditionSqlNode>   conditions;   ///< 连接条件
 };
@@ -142,6 +143,19 @@ struct TableReferencesSqlNode
 };
 
 /**
+ * @brief 
+ * @brief 
+ * @brief 
+ * @brief 
+ */
+struct RelationWithAliasSqlNode
+{
+  string table_name;  ///< 
+  string alias;       ///< 
+};
+
+
+/**
  * @brief 描述一个select语句
  * @ingroup SQLParser
  * @details 一个正常的select语句描述起来比这个要复杂很多，这里做了简化。
@@ -154,13 +168,14 @@ struct TableReferencesSqlNode
 
 struct SelectSqlNode
 {
-  vector<unique_ptr<Expression>> expressions;  ///< 查询的表达式
-  vector<string>                 relations;    ///< 查询的表
-  vector<JoinSqlNode>            joins;        ///< join操作
-  vector<ConditionSqlNode>       conditions;   ///< 查询条件，使用AND串联起来多个条件
-  vector<unique_ptr<Expression>> group_by;     ///< group by clause
-  unique_ptr<Expression>         having_expr;  ///< having clause (expression)
-  vector<OrderBySqlNode>         order_by;     ///< order by clause
+  vector<unique_ptr<Expression>> expressions;   ///< 查询的表达式
+  vector<string>                 relations;     ///< 查询的表
+  vector<string>                 relation_aliases; ///< 与relations一一对应的别名，空字符串表示无别名
+  vector<JoinSqlNode>            joins;         ///< join操作
+  vector<ConditionSqlNode>       conditions;    ///< 查询条件，使用AND串联起来多个条件
+  vector<unique_ptr<Expression>> group_by;      ///< group by clause
+  unique_ptr<Expression>         having_expr;   ///< having clause (expression)
+  vector<OrderBySqlNode>         order_by;      ///< order by clause
 };
 
 /**

@@ -22,6 +22,13 @@ using namespace common;
 
 Table *BinderContext::find_table(const char *table_name) const
 {
+  // First try alias/registered names map (case-insensitive match)
+  for (const auto &kv : name_to_table_) {
+    if (0 == strcasecmp(table_name, kv.first.c_str())) {
+      return kv.second;
+    }
+  }
+  // Fallback: search by real table names in query tables
   auto pred = [table_name](Table *table) { return 0 == strcasecmp(table_name, table->name()); };
   auto iter = ranges::find_if(query_tables_, pred);
   if (iter == query_tables_.end()) {
@@ -173,7 +180,13 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
     Field      field(table, field_meta);
     FieldExpr *field_expr = new FieldExpr(field);
-    field_expr->set_name(field_name);
+    const char *alias_name = expr->name();
+
+    if (alias_name != nullptr && alias_name[0] != '\0') {
+      field_expr->set_name(alias_name);
+    } else {
+      field_expr->set_name(field_name);
+    }
     bound_expressions.emplace_back(field_expr);
   }
 
@@ -323,36 +336,37 @@ RC ExpressionBinder::bind_arithmetic_expression(
   unique_ptr<Expression>        &left_expr  = arithmetic_expr->left();
   unique_ptr<Expression>        &right_expr = arithmetic_expr->right();
 
+  // Bind left (always required)
   RC rc = bind_expression(left_expr, child_bound_expressions);
   if (OB_FAIL(rc)) {
     return rc;
   }
-
   if (child_bound_expressions.size() != 1) {
-    LOG_WARN("invalid left children number of comparison expression: %d", child_bound_expressions.size());
+    LOG_WARN("invalid left children number of arithmetic expression: %d", child_bound_expressions.size());
     return RC::INVALID_ARGUMENT;
   }
-
   unique_ptr<Expression> &left = child_bound_expressions[0];
   if (left.get() != left_expr.get()) {
     left_expr.reset(left.release());
   }
 
+  // Bind right only if it exists (binary ops). Unary ops like NEGATIVE have null right child.
   child_bound_expressions.clear();
-  rc = bind_expression(right_expr, child_bound_expressions);
-  if (OB_FAIL(rc)) {
-    return rc;
+  if (right_expr) {
+    rc = bind_expression(right_expr, child_bound_expressions);
+    if (OB_FAIL(rc)) {
+      return rc;
+    }
+    if (child_bound_expressions.size() != 1) {
+      LOG_WARN("invalid right children number of arithmetic expression: %d", child_bound_expressions.size());
+      return RC::INVALID_ARGUMENT;
+    }
+    unique_ptr<Expression> &right = child_bound_expressions[0];
+    if (right.get() != right_expr.get()) {
+      right_expr.reset(right.release());
+    }
   }
 
-  if (child_bound_expressions.size() != 1) {
-    LOG_WARN("invalid right children number of comparison expression: %d", child_bound_expressions.size());
-    return RC::INVALID_ARGUMENT;
-  }
-
-  unique_ptr<Expression> &right = child_bound_expressions[0];
-  if (right.get() != right_expr.get()) {
-    right_expr.reset(right.release());
-  }
   bound_expressions.emplace_back(std::move(expr));
   return RC::SUCCESS;
 }

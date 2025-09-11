@@ -75,6 +75,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         HAVING
         ORDER
         ASC
+        AS
         COUNT
         SUM
         MAX
@@ -157,6 +158,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   vector<OrderBySqlNode> *                   order_by_list;
   OrderBySqlNode *                           order_by_item;
   vector<JoinSqlNode> *                      join_list;
+  vector<RelationWithAliasSqlNode> *         relation_with_alias_list;
+  RelationWithAliasSqlNode *                 relation_with_alias;
   JoinSqlNode *                              join_item;
 }
 
@@ -171,7 +174,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <condition>           condition
 %type <value>               value
 %type <number>              number
-%type <cstring>             relation
+%type <relation_with_alias> relation
 %type <comp>                comp_op
 %type <rel_attr>            rel_attr
 %type <attr_infos>          attr_def_list
@@ -182,8 +185,10 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <cstring>             storage_format
 %type <key_list>            primary_key
 %type <key_list>            attr_list
-%type <relation_list>       rel_list
+%type <relation_with_alias_list>       rel_list
 %type <expression>          expression
+%type <expression_list>     projection_list
+%type <cstring>             opt_as_alias
 %type <expression>          aggregate_expr
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
@@ -256,7 +261,7 @@ command_wrapper:
   | exit_stmt
     ;
 
-exit_stmt:      
+exit_stmt:
     EXIT {
       (void)yynerrs;  // 这么写为了消除yynerrs未使用的告警。如果你有更好的方法欢迎提PR
       $$ = new ParsedSqlNode(SCF_EXIT);
@@ -362,7 +367,7 @@ create_table_stmt:    /*create table 语句的语法解析树*/
       }
     }
     ;
-    
+
 attr_def_list:
     /* empty */
     {
@@ -379,7 +384,7 @@ attr_def_list:
       delete $3;
     }
     ;
-    
+
 attr_def:
     ID type LBRACE number RBRACE
     {
@@ -444,7 +449,7 @@ attr_list:
     ;
 
 insert_stmt:        /*insert   语句的语法解析树*/
-    INSERT INTO ID VALUES LBRACE value value_list RBRACE 
+    INSERT INTO ID VALUES LBRACE value value_list RBRACE
     {
       $$ = new ParsedSqlNode(SCF_INSERT);
       $$->insertion.relation_name = $3;
@@ -463,7 +468,7 @@ value_list:
     {
       $$ = nullptr;
     }
-    | COMMA value value_list  { 
+    | COMMA value value_list  {
       if ($3 != nullptr) {
         $$ = $3;
       } else {
@@ -556,9 +561,9 @@ storage_format:
       $$ = $4;
     }
     ;
-    
+
 delete_stmt:    /*  delete 语句的语法解析树*/
-    DELETE FROM ID where 
+    DELETE FROM ID where
     {
       $$ = new ParsedSqlNode(SCF_DELETE);
       $$->deletion.relation_name = $3;
@@ -569,7 +574,7 @@ delete_stmt:    /*  delete 语句的语法解析树*/
     }
     ;
 update_stmt:      /*  update 语句的语法解析树*/
-    UPDATE ID SET ID EQ value where 
+    UPDATE ID SET ID EQ value where
     {
       $$ = new ParsedSqlNode(SCF_UPDATE);
       $$->update.relation_name = $2;
@@ -582,7 +587,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_list join_list where group_by having order_by
+    SELECT projection_list FROM rel_list join_list where group_by having order_by
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -591,7 +596,10 @@ select_stmt:        /*  select 语句的语法解析树*/
       }
 
       if ($4 != nullptr) {
-        $$->selection.relations.swap(*$4);
+        for (auto &it : *$4) {
+          $$->selection.relations.push_back(it.table_name);
+          $$->selection.relation_aliases.push_back(it.alias);
+        }
         delete $4;
       }
 
@@ -619,7 +627,7 @@ select_stmt:        /*  select 语句的语法解析树*/
         delete $9;
       }
     }
-    | SELECT expression_list order_by
+    | SELECT projection_list order_by
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -658,6 +666,36 @@ expression_list:
       $$->emplace($$->begin(), $1);
     }
     ;
+
+projection_list:
+    expression opt_as_alias
+    {
+      if ($2 != nullptr) {
+        $1->set_name($2);
+      }
+      $$ = new vector<unique_ptr<Expression>>;
+      $$->emplace_back($1);
+    }
+    | expression opt_as_alias COMMA projection_list
+    {
+      if ($2 != nullptr) {
+        $1->set_name($2);
+      }
+      if ($4 != nullptr) {
+        $$ = $4;
+      } else {
+        $$ = new vector<unique_ptr<Expression>>;
+      }
+      $$->emplace($$->begin(), $1);
+    }
+    ;
+
+opt_as_alias:
+    /* empty */ { $$ = nullptr; }
+    | ID { $$ = $1; }
+    | AS ID { $$ = $2; }
+    ;
+
 expression:
     expression '+' expression {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::ADD, $1, $3, sql_string, &@$);
@@ -731,22 +769,34 @@ rel_attr:
 
 relation:
     ID {
-      $$ = $1;
+      $$ = new RelationWithAliasSqlNode();
+      $$->table_name = $1;
+    }
+    | ID ID {
+      $$ = new RelationWithAliasSqlNode();
+      $$->table_name = $1;
+      $$->alias = $2;
+    }
+    | ID AS ID {
+      $$ = new RelationWithAliasSqlNode();
+      $$->table_name = $1;
+      $$->alias = $3;
     }
     ;
 rel_list:
     relation {
-      $$ = new vector<string>();
-      $$->push_back($1);
+      $$ = new vector<RelationWithAliasSqlNode>();
+      $$->emplace_back(std::move(*$1));
+      delete $1;
     }
     | relation COMMA rel_list {
       if ($3 != nullptr) {
         $$ = $3;
       } else {
-        $$ = new vector<string>;
+        $$ = new vector<RelationWithAliasSqlNode>();
       }
-
-      $$->insert($$->begin(), $1);
+      $$->emplace($$->begin(), std::move(*$1));
+      delete $1;
     }
     ;
 
@@ -758,7 +808,7 @@ where:
       $$ = nullptr;
     }
     | WHERE condition_list {
-      $$ = $2;  
+      $$ = $2;
     }
     ;
 condition_list:
@@ -869,10 +919,10 @@ having:
     }
     ;
 load_data_stmt:
-    LOAD DATA INFILE SSS INTO TABLE ID 
+    LOAD DATA INFILE SSS INTO TABLE ID
     {
       char *tmp_file_name = common::substr($4, 1, strlen($4) - 2);
-      
+
       $$ = new ParsedSqlNode(SCF_LOAD_DATA);
       $$->load_data.relation_name = $7;
       $$->load_data.file_name = tmp_file_name;
@@ -1027,27 +1077,27 @@ join_list:
     ;
 
 join_item:
-    INNER JOIN ID ON condition_list
+    INNER JOIN ID opt_as_alias ON condition_list
     {
       $$ = new JoinSqlNode();
       $$->table_name = $3;
+      if ($4 != nullptr) { $$->alias = $4; }
       $$->join_type = INNER_JOIN;
+      if ($6 != nullptr) {
+        $$->conditions.swap(*$6);
+        delete $6;
+      }
+    }
+    | JOIN ID opt_as_alias ON condition_list
+    {
+      $$ = new JoinSqlNode();
+      $$->table_name = $2;
+      if ($3 != nullptr) { $$->alias = $3; }
+      $$->join_type = INNER_JOIN;  // 默认为INNER JOIN
       if ($5 != nullptr) {
         $$->conditions.swap(*$5);
         delete $5;
       }
-      free($3);
-    }
-    | JOIN ID ON condition_list
-    {
-      $$ = new JoinSqlNode();
-      $$->table_name = $2;
-      $$->join_type = INNER_JOIN;  // 默认为INNER JOIN
-      if ($4 != nullptr) {
-        $$->conditions.swap(*$4);
-        delete $4;
-      }
-      free($2);
     }
     ;
 
