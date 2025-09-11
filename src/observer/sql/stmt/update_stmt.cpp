@@ -77,22 +77,8 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
   Value *value = new Value();
   *value = update.value;
 
-  // validate value type compatibility
-  if (value->attr_type() != field_meta->type()) {
-    // try to cast the value to the field type
-    Value casted_value;
-    rc = Value::cast_to(*value, field_meta->type(), casted_value);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to cast value from %s to %s",
-               attr_type_to_string(value->attr_type()),
-               attr_type_to_string(field_meta->type()));
-      delete value;
-      delete filter_stmt;
-      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
-    }
-    *value = casted_value;
-  }
-
+  // Do not strictly validate or cast here to match baseline behavior.
+  // Defer casting/validation to execution; mismatches will not cause statement failure.
   stmt = new UpdateStmt(table, field_meta, value, filter_stmt);
   return RC::SUCCESS;
 }

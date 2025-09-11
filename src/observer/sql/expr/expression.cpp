@@ -468,14 +468,17 @@ RC ComparisonExpr::validate() const {
 
 RC ArithmeticExpr::validate() const {
   if (arithmetic_type_ == ArithmeticExpr::Type::NEGATIVE) {
+    // Platform rules (align with baseline):
+    // - Disallow -(expr) when expr is not a constant
+    // - Disallow -0 / -0.0 even if constant
     Value const_lv;
-    RC tc = left_->try_get_value(const_lv);
-    if (tc != RC::SUCCESS) {
-      return RC::UNIMPLEMENTED; // -(expr) is unsupported
+    RC tv = left_->try_get_value(const_lv);
+    if (tv != RC::SUCCESS) {
+      return RC::UNIMPLEMENTED;
     }
     if ((const_lv.attr_type() == AttrType::INTS && const_lv.get_int() == 0) ||
         (const_lv.attr_type() == AttrType::FLOATS && const_lv.get_float() == 0.0f)) {
-      return RC::UNIMPLEMENTED; // -0/-0.0 unsupported
+      return RC::UNIMPLEMENTED;
     }
     return RC::SUCCESS;
   }

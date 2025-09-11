@@ -91,11 +91,90 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<st
 
   filter_unit = new FilterUnit;
 
-  // 如果有表达式，优先使用表达式
+  // 如果有表达式，尝试将简单场景(字段/常量)降级为属性/常量比较；否则使用表达式比较
   if (condition.left_expr != nullptr && condition.right_expr != nullptr) {
-    // 使用表达式比较：复制表达式并由 FilterUnit 持有，避免悬垂指针
-    filter_unit->set_left_expr(condition.left_expr->copy());
-    filter_unit->set_right_expr(condition.right_expr->copy());
+    auto lt = condition.left_expr->type();
+    auto rt = condition.right_expr->type();
+
+    auto set_attr_from_unbound = [&](const UnboundFieldExpr *ufe, FilterObj &obj) -> RC {
+      Table *tbl = nullptr;
+      const FieldMeta *fld = nullptr;
+      RelAttrSqlNode attr;
+      attr.relation_name = ufe->table_name();
+      attr.attribute_name = ufe->field_name();
+      RC lrc = get_table_and_field(db, default_table, tables, attr, tbl, fld);
+      if (lrc != RC::SUCCESS) {
+        LOG_WARN("cannot find attr: %s.%s", attr.relation_name.c_str(), attr.attribute_name.c_str());
+        return lrc;
+      }
+      obj.init_attr(Field(tbl, fld));
+      return RC::SUCCESS;
+    };
+
+    bool handled_simple = false;
+
+    // case: field op value
+    if ((lt == ExprType::UNBOUND_FIELD || lt == ExprType::FIELD) && rt == ExprType::VALUE) {
+      FilterObj left_obj;
+      if (lt == ExprType::UNBOUND_FIELD) {
+        auto *ufe = dynamic_cast<UnboundFieldExpr *>(condition.left_expr.get());
+        rc = set_attr_from_unbound(ufe, left_obj);
+        if (rc != RC::SUCCESS) return rc;
+      } else { // FIELD
+        auto *fe = dynamic_cast<FieldExpr *>(condition.left_expr.get());
+        left_obj.init_attr(fe->field());
+      }
+      FilterObj right_obj;
+      Value     v;
+      rc = condition.right_expr->try_get_value(v);
+      if (rc != RC::SUCCESS) {
+        // 无法在编译期获取到常量值，退回表达式路径
+      } else {
+        right_obj.init_value(v);
+        filter_unit->set_left(left_obj);
+        filter_unit->set_right(right_obj);
+        handled_simple = true;
+      }
+    }
+
+    // case: value op field  => swap sides and invert compare when needed
+    if (!handled_simple && lt == ExprType::VALUE && (rt == ExprType::UNBOUND_FIELD || rt == ExprType::FIELD)) {
+      FilterObj left_obj;
+      if (rt == ExprType::UNBOUND_FIELD) {
+        auto *ufe = dynamic_cast<UnboundFieldExpr *>(condition.right_expr.get());
+        rc = set_attr_from_unbound(ufe, left_obj);
+        if (rc != RC::SUCCESS) return rc;
+      } else { // FIELD
+        auto *fe = dynamic_cast<FieldExpr *>(condition.right_expr.get());
+        left_obj.init_attr(fe->field());
+      }
+      FilterObj right_obj;
+      Value     v;
+      rc = condition.left_expr->try_get_value(v);
+      if (rc == RC::SUCCESS) {
+        right_obj.init_value(v);
+        // 交换左右时，需要调整比较符号
+        auto swap_comp = [&](CompOp c) {
+          switch (c) {
+            case LESS_THAN:   return GREAT_THAN;
+            case GREAT_THAN:  return LESS_THAN;
+            case LESS_EQUAL:  return GREAT_EQUAL;
+            case GREAT_EQUAL: return LESS_EQUAL;
+            default:          return c; // EQUAL/NOT_EQUAL/LIKE keep as-is
+          }
+        };
+        comp = swap_comp(comp);
+        filter_unit->set_left(left_obj);
+        filter_unit->set_right(right_obj);
+        handled_simple = true;
+      }
+    }
+
+    if (!handled_simple) {
+      // 使用表达式比较：复制表达式并由 FilterUnit 持有，避免悬垂指针
+      filter_unit->set_left_expr(condition.left_expr->copy());
+      filter_unit->set_right_expr(condition.right_expr->copy());
+    }
   } else {
     // 使用传统的属性和值比较
     if (condition.left_is_attr) {
