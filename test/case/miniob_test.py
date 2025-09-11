@@ -80,7 +80,7 @@ class ResultWriter:
 
   def __exit__(self, exc_type, exc_value, exc_tb):
     self.close()
-  
+
   def close(self):
     if self.__file is not None:
       self.__file.close()
@@ -135,7 +135,7 @@ class MiniObServer:
   def __check_base_dir(self, base_dir: str):
     if not(os.path.isdir(base_dir)):
       raise(Exception("failed to check base directory. " + base_dir + " is not a directory"))
-    
+
     observer_path = self.__observer_path(base_dir)
     if not(os.path.isfile(observer_path)):
       raise(Exception("observer not exists: " + observer_path))
@@ -147,7 +147,7 @@ class MiniObServer:
     os.makedirs(data_dir, exist_ok=True)
     if not(os.path.isdir(data_dir)):
       raise(Exception(data_dir + " is not a directory or failed to create"))
-    
+
     # results = os.listdir(data_dir)
     # if len(results) != 0:
     #   raise(Exception(data_dir + " is not empty"))
@@ -185,7 +185,7 @@ class MiniObServer:
     if return_code != None:
       _logger.error("Failed to start observer, exit with code %d", return_code)
       return False
-    
+
     _logger.info('start subprocess with pid=%d', process.pid)
     #os.setpgid(process.pid, GlobalConfig.group_id)
 
@@ -297,7 +297,7 @@ class MiniObClient:
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     errno = s.connect_ex(('127.0.0.1', server_port))
     if errno != 0:
-      _logger.error("Failed to connect to server with port %d. errno=%d:%s", 
+      _logger.error("Failed to connect to server with port %d. errno=%d:%s",
                     server_port, errno, os.strerror(errno))
       s = None
     return s
@@ -306,7 +306,7 @@ class MiniObClient:
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     errno = sock.connect_ex(server_socket)
     if errno != 0:
-      _logger.error("Failed to connect to server with address '%s'. errno=%d:%s", 
+      _logger.error("Failed to connect to server with address '%s'. errno=%d:%s",
                     server_socket, errno, os.strerror(errno))
       sock = None
     return sock
@@ -316,7 +316,7 @@ class MiniObClient:
 
   def __recv_response(self):
     result = ''
-    
+
     while True:
       events = self.__poller.poll(self.__time_limit * 1000)
       if len(events) == 0:
@@ -327,7 +327,7 @@ class MiniObClient:
         msg = "Failed to receive from server. poll return POLLHUP(%s) or POLLERR(%s)" % ( str(event & select.POLLHUP), str(event & select.POLLERR))
         _logger.info(msg)
         raise Exception(msg)
-      
+
       data = self.__socket.recv(self.__buffer_size)
       if len(data) > 0:
         result_tmp = data.decode(encoding= GlobalConfig.default_encoding)
@@ -337,11 +337,11 @@ class MiniObClient:
           return result.strip() + '\n'
         else:
           result += result_tmp # TODO 返回数据量比较大的时候，python可能会hang住
-                               # 可以考虑返回列表
+          # 可以考虑返回列表
       else:
         _logger.info("receive from server error. result len=%d", len(data))
         raise Exception("receive return error. the connection may be closed")
-          
+
 
   def run_sql(self, sql: str) -> Tuple[bool, str]:
     try:
@@ -387,7 +387,7 @@ class CommandRunner:
 
   def __enter__(self):
     return self
-  
+
   def __exit__(self, exc_type, exc_value, exc_tb):
     self.close()
 
@@ -488,7 +488,7 @@ class CommandRunner:
       result = False
 
     return result
-  
+
   def run_ensure(self, command: str, sql: str):
     self.__result_writer.write_line(command + " " + sql)
     result, data = self.__current_client.run_sql("explain " + sql)
@@ -513,16 +513,16 @@ class CommandRunner:
       _logger.error("No such ensure command %s", command)
       return False
     return True
-    
+
   def run_anything(self, argline: str):
     argline = argline.strip()
     if len(argline) == 0:
       self.__result_writer.write_line('') # 读取到一个空行，也写入一个空行
       return True
-    
+
     if argline.startswith(self.__comment_prefix):
       return True
-    
+
     if argline.startswith(self.__command_prefix):
       return self.run_command(argline)
 
@@ -615,7 +615,7 @@ class TestCaseLister:
       full_path = base_dir + "/" + test_name + self.__suffix
       if not(os.path.isfile(full_path)):
         raise(Exception(full_path + " is not a file"))
-      
+
       test_case = TestCase()
       test_case.init_with_file(test_name, full_path)
       test_cases.append(test_case)
@@ -626,13 +626,13 @@ class TestCaseLister:
 class EvalResult:
   def __init__(self):
     self.__message = []
-    
+
   def clear_message(self):
     self.__message = []
-    
+
   def append_message(self, message):
     self.__message.append(message)
-    
+
   def get_message(self):
     return "\n".join(self.__message)
 
@@ -644,7 +644,7 @@ class EvalResult:
     json_encoder.item_separator = ','
     json_encoder.key_separator = ':'
     return json_encoder.encode(json_dict)
-  
+
 class TestSuite:
 
   def __init__(self):
@@ -660,13 +660,13 @@ class TestSuite:
     self.__need_start_server = True
     self.__test_names = None # 如果指定测试哪些Case，就不再遍历所有的cases
     self.__miniob_server = None
-  
+
   def set_test_names(self, tests):
     self.__test_names = tests
 
   def set_test_case_base_dir(self, test_case_base_dir):
     self.__test_case_base_dir = test_case_base_dir
-  
+
   def set_test_result_base_dir(self, test_result_base_dir):
     self.__test_result_base_dir = test_result_base_dir
 
@@ -675,7 +675,7 @@ class TestSuite:
     os.makedirs(test_result_tmp_dir, exist_ok=True)
     if not(os.path.isdir(test_result_tmp_dir)):
       raise(Exception("Failed to set test result temp directory. " + test_result_tmp_dir + " is not a directory or failed to create"))
-  
+
   def set_db_server_base_dir(self, db_server_base_dir):
     self.__db_server_base_dir = db_server_base_dir
 
@@ -698,73 +698,18 @@ class TestSuite:
     self.__report_only = report_only
 
   def __compare_files(self, file1, file2):
-    def is_sql_header(line: str) -> bool:
-      up = line.strip().upper()
-      if not up.endswith(';'):
-        return False
-      starts = (
-        'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP',
-        'EXPLAIN', 'DESC', 'SHOW', 'ALTER'
-      )
-      return any(up.startswith(s) for s in starts)
-
-    def find_stmt_block(lines, start_idx):
-      # 找到从 start_idx 往前最近的一条 SQL 语句头（以 ; 结尾）
-      s = start_idx
-      while s >= 0 and not is_sql_header(lines[s]):
-        s -= 1
-      # 向后找到下一条 SQL 语句头，作为当前语句的结束边界
-      e = len(lines)
-      if s >= 0:
-        for j in range(s+1, len(lines)):
-          if is_sql_header(lines[j]):
-            e = j
-            break
-      return s, e
-
     with open(file1, 'r') as f1, open(file2, 'r') as f2:
       lines1 = f1.readlines()
       lines2 = f2.readlines()
+      if len(lines1) != len(lines2):
+        return False
 
-      # 先定位第一处差异的行号 i
-      i = None
-      min_len = min(len(lines1), len(lines2))
-      for k in range(min_len):
-        if lines1[k].upper() != lines2[k].upper():
-          i = k
-          break
-      if i is None:
-        if len(lines1) != len(lines2):
-          _logger.error('Result line count mismatch: tmp=%s(%d lines) vs base=%s(%d lines)', file1, len(lines1), file2, len(lines2))
-          # 把差异定位到较短文件的末尾
-          i = min_len - 1 if min_len > 0 else 0
-        else:
-          return True
-
-      # 报告哪条语句导致的不同，并打印该语句的期望与实际结果块
-      s1, e1 = find_stmt_block(lines1, i)
-      s2, e2 = find_stmt_block(lines2, i)
-
-      # 语句头（优先以 BASE 为准）
-      stmt = None
-      if s2 is not None and s2 >= 0:
-        stmt = lines2[s2].rstrip('\n')
-      elif s1 is not None and s1 >= 0:
-        stmt = lines1[s1].rstrip('\n')
-
-      if stmt:
-        _logger.error('Statement mismatch starting at line %d: %s', (i+1), stmt)
-      else:
-        _logger.error('Mismatch starting at line %d (unable to locate SQL header)', (i+1))
-
-      # 打印期望与实际的结果块（不含语句头本身）
-      base_block = ''.join(lines2[(s2+1 if s2 is not None and s2 >= 0 else 0): e2]).rstrip('\n')
-      tmp_block  = ''.join(lines1[(s1+1 if s1 is not None and s1 >= 0 else 0): e1]).rstrip('\n')
-
-      _logger.error('EXPECTED (BASE)\n%s', base_block)
-      _logger.error('ACTUAL   (TMP)\n%s', tmp_block)
-
-      return False
+      line_num = len(lines1)
+      for i in range(line_num):
+        if lines1[i].upper() != lines2[i].upper():
+          _logger.info('file1=%s, file2=%s, line1=%s, line2=%s', file1, file2, lines1[i], lines2[i])
+          return False
+      return True
 
   def run_case(self, test_case, timeout=20) -> Result:
     # eventlet.monkey_patch()
@@ -841,7 +786,7 @@ class TestSuite:
 
     # 找出所有需要测试Case
     test_cases = self.__get_all_test_cases()
-    
+
     if not test_cases:
       _logger.info("Cannot find any test cases")
       return True
@@ -869,7 +814,7 @@ class TestSuite:
           _logger.info("Case passed: %s", test_case.get_name())
           success_count += 1
           eval_result.append_message("%s is success" % test_case.get_name())
-        else: 
+        else:
 
           if result is Result.false:
             _logger.info("Case failed: %s", test_case.get_name())
@@ -898,8 +843,8 @@ class TestSuite:
       if self.__use_unix_socket:
         unix_socket = self.__get_unix_socket_address()
 
-      miniob_server = MiniObServer(self.__db_server_base_dir, self.__db_data_dir, 
-          self.__db_config, self.__server_port, unix_socket, clean_data_dir)
+      miniob_server = MiniObServer(self.__db_server_base_dir, self.__db_data_dir,
+                                   self.__db_config, self.__server_port, unix_socket, clean_data_dir)
       miniob_server.init_server()
       result = miniob_server.start_server()
       if result is False:
@@ -921,40 +866,40 @@ class TestSuite:
 def __init_options():
   options_parser = ArgumentParser()
   # 是否仅仅生成结果，而不对结果做校验。一般在新生成一个case时使用
-  options_parser.add_argument('--report-only', action='store_true', dest='report_only', default=False, 
-                            help='just report the result')
+  options_parser.add_argument('--report-only', action='store_true', dest='report_only', default=False,
+                              help='just report the result')
 
   # 当前miniob的代码目录
   options_parser.add_argument('--project-dir', action='store', dest='project_dir', default='')
 
   # 测试哪些用例。不指定就会扫描test-case-dir目录下面的所有测试用例。指定的话，就从test-case-dir目录下面按照名字找
-  options_parser.add_argument('--test-cases', action='store', dest='test_cases', 
-                            help='test cases. If none, we will iterate the test case directory. Split with \',\' if more than one')
+  options_parser.add_argument('--test-cases', action='store', dest='test_cases',
+                              help='test cases. If none, we will iterate the test case directory. Split with \',\' if more than one')
 
   # 测试时服务器程序的数据文件存放目录
   options_parser.add_argument('--work-dir', action='store', dest='work_dir', default='',
-                            help='the directory of miniob database\'s data for test')
+                              help='the directory of miniob database\'s data for test')
 
   # 服务程序端口号，客户端也使用这个端口连接服务器。目前还不具备通过配置文件解析端口配置的能力
   options_parser.add_argument('--server-port', action='store', type=int, dest='server_port', default=6789,
-                            help='the server port. should be the same with the value in the config')
+                              help='the server port. should be the same with the value in the config')
   options_parser.add_argument('--not-use-unix-socket', action='store_true', dest='not_use_unix_socket', default=False,
-                            help='If false, server-port will be ignored and will use a random address socket.')
-  
+                              help='If false, server-port will be ignored and will use a random address socket.')
+
   # 测试过程中生成的日志存放的文件。使用stdout/stderr输出到控制台
   options_parser.add_argument('--log', action='store', dest='log_file', default='stdout',
-                            help='log file. stdout=standard output and stderr=standard error')
+                              help='log file. stdout=standard output and stderr=standard error')
   # 是否启动调试模式。调试模式不会清理服务器的数据目录
   options_parser.add_argument('-d', '--debug', action='store_true', dest='debug', default=False,
-                            help='enable debug mode')
+                              help='enable debug mode')
 
   options_parser.add_argument('--compile-make-args', action='store', dest='compile_make_args', default='',
-                            help='compile args used by make')
+                              help='compile args used by make')
   options_parser.add_argument('--compile-cmake-args', action='store', dest='compile_cmake_args', default='',
-                            help='compile args used by cmake')
+                              help='compile args used by cmake')
   # 之前已经编译过，是否需要重新编译，还是直接执行make就可以了
   options_parser.add_argument('--compile-rebuild', action='store_true', default=False, dest='compile_rebuild',
-                            help='whether rebuild if build path exists')
+                              help='whether rebuild if build path exists')
 
   options = options_parser.parse_args(sys.argv[1:])
 
@@ -1018,10 +963,10 @@ def __init_test_suite_with_source_code(options, eval_result):
   proj_path = os.path.abspath(options.project_dir)
   build_path = __get_build_path(options.work_dir)
 
-  if not compile(proj_path, build_path, 
-                 options.compile_cmake_args, 
-                 options.compile_make_args, 
-                 options.compile_rebuild, 
+  if not compile(proj_path, build_path,
+                 options.compile_cmake_args,
+                 options.compile_make_args,
+                 options.compile_rebuild,
                  eval_result):
     message = "Failed to compile source code"
     _logger.error(message)
@@ -1049,7 +994,7 @@ def __run_shell_command(command_args):
     line_str = line.decode(GlobalConfig.default_encoding)
     if isinstance(line_str, str):
       outputs.append(line_str.strip())
-    
+
     return_code = command_process.poll()
     if return_code is not None:
       return return_code, outputs
@@ -1088,7 +1033,7 @@ def compile(work_dir: str, build_dir: str, cmake_args: str, make_args: str, rebu
     shutil.rmtree(build_path)
 
   os.makedirs(build_path, exist_ok=True)
-  
+
   _logger.info("start compiling ... build path=%s", build_path)
   ret, outputs = run_cmake(work_dir, build_path, cmake_args)
   if ret == False:

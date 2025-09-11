@@ -808,8 +808,6 @@ select * from exp_table where col3 + 1 > col1;
 select * from exp_table where col1*col2 < 0;
 ### 2025-09-09 12:20:17.908
 insert into exp_table values (4, 2, 2, -2, 5.5);
-### 2025-09-09 14:32:41.114
-q
 ### 2025-09-09 21:40:30.434
 insert into exp_table VALUES (3, 8, 9, 9.42, 9.24);
 ### 2025-09-09 21:40:30.436
@@ -820,8 +818,6 @@ insert into exp_table VALUES (8, 5, 4, 2.32, 6.19);
 select * from exp_table where 7 = 3/5;
 ### 2025-09-09 21:40:48.183
 select count(*) from exp_table where 7 = 14/2;
-### 2025-09-10 08:22:13.654
-create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
 ### 2025-09-10 08:22:13.693
 create table exp_table2(id int, col1 int);
 ### 2025-09-10 08:22:13.697
@@ -836,3 +832,27 @@ select * from exp_table where 6 = 7/1;
 -- create and populate table
 ### 2025-09-10 11:21:31.024
 INSERT INTO exp_table VALUES (1, 10, 5);
+### 2025-09-11 16:36:51.650
+INITIALIZATION
+### 2025-09-11 16:46:26.395
+CREATE TABLE EXP_TABLE(ID INT, COL1 INT, COL2 INT, COL3 FLOAT, COL4 FLOAT);
+### 2025-09-11 16:46:30.894
+INSERT INTO EXP_TABLE VALUES (1, 1, 1, 1.0, 1.5);
+### 2025-09-11 16:46:35.249
+INSERT INTO EXP_TABLE VALUES (2, 2, -2, 5.5, 1.0);
+### 2025-09-11 16:46:39.288
+INSERT INTO EXP_TABLE VALUES (3, 3, 4, 5.0, 4.0);
+### 2025-09-11 16:46:46.598
+SELECT * FROM EXP_TABLE WHERE -0 < COL1-COL2;
+### 2025-09-11 16:48:37.082
+q
+### 2025-09-11 16:52:48.497
+create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
+### 2025-09-11 16:52:52.980
+insert into exp_table VALUES (1, 1, 1, 1.0, 1.5);
+### 2025-09-11 16:52:57.335
+insert into exp_table VALUES (2, 2, -2, 5.5, 1.0);
+### 2025-09-11 16:53:01.034
+insert into exp_table VALUES (3, 3, 4, 5.0, 4.0);
+### 2025-09-11 16:53:12.292
+select * from exp_table where -0 < col1-col2;
