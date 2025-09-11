@@ -698,37 +698,73 @@ class TestSuite:
     self.__report_only = report_only
 
   def __compare_files(self, file1, file2):
+    def is_sql_header(line: str) -> bool:
+      up = line.strip().upper()
+      if not up.endswith(';'):
+        return False
+      starts = (
+        'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP',
+        'EXPLAIN', 'DESC', 'SHOW', 'ALTER'
+      )
+      return any(up.startswith(s) for s in starts)
+
+    def find_stmt_block(lines, start_idx):
+      # 找到从 start_idx 往前最近的一条 SQL 语句头（以 ; 结尾）
+      s = start_idx
+      while s >= 0 and not is_sql_header(lines[s]):
+        s -= 1
+      # 向后找到下一条 SQL 语句头，作为当前语句的结束边界
+      e = len(lines)
+      if s >= 0:
+        for j in range(s+1, len(lines)):
+          if is_sql_header(lines[j]):
+            e = j
+            break
+      return s, e
+
     with open(file1, 'r') as f1, open(file2, 'r') as f2:
       lines1 = f1.readlines()
       lines2 = f2.readlines()
-      if len(lines1) != len(lines2):
-        _logger.error('Result line count mismatch: tmp=%s(%d lines) vs base=%s(%d lines)', file1, len(lines1), file2, len(lines2))
-        # 打印前后各10行方便对齐
-        preview = min(10, max(len(lines1), len(lines2)))
-        _logger.debug('TMP HEAD:\n%s', ''.join(lines1[:preview]))
-        _logger.debug('BASE HEAD:\n%s', ''.join(lines2[:preview]))
-        # 继续扫描找出第一处不一致（在较短长度范围内）
-        min_len = min(len(lines1), len(lines2))
-        for i in range(min_len):
-          if lines1[i].upper() != lines2[i].upper():
-            _logger.error('First diff at line %d (within min length)', i+1)
-            _logger.error('TMP(%s): %s', file1, lines1[i].rstrip('\n'))
-            _logger.error('BASE(%s): %s', file2, lines2[i].rstrip('\n'))
-            break
-        # 同时打印尾部，帮助定位哪些尾行缺失/多出
-        tail = min(10, max(len(lines1), len(lines2)))
-        _logger.debug('TMP TAIL:\n%s', ''.join(lines1[-tail:]))
-        _logger.debug('BASE TAIL:\n%s', ''.join(lines2[-tail:]))
-        return False
 
-      line_num = len(lines1)
-      for i in range(line_num):
-        if lines1[i].upper() != lines2[i].upper():
-          _logger.error('First diff at line %d', i+1)
-          _logger.error('TMP(%s): %s', file1, lines1[i].rstrip('\n'))
-          _logger.error('BASE(%s): %s', file2, lines2[i].rstrip('\n'))
-          return False
-      return True
+      # 先定位第一处差异的行号 i
+      i = None
+      min_len = min(len(lines1), len(lines2))
+      for k in range(min_len):
+        if lines1[k].upper() != lines2[k].upper():
+          i = k
+          break
+      if i is None:
+        if len(lines1) != len(lines2):
+          _logger.error('Result line count mismatch: tmp=%s(%d lines) vs base=%s(%d lines)', file1, len(lines1), file2, len(lines2))
+          # 把差异定位到较短文件的末尾
+          i = min_len - 1 if min_len > 0 else 0
+        else:
+          return True
+
+      # 报告哪条语句导致的不同，并打印该语句的期望与实际结果块
+      s1, e1 = find_stmt_block(lines1, i)
+      s2, e2 = find_stmt_block(lines2, i)
+
+      # 语句头（优先以 BASE 为准）
+      stmt = None
+      if s2 is not None and s2 >= 0:
+        stmt = lines2[s2].rstrip('\n')
+      elif s1 is not None and s1 >= 0:
+        stmt = lines1[s1].rstrip('\n')
+
+      if stmt:
+        _logger.error('Statement mismatch starting at line %d: %s', (i+1), stmt)
+      else:
+        _logger.error('Mismatch starting at line %d (unable to locate SQL header)', (i+1))
+
+      # 打印期望与实际的结果块（不含语句头本身）
+      base_block = ''.join(lines2[(s2+1 if s2 is not None and s2 >= 0 else 0): e2]).rstrip('\n')
+      tmp_block  = ''.join(lines1[(s1+1 if s1 is not None and s1 >= 0 else 0): e1]).rstrip('\n')
+
+      _logger.error('EXPECTED (BASE)\n%s', base_block)
+      _logger.error('ACTUAL   (TMP)\n%s', tmp_block)
+
+      return False
 
   def run_case(self, test_case, timeout=20) -> Result:
     # eventlet.monkey_patch()
