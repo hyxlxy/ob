@@ -103,6 +103,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         INT_T
         STRING_T
         FLOAT_T
+        FLOAT_LITERAL
         DATE_T
         VECTOR_T
         HELP
@@ -164,7 +165,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 }
 
 %token <number> NUMBER
-%token <floats> FLOAT
+%token <floats> FLOAT_LITERAL
 %token <cstring> ID
 %token <cstring> SSS
 //非终结符
@@ -415,6 +416,7 @@ attr_def:
     ;
 number:
     NUMBER {$$ = $1;}
+    | FLOAT_LITERAL {$$ = $1;}
     ;
 type:
     INT_T      { $$ = static_cast<int>(AttrType::INTS); }
@@ -487,7 +489,7 @@ insert_value:
       $$ = new Value(-(int)$2);
       @$ = @2;
     }
-    | '-' FLOAT {
+    | '-' FLOAT_LITERAL {
       $$ = new Value(-(float)$2);
       @$ = @2;
     }
@@ -498,7 +500,7 @@ value:
       $$ = new Value((int)$1);
       @$ = @1;
     }
-    |FLOAT {
+    |FLOAT_LITERAL {
       $$ = new Value((float)$1);
       @$ = @1;
     }
@@ -724,11 +726,6 @@ expression:
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::NEGATIVE, $2, nullptr, sql_string, &@$);
     }
     | value {
-      $$ = new ValueExpr(*$1);
-      $$->set_name(token_name(sql_string, &@$));
-      delete $1;
-    }
-    | vector_literal {
       $$ = new ValueExpr(*$1);
       $$->set_name(token_name(sql_string, &@$));
       delete $1;
