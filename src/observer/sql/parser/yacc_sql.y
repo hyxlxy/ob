@@ -1033,26 +1033,24 @@ join_list:
     ;
 
 join_item:
-    INNER JOIN ID opt_as_alias ON condition_list
+    INNER JOIN ID ON condition_list
     {
       $$ = new JoinSqlNode();
       $$->table_name = $3;
-      if ($4 != nullptr) { $$->alias = $4; }
       $$->join_type = INNER_JOIN;
-      if ($6 != nullptr) {
-        $$->conditions.swap(*$6);
-        delete $6;
-      }
-    }
-    | JOIN ID opt_as_alias ON condition_list
-    {
-      $$ = new JoinSqlNode();
-      $$->table_name = $2;
-      if ($3 != nullptr) { $$->alias = $3; }
-      $$->join_type = INNER_JOIN;  // 默认为INNER JOIN
       if ($5 != nullptr) {
         $$->conditions.swap(*$5);
         delete $5;
+      }
+    }
+    | JOIN ID ON condition_list
+    {
+      $$ = new JoinSqlNode();
+      $$->table_name = $2;
+      $$->join_type = INNER_JOIN;  // 默认为INNER JOIN
+      if ($4 != nullptr) {
+        $$->conditions.swap(*$4);
+        delete $4;
       }
     }
     ;

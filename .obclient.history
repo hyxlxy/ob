@@ -844,8 +844,6 @@ INSERT INTO EXP_TABLE VALUES (2, 2, -2, 5.5, 1.0);
 INSERT INTO EXP_TABLE VALUES (3, 3, 4, 5.0, 4.0);
 ### 2025-09-11 16:46:46.598
 SELECT * FROM EXP_TABLE WHERE -0 < COL1-COL2;
-### 2025-09-11 16:48:37.082
-q
 ### 2025-09-11 16:52:48.497
 create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
 ### 2025-09-11 16:52:52.980
@@ -878,5 +876,27 @@ calc [1,2,3];
 -- 测试题目要求的完整SQL语句
 ### 2025-09-11 20:24:11.171
 -- 测试使用整数向量字面量的完整SQL语句
-### 2025-09-11 20:29:56.082
+### 2025-09-11 20:31:33.781
+CREATE TABLE test_a(id int, name char);
+### 2025-09-11 20:39:31.901
+SELECT * FROM test_a a INNER JOIN test_b b ON a.id = b.id;
+### 2025-09-11 20:41:24.183
 -- 测试当前JOIN功能
+### 2025-09-11 20:42:41.693
+SELECT a.name, b.value FROM test_a a INNER JOIN test_b b ON a.id = b.id;
+### 2025-09-11 20:51:05.356
+-- 测试参考项目的JOIN语法
+### 2025-09-11 20:53:35.884
+SELECT a.name FROM test_a a;
+### 2025-09-11 20:55:46.303
+SELECT a.name, b.value FROM test_a INNER JOIN test_b b ON test_a.id = b.id;
+### 2025-09-11 20:59:50.043
+-- 调试JOIN表别名问题
+### 2025-09-11 21:02:00.593
+SELECT * FROM test_a INNER JOIN test_b ON test_a.id = test_b.id;
+### 2025-09-11 21:03:23.827
+SELECT * FROM test_a INNER JOIN test_b b ON test_a.id = b.id;
+### 2025-09-11 21:04:21.792
+SELECT * FROM test_a JOIN test_b b ON test_a.id = b.id;
+### 2025-09-12 08:22:26.169
+q

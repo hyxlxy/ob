@@ -1,0 +1,5 @@
+[2025-09-12 08:22:26.191607 pid:13299 tid:7be66b5ff6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=2): q
+[2025-09-12 08:22:26.192118 pid:13299 tid:7be66b5ff6c0 ctx:504000000550 DEBUG: yylex@lex_sql.l:141] >> ID
+[2025-09-12 08:22:26.192206 pid:13299 tid:7be66b5ff6c0 ctx:504000000550 TRACE: handle_sql@sql_task_handler.cpp:68] >> failed to do parse. rc=SQL_SYNTAX
+[2025-09-12 08:22:26.192234 pid:13299 tid:7be66b5ff6c0 ctx:504000000550 TRACE: handle_event@sql_task_handler.cpp:39] >> failed to handle sql. rc=SQL_SYNTAX
+[2025-09-12 08:22:26.192297 pid:13299 tid:7be66b5ff6c0 ctx:504000000550 INFO: handle_event@sql_task_handler.cpp:46] >> write result return SUCCESS
