@@ -30,16 +30,7 @@ RC PredicatePhysicalOperator::open(Trx *trx)
     return RC::INTERNAL;
   }
 
-  RC rc = children_[0]->open(trx);
-  if (rc != RC::SUCCESS) {
-    return rc;
-  }
-  // Pre-validate predicate to fail early (before sending header), so client gets FAILURE not partial output
-  rc = expression_->validate();
-  if (rc != RC::SUCCESS) {
-    return rc;
-  }
-  return RC::SUCCESS;
+  return children_[0]->open(trx);
 }
 
 RC PredicatePhysicalOperator::next()
@@ -58,8 +49,12 @@ RC PredicatePhysicalOperator::next()
     Value value;
     rc = expression_->get_value(*tuple, value);
     if (rc != RC::SUCCESS) {
+      LOG_WARN("PredicatePhysicalOperator::next() get_value failed: expr_type=%d rc=%s",
+               static_cast<int>(expression_->type()), strrc(rc));
       return rc;
     }
+    LOG_DEBUG("PredicatePhysicalOperator::next() get_value SUCCESS: expr_type=%d value_type=%d",
+              static_cast<int>(expression_->type()), static_cast<int>(value.attr_type()));
 
     if (value.get_boolean()) {
       return rc;

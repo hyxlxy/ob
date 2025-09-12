@@ -253,26 +253,40 @@ RC ComparisonExpr::try_get_value(Value &cell) const
 
 RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
 {
+  LOG_DEBUG("ComparisonExpr::get_value() starting: left_type=%d right_type=%d",
+            static_cast<int>(left_->type()), static_cast<int>(right_->type()));
+
   Value left_value;
   Value right_value;
 
   RC rc = left_->get_value(tuple, left_value);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
+    LOG_WARN("ComparisonExpr::get_value() failed to get value of left expression: left_type=%d rc=%s",
+             static_cast<int>(left_->type()), strrc(rc));
     return rc;
   }
+  LOG_DEBUG("ComparisonExpr::get_value() left value SUCCESS: left_type=%d value_type=%d",
+            static_cast<int>(left_->type()), static_cast<int>(left_value.attr_type()));
+
   rc = right_->get_value(tuple, right_value);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
+    LOG_WARN("ComparisonExpr::get_value() failed to get value of right expression: right_type=%d rc=%s",
+             static_cast<int>(right_->type()), strrc(rc));
     return rc;
   }
+  LOG_DEBUG("ComparisonExpr::get_value() right value SUCCESS: right_type=%d value_type=%d",
+            static_cast<int>(right_->type()), static_cast<int>(right_value.attr_type()));
 
   bool bool_value = false;
 
   rc = compare_value(left_value, right_value, bool_value);
-  if (rc == RC::SUCCESS) {
-    value.set_boolean(bool_value);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("ComparisonExpr::get_value() compare_value failed: rc=%s", strrc(rc));
+    return rc;
   }
+
+  LOG_DEBUG("ComparisonExpr::get_value() SUCCESS: result=%s", bool_value ? "true" : "false");
+  value.set_boolean(bool_value);
   return rc;
 }
 
@@ -461,27 +475,61 @@ RC ConjunctionExpr::validate() const {
 }
 
 RC ComparisonExpr::validate() const {
+  LOG_DEBUG("ComparisonExpr::validate() starting: left_type=%d right_type=%d",
+            static_cast<int>(left_->type()), static_cast<int>(right_->type()));
+
   RC rc = left_->validate();
-  if (rc != RC::SUCCESS) return rc;
-  return right_->validate();
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("ComparisonExpr::validate() left validation failed: left_type=%d rc=%s",
+             static_cast<int>(left_->type()), strrc(rc));
+    return rc;
+  }
+  LOG_DEBUG("ComparisonExpr::validate() left validation SUCCESS: left_type=%d",
+            static_cast<int>(left_->type()));
+
+  rc = right_->validate();
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("ComparisonExpr::validate() right validation failed: right_type=%d rc=%s",
+             static_cast<int>(right_->type()), strrc(rc));
+    return rc;
+  }
+  LOG_DEBUG("ComparisonExpr::validate() right validation SUCCESS: right_type=%d",
+            static_cast<int>(right_->type()));
+
+  LOG_DEBUG("ComparisonExpr::validate() SUCCESS");
+  return RC::SUCCESS;
 }
 
 RC ArithmeticExpr::validate() const {
   if (arithmetic_type_ == ArithmeticExpr::Type::NEGATIVE) {
-    // Allow NEGATIVE for constant literals, including -0
-    // Only disallow -(expr) when expr is not a constant
-    Value const_lv;
-    RC tv = left_->try_get_value(const_lv);
-    if (tv != RC::SUCCESS) {
-      return RC::UNIMPLEMENTED;
+    // Allow NEGATIVE for any expression, not just constants
+    // This supports complex expressions like -(col1 + col2), -col1, etc.
+    if (!left_) {
+      LOG_WARN("ArithmeticExpr::validate() NEGATIVE has no left child");
+      return RC::INTERNAL;
     }
-    // Allow -0 and -0.0 as they are mathematically valid
+    RC rc = left_->validate();
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("ArithmeticExpr::validate() NEGATIVE left validation failed: rc=%s", strrc(rc));
+      return rc;
+    }
+    LOG_DEBUG("ArithmeticExpr::validate() NEGATIVE validation SUCCESS for expr_type=%d",
+              static_cast<int>(left_->type()));
     return RC::SUCCESS;
   }
   // binary or other unary: validate children
   RC rc = left_->validate();
-  if (rc != RC::SUCCESS) return rc;
-  if (right_) return right_->validate();
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("ArithmeticExpr::validate() left validation failed: rc=%s", strrc(rc));
+    return rc;
+  }
+  if (right_) {
+    rc = right_->validate();
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("ArithmeticExpr::validate() right validation failed: rc=%s", strrc(rc));
+      return rc;
+    }
+  }
   return RC::SUCCESS;
 }
 
@@ -564,9 +612,39 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
     } break;
 
     case Type::NEGATIVE: {
-      rc = Value::negative(left_value, value);
+      // Universal NEGATIVE handling: use binary subtraction (0 - value) for all types
+      Value zero_value;
+      AttrType operand_type = left_value.attr_type();
+
+      switch (operand_type) {
+        case AttrType::INTS:
+          zero_value.set_int(0);
+          break;
+        case AttrType::FLOATS:
+          zero_value.set_float(0.0f);
+          break;
+        case AttrType::VECTORS:
+          // For vectors, create a zero vector of the same dimension
+          {
+            int vec_len = left_value.length();
+            if (vec_len % sizeof(float) != 0) {
+              LOG_WARN("NEGATIVE invalid vector length: %d", vec_len);
+              return RC::INTERNAL;
+            }
+            int dimension = vec_len / sizeof(float);
+            vector<float> zero_vec(dimension, 0.0f);
+            zero_value.set_data(reinterpret_cast<char*>(zero_vec.data()), vec_len);
+            zero_value.set_type(AttrType::VECTORS);
+          }
+          break;
+        default:
+          LOG_WARN("NEGATIVE unsupported type: %d", static_cast<int>(operand_type));
+          return RC::UNIMPLEMENTED;
+      }
+
+      rc = Value::subtract(zero_value, left_value, value);
       if (rc != RC::SUCCESS) {
-        LOG_WARN("failed to negate value. rc=%s", strrc(rc));
+        LOG_WARN("failed to negate value using subtraction. rc=%s", strrc(rc));
       }
     } break;
 
@@ -659,25 +737,102 @@ RC ArithmeticExpr::get_value(const Tuple &tuple, Value &value) const
 {
   RC rc = RC::SUCCESS;
 
+  LOG_DEBUG("ArithmeticExpr::get_value() starting: arithmetic_type=%d left_type=%d",
+            static_cast<int>(arithmetic_type_), left_ ? static_cast<int>(left_->type()) : -1);
+
+  // Universal handling for NEGATIVE: always use binary subtraction (0 - expr)
+  // This ensures consistent behavior across SELECT and WHERE clauses
+  if (arithmetic_type_ == Type::NEGATIVE && left_ && !right_) {
+    LOG_DEBUG("ArithmeticExpr::get_value() converting NEGATIVE to binary subtraction (0 - expr)");
+
+    Value left_value;
+    rc = left_->get_value(tuple, left_value);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("ArithmeticExpr::get_value() NEGATIVE failed to get operand value: rc=%s", strrc(rc));
+      return rc;
+    }
+
+    // Create zero value with appropriate type
+    Value zero_value;
+    AttrType operand_type = left_value.attr_type();
+
+    switch (operand_type) {
+      case AttrType::INTS:
+        zero_value.set_int(0);
+        break;
+      case AttrType::FLOATS:
+        zero_value.set_float(0.0f);
+        break;
+      case AttrType::VECTORS:
+        // For vectors, create a zero vector of the same dimension
+        {
+          int vec_len = left_value.length();
+          if (vec_len % sizeof(float) != 0) {
+            LOG_WARN("ArithmeticExpr::get_value() invalid vector length: %d", vec_len);
+            return RC::INTERNAL;
+          }
+          int dimension = vec_len / sizeof(float);
+          vector<float> zero_vec(dimension, 0.0f);
+          zero_value.set_data(reinterpret_cast<char*>(zero_vec.data()), vec_len);
+          zero_value.set_type(AttrType::VECTORS);
+        }
+        break;
+      default:
+        LOG_WARN("ArithmeticExpr::get_value() NEGATIVE unsupported type: %d", static_cast<int>(operand_type));
+        return RC::UNIMPLEMENTED;
+    }
+
+    // Set result type to match operand type
+    value.set_type(operand_type);
+
+    // Perform subtraction: 0 - operand_value
+    rc = Value::subtract(zero_value, left_value, value);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("ArithmeticExpr::get_value() NEGATIVE subtraction failed: rc=%s", strrc(rc));
+      return rc;
+    }
+
+    LOG_DEBUG("ArithmeticExpr::get_value() NEGATIVE SUCCESS: result_type=%d",
+              static_cast<int>(value.attr_type()));
+    return RC::SUCCESS;
+  }
+
   Value left_value;
   Value right_value;
 
-  rc = left_->get_value(tuple, left_value);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
-    return rc;
+  if (left_) {
+    rc = left_->get_value(tuple, left_value);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("ArithmeticExpr::get_value() failed to get value of left expression: left_type=%d rc=%s",
+               static_cast<int>(left_->type()), strrc(rc));
+      return rc;
+    }
+    LOG_DEBUG("ArithmeticExpr::get_value() left value SUCCESS: left_type=%d value_type=%d",
+              static_cast<int>(left_->type()), static_cast<int>(left_value.attr_type()));
   }
 
   // 对于一元运算符（如负号），right_可能为nullptr
   if (right_) {
     rc = right_->get_value(tuple, right_value);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
+      LOG_WARN("ArithmeticExpr::get_value() failed to get value of right expression: right_type=%d rc=%s",
+               static_cast<int>(right_->type()), strrc(rc));
       return rc;
     }
+    LOG_DEBUG("ArithmeticExpr::get_value() right value SUCCESS: right_type=%d value_type=%d",
+              static_cast<int>(right_->type()), static_cast<int>(right_value.attr_type()));
   }
 
-  return calc_value(left_value, right_value, value);
+  rc = calc_value(left_value, right_value, value);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("ArithmeticExpr::get_value() calc_value failed: arithmetic_type=%d rc=%s",
+             static_cast<int>(arithmetic_type_), strrc(rc));
+    return rc;
+  }
+  LOG_DEBUG("ArithmeticExpr::get_value() SUCCESS: arithmetic_type=%d result_type=%d",
+            static_cast<int>(arithmetic_type_), static_cast<int>(value.attr_type()));
+
+  return rc;
 }
 
 RC ArithmeticExpr::get_column(Chunk &chunk, Column &column)

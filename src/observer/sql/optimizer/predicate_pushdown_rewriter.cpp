@@ -123,12 +123,15 @@ RC PredicatePushdownRewriter::get_exprs_can_pushdown(
 
     unique_ptr<Expression> &left_expr  = comparison_expr->left();
     unique_ptr<Expression> &right_expr = comparison_expr->right();
-    // 比较操作的左右两边只要有一个是取列字段值的并且另一边也是取字段值或常量，就pushdown
+    // 比较操作的左右两边只要有一个是取列字段值的并且另一边也是取字段值、常量或算术表达式，就pushdown
     if (left_expr->type() != ExprType::FIELD && right_expr->type() != ExprType::FIELD) {
       return rc;
     }
-    if (left_expr->type() != ExprType::FIELD && left_expr->type() != ExprType::VALUE &&
-        right_expr->type() != ExprType::FIELD && right_expr->type() != ExprType::VALUE) {
+    // Allow FIELD, VALUE, and ARITHMETIC expressions to be pushed down
+    auto is_pushdown_compatible = [](ExprType type) {
+      return type == ExprType::FIELD || type == ExprType::VALUE || type == ExprType::ARITHMETIC;
+    };
+    if (!is_pushdown_compatible(left_expr->type()) && !is_pushdown_compatible(right_expr->type())) {
       return rc;
     }
 

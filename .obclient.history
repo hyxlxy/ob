@@ -922,3 +922,141 @@ select * from test_table where -0 < col1 - col2;
 -- 重新测试原始查询
 ### 2025-09-12 09:58:52.150
 -- 完整测试负零表达式的正确性
+### 2025-09-12 10:19:34.248
+-- 测试复杂的算术表达式
+### 2025-09-12 10:23:53.895
+select id from exp_table where col1 > -5;
+### 2025-09-12 10:28:25.845
+select 1 where 1 < 2;
+### 2025-09-12 10:28:56.158
+select id from exp_table where -col1 < 0;
+### 2025-09-12 10:32:20.888
+-- 测试复杂表达式是否能输出预期结果
+### 2025-09-12 10:33:01.256
+select id, -col2 from exp_table;
+### 2025-09-12 10:33:28.069
+select id, col2*(-2) from exp_table;
+### 2025-09-12 10:33:56.674
+select id, -(col2*(-2)+5) from exp_table;
+### 2025-09-12 10:34:24.187
+select id, -(col2*(-2)+5)+(col4+8)*(col1+col3*1) from exp_table;
+### 2025-09-12 10:34:51.339
+select id, (2+col2)*col3*7 from exp_table;
+### 2025-09-12 10:35:18.064
+select id, -(col2*(-2)+5)+(col4+8)*(col1+col3*1), (2+col2)*col3*7 from exp_table;
+### 2025-09-12 10:36:41.883
+select id from exp_table where col2*(-8) > 0;
+### 2025-09-12 10:37:53.219
+select id from exp_table where (col2*(-8)+3) > 0;
+### 2025-09-12 10:38:53.389
+select id from exp_table where 0 - (col2*(-8)+3) > 0;
+### 2025-09-12 10:40:48.451
+select id from exp_table where -5 > 0;
+### 2025-09-12 10:41:15.448
+select id from exp_table where -(5) > 0;
+### 2025-09-12 10:41:42.760
+select id from exp_table where -(col2+3) > 0;
+### 2025-09-12 10:44:34.511
+-- 调试负数字段表达式的问题
+### 2025-09-12 10:47:13.037
+select id from debug_table where val > 0;
+### 2025-09-12 10:48:29.501
+select id from debug_table where 0-val > 0;
+### 2025-09-12 10:49:57.238
+select -5 > 0;
+### 2025-09-12 10:50:29.537
+select (-5) > 0;
+### 2025-09-12 10:50:55.647
+select 1 where (-5) > 0;
+### 2025-09-12 10:51:23.180
+select 1 where 5 > 0;
+### 2025-09-12 10:51:48.812
+select 1 where -5 > 0;
+### 2025-09-12 10:52:18.450
+select 1 where 0 > 5;
+### 2025-09-12 10:52:48.356
+select id from debug_table where 0 > 5;
+### 2025-09-12 11:01:01.648
+select id from debug_table where -val > 0;
+### 2025-09-12 11:02:58.054
+-- 调试简单的负数表达式
+### 2025-09-12 11:04:55.894
+select -val from simple_table;
+### 2025-09-12 11:10:13.437
+select id from simple_table where -val < 0;
+### 2025-09-12 11:11:19.753
+select id from simple_table where -5 < val;
+### 2025-09-12 11:19:18.504
+-- 最小化的负数表达式测试
+### 2025-09-12 11:22:15.888
+select id from test_neg where -val < 0;
+### 2025-09-12 11:23:43.193
+select 1 where 1 > 0;
+### 2025-09-12 11:24:10.970
+select 1 where -1 < 0;
+### 2025-09-12 11:29:43.174
+select 1 from test_neg where -val < 0;
+### 2025-09-12 11:34:40.881
+-- 测试语法解析问题
+### 2025-09-12 11:37:35.584
+select id from exp_table where -(col2*(-8)+3)+(col4+4)*(col1+col3*2) > (4+col2)*col3*2;
+### 2025-09-12 11:38:57.937
+select 1 where 1 > -1;
+### 2025-09-12 11:44:52.606
+select id from syntax_test where -val < 0;
+### 2025-09-12 11:45:23.078
+-- 测试最终的复杂表达式查询
+### 2025-09-12 11:46:26.869
+select id from exp_table where -(col2*2) > 0;
+### 2025-09-12 11:46:54.469
+select id from exp_table where -(col2*(-8)+3) > 0;
+### 2025-09-12 11:48:13.630
+select -5;
+### 2025-09-12 11:49:07.932
+select -val from test_neg;
+### 2025-09-12 11:49:36.744
+desc exp_table;
+### 2025-09-12 11:50:01.460
+desc test_neg;
+### 2025-09-12 11:50:31.970
+select -col1 from exp_table;
+### 2025-09-12 11:50:59.810
+select -col2 from exp_table;
+### 2025-09-12 11:51:31.741
+select -val from exp_table;
+### 2025-09-12 11:52:01.921
+select id from exp_table where -col2 > 0;
+### 2025-09-12 11:52:33.593
+select id from test_neg where -val > 0;
+### 2025-09-12 14:20:35.156
+-- 系统性测试 WHERE 子句中的负数表达式
+### 2025-09-12 14:26:21.178
+select id from debug_where where -val < 0;
+### 2025-09-12 14:27:21.451
+-- 逐步调试负数表达式
+### 2025-09-12 14:29:42.943
+-- 测试负数表达式的各个组件
+### 2025-09-12 14:30:50.605
+select id from test_components where -val > -10;
+### 2025-09-12 14:31:42.793
+select id from test_components where -val = -5;
+### 2025-09-12 14:43:21.017
+select id,-(col2*(-2)+5)+(col4+8)*(col1+col3*1),(2+col2)*col3*7 from exp_table;
+### 2025-09-12 14:44:03.651
+select id from exp_table where col2 > 0;
+### 2025-09-12 14:44:34.999
+select id from exp_table where col2*2 > 5;
+### 2025-09-12 14:45:05.240
+select id from exp_table where col2 > -1;
+### 2025-09-12 14:45:47.180
+select id from exp_table where -col2 > -10;
+### 2025-09-12 14:46:20.500
+select id,-(col2*(-2)+5)+(col4+8)*(col1+col3*1),(2+col2)*col3*7 from exp_table where (0-col2*(-8)+3)+(col4+4)*(col1+col3*2) > (4+col2)*col3*2;
+### 2025-09-12 14:49:20.948
+select id from exp_table where 0 > -col2;
+### 2025-09-12 14:51:09.629
+select id,-(col2*(-2)+5)+(col4+8)*(col1+col3*1),(2+col2)*col3*7 from exp_table where id = 7;
+### 2025-09-12 15:02:55.122
+select id from minimal_test where -val < 0;
+### 2025-09-12 15:03:30.129
+select id,-(col2*(-2)+5)+(col4+8)*(col1+col3*1),(2+col2)*col3*7 from exp_table where -(col2*(-8)+3)+(col4+4)*(col1+col3*2) > (4+col2)*col3*2;
