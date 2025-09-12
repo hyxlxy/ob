@@ -26,7 +26,6 @@ ScalarGroupByPhysicalOperator::ScalarGroupByPhysicalOperator(vector<Expression *
 
 RC ScalarGroupByPhysicalOperator::open(Trx *trx)
 {
-  LOG_INFO("DEBUG: ScalarGroupByPhysicalOperator::open - start");
   ASSERT(children_.size() == 1, "group by operator only support one child, but got %d", children_.size());
 
   // 安全检查
@@ -36,13 +35,11 @@ RC ScalarGroupByPhysicalOperator::open(Trx *trx)
   }
 
   PhysicalOperator &child = *children_[0];
-  LOG_INFO("DEBUG: ScalarGroupByPhysicalOperator::open - opening child");
   RC                rc    = child.open(trx);
   if (OB_FAIL(rc)) {
     LOG_INFO("failed to open child operator. rc=%s", strrc(rc));
     return rc;
   }
-  LOG_INFO("DEBUG: ScalarGroupByPhysicalOperator::open - child opened successfully");
 
   ExpressionTuple<Expression *> group_value_expression_tuple(value_expressions_);
 
@@ -51,7 +48,6 @@ RC ScalarGroupByPhysicalOperator::open(Trx *trx)
   int processed_rows = 0;
   const int MAX_ROWS_PER_QUERY = 1000000; // 防止处理过多行
 
-  LOG_INFO("DEBUG: ScalarGroupByPhysicalOperator::open - starting aggregation loop");
   while (OB_SUCC(rc = child.next())) {
     // 防止处理过多行导致内存问题
     if (++processed_rows > MAX_ROWS_PER_QUERY) {
@@ -59,7 +55,6 @@ RC ScalarGroupByPhysicalOperator::open(Trx *trx)
       break;
     }
 
-    LOG_INFO("DEBUG: ScalarGroupByPhysicalOperator::open - processing row %d", processed_rows);
     Tuple *child_tuple = child.current_tuple();
     if (nullptr == child_tuple) {
       LOG_WARN("failed to get tuple from child operator. rc=%s", strrc(rc));
@@ -83,6 +78,7 @@ RC ScalarGroupByPhysicalOperator::open(Trx *trx)
 
       CompositeTuple composite_tuple;
       composite_tuple.add_tuple(make_unique<ValueListTuple>(std::move(child_tuple_to_value)));
+
       group_value_ = make_unique<GroupValueType>(std::move(aggregator_list), std::move(composite_tuple));
 
       // 验证group_value_创建成功
@@ -119,15 +115,11 @@ RC ScalarGroupByPhysicalOperator::open(Trx *trx)
 
 RC ScalarGroupByPhysicalOperator::next()
 {
-  LOG_INFO("DEBUG: ScalarGroupByPhysicalOperator::next - start");
   if (group_value_ == nullptr || emitted_) {
-    LOG_INFO("DEBUG: ScalarGroupByPhysicalOperator::next - returning EOF");
     return RC::RECORD_EOF;
   }
 
   emitted_ = true;
-  LOG_INFO("DEBUG: ScalarGroupByPhysicalOperator::next - success");
-
   return RC::SUCCESS;
 }
 
@@ -141,17 +133,12 @@ RC ScalarGroupByPhysicalOperator::close()
 
 Tuple *ScalarGroupByPhysicalOperator::current_tuple()
 {
-  LOG_INFO("DEBUG: ScalarGroupByPhysicalOperator::current_tuple - start");
   if (group_value_ == nullptr || !emitted_) {
-    LOG_INFO("DEBUG: ScalarGroupByPhysicalOperator::current_tuple - returning nullptr");
     return nullptr;
   }
 
   try {
-    LOG_INFO("DEBUG: ScalarGroupByPhysicalOperator::current_tuple - getting tuple");
-    Tuple* result = &get<1>(*group_value_);
-    LOG_INFO("DEBUG: ScalarGroupByPhysicalOperator::current_tuple - success");
-    return result;
+    return &get<1>(*group_value_);
   } catch (...) {
     LOG_WARN("ScalarGroupByPhysicalOperator::current_tuple failed");
     return nullptr;

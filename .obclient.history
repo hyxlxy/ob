@@ -1088,13 +1088,15 @@ select id from exp_table where -col1 > -5;
 select -col1 from exp_table;
 ### 2025-09-12 16:39:37.311
 select -col1 from exp_table limit 1;
-### 2025-09-12 16:40:32.411
-select id from exp_table where -col1 > -5 limit 5;
-### 2025-09-12 16:41:31.276
-select id,-(col2*(-2)+5)+(col4+8)*(col1+col3*1),(2+col2)*col3*7 from exp_table where -(col2*(-8)+3)+(col4+4)*(col1+col3*2) > (4+col2)*col3*2 limit 3;
-### 2025-09-12 16:42:26.779
-select count(*) from simple_count_test;
-### 2025-09-12 16:43:36.660
+### 2025-09-12 17:06:29.846
+select count(id) from exp_table where 7/7*8 < 4+col3*col3/4;
+### 2025-09-12 17:09:19.437
 select count(id) from exp_table where 5/7*3 < 2+col3*col3/4;
-### 2025-09-12 16:45:34.227
+### 2025-09-12 17:09:49.369
+select count(*) from simple_count_test;
+### 2025-09-12 17:10:20.281
 select -col1 from exp_table limit 3;
+### 2025-09-12 17:10:47.261
+select id from exp_table where -col1 > -5 limit 5;
+### 2025-09-12 17:11:14.857
+select id,-(col2*(-2)+5)+(col4+8)*(col1+col3*1),(2+col2)*col3*7 from exp_table where -(col2*(-8)+3)+(col4+4)*(col1+col3*2) > (4+col2)*col3*2 limit 3;

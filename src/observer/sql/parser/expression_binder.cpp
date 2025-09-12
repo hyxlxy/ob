@@ -98,7 +98,9 @@ RC ExpressionBinder::bind_expression(unique_ptr<Expression> &expr, vector<unique
     } break;
 
     case ExprType::AGGREGATION: {
-      ASSERT(false, "shouldn't be here");
+      // 聚合表达式已经绑定过了，直接添加到bound_expressions中
+      bound_expressions.emplace_back(std::move(expr));
+      return RC::SUCCESS;
     } break;
 
     default: {
