@@ -710,35 +710,26 @@ RC ArithmeticExpr::execute_calc(
 RC ArithmeticExpr::get_value(const Tuple &tuple, Value &value) const
 {
   RC rc = RC::SUCCESS;
-  LOG_INFO("DEBUG: ArithmeticExpr::get_value - type=%d", static_cast<int>(arithmetic_type_));
 
   Value left_value;
   Value right_value;
 
   if (left_) {
-    LOG_INFO("DEBUG: ArithmeticExpr::get_value - getting left value");
     rc = left_->get_value(tuple, left_value);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
       return rc;
     }
-    LOG_INFO("DEBUG: ArithmeticExpr::get_value - left value type=%d", static_cast<int>(left_value.attr_type()));
   }
   if (right_) {
-    LOG_INFO("DEBUG: ArithmeticExpr::get_value - getting right value");
     rc = right_->get_value(tuple, right_value);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
       return rc;
     }
-    LOG_INFO("DEBUG: ArithmeticExpr::get_value - right value type=%d", static_cast<int>(right_value.attr_type()));
   }
 
-  LOG_INFO("DEBUG: ArithmeticExpr::get_value - calling calc_value");
-  rc = calc_value(left_value, right_value, value);
-  LOG_INFO("DEBUG: ArithmeticExpr::get_value - calc_value result rc=%s", strrc(rc));
-
-  return rc;
+  return calc_value(left_value, right_value, value);
 }
 
 RC ArithmeticExpr::get_column(Chunk &chunk, Column &column)
