@@ -21,6 +21,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/utility.h"
 
 class Expression;
+struct ParsedSqlNode;
 
 /**
  * @defgroup SQLParser SQL Parser
@@ -53,6 +54,10 @@ enum CompOp
   GREAT_THAN,   ///< ">"
   LIKE_OP,      ///< "LIKE"
   NOT_LIKE_OP,  ///< "NOT LIKE"
+  IN_OP,        ///< "IN"
+  NOT_IN_OP,    ///< "NOT IN"
+  EXISTS_OP,    ///< "EXISTS"
+  NOT_EXISTS_OP,///< "NOT EXISTS"
   NO_OP
 };
 
@@ -100,6 +105,9 @@ struct ConditionSqlNode
   // 新增：支持表达式比较
   std::unique_ptr<Expression> left_expr;   ///< left-hand side expression
   std::unique_ptr<Expression> right_expr;  ///< right-hand side expression
+
+  // 新增：支持子查询
+  std::unique_ptr<ParsedSqlNode> sub_query;  ///< sub-query for IN/EXISTS operations
 
   // 添加移动构造函数和移动赋值操作符
   ConditionSqlNode() = default;
@@ -269,13 +277,19 @@ struct AnalyzeTableSqlNode
  * @brief 描述一个create index语句
  * @ingroup SQLParser
  * @details 创建索引时，需要指定索引名，表名，字段名。
- * 正常的SQL语句中，一个索引可能包含了多个字段，这里仅支持一个字段。
+ * 支持多个字段的索引和唯一索引。
  */
 struct CreateIndexSqlNode
 {
-  string index_name;      ///< Index name
-  string relation_name;   ///< Relation name
-  string attribute_name;  ///< Attribute name
+  string index_name;           ///< Index name
+  string relation_name;        ///< Relation name
+  vector<string> attribute_names;  ///< Attribute names (支持多字段)
+  bool is_unique = false;      ///< 是否为唯一索引
+
+  // 为了向后兼容，保留单字段访问接口
+  string attribute_name() const {
+    return attribute_names.empty() ? "" : attribute_names[0];
+  }
 };
 
 /**

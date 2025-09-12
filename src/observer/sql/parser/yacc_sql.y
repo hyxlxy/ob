@@ -127,6 +127,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         PRIMARY
         KEY
         ANALYZE
+        IN
+        EXISTS
+        UNIQUE
         EQ
         LT
         GT
@@ -225,6 +228,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <sql_node>            command_wrapper
 // commands should be a list but I use a single command instead
 %type <sql_node>            commands
+%type <sql_node>            sub_query
 
 %left '+' '-'
 %left '*' '/'
@@ -324,13 +328,29 @@ desc_table_stmt:
     ;
 
 create_index_stmt:    /*create index 语句的语法解析树*/
-    CREATE INDEX ID ON ID LBRACE ID RBRACE
+    CREATE INDEX ID ON ID LBRACE attr_list RBRACE
     {
       $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
       CreateIndexSqlNode &create_index = $$->create_index;
       create_index.index_name = $3;
       create_index.relation_name = $5;
-      create_index.attribute_name = $7;
+      if ($7 != nullptr) {
+        create_index.attribute_names.swap(*$7);
+        delete $7;
+      }
+      create_index.is_unique = false;
+    }
+    | CREATE UNIQUE INDEX ID ON ID LBRACE attr_list RBRACE
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
+      CreateIndexSqlNode &create_index = $$->create_index;
+      create_index.index_name = $4;
+      create_index.relation_name = $6;
+      if ($8 != nullptr) {
+        create_index.attribute_names.swap(*$8);
+        delete $8;
+      }
+      create_index.is_unique = true;
     }
     ;
 
@@ -837,6 +857,32 @@ condition:
       $$->right_expr.reset($3);
       $$->comp = $2;
     }
+    | expression IN LBRACE sub_query RBRACE
+    {
+      $$ = new ConditionSqlNode;
+      $$->left_expr.reset($1);
+      $$->sub_query.reset($4);
+      $$->comp = IN_OP;
+    }
+    | expression NOT IN LBRACE sub_query RBRACE
+    {
+      $$ = new ConditionSqlNode;
+      $$->left_expr.reset($1);
+      $$->sub_query.reset($5);
+      $$->comp = NOT_IN_OP;
+    }
+    | EXISTS LBRACE sub_query RBRACE
+    {
+      $$ = new ConditionSqlNode;
+      $$->sub_query.reset($3);
+      $$->comp = EXISTS_OP;
+    }
+    | NOT EXISTS LBRACE sub_query RBRACE
+    {
+      $$ = new ConditionSqlNode;
+      $$->sub_query.reset($4);
+      $$->comp = NOT_EXISTS_OP;
+    }
     ;
 
 comp_op:
@@ -1050,6 +1096,13 @@ join_item:
         $$->conditions.swap(*$4);
         delete $4;
       }
+    }
+    ;
+
+sub_query:
+    select_stmt
+    {
+      $$ = $1;
     }
     ;
 

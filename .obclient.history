@@ -1226,5 +1226,83 @@ calc -(3+2);
 calc (1+2)*3;
 ### 2025-09-13 00:26:49.622
 select 5/4, 5/0, -(3+2), (1+2)*3;
-### 2025-09-13 00:26:49.625
+### 2025-09-13 00:54:26.128
+select * from items;
+### 2025-09-13 00:54:26.137
+select embedding + [1.5,2.3,3.3] from items;
+### 2025-09-13 00:54:59.616
+create table items(id int, embedding vector(3));
+### 2025-09-13 00:54:59.631
+insert into items values (1, '[1.0,2.0,3.0]');
+### 2025-09-13 00:54:59.634
+insert into items values (2, '[1.5,2.3,3.3]');
+### 2025-09-13 00:54:59.637
+select embedding + [1.5,2.3,3.3], embedding - '[1,2,3]', [1,2,3] - embedding from items where embedding > [0,0,0];
+### 2025-09-13 01:02:55.199
+-- Test INNER JOIN
+### 2025-09-13 01:02:55.250
+insert into t1 values (1, 'a'), (2, 'b');
+### 2025-09-13 01:02:55.253
+insert into t2 values (1, 100), (2, 200);
+### 2025-09-13 01:02:55.260
+-- Test subquery
+### 2025-09-13 01:02:55.292
+insert into ssq_1 values (1, 10), (2, 20);
+### 2025-09-13 01:02:55.293
+insert into ssq_2 values (1, 100), (3, 300);
+### 2025-09-13 01:02:55.294
+-- Test multi-field index
+### 2025-09-13 01:02:55.311
+insert into multi_idx values (1, 10, 20), (2, 10, 30);
+### 2025-09-13 01:02:55.314
+-- Test unique index
+### 2025-09-13 01:03:28.215
+create table t1(id int, name char);
+### 2025-09-13 01:03:28.229
+create table t2(id int, value int);
+### 2025-09-13 01:03:28.230
+insert into t1 values (1, 'a');
+### 2025-09-13 01:03:28.231
+insert into t1 values (2, 'b');
+### 2025-09-13 01:03:28.233
+insert into t2 values (1, 100);
+### 2025-09-13 01:03:28.234
+insert into t2 values (2, 200);
+### 2025-09-13 01:03:28.235
+select * from t1 inner join t2 on t1.id = t2.id;
+### 2025-09-13 01:04:00.903
+create table ssq_1(id int, col1 int);
+### 2025-09-13 01:04:00.918
+create table ssq_2(id int, col2 int);
+### 2025-09-13 01:04:00.919
+insert into ssq_1 values (1, 10);
+### 2025-09-13 01:04:00.922
+insert into ssq_1 values (2, 20);
+### 2025-09-13 01:04:00.923
+insert into ssq_2 values (1, 100);
+### 2025-09-13 01:04:00.924
+insert into ssq_2 values (3, 300);
+### 2025-09-13 01:04:00.925
+select * from ssq_1 where id in (select id from ssq_2);
+### 2025-09-13 01:04:32.425
+create table multi_idx(id int, col1 int, col2 int);
+### 2025-09-13 01:04:32.440
+create index idx_multi on multi_idx(col1, col2);
+### 2025-09-13 01:04:32.441
+insert into multi_idx values (1, 10, 20);
+### 2025-09-13 01:04:32.444
+insert into multi_idx values (2, 10, 30);
+### 2025-09-13 01:04:32.446
+select * from multi_idx;
+### 2025-09-13 01:05:04.795
+create table unique_tbl(id int, col1 int);
+### 2025-09-13 01:05:04.811
+create unique index idx_unique on unique_tbl(id);
+### 2025-09-13 01:05:04.812
+insert into unique_tbl values (1, 100);
+### 2025-09-13 01:05:04.814
+insert into unique_tbl values (2, 200);
+### 2025-09-13 01:05:04.817
+select * from unique_tbl;
+### 2025-09-13 01:05:04.822
 exit;

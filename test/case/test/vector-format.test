@@ -1,0 +1,23 @@
+-- echo vector format test
+
+create table items(id int, embedding vector(3));
+insert into items values (1, '[1.0,2.0,3.0]');
+insert into items values (2, '[1.5,2.3,3.3]');
+insert into items values (3, '[0,0,0]');
+
+select * from items;
+
+-- echo vector literal operations
+select embedding + [1.5,2.3,3.3] from items;
+select embedding - '[1,2,3]' from items;
+select [1,2,3] - embedding from items;
+
+-- echo complex query
+select embedding + [1.5,2.3,3.3], embedding - '[1,2,3]', [1,2,3] - embedding from items where embedding > [0,0,0];
+
+-- echo vector comparison tests
+select * from items where embedding > [0,0,0];
+select * from items where embedding = [1.5,2.3,3.3];
+
+-- echo vector operation result comparison
+select * from items where embedding + [1,1,1] > [2,3,4];
