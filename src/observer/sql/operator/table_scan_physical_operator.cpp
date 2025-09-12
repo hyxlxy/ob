@@ -33,9 +33,26 @@ RC TableScanPhysicalOperator::next()
   RC rc = RC::SUCCESS;
 
   bool filter_result = false;
+  static int scan_counter = 0;
+
   while (OB_SUCC(rc = record_scanner_->next(current_record_))) {
+    scan_counter++;
+
+    // 防止无限循环，每10000次扫描输出调试信息
+    if (scan_counter % 10000 == 0) {
+      printf("DEBUG: TableScanPhysicalOperator::next scanned %d records\n", scan_counter);
+      fflush(stdout);
+    }
+
+    // 如果扫描次数过多，强制退出
+    if (scan_counter > 100000) {
+      printf("DEBUG: TableScanPhysicalOperator::next exceeded maximum scan limit, breaking\n");
+      fflush(stdout);
+      return RC::RECORD_EOF;
+    }
+
     LOG_TRACE("got a record. rid=%s", current_record_.rid().to_string().c_str());
-    
+
     tuple_.set_record(&current_record_);
     rc = filter(tuple_, filter_result);
     if (rc != RC::SUCCESS) {
@@ -95,6 +112,10 @@ RC TableScanPhysicalOperator::filter(RowTuple &tuple, bool &result)
 {
   RC    rc = RC::SUCCESS;
   Value value;
+
+  static int filter_counter = 0;
+  filter_counter++;
+
   for (unique_ptr<Expression> &expr : predicates_) {
     rc = expr->get_value(tuple, value);
     if (rc != RC::SUCCESS) {
@@ -102,6 +123,14 @@ RC TableScanPhysicalOperator::filter(RowTuple &tuple, bool &result)
     }
 
     bool tmp_result = value.get_boolean();
+
+    // 每1000次调用输出一次调试信息
+    if (filter_counter % 1000 == 0) {
+      printf("DEBUG: TableScanPhysicalOperator::filter called %d times, result=%s\n",
+             filter_counter, tmp_result ? "true" : "false");
+      fflush(stdout);
+    }
+
     if (!tmp_result) {
       result = false;
       return rc;

@@ -782,8 +782,6 @@ SELECT COUNT(*) FROM exp_table WHERE col1 - 9 > 9;  -- should work without crash
 insert into exp_table values (8,1,8,2.13,6.85);
 ### 2025-09-09 11:00:19.218
 select * from exp_table where col1 - 9 > 4;
-### 2025-09-09 11:00:19.232
-exit;
 ### 2025-09-09 11:56:23.070
 create table if not exists t(a int, b int);
 ### 2025-09-09 11:58:26.624
@@ -1060,8 +1058,6 @@ select 1;
 select 5/7*3;
 ### 2025-09-12 15:30:10.533
 select id from exp_table where 5/7*3 < 5;
-### 2025-09-12 15:30:41.180
-select count(*) from exp_table;
 ### 2025-09-12 15:31:12.582
 select count(id) from exp_table;
 ### 2025-09-12 15:42:28.843
@@ -1116,11 +1112,119 @@ select avg(col2) from exp_table where id<>7/7;
 select max(col4) from exp_table where id<>7/7;
 ### 2025-09-12 21:13:35.580
 select min(col1)+avg(col2)*max(col3)/(max(col4) - 1) from exp_table where id<>7/7;
-### 2025-09-12 21:14:23.505
-select count(id) from exp_table where 5/7*3 < 2+col3*col3/4;
 ### 2025-09-12 21:15:00.765
 select count(id) from exp_table where 4/3*8 < 1+col3*col3/6;
 ### 2025-09-12 21:15:53.796
 select -col1 from exp_table limit 3;
 ### 2025-09-12 21:16:28.496
 select id from exp_table where -col1 > -5 limit 5;
+### 2025-09-12 21:42:17.452
+select col3 from exp_table where col3 > 8.92 or col3 < -8.92;
+### 2025-09-12 21:43:12.632
+select max(col3) from exp_table;
+### 2025-09-12 21:46:48.208
+select id from exp_table where 9/4*9 < 7+col3*col3/6 limit 5;
+### 2025-09-12 21:47:31.123
+select id from exp_table where col3*col3/6 > 13 limit 5;
+### 2025-09-12 21:48:31.609
+select id from exp_table where col3 > 8 limit 5;
+### 2025-09-12 21:50:33.851
+select id from exp_table where col3*col3 > 79 limit 5;
+### 2025-09-12 21:51:16.525
+select id from exp_table where col1*col2 > 10 limit 5;
+### 2025-09-12 21:54:11.897
+select col3 from exp_table limit 5;
+### 2025-09-12 21:56:49.097
+select col3 from exp_table where col3 > 8.0 limit 1;
+### 2025-09-12 22:18:04.948
+select count(id) from exp_table where 5/7*3 < 2+col3*col3/4;
+### 2025-09-12 22:19:15.196
+select count(id) from exp_table where 9/4*9 < 7+col3*col3/4;
+### 2025-09-12 22:19:44.355
+select count(id) from exp_table where col3*col3/6 > 10;
+### 2025-09-12 22:20:08.897
+select count(id) from exp_table where col3*col3/5 > 10;
+### 2025-09-12 22:20:29.842
+select 10/6;
+### 2025-09-12 22:21:06.981
+select col3/6 from exp_table limit 3;
+### 2025-09-12 22:33:17.062
+select count(*) from exp_table where col3*col3 > 50;
+### 2025-09-12 22:33:37.826
+select count(*) from exp_table where (col3*col3)/6 > 10;
+### 2025-09-12 22:33:58.503
+select count(*) from exp_table where col3*(col3/6) > 10;
+### 2025-09-12 22:34:20.390
+select count(*) from exp_table where col3*(col3/7) > 10;
+### 2025-09-12 22:57:11.582
+select * from exp_table limit 1;
+### 2025-09-12 22:57:43.045
+select count(*) from exp_table;
+### 2025-09-12 22:58:02.998
+select count(*) from exp_table where id = 1;
+### 2025-09-12 22:58:22.719
+select count(*) from exp_table where col3 > 5;
+### 2025-09-12 22:58:41.796
+select count(*) from exp_table where col3/5 > 1;
+### 2025-09-12 22:59:02.520
+select count(*) from exp_table where col3/6 > 1;
+### 2025-09-12 22:59:21.681
+select count(*) from exp_table where col3*col3 > 25;
+### 2025-09-12 22:59:42.547
+select count(*) from exp_table where col3*col3/6 > 5;
+### 2025-09-12 23:00:23.663
+select count(*) from exp_table where 7+col3 > 10;
+### 2025-09-12 23:00:44.137
+select count(*) from exp_table where col3*col3+7 > 20;
+### 2025-09-12 23:01:06.194
+select count(*) from exp_table where 7+(col3*col3/6) > 20;
+### 2025-09-12 23:01:28.293
+select count(*) from exp_table where (7+col3*col3)/6 > 5;
+### 2025-09-12 23:01:53.434
+select count(*) from exp_table where 7+col3*col3/6 > 20;
+### 2025-09-12 23:16:23.854
+select count(id) from exp_table where 7+col3*col3/6 > 20;
+### 2025-09-12 23:25:49.442
+select count(*) from exp_table where col3*col3/6 < 13.25;
+### 2025-09-12 23:26:10.548
+select count(*) from exp_table where 20.25 < 20;
+### 2025-09-12 23:29:27.861
+select count(id) from exp_table where 20.25 < 25.0;
+### 2025-09-12 23:30:02.305
+select count(id) from exp_table where 20.25 > 25.0;
+### 2025-09-12 23:35:19.205
+select 9/4*9;
+### 2025-09-12 23:35:56.093
+select col3, 7+col3*col3/6 from exp_table limit 5;
+### 2025-09-12 23:36:53.426
+select col3, 7+col3*col3/6 from exp_table where 7+col3*col3/6 > 20;
+### 2025-09-12 23:37:35.933
+select col3, 7+col3*col3/6 from exp_table where 7+col3*col3/6 > 20.25;
+### 2025-09-12 23:52:41.024
+select count(id) from exp_table where 9/4*9 < 7+col3*col3/6;
+### 2025-09-13 00:25:10.988
+calc 1+2*3;
+### 2025-09-13 00:25:11.003
+select 1+2*3;
+### 2025-09-13 00:25:36.506
+create table test_expr(id int, col1 int, col2 float);
+### 2025-09-13 00:25:36.547
+insert into test_expr values (1, 10, 2.5);
+### 2025-09-13 00:25:36.549
+insert into test_expr values (2, 20, 3.0);
+### 2025-09-13 00:25:36.551
+select id, col1+col2, col1*col2 from test_expr;
+### 2025-09-13 00:25:36.553
+select * from test_expr where col1+col2 > 12;
+### 2025-09-13 00:26:49.602
+calc 5/4;
+### 2025-09-13 00:26:49.620
+calc 5/0;
+### 2025-09-13 00:26:49.621
+calc -(3+2);
+### 2025-09-13 00:26:49.622
+calc (1+2)*3;
+### 2025-09-13 00:26:49.622
+select 5/4, 5/0, -(3+2), (1+2)*3;
+### 2025-09-13 00:26:49.625
+exit;

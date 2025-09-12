@@ -8,6 +8,7 @@ EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
 MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 See the Mulan PSL v2 for more details. */
 
+#include <cmath>
 #include "common/lang/comparator.h"
 #include "common/lang/sstream.h"
 #include "common/log/log.h"
@@ -44,12 +45,22 @@ RC FloatType::multiply(const Value &left, const Value &right, Value &result) con
 RC FloatType::divide(const Value &left, const Value &right, Value &result) const
 {
   if (right.get_float() > -EPSILON && right.get_float() < EPSILON) {
-    // NOTE:
-    // 设置为浮点数最大值是不正确的。通常的做法是设置为NULL，但是当前的miniob没有NULL概念，所以这里设置为浮点数最大值。
-    result.set_float(numeric_limits<float>::max());
-  } else {
-    result.set_float(left.get_float() / right.get_float());
+    // 除零情况，设置为0而不是最大值，避免无穷大导致的问题
+    result.set_float(0.0f);
+    return RC::SUCCESS;
   }
+
+  float left_val = left.get_float();
+  float right_val = right.get_float();
+  float division_result = left_val / right_val;
+
+  // 检查结果是否为无穷大或NaN，如果是则设置为0
+  if (std::isinf(division_result) || std::isnan(division_result)) {
+    result.set_float(0.0f);
+    return RC::SUCCESS;
+  }
+
+  result.set_float(division_result);
   return RC::SUCCESS;
 }
 
