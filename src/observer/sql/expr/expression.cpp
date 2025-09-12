@@ -468,18 +468,14 @@ RC ComparisonExpr::validate() const {
 
 RC ArithmeticExpr::validate() const {
   if (arithmetic_type_ == ArithmeticExpr::Type::NEGATIVE) {
-    // Baseline rule: NEGATIVE only allowed for constant non-zero literals.
-    // - Disallow -(expr) when expr is not a constant
-    // - Disallow -0 / -0.0 even if constant
+    // Allow NEGATIVE for constant literals, including -0
+    // Only disallow -(expr) when expr is not a constant
     Value const_lv;
     RC tv = left_->try_get_value(const_lv);
     if (tv != RC::SUCCESS) {
       return RC::UNIMPLEMENTED;
     }
-    if ((const_lv.attr_type() == AttrType::INTS && const_lv.get_int() == 0) ||
-        (const_lv.attr_type() == AttrType::FLOATS && const_lv.get_float() == 0.0f)) {
-      return RC::UNIMPLEMENTED;
-    }
+    // Allow -0 and -0.0 as they are mathematically valid
     return RC::SUCCESS;
   }
   // binary or other unary: validate children

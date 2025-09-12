@@ -902,3 +902,23 @@ q
 -- 测试JOIN功能
 ### 2025-09-12 09:09:07.473
 SELECT * FROM test_a INNER JOIN test_b ON test_a.id = test_b.id;
+### 2025-09-12 09:32:18.667
+-- 测试负零表达式的问题
+### 2025-09-12 09:34:26.877
+calc -0;
+### 2025-09-12 09:38:08.052
+-- 测试各种表达式的解析
+### 2025-09-12 09:40:24.800
+select * from test_table where 1 < 2;
+### 2025-09-12 09:41:11.485
+select * from test_table where -1 < 2;
+### 2025-09-12 09:41:42.568
+select * from test_table where -0 < 2;
+### 2025-09-12 09:42:08.739
+select * from test_table where 1 < col1 - col2;
+### 2025-09-12 09:42:45.001
+select * from test_table where -0 < col1 - col2;
+### 2025-09-12 09:43:54.900
+-- 重新测试原始查询
+### 2025-09-12 09:58:52.150
+-- 完整测试负零表达式的正确性
