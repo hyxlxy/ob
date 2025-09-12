@@ -37,20 +37,20 @@ RC SumAggregator::evaluate(Value& result)
 
 RC CountAggregator::accumulate(const Value &value)
 {
-  // 确保value_已经正确初始化
-  if (value_.attr_type() == AttrType::UNDEFINED) {
-    value_.set_int(0);
-  }
-
-  int count = value_.get_int();
-  count++;
-  value_.set_int(count);
+  // 安全的计数实现，不依赖传入的value内容
+  LOG_INFO("DEBUG: CountAggregator::accumulate - before increment, count=%ld", count_);
+  count_++;
+  LOG_INFO("DEBUG: CountAggregator::accumulate - after increment, count=%ld", count_);
+  // 不立即更新value_，在evaluate时再设置
   return RC::SUCCESS;
 }
 
 RC CountAggregator::evaluate(Value& result)
 {
-  result = value_;
+  // 安全地设置结果
+  LOG_INFO("DEBUG: CountAggregator::evaluate - count=%ld", count_);
+  result.set_int(static_cast<int>(count_));
+  LOG_INFO("DEBUG: CountAggregator::evaluate - result set successfully");
   return RC::SUCCESS;
 }
 

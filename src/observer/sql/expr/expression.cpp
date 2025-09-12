@@ -612,7 +612,11 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
     } break;
 
     case Type::NEGATIVE: {
-      rc = Value::negative(left_value, value);
+      // 直接使用操作数的类型实例进行负数运算
+      AttrType operand_type = left_value.attr_type();
+      value.set_type(operand_type);
+
+      rc = DataType::type_instance(operand_type)->negative(left_value, value);
       if (rc != RC::SUCCESS) {
         LOG_WARN("failed to negate value. rc=%s", strrc(rc));
       }
@@ -706,53 +710,35 @@ RC ArithmeticExpr::execute_calc(
 RC ArithmeticExpr::get_value(const Tuple &tuple, Value &value) const
 {
   RC rc = RC::SUCCESS;
-
-  // 特殊处理一元负号表达式，使用二元减法替代
-  if (arithmetic_type_ == Type::NEGATIVE && left_ && !right_) {
-    Value operand_value;
-    rc = left_->get_value(tuple, operand_value);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to get value of operand expression for NEGATIVE. rc=%s", strrc(rc));
-      return rc;
-    }
-
-    // 创建零值
-    Value zero_value;
-    AttrType operand_type = operand_value.attr_type();
-    switch (operand_type) {
-      case AttrType::INTS:
-        zero_value.set_int(0);
-        break;
-      case AttrType::FLOATS:
-        zero_value.set_float(0.0f);
-        break;
-      default:
-        LOG_WARN("NEGATIVE unsupported type: %d", static_cast<int>(operand_type));
-        return RC::UNIMPLEMENTED;
-    }
-
-    // 执行 0 - operand_value
-    return Value::subtract(zero_value, operand_value, value);
-  }
+  LOG_INFO("DEBUG: ArithmeticExpr::get_value - type=%d", static_cast<int>(arithmetic_type_));
 
   Value left_value;
   Value right_value;
 
   if (left_) {
+    LOG_INFO("DEBUG: ArithmeticExpr::get_value - getting left value");
     rc = left_->get_value(tuple, left_value);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
       return rc;
     }
+    LOG_INFO("DEBUG: ArithmeticExpr::get_value - left value type=%d", static_cast<int>(left_value.attr_type()));
   }
   if (right_) {
+    LOG_INFO("DEBUG: ArithmeticExpr::get_value - getting right value");
     rc = right_->get_value(tuple, right_value);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
       return rc;
     }
+    LOG_INFO("DEBUG: ArithmeticExpr::get_value - right value type=%d", static_cast<int>(right_value.attr_type()));
   }
-  return calc_value(left_value, right_value, value);
+
+  LOG_INFO("DEBUG: ArithmeticExpr::get_value - calling calc_value");
+  rc = calc_value(left_value, right_value, value);
+  LOG_INFO("DEBUG: ArithmeticExpr::get_value - calc_value result rc=%s", strrc(rc));
+
+  return rc;
 }
 
 RC ArithmeticExpr::get_column(Chunk &chunk, Column &column)

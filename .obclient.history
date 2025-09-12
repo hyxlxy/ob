@@ -1016,8 +1016,6 @@ select -val from test_neg;
 desc exp_table;
 ### 2025-09-12 11:50:01.460
 desc test_neg;
-### 2025-09-12 11:50:31.970
-select -col1 from exp_table;
 ### 2025-09-12 11:50:59.810
 select -col2 from exp_table;
 ### 2025-09-12 11:51:31.741
@@ -1058,10 +1056,6 @@ select id,-(col2*(-2)+5)+(col4+8)*(col1+col3*1),(2+col2)*col3*7 from exp_table w
 select id from minimal_test where -val < 0;
 ### 2025-09-12 15:28:09.458
 select 1;
-### 2025-09-12 15:28:36.785
-select count(id) from exp_table where 5/7*3 < 2+col3*col3/4;
-### 2025-09-12 15:29:15.244
-select * from exp_table;
 ### 2025-09-12 15:29:42.474
 select 5/7*3;
 ### 2025-09-12 15:30:10.533
@@ -1074,8 +1068,6 @@ select count(id) from exp_table;
 create table simple_count_test(id int);
 ### 2025-09-12 15:42:54.843
 insert into simple_count_test VALUES (1);
-### 2025-09-12 15:58:36.338
-select count(*) from simple_count_test;
 ### 2025-09-12 15:59:12.870
 select sum(id) from simple_count_test;
 ### 2025-09-12 16:00:58.865
@@ -1084,5 +1076,25 @@ select id from exp_table where -col1 > 0;
 select id from exp_table where -col2 < 0;
 ### 2025-09-12 16:02:10.036
 select id from exp_table where -(col2*(-8)+3) > 0;
-### 2025-09-12 16:03:16.840
+### 2025-09-12 16:15:12.897
+select * from exp_table;
+### 2025-09-12 16:16:03.414
+select id from exp_table where 5/7*3 < 2+col3*col3/4;
+### 2025-09-12 16:16:56.414
 select id,-(col2*(-2)+5)+(col4+8)*(col1+col3*1),(2+col2)*col3*7 from exp_table where -(col2*(-8)+3)+(col4+4)*(col1+col3*2) > (4+col2)*col3*2;
+### 2025-09-12 16:20:48.447
+select id from exp_table where -col1 > -5;
+### 2025-09-12 16:21:17.916
+select -col1 from exp_table;
+### 2025-09-12 16:29:25.472
+select -col1 from exp_table limit 3;
+### 2025-09-12 16:39:37.311
+select -col1 from exp_table limit 1;
+### 2025-09-12 16:40:32.411
+select id from exp_table where -col1 > -5 limit 5;
+### 2025-09-12 16:41:31.276
+select id,-(col2*(-2)+5)+(col4+8)*(col1+col3*1),(2+col2)*col3*7 from exp_table where -(col2*(-8)+3)+(col4+4)*(col1+col3*2) > (4+col2)*col3*2 limit 3;
+### 2025-09-12 16:42:26.779
+select count(*) from simple_count_test;
+### 2025-09-12 16:43:36.660
+select count(id) from exp_table where 5/7*3 < 2+col3*col3/4;

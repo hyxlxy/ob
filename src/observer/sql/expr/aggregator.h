@@ -41,9 +41,19 @@ class CountAggregator : public Aggregator
 public:
   CountAggregator() {
     value_.set_int(0);
+    count_ = 0; // 明确初始化计数器
   }
+
+  // 添加安全检查
+  bool validate() const {
+    return value_.attr_type() == AttrType::INTS && count_ >= 0;
+  }
+
   RC accumulate(const Value &value) override;
   RC evaluate(Value &result) override;
+
+private:
+  int64_t count_ = 0; // 独立的计数器，防止Value操作问题
 };
 
 class MaxAggregator : public Aggregator
