@@ -1008,8 +1008,6 @@ select id from syntax_test where -val < 0;
 -- 测试最终的复杂表达式查询
 ### 2025-09-12 11:46:26.869
 select id from exp_table where -(col2*2) > 0;
-### 2025-09-12 11:46:54.469
-select id from exp_table where -(col2*(-8)+3) > 0;
 ### 2025-09-12 11:48:13.630
 select -5;
 ### 2025-09-12 11:49:07.932
@@ -1058,5 +1056,33 @@ select id from exp_table where 0 > -col2;
 select id,-(col2*(-2)+5)+(col4+8)*(col1+col3*1),(2+col2)*col3*7 from exp_table where id = 7;
 ### 2025-09-12 15:02:55.122
 select id from minimal_test where -val < 0;
-### 2025-09-12 15:03:30.129
+### 2025-09-12 15:28:09.458
+select 1;
+### 2025-09-12 15:28:36.785
+select count(id) from exp_table where 5/7*3 < 2+col3*col3/4;
+### 2025-09-12 15:29:15.244
+select * from exp_table;
+### 2025-09-12 15:29:42.474
+select 5/7*3;
+### 2025-09-12 15:30:10.533
+select id from exp_table where 5/7*3 < 5;
+### 2025-09-12 15:30:41.180
+select count(*) from exp_table;
+### 2025-09-12 15:31:12.582
+select count(id) from exp_table;
+### 2025-09-12 15:42:28.843
+create table simple_count_test(id int);
+### 2025-09-12 15:42:54.843
+insert into simple_count_test VALUES (1);
+### 2025-09-12 15:58:36.338
+select count(*) from simple_count_test;
+### 2025-09-12 15:59:12.870
+select sum(id) from simple_count_test;
+### 2025-09-12 16:00:58.865
+select id from exp_table where -col1 > 0;
+### 2025-09-12 16:01:39.613
+select id from exp_table where -col2 < 0;
+### 2025-09-12 16:02:10.036
+select id from exp_table where -(col2*(-8)+3) > 0;
+### 2025-09-12 16:03:16.840
 select id,-(col2*(-2)+5)+(col4+8)*(col1+col3*1),(2+col2)*col3*7 from exp_table where -(col2*(-8)+3)+(col4+4)*(col1+col3*2) > (4+col2)*col3*2;

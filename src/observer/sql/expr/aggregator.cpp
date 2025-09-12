@@ -37,6 +37,11 @@ RC SumAggregator::evaluate(Value& result)
 
 RC CountAggregator::accumulate(const Value &value)
 {
+  // 确保value_已经正确初始化
+  if (value_.attr_type() == AttrType::UNDEFINED) {
+    value_.set_int(0);
+  }
+
   int count = value_.get_int();
   count++;
   value_.set_int(count);

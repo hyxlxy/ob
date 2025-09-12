@@ -39,7 +39,9 @@ public:
 class CountAggregator : public Aggregator
 {
 public:
-  CountAggregator() { value_.set_int(0); }
+  CountAggregator() {
+    value_.set_int(0);
+  }
   RC accumulate(const Value &value) override;
   RC evaluate(Value &result) override;
 };
