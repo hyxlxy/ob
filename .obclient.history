@@ -1090,13 +1090,37 @@ select -col1 from exp_table;
 select -col1 from exp_table limit 1;
 ### 2025-09-12 17:06:29.846
 select count(id) from exp_table where 7/7*8 < 4+col3*col3/4;
-### 2025-09-12 17:09:19.437
-select count(id) from exp_table where 5/7*3 < 2+col3*col3/4;
 ### 2025-09-12 17:09:49.369
 select count(*) from simple_count_test;
-### 2025-09-12 17:10:20.281
-select -col1 from exp_table limit 3;
-### 2025-09-12 17:10:47.261
-select id from exp_table where -col1 > -5 limit 5;
 ### 2025-09-12 17:11:14.857
 select id,-(col2*(-2)+5)+(col4+8)*(col1+col3*1),(2+col2)*col3*7 from exp_table where -(col2*(-8)+3)+(col4+4)*(col1+col3*2) > (4+col2)*col3*2 limit 3;
+### 2025-09-12 20:07:28.558
+select * from exp_table where id<>7/7;
+### 2025-09-12 20:27:27.146
+select col1 from exp_table where id<>7/7 order by col1 limit 10;
+### 2025-09-12 20:37:26.777
+select col2 from exp_table where id<>7/7 order by col2 limit 10;
+### 2025-09-12 20:38:00.555
+select col3 from exp_table where id<>7/7 order by col3 desc limit 10;
+### 2025-09-12 20:38:34.077
+select col4 from exp_table where id<>7/7 order by col4 desc limit 10;
+### 2025-09-12 20:41:53.146
+select min(col1), avg(col2), max(col3), max(col4) from exp_table where id<>7/7;
+### 2025-09-12 21:11:06.317
+select max(col3) from exp_table where id<>7/7;
+### 2025-09-12 21:11:49.318
+select min(col1) from exp_table where id<>7/7;
+### 2025-09-12 21:12:22.950
+select avg(col2) from exp_table where id<>7/7;
+### 2025-09-12 21:12:55.891
+select max(col4) from exp_table where id<>7/7;
+### 2025-09-12 21:13:35.580
+select min(col1)+avg(col2)*max(col3)/(max(col4) - 1) from exp_table where id<>7/7;
+### 2025-09-12 21:14:23.505
+select count(id) from exp_table where 5/7*3 < 2+col3*col3/4;
+### 2025-09-12 21:15:00.765
+select count(id) from exp_table where 4/3*8 < 1+col3*col3/6;
+### 2025-09-12 21:15:53.796
+select -col1 from exp_table limit 3;
+### 2025-09-12 21:16:28.496
+select id from exp_table where -col1 > -5 limit 5;

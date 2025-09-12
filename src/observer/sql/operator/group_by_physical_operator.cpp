@@ -45,13 +45,15 @@ void GroupByPhysicalOperator::create_aggregator_list(AggregatorList &aggregator_
 
 RC GroupByPhysicalOperator::aggregate(AggregatorList &aggregator_list, const Tuple &tuple)
 {
-  ASSERT(static_cast<int>(aggregator_list.size()) == tuple.cell_num(), 
+  ASSERT(static_cast<int>(aggregator_list.size()) == tuple.cell_num(),
          "aggregator list size must be equal to tuple size. aggregator num: %d, tuple num: %d",
          aggregator_list.size(), tuple.cell_num());
 
   RC        rc = RC::SUCCESS;
   Value     value;
   const int size = static_cast<int>(aggregator_list.size());
+  LOG_INFO("DEBUG: GroupByPhysicalOperator::aggregate - processing %d aggregators", size);
+
   for (int i = 0; i < size; i++) {
     Aggregator *aggregator = aggregator_list[i].get();
 
@@ -61,6 +63,9 @@ RC GroupByPhysicalOperator::aggregate(AggregatorList &aggregator_list, const Tup
       return rc;
     }
 
+    LOG_INFO("DEBUG: GroupByPhysicalOperator::aggregate - aggregator[%d] accumulating value: %s",
+             i, value.to_string().c_str());
+
     rc = aggregator->accumulate(value);
     if (OB_FAIL(rc)) {
       LOG_WARN("failed to accumulate value. rc=%s", strrc(rc));
@@ -68,6 +73,7 @@ RC GroupByPhysicalOperator::aggregate(AggregatorList &aggregator_list, const Tup
     }
   }
 
+  LOG_INFO("DEBUG: GroupByPhysicalOperator::aggregate - completed successfully");
   return rc;
 }
 

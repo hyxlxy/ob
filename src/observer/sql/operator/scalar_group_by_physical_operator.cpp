@@ -54,7 +54,6 @@ RC ScalarGroupByPhysicalOperator::open(Trx *trx)
       LOG_WARN("Too many rows processed in aggregation: %d", processed_rows);
       break;
     }
-
     Tuple *child_tuple = child.current_tuple();
     if (nullptr == child_tuple) {
       LOG_WARN("failed to get tuple from child operator. rc=%s", strrc(rc));
