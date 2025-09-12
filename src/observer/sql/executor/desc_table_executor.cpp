@@ -22,13 +22,20 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/desc_table_stmt.h"
 #include "sql/stmt/update_stmt.h"
 #include "sql/stmt/filter_stmt.h"
+#include "sql/stmt/select_stmt.h"
 #include "sql/expr/expression.h"
+#include "sql/optimizer/logical_plan_generator.h"
+#include "sql/optimizer/physical_plan_generator.h"
+#include "sql/operator/physical_operator.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 #include "storage/record/record_scanner.h"
 #include <vector>
 
 using namespace std;
+
+// Forward declaration
+RC execute_sub_query(Stmt *sub_query_stmt, Session *session, Value &result_value);
 
 RC DescTableExecutor::execute(SQLStageEvent *sql_event)
 {
@@ -219,6 +226,19 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
   // Update each record
   const FieldMeta *field_meta = update_stmt->field_meta();
   Value *orig_value = update_stmt->value();
+  Stmt *sub_query_stmt = update_stmt->sub_query_stmt();
+
+  // If this is a sub-query update, execute the sub-query first
+  Value sub_query_value;
+  if (sub_query_stmt != nullptr) {
+    // Execute the sub-query to get the value
+    rc = execute_sub_query(sub_query_stmt, session, sub_query_value);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to execute sub-query for UPDATE. rc=%s", strrc(rc));
+      return rc;
+    }
+    orig_value = &sub_query_value;
+  }
 
   for (Record &old_record : records_to_update) {
     // Create new record with updated field
@@ -267,5 +287,89 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
     }
   }
 
+  return RC::SUCCESS;
+}
+
+// Helper function to execute sub-query and get a single value
+RC execute_sub_query(Stmt *sub_query_stmt, Session *session, Value &result_value)
+{
+  if (sub_query_stmt->type() != StmtType::SELECT) {
+    LOG_WARN("sub-query must be a SELECT statement");
+    return RC::INVALID_ARGUMENT;
+  }
+
+  SelectStmt *select_stmt = static_cast<SelectStmt *>(sub_query_stmt);
+
+  // Generate logical plan
+  LogicalPlanGenerator logical_plan_generator;
+  std::unique_ptr<LogicalOperator> logical_operator;
+  RC rc = logical_plan_generator.create(select_stmt, logical_operator);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to create logical plan for sub-query. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  // Generate physical plan
+  PhysicalPlanGenerator physical_plan_generator;
+  std::unique_ptr<PhysicalOperator> physical_operator;
+  rc = physical_plan_generator.create(*logical_operator, physical_operator, session);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to create physical plan for sub-query. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  // Open the operator
+  rc = physical_operator->open(session->current_trx());
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to open physical operator for sub-query. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  // Get the first (and hopefully only) tuple
+  rc = physical_operator->next();
+  if (rc != RC::SUCCESS) {
+    physical_operator->close();
+    if (rc == RC::RECORD_EOF) {
+      LOG_WARN("sub-query returned no results");
+      return RC::EMPTY;
+    }
+    LOG_WARN("failed to get result from sub-query. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  // Get the current tuple
+  Tuple *tuple = physical_operator->current_tuple();
+  if (tuple == nullptr) {
+    physical_operator->close();
+    LOG_WARN("sub-query returned null tuple");
+    return RC::EMPTY;
+  }
+
+  // Get the first cell from the tuple
+  if (tuple->cell_num() == 0) {
+    physical_operator->close();
+    LOG_WARN("sub-query returned empty tuple");
+    return RC::EMPTY;
+  }
+
+  Value cell_value;
+  rc = tuple->cell_at(0, cell_value);
+  if (rc != RC::SUCCESS) {
+    physical_operator->close();
+    LOG_WARN("failed to get cell value from sub-query result. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  result_value = cell_value;
+
+  // Check if there are more results (sub-query should return only one value)
+  RC next_rc = physical_operator->next();
+  if (next_rc == RC::SUCCESS) {
+    physical_operator->close();
+    LOG_WARN("sub-query returned more than one row");
+    return RC::INVALID_ARGUMENT; // Use INVALID_ARGUMENT instead of TOO_MANY_ROWS
+  }
+
+  physical_operator->close();
   return RC::SUCCESS;
 }

@@ -226,6 +226,8 @@ struct UpdateSqlNode
   string                   attribute_name;  ///< 更新的字段，仅支持一个字段
   Value                    value;           ///< 更新的值，仅支持一个字段
   vector<ConditionSqlNode> conditions;
+  bool                     is_sub_query = false;  ///< 是否使用子查询更新
+  std::unique_ptr<ParsedSqlNode> sub_query;       ///< 子查询节点
 };
 
 /**

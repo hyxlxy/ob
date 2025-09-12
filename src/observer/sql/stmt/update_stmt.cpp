@@ -26,6 +26,10 @@ UpdateStmt::UpdateStmt(Table *table, const FieldMeta *field_meta, Value *value, 
     : table_(table), field_meta_(field_meta), value_(value), filter_stmt_(filter_stmt)
 {}
 
+UpdateStmt::UpdateStmt(Table *table, const FieldMeta *field_meta, Stmt *sub_query_stmt, FilterStmt *filter_stmt)
+    : table_(table), field_meta_(field_meta), filter_stmt_(filter_stmt), sub_query_stmt_(sub_query_stmt)
+{}
+
 UpdateStmt::~UpdateStmt()
 {
   if (nullptr != filter_stmt_) {
@@ -35,6 +39,10 @@ UpdateStmt::~UpdateStmt()
   if (nullptr != value_) {
     delete value_;
     value_ = nullptr;
+  }
+  if (nullptr != sub_query_stmt_) {
+    delete sub_query_stmt_;
+    sub_query_stmt_ = nullptr;
   }
 }
 
@@ -73,12 +81,26 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
     return rc;
   }
 
-  // create value copy
-  Value *value = new Value();
-  *value = update.value;
+  // Check if this is a sub-query update
+  if (update.is_sub_query) {
+    // Create sub-query statement
+    Stmt *sub_query_stmt = nullptr;
+    rc = Stmt::create_stmt(db, *update.sub_query, sub_query_stmt);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to create sub-query statement. rc=%d:%s", rc, strrc(rc));
+      delete filter_stmt;
+      return rc;
+    }
 
-  // Do not strictly validate or cast here to match baseline behavior.
-  // Defer casting/validation to execution; mismatches will not cause statement failure.
-  stmt = new UpdateStmt(table, field_meta, value, filter_stmt);
+    stmt = new UpdateStmt(table, field_meta, sub_query_stmt, filter_stmt);
+  } else {
+    // create value copy
+    Value *value = new Value();
+    *value = update.value;
+
+    // Do not strictly validate or cast here to match baseline behavior.
+    // Defer casting/validation to execution; mismatches will not cause statement failure.
+    stmt = new UpdateStmt(table, field_meta, value, filter_stmt);
+  }
   return RC::SUCCESS;
 }

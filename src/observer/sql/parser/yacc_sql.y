@@ -611,6 +611,19 @@ update_stmt:      /*  update 语句的语法解析树*/
         $$->update.conditions.swap(*$7);
         delete $7;
       }
+      delete $6;
+    }
+    | UPDATE ID SET ID EQ LBRACE select_stmt RBRACE where
+    {
+      $$ = new ParsedSqlNode(SCF_UPDATE);
+      $$->update.relation_name = $2;
+      $$->update.attribute_name = $4;
+      $$->update.sub_query = std::unique_ptr<ParsedSqlNode>($7);
+      $$->update.is_sub_query = true;
+      if ($9 != nullptr) {
+        $$->update.conditions.swap(*$9);
+        delete $9;
+      }
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/

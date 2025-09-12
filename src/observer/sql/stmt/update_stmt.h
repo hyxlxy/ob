@@ -32,6 +32,7 @@ public:
   UpdateStmt() = default;
   UpdateStmt(Table *table, Value *values, int value_amount);
   UpdateStmt(Table *table, const FieldMeta *field_meta, Value *value, FilterStmt *filter_stmt);
+  UpdateStmt(Table *table, const FieldMeta *field_meta, Stmt *sub_query_stmt, FilterStmt *filter_stmt);
   virtual ~UpdateStmt();
 
   StmtType type() const override { return StmtType::UPDATE; }
@@ -47,6 +48,8 @@ public:
   const FieldMeta *field_meta() const { return field_meta_; }
   Value *value() const { return value_; }
   FilterStmt *filter_stmt() const { return filter_stmt_; }
+  bool is_sub_query() const { return sub_query_stmt_ != nullptr; }
+  Stmt *sub_query_stmt() const { return sub_query_stmt_; }
 
 private:
   Table *table_        = nullptr;
@@ -57,4 +60,5 @@ private:
   const FieldMeta *field_meta_ = nullptr;
   Value *value_ = nullptr;
   FilterStmt *filter_stmt_ = nullptr;
+  Stmt *sub_query_stmt_ = nullptr;
 };

@@ -600,8 +600,6 @@ INSERT INTO test_table VALUES (1, 'Alice', 85.5);
 INSERT INTO test_table VALUES (2, 'Bob', 92.0);
 ### 2025-09-08 21:17:57.297
 INSERT INTO test_table VALUES (3, 'Charlie', 78.5);
-### 2025-09-08 21:17:57.298
-SELECT * FROM test_table;
 ### 2025-09-08 21:17:57.300
 SELECT * FROM test_table ORDER BY score DESC;
 ### 2025-09-08 21:17:57.303
@@ -1304,5 +1302,87 @@ insert into unique_tbl values (1, 100);
 insert into unique_tbl values (2, 200);
 ### 2025-09-13 01:05:04.817
 select * from unique_tbl;
-### 2025-09-13 01:05:04.822
+### 2025-09-13 02:07:14.051
+create table source_table(id int, data int);
+### 2025-09-13 02:07:14.052
+insert into test_table values (2, 20);
+### 2025-09-13 02:07:14.053
+insert into source_table values (1, 100);
+### 2025-09-13 02:07:14.053
+insert into source_table values (2, 200);
+### 2025-09-13 02:07:14.058
+update test_table set value = (select data from source_table where source_table.id = 1) where id = 1;
+### 2025-09-13 02:08:37.581
+create table test_table(id int, value int);
+### 2025-09-13 02:08:37.599
+insert into test_table values (1, 10);
+### 2025-09-13 02:08:37.600
+select * from test_table;
+### 2025-09-13 02:08:51.400
+update test_table set value = 42 where id = 1;
+### 2025-09-13 02:09:02.531
+update test_table set value = (select 42);
+### 2025-09-13 02:09:53.996
+UPDATE Update_table_1 SET col1 = (SELECT data FROM source_table WHERE id = 1) WHERE id = 1;
+### 2025-09-13 02:11:15.972
+UPDATE Update_table_1 SET col1 = (SELECT 42);
+### 2025-09-13 02:11:43.975
+CREATE TABLE temp_table(val int);
+### 2025-09-13 02:11:44.048
+INSERT INTO temp_table VALUES (42);
+### 2025-09-13 02:11:44.050
+UPDATE Update_table_1 SET col1 = (SELECT val FROM temp_table);
+### 2025-09-13 02:12:06.839
+SELECT (SELECT 42);
+### 2025-09-13 02:14:22.421
+CREATE TABLE Update_table_1(id int, t_name char, col1 int, col2 int);
+### 2025-09-13 02:14:22.443
+INSERT INTO Update_table_1 VALUES (1,'N1',1,1);
+### 2025-09-13 02:14:22.445
+UPDATE Update_table_1 SET t_name='N01' WHERE id=1;
+### 2025-09-13 02:14:36.738
+SELECT * FROM source_table;
+### 2025-09-13 02:15:21.917
+SELECT 42;
+### 2025-09-13 02:15:49.823
+UPDATE Update_table_1 SET col1 = (SELECT col1 FROM Update_table_1 WHERE id = 1) WHERE id = 1;
+### 2025-09-13 02:17:56.901
+UPDATE Update_table_1 SET col1 = (SELECT 42) WHERE id = 1;
+### 2025-09-13 02:18:08.928
+UPDATE Update_table_1 SET col2 = (SELECT col1 FROM Update_table_1 WHERE id = 1) WHERE id = 1;
+### 2025-09-13 02:21:09.739
+-- Test UPDATE-SELECT functionality
+### 2025-09-13 02:21:09.754
+CREATE TABLE test_table(id int, value int);
+### 2025-09-13 02:21:09.756
+CREATE TABLE source_table(id int, data int);
+### 2025-09-13 02:21:09.757
+INSERT INTO test_table VALUES (1, 10);
+### 2025-09-13 02:21:09.758
+INSERT INTO test_table VALUES (2, 20);
+### 2025-09-13 02:21:09.758
+INSERT INTO source_table VALUES (1, 100);
+### 2025-09-13 02:21:09.759
+INSERT INTO source_table VALUES (2, 200);
+### 2025-09-13 02:21:09.760
+-- Test simple UPDATE-SELECT
+### 2025-09-13 02:21:09.760
+UPDATE test_table SET value = (SELECT 42) WHERE id = 1;
+### 2025-09-13 02:21:09.767
+-- Test UPDATE-SELECT with aggregation
+### 2025-09-13 02:21:09.768
+UPDATE test_table SET value = (SELECT MAX(data) FROM source_table) WHERE id = 2;
+### 2025-09-13 02:21:09.768
+SELECT * FROM test_table;
+### 2025-09-13 02:21:22.190
+-- Test UPDATE-SELECT with existing table
+### 2025-09-13 02:21:22.205
+UPDATE Update_table_1 SET col1 = (SELECT 99) WHERE id = 1;
+### 2025-09-13 02:21:22.215
+-- Test UPDATE-SELECT with COUNT
+### 2025-09-13 02:21:22.215
+UPDATE Update_table_1 SET col2 = (SELECT COUNT(*) FROM Update_table_1) WHERE id = 1;
+### 2025-09-13 02:21:22.221
+SELECT * FROM Update_table_1;
+### 2025-09-13 02:21:22.223
 exit;
