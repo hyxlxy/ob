@@ -4,8 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <vector>
-#include <string>
 
 #include "common/log/log.h"
 #include "common/lang/string.h"
