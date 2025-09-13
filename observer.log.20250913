@@ -1,0 +1,3 @@
+[2025-09-13 15:41:23.882590 pid:234964 tid:7d450877e6c0 ctx:0 ERROR: operator()@one_thread_per_connection_thread_handler.cpp:98] >> handle error. rc = IOERR_CLOSE
+[2025-09-13 15:41:40.873165 pid:234964 tid:7d450877e6c0 ctx:0 ERROR: operator()@one_thread_per_connection_thread_handler.cpp:98] >> handle error. rc = IOERR_CLOSE
+[2025-09-13 15:44:47.269022 pid:235873 tid:729fcdd7e6c0 ctx:0 ERROR: operator()@one_thread_per_connection_thread_handler.cpp:98] >> handle error. rc = IOERR_CLOSE

@@ -136,8 +136,6 @@ CREATE TABLE test (id INT, value INT);
 -- 测试表达式功能
 ### 2025-09-04 07:25:12.034
 -- 1. 测试基本算术表达式
-### 2025-09-04 07:25:12.034
-SELECT 1 + 2;
 ### 2025-09-04 07:25:12.035
 SELECT 10 - 3;
 ### 2025-09-04 07:25:12.036
@@ -296,8 +294,6 @@ SELECT * FROM students ORDER BY age, score DESC;
 SELECT name, score FROM students ORDER BY score DESC;
 ### 2025-09-04 09:00:21.098
 SELECT 1 ORDER BY 1;
-### 2025-09-04 09:01:52.794
-SELECT 1;
 ### 2025-09-04 09:02:30.806
 -- 简单的ORDER BY测试
 ### 2025-09-04 09:02:30.816
@@ -682,8 +678,6 @@ INSERT INTO TEST VALUES(1, [1,1,1], [1,2,3], [1,2,3,4]);
 -- 测试表达式功能和向量功能
 ### 2025-09-09 09:51:55.904
 -- 创建测试表
-### 2025-09-09 09:51:55.905
-CREATE TABLE exp_table(id int, col1 int, col2 int, col3 float, col4 float);
 ### 2025-09-09 09:51:55.906
 INSERT INTO exp_table VALUES (8, 3, 4, 2.9, 3.38);
 ### 2025-09-09 09:51:55.907
@@ -1384,5 +1378,43 @@ UPDATE Update_table_1 SET col1 = (SELECT 99) WHERE id = 1;
 UPDATE Update_table_1 SET col2 = (SELECT COUNT(*) FROM Update_table_1) WHERE id = 1;
 ### 2025-09-13 02:21:22.221
 SELECT * FROM Update_table_1;
-### 2025-09-13 02:21:22.223
+### 2025-09-13 15:19:04.660
+-- Test expression functionality
+### 2025-09-13 15:19:04.706
+-- Test the problematic query
+### 2025-09-13 15:19:04.731
+-- Debug: Show all data first
+### 2025-09-13 15:19:04.732
+SELECT id, col1, (col1 - 6) as col1_minus_6 FROM exp_table;
+### 2025-09-13 15:41:23.829
+-- Test the specific expression issue
+### 2025-09-13 15:41:23.859
+-- This should return rows where col1 > 6 (i.e., col1=8 and col1=9)
+### 2025-09-13 15:41:23.873
+-- Debug: show the calculation
+### 2025-09-13 15:41:23.874
+SELECT id, col1, (col1 - 6) as diff FROM exp_table;
+### 2025-09-13 15:41:40.845
+-- Test basic functionality
+### 2025-09-13 15:41:40.870
+SELECT 1;
+### 2025-09-13 15:41:40.871
+SELECT 1 + 2;
+### 2025-09-13 15:44:47.223
+-- Test basic CREATE TABLE and expression
+### 2025-09-13 15:44:47.247
+CREATE TABLE exp_table(id int, col1 int, col2 int, col3 float, col4 float);
+### 2025-09-13 15:44:47.248
+INSERT INTO exp_table VALUES (4, 4, 6, 2.21, 8.32);
+### 2025-09-13 15:44:47.250
+INSERT INTO exp_table VALUES (5, 8, 2, 3.06, 7.64);
+### 2025-09-13 15:44:47.251
+INSERT INTO exp_table VALUES (4, 2, 6, 1.02, 7.51);
+### 2025-09-13 15:44:47.252
+INSERT INTO exp_table VALUES (5, 9, 5, 2.79, 6.56);
+### 2025-09-13 15:44:47.253
+-- Test the expression query
+### 2025-09-13 15:44:47.254
+SELECT * FROM exp_table WHERE 0 < col1 - 6;
+### 2025-09-13 15:44:47.268
 exit;
