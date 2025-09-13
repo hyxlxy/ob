@@ -528,8 +528,6 @@ INSERT INTO test_expr VALUES (3, 20);
 SELECT * FROM test_expr WHERE val - 9 > 5;
 ### 2025-09-08 20:10:35.284
 DROP TABLE TEST;
-### 2025-09-08 20:10:35.328
-CREATE TABLE TEST (ID INT, C1 VECTOR(3));
 ### 2025-09-08 20:10:35.345
 INSERT INTO TEST VALUES(1, '[1,1,1]');
 ### 2025-09-08 20:22:36.011
@@ -670,10 +668,6 @@ SELECT * FROM exp_table;
 SELECT * FROM exp_table WHERE col1 > 5;
 ### 2025-09-09 09:48:25.369
 SELECT * FROM exp_table WHERE col1 + col2 > 15;
-### 2025-09-09 09:49:20.606
-CREATE TABLE TEST (ID INT, C1 VECTOR(3), C2 VECTOR(3), C3 VECTOR(4));
-### 2025-09-09 09:49:20.629
-INSERT INTO TEST VALUES(1, [1,1,1], [1,2,3], [1,2,3,4]);
 ### 2025-09-09 09:51:55.895
 -- 测试表达式功能和向量功能
 ### 2025-09-09 09:51:55.904
@@ -1424,8 +1418,6 @@ SELECT * FROM exp_table WHERE 0 < col1 - 6;
 -- Debug: Let's calculate each part separately
 ### 2025-09-13 16:05:42.221
 -- Test the fixed expression calculation
-### 2025-09-13 16:05:42.246
-CREATE TABLE exp_table(id int, col1 int, col2 int, col3 float, col4 float);
 ### 2025-09-13 16:05:42.248
 INSERT INTO exp_table VALUES (1, 2, 1, 2.72, 5.77);
 ### 2025-09-13 16:05:42.251
@@ -1450,8 +1442,6 @@ SELECT * FROM exp_table WHERE 8/2*3 < (1+col2)*col3*2;
 SELECT id, col2, col3, (8/2*3) as left_side, ((1+col2)*col3*2) as right_side FROM exp_table;
 ### 2025-09-13 16:07:09.663
 -- Test simple expression parsing
-### 2025-09-13 16:07:09.687
-CREATE TABLE test_exp(id int, col1 int, col2 int);
 ### 2025-09-13 16:07:09.736
 INSERT INTO test_exp VALUES (1, 8, 2);
 ### 2025-09-13 16:07:09.738
@@ -1462,5 +1452,181 @@ INSERT INTO test_exp VALUES (2, 9, 5);
 SELECT * FROM test_exp WHERE col1 > 6;
 ### 2025-09-13 16:07:09.743
 SELECT * FROM test_exp WHERE col1 - col2 > 3;
-### 2025-09-13 16:07:09.746
+### 2025-09-13 16:23:46.357
+-- Test division by zero issue
+### 2025-09-13 16:23:46.388
+-- Test the problematic query with division by zero
+### 2025-09-13 16:23:46.409
+-- Test without division by zero first
+### 2025-09-13 16:26:20.942
+-- Test division by zero handling
+### 2025-09-13 16:26:20.972
+-- Test simple division by zero
+### 2025-09-13 16:26:20.973
+SELECT id, (9/0) as div_by_zero FROM exp_table;
+### 2025-09-13 16:26:20.987
+-- Test the original problematic query
+### 2025-09-13 16:26:20.987
+SELECT id, 3*col1*(col2+5) FROM exp_table WHERE 2*col1*(col2+4)+9/0 > 7;
+### 2025-09-13 16:27:19.054
+-- Test complex expression parsing step by step
+### 2025-09-13 16:27:19.080
+CREATE TABLE test_exp(id int, col1 int, col2 int);
+### 2025-09-13 16:27:19.081
+INSERT INTO test_exp VALUES (1, 5, 5);
+### 2025-09-13 16:27:19.082
+INSERT INTO test_exp VALUES (2, 7, 7);
+### 2025-09-13 16:27:19.083
+-- Test simple expressions first
+### 2025-09-13 16:27:19.083
+SELECT id, col1*col2 FROM test_exp;
+### 2025-09-13 16:27:19.089
+SELECT id, 3*col1 FROM test_exp;
+### 2025-09-13 16:27:19.092
+SELECT id, 3*col1*col2 FROM test_exp;
+### 2025-09-13 16:27:19.094
+-- Test with parentheses
+### 2025-09-13 16:27:19.095
+SELECT id, (col1+5) FROM test_exp;
+### 2025-09-13 16:27:19.097
+SELECT id, col1*(col2+5) FROM test_exp;
+### 2025-09-13 16:27:41.383
+-- Test the original problematic expression step by step
+### 2025-09-13 16:27:41.414
+-- Test parts of the original expression
+### 2025-09-13 16:27:41.415
+SELECT id, 3*col1 FROM exp_table;
+### 2025-09-13 16:27:41.430
+SELECT id, (col2+5) FROM exp_table;
+### 2025-09-13 16:27:41.440
+SELECT id, 3*col1*(col2+5) FROM exp_table;
+### 2025-09-13 16:27:41.450
+-- Test WHERE clause parts
+### 2025-09-13 16:27:41.450
+SELECT id FROM exp_table WHERE 2*col1 > 7;
+### 2025-09-13 16:27:41.456
+SELECT id FROM exp_table WHERE 2*col1*(col2+4) > 7;
+### 2025-09-13 16:27:41.463
+-- Test the full WHERE clause without division by zero
+### 2025-09-13 16:27:41.463
+SELECT id, 3*col1*(col2+5) FROM exp_table WHERE 2*col1*(col2+4)+9 > 7;
+### 2025-09-13 16:31:40.222
+-- Let's analyze the query step by step
+### 2025-09-13 16:31:40.252
+-- Let's break down the WHERE condition: 2*col1*(col2+4)+9/0 > 7
+### 2025-09-13 16:31:40.252
+-- Since 9/0 = 0 in our system, this becomes: 2*col1*(col2+4)+0 > 7
+### 2025-09-13 16:31:40.253
+-- Which simplifies to: 2*col1*(col2+4) > 7
+### 2025-09-13 16:31:40.253
+-- Calculate each part for each row
+### 2025-09-13 16:31:40.253
+SELECT id, col1, col2, 
+### 2025-09-13 16:31:40.254
+       (col2+4) as col2_plus_4,
+### 2025-09-13 16:31:40.254
+       2*col1 as two_times_col1,
+### 2025-09-13 16:31:40.254
+       2*col1*(col2+4) as left_side,
+### 2025-09-13 16:31:40.255
+       (2*col1*(col2+4) > 7) as condition_result
+### 2025-09-13 16:31:40.255
+FROM exp_table;
+### 2025-09-13 16:31:40.255
+-- Now let's see which rows should be selected
+### 2025-09-13 16:31:40.256
+SELECT id, 3*col1*(col2+5) as result_expr 
+### 2025-09-13 16:31:40.256
+FROM exp_table 
+### 2025-09-13 16:31:40.256
+WHERE 2*col1*(col2+4) > 7;
+### 2025-09-13 16:31:57.924
+-- Manual calculation for each row
+### 2025-09-13 16:31:57.955
+CREATE TABLE exp_table(id int, col1 int, col2 int, col3 float, col4 float);
+### 2025-09-13 16:31:57.956
+INSERT INTO exp_table VALUES (2, 5, 5, 5.0, 2.28);
+### 2025-09-13 16:31:57.957
+INSERT INTO exp_table VALUES (9, 7, 7, 5.71, 2.15);
+### 2025-09-13 16:31:57.958
+INSERT INTO exp_table VALUES (5, 7, 9, 3.19, 4.19);
+### 2025-09-13 16:31:57.959
+-- Show all data first
+### 2025-09-13 16:31:57.960
+SELECT id, col1, col2 FROM exp_table;
+### 2025-09-13 16:31:57.975
+-- Test the WHERE condition without division by zero: 2*col1*(col2+4) > 7
+### 2025-09-13 16:31:57.975
+SELECT id, col1, col2 FROM exp_table WHERE 2*col1*(col2+4) > 7;
+### 2025-09-13 16:31:57.985
+-- Test the SELECT expression: 3*col1*(col2+5)
+### 2025-09-13 16:31:57.985
+SELECT id, 3*col1*(col2+5) FROM exp_table WHERE 2*col1*(col2+4) > 7;
+### 2025-09-13 16:39:09.228
+-- Test vector functionality
+### 2025-09-13 16:41:29.292
+-- Test fixed vector formatting
+### 2025-09-13 16:41:29.325
+-- Show all data
+### 2025-09-13 16:41:51.524
+-- Test float display directly
+### 2025-09-13 16:41:51.550
+CREATE TABLE test_float(id int, val float);
+### 2025-09-13 16:41:51.588
+INSERT INTO test_float VALUES(1, 2.2);
+### 2025-09-13 16:41:51.589
+INSERT INTO test_float VALUES(2, 3.55);
+### 2025-09-13 16:41:51.590
+INSERT INTO test_float VALUES(3, 1.11);
+### 2025-09-13 16:41:51.590
+SELECT * FROM test_float;
+### 2025-09-13 16:44:29.158
+-- Test vector parsing and storage
+### 2025-09-13 16:44:29.185
+CREATE TABLE test_vec(id int, vec vector(3));
+### 2025-09-13 16:44:29.215
+INSERT INTO test_vec VALUES(1, '[1.0,2.0,3.0]');
+### 2025-09-13 16:44:29.217
+INSERT INTO test_vec VALUES(2, '[1.5,2.3,3.3]');
+### 2025-09-13 16:44:29.217
+INSERT INTO test_vec VALUES(3, '[2.2,2.3,2.4]');
+### 2025-09-13 16:44:29.218
+SELECT * FROM test_vec;
+### 2025-09-13 16:48:16.103
+-- Test the exact scenario from your question
+### 2025-09-13 16:49:11.414
+-- Clean test with fresh database
+### 2025-09-13 16:54:10.203
+-- Test the fixed vector parsing
+### 2025-09-13 16:56:07.095
+-- Test vector parsing with debug logs
+### 2025-09-13 16:56:07.133
+INSERT INTO TEST VALUES(1, [2.2,2.3,2.4]);
+### 2025-09-13 16:57:00.947
+-- Test if vector literal parsing is being used
+### 2025-09-13 16:57:00.963
+CREATE TABLE TEST (ID INT, C1 VECTOR(3));
+### 2025-09-13 16:57:00.964
+INSERT INTO TEST VALUES(1, '[2.2,2.3,2.4]');
+### 2025-09-13 17:00:46.340
+-- Test the fixed vector literal parsing
+### 2025-09-13 17:03:58.976
+-- Final test of vector literal parsing
+### 2025-09-13 17:23:54.401
+-- Test the fixed vector precision parsing
+### 2025-09-13 17:25:43.752
+-- Test the FINAL fixed vector precision parsing
+### 2025-09-13 17:25:43.769
+CREATE TABLE TEST (ID INT, C1 VECTOR(3), C2 VECTOR(3), C3 VECTOR(4));
+### 2025-09-13 17:25:43.789
+INSERT INTO TEST VALUES(1, [1,1,1], [1,2,3], [1,2,3,4]);
+### 2025-09-13 17:25:43.793
+INSERT INTO TEST VALUES(2, [2.2,2.3,2.4], [1.5,2.56,3.44], [1,2,3,4]);
+### 2025-09-13 17:25:43.797
+INSERT INTO TEST VALUES(3, [3.55,3.66,3.77], [1.12,2,3], [1,2,3,4]);
+### 2025-09-13 17:25:43.801
+INSERT INTO TEST VALUES(1, [1.11,2.33,3], [1, 1, 1 ], [2.22,3.33,45.55, 3.2]);
+### 2025-09-13 17:25:43.804
+SELECT * FROM TEST;
+### 2025-09-13 17:25:43.808
 exit;

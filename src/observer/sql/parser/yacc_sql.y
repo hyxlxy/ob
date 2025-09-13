@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sstream>
+#include <iomanip>
 
 #include "common/log/log.h"
 #include "common/lang/string.h"
@@ -155,8 +157,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   vector<string> *                           key_list;
   char *                                     cstring;
   int                                        number;
-  float                                      floats;
-  vector<float> *                            float_list;
+  double                                     floats;
+  vector<double> *                           float_list;
   vector<OrderBySqlNode> *                   order_by_list;
   OrderBySqlNode *                           order_by_item;
   vector<JoinSqlNode> *                      join_list;
@@ -177,6 +179,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <value>               value
 %type <value>               insert_value
 %type <number>              number
+%type <floats>              float_number
 %type <relation_with_alias> relation
 %type <comp>                comp_op
 %type <rel_attr>            rel_attr
@@ -434,6 +437,10 @@ attr_def:
     ;
 number:
     NUMBER {$$ = $1;}
+    ;
+
+float_number:
+    NUMBER {$$ = (double)$1;}
     | FLOAT_LITERAL {$$ = $1;}
     ;
 type:
@@ -959,7 +966,19 @@ vector_literal:
       if ($2 != nullptr) {
         for (size_t i = 0; i < $2->size(); i++) {
           if (i > 0) vector_str += ",";
-          vector_str += std::to_string((*$2)[i]);
+          // 使用stringstream来保持浮点数精度，而不是std::to_string
+          std::ostringstream oss;
+          oss << std::fixed << std::setprecision(6) << (*$2)[i];
+          std::string float_str = oss.str();
+          // 移除尾随的零和小数点（如果需要）
+          size_t end = float_str.find_last_not_of('0');
+          if (end != std::string::npos && float_str[end] == '.') {
+            end--;
+          }
+          if (end != std::string::npos) {
+            float_str = float_str.substr(0, end + 1);
+          }
+          vector_str += float_str;
         }
         delete $2;
       }
@@ -977,11 +996,11 @@ vector_literal:
     ;
 
 number_list:
-    number {
-      $$ = new std::vector<float>();
+    float_number {
+      $$ = new std::vector<double>();
       $$->push_back($1);
     }
-    | number_list COMMA number {
+    | number_list COMMA float_number {
       $$ = $1;
       $$->push_back($3);
     }

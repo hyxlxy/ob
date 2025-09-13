@@ -10,6 +10,8 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include <limits>
+
 #if defined(USE_SIMD)
 #include "common/math/simd_util.h"
 #endif
@@ -175,7 +177,17 @@ struct DivideOperator
   template <class T>
   static inline T operation(T left, T right)
   {
-    // TODO: `right = 0` is invalid
+    // Handle division by zero
+    if (right == 0) {
+      // Return positive or negative infinity based on left operand
+      if (left > 0) {
+        return std::numeric_limits<T>::infinity();
+      } else if (left < 0) {
+        return -std::numeric_limits<T>::infinity();
+      } else {
+        return std::numeric_limits<T>::quiet_NaN();
+      }
+    }
     return left / right;
   }
 

@@ -126,53 +126,17 @@ RC VectorType::vector_to_string(const std::vector<float> &vec, string &result)
 {
   stringstream ss;
   ss << "[";
-  
+
   for (size_t i = 0; i < vec.size(); i++) {
     if (i > 0) {
       ss << ",";
     }
-    // 保留2位小数，去掉多余的0
-    ss << fixed << setprecision(2) << vec[i];
-    string num_str = ss.str().substr(ss.str().find_last_of(',') + 1);
-    if (i == 0) {
-      num_str = ss.str();
-    }
-    
-    // 去掉末尾的0和小数点
-    size_t pos = num_str.find_last_not_of('0');
-    if (pos != string::npos && num_str[pos] == '.') {
-      pos--;
-    }
-    if (i == 0) {
-      ss.str("");
-      ss << "[" << num_str.substr(1, pos);
-    }
-  }
-  
-  // 重新格式化，确保正确的小数位数
-  ss.str("");
-  ss << "[";
-  for (size_t i = 0; i < vec.size(); i++) {
-    if (i > 0) {
-      ss << ",";
-    }
-    
-    // 格式化数字：保留2位小数，去掉多余的0
-    stringstream num_ss;
-    num_ss << fixed << setprecision(2) << vec[i];
-    string num_str = num_ss.str();
-    
-    // 去掉末尾的0
-    size_t pos = num_str.find_last_not_of('0');
-    if (pos != string::npos && num_str[pos] == '.') {
-      pos--;
-    }
-    num_str = num_str.substr(0, pos + 1);
-    
-    ss << num_str;
+
+    // 使用与FloatType相同的格式化方法
+    ss << common::double_to_str(vec[i]);
   }
   ss << "]";
-  
+
   result = ss.str();
   return RC::SUCCESS;
 }

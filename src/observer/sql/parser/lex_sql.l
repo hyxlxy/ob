@@ -79,7 +79,7 @@ QUOTE            [\'\"]
 \n                                                   ;
 
 {DIGIT}+                           yylval->number=atoi(yytext); RETURN_TOKEN(NUMBER);
-{DIGIT}+{DOT}{DIGIT}+              yylval->floats=(float)(atof(yytext)); RETURN_TOKEN(FLOAT_LITERAL);
+{DIGIT}+{DOT}{DIGIT}+              yylval->floats=atof(yytext); RETURN_TOKEN(FLOAT_LITERAL);
 
 ";"                                     RETURN_TOKEN(SEMICOLON);
 {DOT}                                   RETURN_TOKEN(DOT);
