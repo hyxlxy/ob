@@ -583,33 +583,9 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
   const AttrType target_type = value_type();
   value.set_type(target_type);
 
-  // 防止无限递归的安全检查
-  static thread_local int recursion_depth = 0;
-  static thread_local int calc_call_count = 0;
-  calc_call_count++;
 
-  // 如果calc_value调用次数过多，直接返回合理值
-  if (calc_call_count > 50) {
-    calc_call_count = 0; // 重置计数器
-    if (arithmetic_type_ == Type::ADD) {
-      value.set_float(15.0f);
-    } else if (arithmetic_type_ == Type::MUL) {
-      value.set_float(25.0f);
-    } else if (arithmetic_type_ == Type::DIV) {
-      value.set_float(4.0f);
-    } else {
-      value.set_float(0.0f);
-    }
-    return RC::SUCCESS;
-  }
 
-  if (recursion_depth > 10) {
-    LOG_WARN("ArithmeticExpr::calc_value recursion depth exceeded, returning 0");
-    value.set_float(0.0f);
-    return RC::SUCCESS;
-  }
 
-  recursion_depth++;
 
   switch (arithmetic_type_) {
     case Type::ADD: {
@@ -657,7 +633,6 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
     } break;
   }
 
-  recursion_depth--;
   return rc;
 }
 
@@ -742,37 +717,9 @@ RC ArithmeticExpr::get_value(const Tuple &tuple, Value &value) const
 {
   RC rc = RC::SUCCESS;
 
-  // 防止过度计算的安全检查
-  static thread_local int call_count = 0;
-  call_count++;
 
-  // 如果单个查询中表达式求值次数过多，限制计算
-  if (call_count > 50) {
-    // 重置计数器，允许下一个查询正常执行
-    call_count = 0;
-    // 根据表达式类型返回合理的默认值
-    // 对于特定的问题查询 9/4*9 < 7+col3*col3/6，确保返回正确结果
-    if (arithmetic_type_ == Type::ADD) {
-      // 返回一个小于20.25的值，确保比较结果为false
-      value.set_float(15.0f);
-    } else if (arithmetic_type_ == Type::MUL) {
-      value.set_float(25.0f);
-    } else if (arithmetic_type_ == Type::DIV) {
-      value.set_float(4.0f);
-    } else {
-      value.set_float(0.0f);
-    }
-    return RC::SUCCESS;
-  }
 
-  static thread_local int get_value_depth = 0;
-  if (get_value_depth > 10) {
-    LOG_WARN("ArithmeticExpr::get_value recursion depth exceeded, returning 0");
-    value.set_float(0.0f);
-    return RC::SUCCESS;
-  }
 
-  get_value_depth++;
 
   Value left_value;
   Value right_value;
@@ -781,7 +728,6 @@ RC ArithmeticExpr::get_value(const Tuple &tuple, Value &value) const
   if (left_.get() == this || right_.get() == this) {
     LOG_WARN("ArithmeticExpr: Circular reference detected!");
     value.set_float(0.0f);
-    get_value_depth--;
     return RC::SUCCESS;
   }
 
@@ -789,7 +735,6 @@ RC ArithmeticExpr::get_value(const Tuple &tuple, Value &value) const
     rc = left_->get_value(tuple, left_value);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
-      get_value_depth--;
       return rc;
     }
   }
@@ -797,13 +742,11 @@ RC ArithmeticExpr::get_value(const Tuple &tuple, Value &value) const
     rc = right_->get_value(tuple, right_value);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
-      get_value_depth--;
       return rc;
     }
   }
 
   rc = calc_value(left_value, right_value, value);
-  get_value_depth--;
   return rc;
 }
 
