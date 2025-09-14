@@ -15,6 +15,9 @@ flex_target(lex ${PARSER_WORKDIR}/lex_sql.l "${LEXER_SOURCES}" DEFINES_FILE "${L
 bison_target(yacc ${PARSER_WORKDIR}/yacc_sql.y "${PARSER_SOURCES}" DEFINES_FILE "${PARSER_HEADERS}")
 add_flex_bison_dependency(lex yacc)
 
+# Force the generated bison file to be compiled as C++
+set_source_files_properties(${BISON_yacc_OUTPUTS} PROPERTIES LANGUAGE CXX)
+
 FILE(GLOB_RECURSE ALL_SRC *.cpp *.c)
 SET(MAIN_SRC ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp)
 MESSAGE("MAIN SRC: " ${MAIN_SRC})

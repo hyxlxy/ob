@@ -1098,7 +1098,7 @@ def run(options) -> Tuple[bool, str]:
   return result, eval_result.to_json_string()
 
 if __name__ == '__main__':
-  os.setpgrp()
+  # os.setpgrp()  # Commented out due to permission issues
   options = __init_options()
 
   result, evaluation = run(options)

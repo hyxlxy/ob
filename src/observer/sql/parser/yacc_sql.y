@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sstream>
+#include <iomanip>
 
 #include "common/log/log.h"
 #include "common/lang/string.h"
@@ -101,7 +103,6 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         INT_T
         STRING_T
         FLOAT_T
-        FLOAT_LITERAL
         DATE_T
         VECTOR_T
         HELP
@@ -183,7 +184,6 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <rel_attr>            rel_attr
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
-%type <value_list>          value_list
 %type <value_list>          insert_value_list
 %type <condition_list>      where
 %type <condition_list>      condition_list
@@ -509,18 +509,7 @@ insert_value_list:
     }
     ;
 
-value_list:
-    value {
-      $$ = new vector<Value>;
-      $$->emplace_back(*$1);
-      delete $1;
-    }
-    | value_list COMMA value {
-      $$ = $1;
-      $$->emplace_back(*$3);
-      delete $3;
-    }
-    ;
+
 
 insert_value:
     value
