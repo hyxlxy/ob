@@ -89,11 +89,10 @@ RC GroupByPhysicalOperator::evaluate(GroupValueType &group_value)
   AggregatorList &aggregators           = get<0>(group_value);
   CompositeTuple &composite_value_tuple = get<1>(group_value);
 
-  ValueListTuple evaluated_tuple;
   vector<Value>  values;
-  for (unique_ptr<Aggregator> &aggregator : aggregators) {
+  for (size_t i = 0; i < aggregators.size(); i++) {
     Value value;
-    rc = aggregator->evaluate(value);
+    rc = aggregators[i]->evaluate(value);
     if (OB_FAIL(rc)) {
       LOG_WARN("failed to evaluate aggregator. rc=%s", strrc(rc));
       return rc;
@@ -101,10 +100,10 @@ RC GroupByPhysicalOperator::evaluate(GroupValueType &group_value)
     values.emplace_back(value);
   }
 
-  evaluated_tuple.set_cells(values);
-  evaluated_tuple.set_names(aggregator_names);
-
-  composite_value_tuple.add_tuple(make_unique<ValueListTuple>(std::move(evaluated_tuple)));
+  auto result_tuple = make_unique<ValueListTuple>();
+  result_tuple->set_cells(values);
+  result_tuple->set_names(aggregator_names);
+  composite_value_tuple.add_tuple(std::move(result_tuple));
 
   return rc;
 }

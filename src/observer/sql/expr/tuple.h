@@ -315,8 +315,12 @@ public:
   ValueListTuple()          = default;
   virtual ~ValueListTuple() = default;
 
-  void set_names(const vector<TupleCellSpec> &specs) { specs_ = specs; }
-  void set_cells(const vector<Value> &cells) { cells_ = cells; }
+  void set_names(const vector<TupleCellSpec> &specs) {
+    specs_ = specs;
+  }
+  void set_cells(const vector<Value> &cells) {
+    cells_ = cells;
+  }
 
   virtual int cell_num() const override { return static_cast<int>(cells_.size()); }
 
