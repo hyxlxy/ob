@@ -126,6 +126,13 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   if (predicate_oper) {
     if (*last_oper) {
       predicate_oper->add_child(std::move(*last_oper));
+    } else {
+      // For queries without FROM clause but with WHERE clause (e.g., "select 1 where 1 in (1,2)")
+      // we need to create a dummy CalcLogicalOperator as the child of PredicateLogicalOperator
+      vector<unique_ptr<Expression>> dummy_expressions;
+      dummy_expressions.emplace_back(make_unique<ValueExpr>(Value(1))); // dummy expression
+      unique_ptr<LogicalOperator> calc_oper(new CalcLogicalOperator(std::move(dummy_expressions)));
+      predicate_oper->add_child(std::move(calc_oper));
     }
 
     last_oper = &predicate_oper;
@@ -236,6 +243,38 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
   bool always_false = false;  // 常量折叠：若任一比较恒为假（AND 语义），整体恒假
   const vector<FilterUnit *>    &filter_units = filter_stmt->filter_units();
   for (const FilterUnit *filter_unit : filter_units) {
+    // 处理IN_VALUES_OP和NOT_IN_VALUES_OP，创建InExpr
+    if (filter_unit->comp() == IN_VALUES_OP || filter_unit->comp() == NOT_IN_VALUES_OP) {
+      const FilterObj &filter_obj_left = filter_unit->left();
+
+      unique_ptr<Expression> left;
+      if (filter_obj_left.is_attr()) {
+        left = make_unique<FieldExpr>(filter_obj_left.field);
+      } else if (filter_obj_left.is_value()) {
+        left = make_unique<ValueExpr>(filter_obj_left.value);
+      } else if (filter_obj_left.is_expr()) {
+        left = filter_obj_left.expr->copy();
+      }
+
+      if (left) {
+        // Bind expression to actual table fields if context is available
+        if (binder_ctx_initialized_) {
+          ExpressionBinder binder(binder_context_);
+          vector<unique_ptr<Expression>> bound_left;
+          RC brc = binder.bind_expression(left, bound_left);
+          if (OB_FAIL(brc)) return brc;
+          if (bound_left.size() == 1) {
+            left = std::move(bound_left[0]);
+          }
+        }
+
+        bool is_not_in = (filter_unit->comp() == NOT_IN_VALUES_OP);
+        auto in_expr = make_unique<InExpr>(std::move(left), filter_unit->right_values(), is_not_in);
+        cmp_exprs.emplace_back(std::move(in_expr));
+      }
+      continue;
+    }
+
     const FilterObj &filter_obj_left  = filter_unit->left();
     const FilterObj &filter_obj_right = filter_unit->right();
 
@@ -278,7 +317,9 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
       }
     }
 
-    if (left->value_type() != right->value_type()) {
+    // Skip type checking for IN operations since ListExpr has UNDEFINED value_type
+    if (filter_unit->comp() != IN_OP && filter_unit->comp() != NOT_IN_OP &&
+        left->value_type() != right->value_type()) {
       auto left_to_right_cost = implicit_cast_cost(left->value_type(), right->value_type());
       auto right_to_left_cost = implicit_cast_cost(right->value_type(), left->value_type());
       if (left_to_right_cost <= right_to_left_cost && left_to_right_cost != INT32_MAX) {

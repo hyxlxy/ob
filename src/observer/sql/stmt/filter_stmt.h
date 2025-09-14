@@ -86,12 +86,17 @@ public:
   const FilterObj &left() const { return left_; }
   const FilterObj &right() const { return right_; }
 
+  // 支持IN操作的值列表
+  void set_right_values(const std::vector<Value> &values) { right_values_ = values; }
+  const std::vector<Value> &right_values() const { return right_values_; }
+
 private:
   CompOp    comp_ = NO_OP;
   FilterObj left_;
   FilterObj right_;
   std::unique_ptr<Expression> left_expr_owner_;
   std::unique_ptr<Expression> right_expr_owner_;
+  std::vector<Value> right_values_;  // 用于IN/NOT IN操作的值列表
 };
 
 /**

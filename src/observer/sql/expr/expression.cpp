@@ -258,8 +258,6 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
             static_cast<int>(left_->type()), static_cast<int>(right_->type()));
 
   Value left_value;
-  Value right_value;
-
   RC rc = left_->get_value(tuple, left_value);
   if (rc != RC::SUCCESS) {
     LOG_WARN("ComparisonExpr::get_value() failed to get value of left expression: left_type=%d rc=%s",
@@ -269,6 +267,47 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
   LOG_DEBUG("ComparisonExpr::get_value() left value SUCCESS: left_type=%d value_type=%d",
             static_cast<int>(left_->type()), static_cast<int>(left_value.attr_type()));
 
+  // Handle IN and NOT IN operations
+  if (comp_ == IN_OP || comp_ == NOT_IN_OP) {
+    if (is_null_like_numeric(left_value)) {
+      value.set_boolean(false);
+      return RC::SUCCESS;
+    }
+
+    if (right_->type() == ExprType::LIST) {
+      ListExpr *list_expr = static_cast<ListExpr *>(right_.get());
+      list_expr->reset();
+    }
+
+    bool found = false;
+    Value right_value;
+
+    // Check all values in the list
+    while (RC::SUCCESS == (rc = right_->get_value(tuple, right_value))) {
+      if (left_value.compare(right_value) == 0) {
+        found = true;
+        break;
+      }
+    }
+
+    // Handle empty list case
+    if (rc == RC::RECORD_EOF && !found) {
+      // Empty list or no match found
+      bool result = (comp_ == NOT_IN_OP); // NOT IN returns true, IN returns false
+      value.set_boolean(result);
+      return RC::SUCCESS;
+    } else if (rc != RC::SUCCESS && rc != RC::RECORD_EOF) {
+      return rc;
+    }
+
+    // Set result based on whether we found a match
+    bool result = found ? (comp_ == IN_OP) : (comp_ == NOT_IN_OP);
+    value.set_boolean(result);
+    return RC::SUCCESS;
+  }
+
+  // Regular comparison operations
+  Value right_value;
   rc = right_->get_value(tuple, right_value);
   if (rc != RC::SUCCESS) {
     LOG_WARN("ComparisonExpr::get_value() failed to get value of right expression: right_type=%d rc=%s",
@@ -279,7 +318,6 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
             static_cast<int>(right_->type()), static_cast<int>(right_value.attr_type()));
 
   bool bool_value = false;
-
   rc = compare_value(left_value, right_value, bool_value);
   if (rc != RC::SUCCESS) {
     LOG_WARN("ComparisonExpr::get_value() compare_value failed: rc=%s", strrc(rc));
@@ -336,6 +374,15 @@ RC ComparisonExpr::eval(Chunk &chunk, vector<uint8_t> &select)
     comm = (ltype == AttrType::FLOATS || rtype == AttrType::FLOATS) ? AttrType::FLOATS : AttrType::INTS;
   } else if (ltype == AttrType::CHARS && rtype == AttrType::CHARS) {
     comm = AttrType::CHARS;
+  } else if ((ltype == AttrType::CHARS && (rtype == AttrType::INTS || rtype == AttrType::FLOATS)) ||
+             (rtype == AttrType::CHARS && (ltype == AttrType::INTS || ltype == AttrType::FLOATS))) {
+    // 字符串与数字比较：尝试将字符串转换为数字进行比较
+    // 如果有浮点数参与，使用浮点数比较；否则使用整数比较
+    if (ltype == AttrType::FLOATS || rtype == AttrType::FLOATS) {
+      comm = AttrType::FLOATS;
+    } else {
+      comm = AttrType::INTS;
+    }
   } else {
     LOG_WARN("unsupported compare types %d vs %d", ltype, rtype);
     return RC::INTERNAL;
@@ -1077,5 +1124,133 @@ RC AggregateExpr::type_from_string(const char *type_str, AggregateExpr::Type &ty
   } else {
     rc = RC::INVALID_ARGUMENT;
   }
+  return rc;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+InExpr::InExpr(unique_ptr<Expression> left, std::vector<Value> values, bool is_not_in)
+    : left_(std::move(left)), values_(std::move(values)), is_not_in_(is_not_in)
+{}
+
+InExpr::~InExpr() {}
+
+unique_ptr<Expression> InExpr::copy() const
+{
+  return make_unique<InExpr>(left_->copy(), values_, is_not_in_);
+}
+
+RC InExpr::get_value(const Tuple &tuple, Value &value) const
+{
+  Value left_value;
+  RC rc = left_->get_value(tuple, left_value);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to get value of left expression in IN. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  bool found = false;
+  for (const Value &val : values_) {
+    if (left_value.compare(val) == 0) {
+      found = true;
+      break;
+    }
+  }
+
+  bool result = is_not_in_ ? !found : found;
+  value.set_boolean(result);
+  return RC::SUCCESS;
+}
+
+RC InExpr::try_get_value(Value &value) const
+{
+  Value left_value;
+  RC rc = left_->try_get_value(left_value);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+
+  bool found = false;
+  for (const Value &val : values_) {
+    if (left_value.compare(val) == 0) {
+      found = true;
+      break;
+    }
+  }
+
+  bool result = is_not_in_ ? !found : found;
+  value.set_boolean(result);
+  return RC::SUCCESS;
+}
+
+RC InExpr::eval(Chunk &chunk, vector<uint8_t> &select)
+{
+  RC rc = RC::SUCCESS;
+
+  // Get left column
+  Column left_column;
+  rc = left_->get_column(chunk, left_column);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to get column of left expression in IN. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  // Evaluate IN condition for each row
+  const bool left_const = left_column.column_type() == Column::Type::CONSTANT_COLUMN;
+  const int n = left_column.count();
+  if ((int)select.size() < n) {
+    select.resize(n, 1);
+  }
+
+  for (int i = 0; i < n; i++) {
+    Value left_value = left_column.get_value(left_const ? 0 : i);
+
+    bool found = false;
+    for (const Value &val : values_) {
+      if (left_value.compare(val) == 0) {
+        found = true;
+        break;
+      }
+    }
+
+    bool result = is_not_in_ ? !found : found;
+    select[i] &= static_cast<uint8_t>(result ? 1 : 0);
+  }
+
+  return RC::SUCCESS;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+ListExpr::ListExpr(std::vector<std::unique_ptr<Expression>> &&exprs) : exprs_(std::move(exprs))
+{}
+
+unique_ptr<Expression> ListExpr::copy() const
+{
+  std::vector<std::unique_ptr<Expression>> copied_exprs;
+  for (const auto &expr : exprs_) {
+    copied_exprs.emplace_back(expr->copy());
+  }
+  return make_unique<ListExpr>(std::move(copied_exprs));
+}
+
+RC ListExpr::get_value(const Tuple &tuple, Value &value) const
+{
+  if (current_index_ >= exprs_.size()) {
+    return RC::RECORD_EOF;
+  }
+
+  RC rc = exprs_[current_index_]->get_value(tuple, value);
+  current_index_++;
+  return rc;
+}
+
+RC ListExpr::try_get_value(Value &value) const
+{
+  if (current_index_ >= exprs_.size()) {
+    return RC::RECORD_EOF;
+  }
+
+  RC rc = exprs_[current_index_]->try_get_value(value);
+  current_index_++;
   return rc;
 }

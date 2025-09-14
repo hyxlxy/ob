@@ -197,6 +197,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <expression_list>     projection_list
 %type <cstring>             opt_as_alias
 %type <expression>          aggregate_expr
+%type <expression>          count_expr
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
 %type <expression>          having
@@ -235,6 +236,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 
 %left '+' '-'
 %left '*' '/'
+%left EQ LT GT LE GE NE LIKE IN
+%left NOT
 %nonassoc UMINUS
 %%
 
@@ -508,6 +511,19 @@ insert_value_list:
     }
     ;
 
+value_list:
+    value {
+      $$ = new vector<Value>;
+      $$->emplace_back(*$1);
+      delete $1;
+    }
+    | value_list COMMA value {
+      $$ = $1;
+      $$->emplace_back(*$3);
+      delete $3;
+    }
+    ;
+
 insert_value:
     value
     | '-' NUMBER {
@@ -663,6 +679,24 @@ select_stmt:        /*  select 语句的语法解析树*/
         delete $9;
       }
     }
+    | SELECT projection_list WHERE condition_list order_by
+    {
+      $$ = new ParsedSqlNode(SCF_SELECT);
+      if ($2 != nullptr) {
+        $$->selection.expressions.swap(*$2);
+        delete $2;
+      }
+
+      if ($4 != nullptr) {
+        $$->selection.conditions.swap(*$4);
+        delete $4;
+      }
+
+      if ($5 != nullptr) {
+        $$->selection.order_by.swap(*$5);
+        delete $5;
+      }
+    }
     | SELECT projection_list order_by
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
@@ -745,8 +779,16 @@ expression:
     | expression '/' expression {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::DIV, $1, $3, sql_string, &@$);
     }
-    | LBRACE expression RBRACE {
-      $$ = $2;
+    | LBRACE expression_list RBRACE {
+      // Always create ListExpr for IN operations, even with single element
+      if ($2 != nullptr) {
+        $$ = new ListExpr(std::move(*$2));
+        delete $2;
+      } else {
+        // Empty list case
+        std::vector<std::unique_ptr<Expression>> empty_exprs;
+        $$ = new ListExpr(std::move(empty_exprs));
+      }
       $$->set_name(token_name(sql_string, &@$));
     }
     | '-' expression %prec UMINUS {
@@ -866,20 +908,8 @@ condition:
       $$->right_expr.reset($3);
       $$->comp = $2;
     }
-    | expression IN LBRACE sub_query RBRACE
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_expr.reset($1);
-      $$->sub_query.reset($4);
-      $$->comp = IN_OP;
-    }
-    | expression NOT IN LBRACE sub_query RBRACE
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_expr.reset($1);
-      $$->sub_query.reset($5);
-      $$->comp = NOT_IN_OP;
-    }
+
+
     | EXISTS LBRACE sub_query RBRACE
     {
       $$ = new ConditionSqlNode;
@@ -903,6 +933,8 @@ comp_op:
     | NE { $$ = NOT_EQUAL; }
     | LIKE { $$ = LIKE_OP; }
     | NOT LIKE { $$ = NOT_LIKE_OP; }
+    | IN { $$ = IN_OP; }
+    | NOT IN { $$ = NOT_IN_OP; }
     ;
 
 // your code here
@@ -1053,14 +1085,22 @@ order_by_item:
     }
     ;
 
-aggregate_expr:
-    COUNT LBRACE '*' RBRACE {
-      $$ = new UnboundAggregateExpr("count", nullptr);
+count_expr:
+    COUNT LBRACE expression RBRACE {
+      // Check if expression is a star expression
+      if (dynamic_cast<StarExpr*>($3)) {
+        $$ = new UnboundAggregateExpr("count", nullptr);
+        delete $3; // Clean up the star expression
+      } else {
+        $$ = new UnboundAggregateExpr("count", unique_ptr<Expression>($3));
+      }
       $$->set_name(token_name(sql_string, &@$));
     }
-    | COUNT LBRACE expression RBRACE {
-      $$ = new UnboundAggregateExpr("count", unique_ptr<Expression>($3));
-      $$->set_name(token_name(sql_string, &@$));
+    ;
+
+aggregate_expr:
+    count_expr {
+      $$ = $1;
     }
     | SUM LBRACE expression RBRACE {
       $$ = new UnboundAggregateExpr("sum", unique_ptr<Expression>($3));
@@ -1108,6 +1148,28 @@ join_item:
         delete $5;
       }
     }
+    | INNER JOIN ID ID ON condition_list
+    {
+      $$ = new JoinSqlNode();
+      $$->table_name = $3;
+      $$->alias = $4;
+      $$->join_type = INNER_JOIN;
+      if ($6 != nullptr) {
+        $$->conditions.swap(*$6);
+        delete $6;
+      }
+    }
+    | INNER JOIN ID AS ID ON condition_list
+    {
+      $$ = new JoinSqlNode();
+      $$->table_name = $3;
+      $$->alias = $5;
+      $$->join_type = INNER_JOIN;
+      if ($7 != nullptr) {
+        $$->conditions.swap(*$7);
+        delete $7;
+      }
+    }
     | JOIN ID ON condition_list
     {
       $$ = new JoinSqlNode();
@@ -1116,6 +1178,28 @@ join_item:
       if ($4 != nullptr) {
         $$->conditions.swap(*$4);
         delete $4;
+      }
+    }
+    | JOIN ID ID ON condition_list
+    {
+      $$ = new JoinSqlNode();
+      $$->table_name = $2;
+      $$->alias = $3;
+      $$->join_type = INNER_JOIN;  // 默认为INNER JOIN
+      if ($5 != nullptr) {
+        $$->conditions.swap(*$5);
+        delete $5;
+      }
+    }
+    | JOIN ID AS ID ON condition_list
+    {
+      $$ = new JoinSqlNode();
+      $$->table_name = $2;
+      $$->alias = $4;
+      $$->join_type = INNER_JOIN;  // 默认为INNER JOIN
+      if ($6 != nullptr) {
+        $$->conditions.swap(*$6);
+        delete $6;
       }
     }
     ;

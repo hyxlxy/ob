@@ -56,6 +56,8 @@ enum CompOp
   NOT_LIKE_OP,  ///< "NOT LIKE"
   IN_OP,        ///< "IN"
   NOT_IN_OP,    ///< "NOT IN"
+  IN_VALUES_OP, ///< "IN (values)"
+  NOT_IN_VALUES_OP, ///< "NOT IN (values)"
   EXISTS_OP,    ///< "EXISTS"
   NOT_EXISTS_OP,///< "NOT EXISTS"
   NO_OP
@@ -108,6 +110,9 @@ struct ConditionSqlNode
 
   // 新增：支持子查询
   std::unique_ptr<ParsedSqlNode> sub_query;  ///< sub-query for IN/EXISTS operations
+
+  // 新增：支持IN操作的值列表
+  std::vector<Value> right_values;  ///< values for IN/NOT IN operations
 
   // 添加移动构造函数和移动赋值操作符
   ConditionSqlNode() = default;

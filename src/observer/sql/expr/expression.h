@@ -56,6 +56,8 @@ enum class ExprType
   ARITHMETIC,   ///< 算术运算
   AGGREGATION,  ///< 聚合运算
   FUNCTION,     ///< 函数调用
+  IN_VALUES,    ///< IN操作（值列表）
+  LIST,         ///< 表达式列表
 };
 
 /**
@@ -575,4 +577,56 @@ public:
 private:
   Type                   aggregate_type_;
   unique_ptr<Expression> child_;
+};
+
+/**
+ * @brief IN表达式
+ * @ingroup Expression
+ */
+class InExpr : public Expression
+{
+public:
+  InExpr(unique_ptr<Expression> left, std::vector<Value> values, bool is_not_in = false);
+  virtual ~InExpr();
+
+  unique_ptr<Expression> copy() const override;
+
+  ExprType type() const override { return ExprType::IN_VALUES; }
+  AttrType value_type() const override { return AttrType::BOOLEANS; }
+
+  RC get_value(const Tuple &tuple, Value &value) const override;
+  RC try_get_value(Value &value) const override;
+  RC eval(Chunk &chunk, vector<uint8_t> &select) override;
+
+private:
+  unique_ptr<Expression> left_;
+  std::vector<Value> values_;
+  bool is_not_in_;
+};
+
+/**
+ * @brief 表达式列表
+ * @ingroup Expression
+ * @details 用于处理值列表，如IN操作中的值列表
+ */
+class ListExpr : public Expression
+{
+public:
+  ListExpr(std::vector<std::unique_ptr<Expression>> &&exprs);
+  virtual ~ListExpr() = default;
+
+  unique_ptr<Expression> copy() const override;
+
+  ExprType type() const override { return ExprType::LIST; }
+  AttrType value_type() const override { return AttrType::UNDEFINED; }
+
+  RC get_value(const Tuple &tuple, Value &value) const override;
+  RC try_get_value(Value &value) const override;
+
+  void reset() { current_index_ = 0; }
+  size_t size() const { return exprs_.size(); }
+
+private:
+  std::vector<std::unique_ptr<Expression>> exprs_;
+  mutable size_t current_index_ = 0;
 };

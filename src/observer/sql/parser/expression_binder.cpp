@@ -103,6 +103,10 @@ RC ExpressionBinder::bind_expression(unique_ptr<Expression> &expr, vector<unique
       return RC::SUCCESS;
     } break;
 
+    case ExprType::LIST: {
+      return bind_list_expression(expr, bound_expressions);
+    } break;
+
     default: {
       LOG_WARN("unknown expression type: %d", static_cast<int>(expr->type()));
       return RC::INTERNAL;
@@ -516,5 +520,18 @@ RC ExpressionBinder::bind_aggregate_expression(
   }
 
   bound_expressions.emplace_back(std::move(aggregate_expr));
+  return RC::SUCCESS;
+}
+
+RC ExpressionBinder::bind_list_expression(
+    unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions)
+{
+  if (nullptr == expr) {
+    return RC::SUCCESS;
+  }
+
+  // For ListExpr, we don't need to bind the individual expressions inside
+  // because they are typically constant values. Just pass it through.
+  bound_expressions.emplace_back(std::move(expr));
   return RC::SUCCESS;
 }

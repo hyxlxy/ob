@@ -89,6 +89,42 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<st
     return RC::INVALID_ARGUMENT;
   }
 
+  // 处理IN_VALUES_OP和NOT_IN_VALUES_OP操作
+  if (comp == IN_VALUES_OP || comp == NOT_IN_VALUES_OP) {
+    if (condition.right_values.empty()) {
+      LOG_WARN("IN/NOT IN operation requires non-empty value list");
+      return RC::INVALID_ARGUMENT;
+    }
+
+    // 对于IN操作，我们需要创建一个特殊的FilterUnit
+    filter_unit = new FilterUnit;
+
+    // 设置左侧表达式或属性
+    if (condition.left_expr != nullptr) {
+      filter_unit->set_left_expr(condition.left_expr->copy());
+    } else if (condition.left_is_attr) {
+      Table           *table = nullptr;
+      const FieldMeta *field = nullptr;
+      rc = get_table_and_field(db, default_table, tables, condition.left_attr, table, field);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("cannot find attr");
+        delete filter_unit;
+        return rc;
+      }
+      FilterObj filter_obj;
+      filter_obj.init_attr(Field(table, field));
+      filter_unit->set_left(filter_obj);
+    } else {
+      FilterObj filter_obj;
+      filter_obj.init_value(condition.left_value);
+      filter_unit->set_left(filter_obj);
+    }
+
+    filter_unit->set_comp(comp);
+    filter_unit->set_right_values(condition.right_values);
+    return RC::SUCCESS;
+  }
+
   filter_unit = new FilterUnit;
 
   // 如果有表达式，尝试将简单场景(字段/常量)降级为属性/常量比较；否则使用表达式比较

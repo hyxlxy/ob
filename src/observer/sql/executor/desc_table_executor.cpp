@@ -194,6 +194,21 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
               condition_match = like_match(left_value.get_string().c_str(), right_value.get_string().c_str());
             }
             break;
+          case IN_VALUES_OP:
+          case NOT_IN_VALUES_OP:
+            {
+              // 处理IN/NOT IN操作
+              const std::vector<Value> &values = filter_unit->right_values();
+              bool found = false;
+              for (const Value &val : values) {
+                if (left_value.compare(val) == 0) {
+                  found = true;
+                  break;
+                }
+              }
+              condition_match = (filter_unit->comp() == IN_VALUES_OP) ? found : !found;
+            }
+            break;
           case NOT_LIKE_OP:
             if (left_value.attr_type() == AttrType::CHARS && right_value.attr_type() == AttrType::CHARS) {
               condition_match = !like_match(left_value.get_string().c_str(), right_value.get_string().c_str());
