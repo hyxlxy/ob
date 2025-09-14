@@ -5,7 +5,14 @@
 #include "common/lang/limits.h"
 
 inline bool is_null_like_numeric(const Value &v) {
-  if (v.attr_type() != AttrType::FLOATS) return false;
-  return v.get_float() == numeric_limits<float>::max();
+  // Check for NULL (UNDEFINED type) - this is the standard SQL NULL
+  if (v.attr_type() == AttrType::UNDEFINED) return true;
+
+  // Legacy check for special float values (kept for compatibility)
+  if (v.attr_type() == AttrType::FLOATS) {
+    return v.get_float() == numeric_limits<float>::max();
+  }
+
+  return false;
 }
 

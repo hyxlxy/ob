@@ -44,18 +44,33 @@ RC IntegerType::cast_to(const Value &val, AttrType type, Value &result) const
 
 RC IntegerType::add(const Value &left, const Value &right, Value &result) const
 {
+  // 如果任一操作数为NULL，结果为NULL
+  if (left.attr_type() == AttrType::UNDEFINED || right.attr_type() == AttrType::UNDEFINED) {
+    result.reset();
+    return RC::SUCCESS;
+  }
   result.set_int(left.get_int() + right.get_int());
   return RC::SUCCESS;
 }
 
 RC IntegerType::subtract(const Value &left, const Value &right, Value &result) const
 {
+  // 如果任一操作数为NULL，结果为NULL
+  if (left.attr_type() == AttrType::UNDEFINED || right.attr_type() == AttrType::UNDEFINED) {
+    result.reset();
+    return RC::SUCCESS;
+  }
   result.set_int(left.get_int() - right.get_int());
   return RC::SUCCESS;
 }
 
 RC IntegerType::multiply(const Value &left, const Value &right, Value &result) const
 {
+  // 如果任一操作数为NULL，结果为NULL
+  if (left.attr_type() == AttrType::UNDEFINED || right.attr_type() == AttrType::UNDEFINED) {
+    result.reset();
+    return RC::SUCCESS;
+  }
   result.set_int(left.get_int() * right.get_int());
   return RC::SUCCESS;
 }
@@ -64,8 +79,9 @@ RC IntegerType::divide(const Value &left, const Value &right, Value &result) con
 {
   int right_val = right.get_int();
   if (right_val == 0) {
-    LOG_WARN("Division by zero");
-    return RC::INVALID_ARGUMENT;
+    // 除零情况，返回NULL（UNDEFINED类型）
+    result.reset();  // 这会将类型设置为 AttrType::UNDEFINED
+    return RC::SUCCESS;
   }
   result.set_int(left.get_int() / right_val);
   return RC::SUCCESS;

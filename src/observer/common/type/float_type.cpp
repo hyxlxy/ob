@@ -28,16 +28,31 @@ int FloatType::compare(const Value &left, const Value &right) const
 
 RC FloatType::add(const Value &left, const Value &right, Value &result) const
 {
+  // 如果任一操作数为NULL，结果为NULL
+  if (left.attr_type() == AttrType::UNDEFINED || right.attr_type() == AttrType::UNDEFINED) {
+    result.reset();
+    return RC::SUCCESS;
+  }
   result.set_float(left.get_float() + right.get_float());
   return RC::SUCCESS;
 }
 RC FloatType::subtract(const Value &left, const Value &right, Value &result) const
 {
+  // 如果任一操作数为NULL，结果为NULL
+  if (left.attr_type() == AttrType::UNDEFINED || right.attr_type() == AttrType::UNDEFINED) {
+    result.reset();
+    return RC::SUCCESS;
+  }
   result.set_float(left.get_float() - right.get_float());
   return RC::SUCCESS;
 }
 RC FloatType::multiply(const Value &left, const Value &right, Value &result) const
 {
+  // 如果任一操作数为NULL，结果为NULL
+  if (left.attr_type() == AttrType::UNDEFINED || right.attr_type() == AttrType::UNDEFINED) {
+    result.reset();
+    return RC::SUCCESS;
+  }
   result.set_float(left.get_float() * right.get_float());
   return RC::SUCCESS;
 }
@@ -45,8 +60,8 @@ RC FloatType::multiply(const Value &left, const Value &right, Value &result) con
 RC FloatType::divide(const Value &left, const Value &right, Value &result) const
 {
   if (right.get_float() > -EPSILON && right.get_float() < EPSILON) {
-    // 除零情况，设置为0而不是最大值，避免无穷大导致的问题
-    result.set_float(0.0f);
+    // 除零情况，返回NULL（UNDEFINED类型）
+    result.reset();  // 这会将类型设置为 AttrType::UNDEFINED
     return RC::SUCCESS;
   }
 
@@ -54,9 +69,9 @@ RC FloatType::divide(const Value &left, const Value &right, Value &result) const
   float right_val = right.get_float();
   float division_result = left_val / right_val;
 
-  // 检查结果是否为无穷大或NaN，如果是则设置为0
+  // 检查结果是否为无穷大或NaN，如果是则返回NULL
   if (std::isinf(division_result) || std::isnan(division_result)) {
-    result.set_float(0.0f);
+    result.reset();  // 这会将类型设置为 AttrType::UNDEFINED
     return RC::SUCCESS;
   }
 
