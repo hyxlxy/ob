@@ -766,17 +766,9 @@ expression:
     | expression '/' expression {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::DIV, $1, $3, sql_string, &@$);
     }
-    | LBRACE expression_list RBRACE {
-      // Always create ListExpr for IN operations, even with single element
-      if ($2 != nullptr) {
-        $$ = new ListExpr(std::move(*$2));
-        delete $2;
-      } else {
-        // Empty list case
-        std::vector<std::unique_ptr<Expression>> empty_exprs;
-        $$ = new ListExpr(std::move(empty_exprs));
-      }
-      $$->set_name(token_name(sql_string, &@$));
+    | LBRACE expression RBRACE {
+      // Simple parentheses for grouping - just return the inner expression
+      $$ = $2;
     }
     | '-' expression %prec UMINUS {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::NEGATIVE, $2, nullptr, sql_string, &@$);
@@ -911,6 +903,28 @@ condition:
       $$->left_expr.reset($1);
       $$->right_expr.reset($3);
       $$->comp = $2;
+    }
+    | expression IN LBRACE expression_list RBRACE
+    {
+      $$ = new ConditionSqlNode;
+      $$->left_expr.reset($1);
+      // Create ListExpr for IN values
+      if ($4 != nullptr) {
+        $$->right_expr.reset(new ListExpr(std::move(*$4)));
+        delete $4;
+      }
+      $$->comp = IN_OP;
+    }
+    | expression NOT IN LBRACE expression_list RBRACE
+    {
+      $$ = new ConditionSqlNode;
+      $$->left_expr.reset($1);
+      // Create ListExpr for NOT IN values
+      if ($5 != nullptr) {
+        $$->right_expr.reset(new ListExpr(std::move(*$5)));
+        delete $5;
+      }
+      $$->comp = NOT_IN_OP;
     }
     | expression IN LBRACE sub_query RBRACE
     {

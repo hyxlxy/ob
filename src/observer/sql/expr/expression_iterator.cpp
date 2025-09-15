@@ -81,6 +81,27 @@ RC ExpressionIterator::iterate_child_expr(Expression &expr, function<RC(unique_p
       }
     } break;
 
+    case ExprType::SUBQUERY: {
+      // SubQueryExpr doesn't have child expressions that need iteration
+      // The subquery itself is handled separately
+    } break;
+
+    case ExprType::IN_VALUES: {
+      // TODO: Add support for IN_VALUES expression iteration if needed
+    } break;
+
+    case ExprType::SUBQUERY_IN: {
+      // TODO: Add support for SUBQUERY_IN expression iteration if needed
+    } break;
+
+    case ExprType::LIST: {
+      // TODO: Add support for LIST expression iteration if needed
+    } break;
+
+    case ExprType::UNBOUND_AGGREGATION: {
+      // TODO: Add support for UNBOUND_AGGREGATION expression iteration if needed
+    } break;
+
     case ExprType::NONE:
     case ExprType::STAR:
     case ExprType::UNBOUND_FIELD:

@@ -1014,7 +1014,8 @@ RC ArithmeticExpr::try_get_value(Value &value) const
     }
   }
 
-  return calc_value(left_value, right_value, value);
+  rc = calc_value(left_value, right_value, value);
+  return rc;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

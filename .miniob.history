@@ -74,8 +74,6 @@ INSERT INTO exp_table VALUES (1, 10, 5);
 INSERT INTO exp_table VALUES (2, 20, 8);
 ### 2025-09-10 11:38:19.995
 INSERT INTO exp_table VALUES (3, 3, 15);
-### 2025-09-10 11:38:19.996
-SELECT * FROM exp_table;
 ### 2025-09-10 11:38:19.997
 SELECT * FROM exp_table WHERE col1 > 5;
 ### 2025-09-10 11:38:19.999
@@ -316,8 +314,6 @@ SELECT * FROM exp_table WHERE 5/4*8 < (4+col2)*col3/2;
 SELECT id,-(col2*(-1)+1)+(col4+2)*(col1+col3*2),(4+col2)*col3/2 FROM exp_table WHERE -(col2*(-1)+1)+(col4+2)*(col1+col3*2) > (4+col2)*col3/2;
 ### 2025-09-11 10:39:27.763
 DROP TABLE IF EXISTS exp_table;
-### 2025-09-11 10:39:27.772
-CREATE TABLE exp_table(id int, col1 int, col2 int, col3 float, col4 float);
 ### 2025-09-11 10:39:27.773
 INSERT INTO exp_table VALUES (1, 1, 1, 1.0, 1.5);
 ### 2025-09-11 10:39:27.774
@@ -576,3 +572,33 @@ SELECT max(csq_2.col2) FROM csq_2 WHERE csq_2.feat2 > 40.0;
 SELECT * FROM csq_1 WHERE (SELECT max(csq_2.col2) FROM csq_2 WHERE csq_2.feat2 > (SELECT min(csq_3.feat3) FROM csq_3)) = col1;
 ### 2025-09-15 14:30:13.825
 SELECT * FROM csq_1; SELECT * FROM csq_2; SELECT * FROM csq_3;
+### 2025-09-15 14:52:26.149
+-- Test arithmetic expression that causes crash
+### 2025-09-15 15:01:45.562
+-- Test arithmetic expression that was causing crash
+### 2025-09-15 15:01:45.570
+-- Drop and recreate the table to ensure clean state
+### 2025-09-15 15:01:45.570
+DROP TABLE exp_table;
+### 2025-09-15 15:01:45.578
+CREATE TABLE exp_table(id int, col1 int, col2 int, col3 float, col4 float);
+### 2025-09-15 15:01:45.590
+INSERT INTO exp_table VALUES (6, 5, 3, 1.46, 9.38);
+### 2025-09-15 15:01:45.591
+INSERT INTO exp_table VALUES (9, 8, 2, 4.41, 1.86);
+### 2025-09-15 15:01:45.592
+INSERT INTO exp_table VALUES (8, 7, 2, 1.63, 6.15);
+### 2025-09-15 15:01:45.593
+-- Check the data
+### 2025-09-15 15:01:45.594
+SELECT * FROM exp_table;
+### 2025-09-15 15:01:45.596
+-- Test the arithmetic expressions step by step
+### 2025-09-15 15:01:45.596
+SELECT 5/2*8;
+### 2025-09-15 15:01:45.598
+SELECT (8+3)*1.46*6;
+### 2025-09-15 15:01:45.599
+-- Test the problematic query
+### 2025-09-15 15:03:24.274
+SELECT * FROM exp_table WHERE 5/2*8 < (8+col2)*col3*6;
