@@ -908,23 +908,45 @@ condition:
     {
       $$ = new ConditionSqlNode;
       $$->left_expr.reset($1);
-      // Create ListExpr for IN values
+      // For IN values operation, store values directly in right_values
       if ($4 != nullptr) {
-        $$->right_expr.reset(new ListExpr(std::move(*$4)));
+        // Convert expressions to values
+        for (auto &expr : *$4) {
+          Value val;
+          RC rc = expr->try_get_value(val);
+          if (rc == RC::SUCCESS) {
+            $$->right_values.push_back(val);
+          } else {
+            // If we can't get constant values, fall back to ListExpr
+            $$->right_expr.reset(new ListExpr(std::move(*$4)));
+            break;
+          }
+        }
         delete $4;
       }
-      $$->comp = IN_OP;
+      $$->comp = IN_VALUES_OP;
     }
     | expression NOT IN LBRACE expression_list RBRACE
     {
       $$ = new ConditionSqlNode;
       $$->left_expr.reset($1);
-      // Create ListExpr for NOT IN values
+      // For NOT IN values operation, store values directly in right_values
       if ($5 != nullptr) {
-        $$->right_expr.reset(new ListExpr(std::move(*$5)));
+        // Convert expressions to values
+        for (auto &expr : *$5) {
+          Value val;
+          RC rc = expr->try_get_value(val);
+          if (rc == RC::SUCCESS) {
+            $$->right_values.push_back(val);
+          } else {
+            // If we can't get constant values, fall back to ListExpr
+            $$->right_expr.reset(new ListExpr(std::move(*$5)));
+            break;
+          }
+        }
         delete $5;
       }
-      $$->comp = NOT_IN_OP;
+      $$->comp = NOT_IN_VALUES_OP;
     }
     | expression IN LBRACE sub_query RBRACE
     {

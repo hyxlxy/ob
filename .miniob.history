@@ -544,8 +544,6 @@ SELECT * FROM csq_1 WHERE col1 = (SELECT max(csq_2.col2) FROM csq_2 WHERE csq_2.
 SELECT * FROM csq_1 WHERE col1 = (SELECT max(col2) FROM csq_2);
 ### 2025-09-15 12:27:32.929
 SELECT max(col2) FROM csq_2;
-### 2025-09-15 14:27:15.411
-SELECT * FROM test_table1 WHERE value = (SELECT max_val FROM test_table2 WHERE id = 1);
 ### 2025-09-15 14:28:06.554
 -- Test complex nested scalar subquery
 ### 2025-09-15 14:28:06.561
@@ -578,27 +576,83 @@ SELECT * FROM csq_1; SELECT * FROM csq_2; SELECT * FROM csq_3;
 -- Test arithmetic expression that was causing crash
 ### 2025-09-15 15:01:45.570
 -- Drop and recreate the table to ensure clean state
-### 2025-09-15 15:01:45.570
-DROP TABLE exp_table;
-### 2025-09-15 15:01:45.578
-CREATE TABLE exp_table(id int, col1 int, col2 int, col3 float, col4 float);
 ### 2025-09-15 15:01:45.590
 INSERT INTO exp_table VALUES (6, 5, 3, 1.46, 9.38);
 ### 2025-09-15 15:01:45.591
 INSERT INTO exp_table VALUES (9, 8, 2, 4.41, 1.86);
 ### 2025-09-15 15:01:45.592
 INSERT INTO exp_table VALUES (8, 7, 2, 1.63, 6.15);
-### 2025-09-15 15:01:45.593
--- Check the data
-### 2025-09-15 15:01:45.594
-SELECT * FROM exp_table;
 ### 2025-09-15 15:01:45.596
 -- Test the arithmetic expressions step by step
-### 2025-09-15 15:01:45.596
-SELECT 5/2*8;
-### 2025-09-15 15:01:45.598
-SELECT (8+3)*1.46*6;
 ### 2025-09-15 15:01:45.599
 -- Test the problematic query
 ### 2025-09-15 15:03:24.274
 SELECT * FROM exp_table WHERE 5/2*8 < (8+col2)*col3*6;
+### 2025-09-15 15:18:08.764
+-- Test arithmetic expression issues
+### 2025-09-15 15:18:08.774
+-- Drop and recreate tables with correct data
+### 2025-09-15 15:18:08.774
+DROP TABLE exp_table;
+### 2025-09-15 15:18:08.783
+DROP TABLE exp_table2;
+### 2025-09-15 15:18:08.792
+CREATE TABLE exp_table(id int, col1 int, col2 int, col3 float, col4 float);
+### 2025-09-15 15:18:08.799
+CREATE TABLE exp_table2(id int, col1 int);
+### 2025-09-15 15:18:08.806
+INSERT INTO exp_table VALUES (5, 5, 8, 1.35, 9.83);
+### 2025-09-15 15:18:08.807
+INSERT INTO exp_table VALUES (9, 8, 1, 6.72, 4.75);
+### 2025-09-15 15:18:08.807
+INSERT INTO exp_table VALUES (2, 5, 2, 8.79, 7.89);
+### 2025-09-15 15:18:08.808
+INSERT INTO exp_table VALUES (3, 7, 4, 2.45, 3.21);
+### 2025-09-15 15:18:08.808
+INSERT INTO exp_table2 VALUES (1, 8);
+### 2025-09-15 15:18:08.809
+INSERT INTO exp_table2 VALUES (2, 4);
+### 2025-09-15 15:18:08.809
+-- Check the data
+### 2025-09-15 15:18:08.809
+SELECT * FROM exp_table;
+### 2025-09-15 15:18:08.810
+SELECT * FROM exp_table2;
+### 2025-09-15 15:18:08.811
+-- Test the problematic queries
+### 2025-09-15 15:24:04.641
+-- Test division by zero issues
+### 2025-09-15 15:24:04.648
+SELECT exp_table.id,8*exp_table2.col1/(exp_table.col2+4) FROM exp_table,exp_table2 WHERE exp_table2.col1/(2-exp_table.col2)*6>4;
+### 2025-09-15 15:24:04.652
+SELECT exp_table.id,4*exp_table2.col1/(exp_table.col2+8) FROM exp_table,exp_table2 WHERE 4+exp_table2.col1/(4-exp_table.col2)*5>=5;
+### 2025-09-15 15:24:40.043
+SELECT * FROM exp_table; SELECT * FROM exp_table2;
+### 2025-09-15 15:25:23.822
+-- Final verification test
+### 2025-09-15 15:25:23.829
+-- Test 1: IN operation with value lists
+### 2025-09-15 15:25:23.829
+SELECT * FROM ssq_1 WHERE id IN (1,2,3);
+### 2025-09-15 15:25:23.832
+-- Test 2: Complex arithmetic expressions
+### 2025-09-15 15:25:23.832
+SELECT 5/2*8;
+### 2025-09-15 15:25:23.833
+SELECT (8+3)*1.46*6;
+### 2025-09-15 15:25:23.833
+-- Test 3: Arithmetic with division by zero (should show empty values)
+### 2025-09-15 15:25:23.833
+SELECT exp_table.id, 4*exp_table2.col1/(exp_table.col2 - 1) FROM exp_table,exp_table2 WHERE exp_table.id IN (9,2);
+### 2025-09-15 15:25:23.835
+-- Test 4: Scalar subquery (previously working)
+### 2025-09-15 15:25:23.835
+SELECT * FROM test_table1 WHERE value = (SELECT max_val FROM test_table2 WHERE id = 1);
+### 2025-09-15 15:27:40.559
+SELECT * FROM ssq_1 WHERE id IN (5,69,42,4,42);
+### 2025-09-15 15:28:07.495
+SELECT * FROM ssq_1;
+### 2025-09-15 15:28:48.706
+-- Test the specific division by zero queries
+### 2025-09-15 15:28:48.713
+SELECT exp_table.id,4*exp_table2.col1/(exp_table.col2 - 1) FROM exp_table,exp_table2 WHERE 5*exp_table2.col1/(exp_table.col2+4)>6;

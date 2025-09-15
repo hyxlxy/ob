@@ -120,6 +120,18 @@ RC ExpressionBinder::bind_expression(unique_ptr<Expression> &expr, vector<unique
       return RC::SUCCESS;
     } break;
 
+    case ExprType::IN_VALUES: {
+      // IN 操作（值列表）表达式，直接添加到bound_expressions中
+      bound_expressions.emplace_back(std::move(expr));
+      return RC::SUCCESS;
+    } break;
+
+    case ExprType::SUBQUERY_IN: {
+      // IN 操作（子查询）表达式，直接添加到bound_expressions中
+      bound_expressions.emplace_back(std::move(expr));
+      return RC::SUCCESS;
+    } break;
+
     default: {
       LOG_WARN("unknown expression type: %d", static_cast<int>(expr->type()));
       return RC::INTERNAL;
