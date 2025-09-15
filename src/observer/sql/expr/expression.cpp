@@ -1592,6 +1592,7 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
     printf("DEBUG: SubQueryExpr: Subquery returned single value: %s\n", cached_result_.to_string().c_str());
   } else {
     printf("ERROR: Scalar subquery returned %d values, expected 1\n", (int)results.size());
+    LOG_WARN("Scalar subquery returned %d values, expected exactly 1. This is a SQL semantic error.", (int)results.size());
     return RC::INVALID_ARGUMENT;
   }
 

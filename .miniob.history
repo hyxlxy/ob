@@ -656,3 +656,17 @@ SELECT * FROM ssq_1;
 -- Test the specific division by zero queries
 ### 2025-09-15 15:28:48.713
 SELECT exp_table.id,4*exp_table2.col1/(exp_table.col2 - 1) FROM exp_table,exp_table2 WHERE 5*exp_table2.col1/(exp_table.col2+4)>6;
+### 2025-09-15 15:56:11.480
+-- Final test for scalar subquery functionality
+### 2025-09-15 15:56:11.487
+-- Test 1: Valid scalar subquery with aggregation (should work)
+### 2025-09-15 15:56:11.487
+SELECT * FROM ssq_1 WHERE col1 = (SELECT MAX(ssq_2.col2) FROM ssq_2);
+### 2025-09-15 15:56:11.492
+-- Test 2: Invalid scalar subquery returning multiple values (should return error, not crash)
+### 2025-09-15 15:56:11.492
+SELECT * FROM ssq_1 WHERE col1 = (SELECT ssq_2.col2 FROM ssq_2);
+### 2025-09-15 15:56:11.494
+-- Test 3: Valid scalar subquery with WHERE clause (should work)
+### 2025-09-15 15:56:11.494
+SELECT * FROM ssq_1 WHERE col1 = (SELECT ssq_2.col2 FROM ssq_2 WHERE ssq_2.id = 1);
