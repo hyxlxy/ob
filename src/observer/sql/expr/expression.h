@@ -57,6 +57,7 @@ enum class ExprType
   AGGREGATION,  ///< 聚合运算
   FUNCTION,     ///< 函数调用
   IN_VALUES,    ///< IN操作（值列表）
+  SUBQUERY_IN,  ///< IN操作（子查询）
   LIST,         ///< 表达式列表
 };
 
@@ -311,6 +312,8 @@ class ComparisonExpr : public Expression
 {
 public:
   ComparisonExpr(CompOp comp, unique_ptr<Expression> left, unique_ptr<Expression> right);
+  ComparisonExpr(CompOp comp, unique_ptr<Expression> left, unique_ptr<class Stmt> sub_query);
+  ComparisonExpr(CompOp comp, unique_ptr<Expression> left, class FilterUnit *filter_unit);
   virtual ~ComparisonExpr();
 
   ExprType type() const override { return ExprType::COMPARISON; }
@@ -321,6 +324,11 @@ public:
 
   unique_ptr<Expression> copy() const override
   {
+    if (sub_query_) {
+      // Note: Cannot easily copy Stmt, this is a limitation
+      LOG_WARN("ComparisonExpr with subquery copy() is not fully implemented");
+      return nullptr;
+    }
     return make_unique<ComparisonExpr>(comp_, left_->copy(), right_->copy());
   }
 
@@ -332,6 +340,7 @@ public:
 
   unique_ptr<Expression> &left() { return left_; }
   unique_ptr<Expression> &right() { return right_; }
+  const std::unique_ptr<class Stmt> &sub_query() const { return sub_query_; }
 
   /**
    * 尝试在没有tuple的情况下获取当前表达式的值
@@ -352,6 +361,8 @@ private:
   CompOp                 comp_;
   unique_ptr<Expression> left_;
   unique_ptr<Expression> right_;
+  std::unique_ptr<class Stmt> sub_query_;  // For IN/NOT IN subquery operations
+  class FilterUnit *filter_unit_;  // Alternative way to access subquery
 };
 
 /**
@@ -601,6 +612,33 @@ public:
 private:
   unique_ptr<Expression> left_;
   std::vector<Value> values_;
+  bool is_not_in_;
+};
+
+/**
+ * @brief 子查询IN表达式
+ * @ingroup Expression
+ */
+class SubQueryInExpr : public Expression
+{
+public:
+  SubQueryInExpr(unique_ptr<Expression> left, unique_ptr<class Stmt> sub_query, bool is_not_in = false);
+  virtual ~SubQueryInExpr();
+
+  unique_ptr<Expression> copy() const override;
+
+  ExprType type() const override { return ExprType::SUBQUERY_IN; }
+  AttrType value_type() const override { return AttrType::BOOLEANS; }
+
+  RC get_value(const Tuple &tuple, Value &value) const override;
+  RC try_get_value(Value &value) const override;
+  RC eval(Chunk &chunk, vector<uint8_t> &select) override;
+
+  const std::unique_ptr<class Stmt> &sub_query() const { return sub_query_; }
+
+private:
+  unique_ptr<Expression> left_;
+  std::unique_ptr<class Stmt> sub_query_;
   bool is_not_in_;
 };
 

@@ -90,6 +90,10 @@ public:
   void set_right_values(const std::vector<Value> &values) { right_values_ = values; }
   const std::vector<Value> &right_values() const { return right_values_; }
 
+  // 支持子查询
+  void set_sub_query(std::unique_ptr<class Stmt> sub_query) { sub_query_ = std::move(sub_query); }
+  const std::unique_ptr<class Stmt> &sub_query() const { return sub_query_; }
+
 private:
   CompOp    comp_ = NO_OP;
   FilterObj left_;
@@ -97,6 +101,7 @@ private:
   std::unique_ptr<Expression> left_expr_owner_;
   std::unique_ptr<Expression> right_expr_owner_;
   std::vector<Value> right_values_;  // 用于IN/NOT IN操作的值列表
+  std::unique_ptr<class Stmt> sub_query_;  // 用于子查询操作
 };
 
 /**

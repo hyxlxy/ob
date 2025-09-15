@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/sys/rc.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
+#include "sql/stmt/select_stmt.h"
 
 FilterStmt::~FilterStmt()
 {
@@ -122,6 +123,56 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<st
 
     filter_unit->set_comp(comp);
     filter_unit->set_right_values(condition.right_values);
+    return RC::SUCCESS;
+  }
+
+  // 处理IN_OP和NOT_IN_OP操作（子查询形式）
+  if (comp == IN_OP || comp == NOT_IN_OP) {
+    if (condition.sub_query == nullptr) {
+      LOG_WARN("IN/NOT IN operation with subquery requires sub_query");
+      return RC::INVALID_ARGUMENT;
+    }
+
+    // 对于子查询IN操作，我们需要创建一个特殊的FilterUnit
+    filter_unit = new FilterUnit;
+
+    // 设置左侧表达式或属性
+    if (condition.left_expr != nullptr) {
+      filter_unit->set_left_expr(condition.left_expr->copy());
+    } else if (condition.left_is_attr) {
+      Table           *table = nullptr;
+      const FieldMeta *field = nullptr;
+      rc = get_table_and_field(db, default_table, tables, condition.left_attr, table, field);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("cannot find attr");
+        delete filter_unit;
+        return rc;
+      }
+      FilterObj filter_obj;
+      filter_obj.init_attr(Field(table, field));
+      filter_unit->set_left(filter_obj);
+    } else {
+      FilterObj filter_obj;
+      filter_obj.init_value(condition.left_value);
+      filter_unit->set_left(filter_obj);
+    }
+
+    // 创建子查询的 Stmt
+    Stmt *sub_query_stmt = nullptr;
+    if (condition.sub_query->flag != SCF_SELECT) {
+      LOG_WARN("sub-query must be a SELECT statement");
+      delete filter_unit;
+      return RC::INVALID_ARGUMENT;
+    }
+    rc = SelectStmt::create(db, condition.sub_query->selection, sub_query_stmt);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to create sub-query statement. rc=%s", strrc(rc));
+      delete filter_unit;
+      return rc;
+    }
+
+    filter_unit->set_comp(comp);
+    filter_unit->set_sub_query(std::unique_ptr<Stmt>(sub_query_stmt));
     return RC::SUCCESS;
   }
 

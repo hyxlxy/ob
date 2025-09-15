@@ -25,6 +25,11 @@ void TableGetLogicalOperator::set_predicates(vector<unique_ptr<Expression>> &&ex
   predicates_ = std::move(exprs);
 }
 
+void TableGetLogicalOperator::add_subquery_filter_unit(FilterUnit *filter_unit)
+{
+  subquery_filter_units_.push_back(filter_unit);
+}
+
 unique_ptr<LogicalProperty> TableGetLogicalOperator::find_log_prop(const vector<LogicalProperty*> &log_props)
 {
   int card = Catalog::get_instance().get_table_stats(table_->table_id()).row_nums;

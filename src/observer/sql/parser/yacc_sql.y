@@ -895,8 +895,20 @@ condition:
       $$->right_expr.reset($3);
       $$->comp = $2;
     }
-
-
+    | expression IN LBRACE sub_query RBRACE
+    {
+      $$ = new ConditionSqlNode;
+      $$->left_expr.reset($1);
+      $$->sub_query.reset($4);
+      $$->comp = IN_OP;
+    }
+    | expression NOT IN LBRACE sub_query RBRACE
+    {
+      $$ = new ConditionSqlNode;
+      $$->left_expr.reset($1);
+      $$->sub_query.reset($5);
+      $$->comp = NOT_IN_OP;
+    }
     | EXISTS LBRACE sub_query RBRACE
     {
       $$ = new ConditionSqlNode;

@@ -57,6 +57,9 @@ public:
   void set_predicates(vector<unique_ptr<Expression>> &&exprs);
   auto predicates() -> vector<unique_ptr<Expression>> & { return predicates_; }
 
+  void add_subquery_filter_unit(class FilterUnit *filter_unit);
+  const vector<class FilterUnit *> &subquery_filter_units() const { return subquery_filter_units_; }
+
 private:
   Table        *table_ = nullptr;
   ReadWriteMode mode_  = ReadWriteMode::READ_WRITE;
@@ -66,4 +69,7 @@ private:
   // 不包含复杂的表达式运算，比如加减乘除、或者conjunction expression
   // 如果有多个表达式，他们的关系都是 AND
   vector<unique_ptr<Expression>> predicates_;
+
+  // 子查询过滤单元，用于处理 IN/NOT IN 子查询
+  vector<class FilterUnit *> subquery_filter_units_;
 };

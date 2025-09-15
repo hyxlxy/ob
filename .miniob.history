@@ -354,3 +354,81 @@ exit;
 q
 ### 2025-09-14 21:31:57.435
 SELECT 1;
+### 2025-09-14 22:09:09.271
+DESC ssq_1;
+### 2025-09-14 22:09:32.806
+SHOW TABLES;
+### 2025-09-14 22:26:36.165
+-- Test NOT IN subquery functionality
+### 2025-09-14 22:26:36.177
+-- Drop existing tables if they exist
+### 2025-09-14 22:26:36.177
+DROP TABLE ssq_1;
+### 2025-09-14 22:26:36.183
+DROP TABLE ssq_2;
+### 2025-09-14 22:26:36.186
+-- Create test tables
+### 2025-09-14 22:26:36.193
+-- Insert test data
+### 2025-09-14 22:26:36.195
+INSERT INTO ssq_1 VALUES (70, 25, 55.50);
+### 2025-09-14 22:26:36.195
+INSERT INTO ssq_2 VALUES (1, 25, 10.5);
+### 2025-09-14 22:26:36.195
+INSERT INTO ssq_2 VALUES (2, 30, 20.5);
+### 2025-09-14 22:26:36.196
+INSERT INTO ssq_2 VALUES (3, 35, 30.5);
+### 2025-09-14 22:26:36.196
+-- Test the NOT IN subquery
+### 2025-09-14 22:26:36.196
+SELECT * FROM ssq_1 WHERE col1 NOT IN (SELECT ssq_2.col2 FROM ssq_2);
+### 2025-09-14 22:32:48.497
+-- 简单的子查询测试
+### 2025-09-14 22:32:48.502
+DROP TABLE IF EXISTS ssq_1;
+### 2025-09-14 22:32:48.502
+DROP TABLE IF EXISTS ssq_2;
+### 2025-09-14 22:32:48.502
+CREATE TABLE ssq_1(id int, col1 int, feat1 float);
+### 2025-09-14 22:32:48.502
+CREATE TABLE ssq_2(id int, col2 int, feat2 float);
+### 2025-09-14 22:32:48.503
+INSERT INTO ssq_1 VALUES (54, 96, 87.95);
+### 2025-09-14 22:32:48.503
+INSERT INTO ssq_1 VALUES (59, 84, 77.75);
+### 2025-09-14 22:32:48.503
+INSERT INTO ssq_1 VALUES (63, 15, 46.83);
+### 2025-09-14 22:32:48.504
+INSERT INTO ssq_1 VALUES (70, 25, 55.5);
+### 2025-09-14 22:32:48.504
+INSERT INTO ssq_2 VALUES (1, 100, 90.0);
+### 2025-09-14 22:32:48.504
+INSERT INTO ssq_2 VALUES (2, 200, 95.0);
+### 2025-09-14 22:32:48.505
+INSERT INTO ssq_2 VALUES (3, 300, 98.0);
+### 2025-09-14 22:32:48.505
+-- 测试 NOT IN 子查询
+### 2025-09-14 22:32:48.505
+-- 预期结果：所有 ssq_1 的行都应该返回，因为 ssq_2.col2 中没有 96, 84, 15, 25
+### 2025-09-15 08:34:14.435
+-- 测试简单的子查询
+### 2025-09-15 08:34:14.440
+select col2 from ssq_2;
+### 2025-09-15 09:05:42.995
+-- 完整的 NOT IN 子查询测试
+### 2025-09-15 09:05:43.000
+-- 测试用例1: 基本 NOT IN 子查询
+### 2025-09-15 09:05:43.005
+-- 测试用例2: 基本 IN 子查询
+### 2025-09-15 09:05:43.008
+-- 测试用例3: 验证子查询结果
+### 2025-09-15 09:05:43.008
+select ssq_2.col2 from ssq_2;
+### 2025-09-15 09:05:43.009
+-- 测试用例4: 验证主表数据
+### 2025-09-15 09:05:43.010
+select * from ssq_1;
+### 2025-09-15 09:14:08.454
+select * from ssq_1 where col1 not in (select ssq_2.col2 from ssq_2);
+### 2025-09-15 09:15:04.084
+select * from ssq_1 where col1 in (select ssq_2.col2 from ssq_2);

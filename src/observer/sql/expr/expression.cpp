@@ -18,6 +18,14 @@ See the Mulan PSL v2 for more details. */
 #include <set>
 #include "common/type/vector_type.h"
 #include "common/log/log.h"
+#include "sql/stmt/select_stmt.h"
+#include "sql/stmt/filter_stmt.h"
+#include "sql/optimizer/logical_plan_generator.h"
+#include "sql/optimizer/physical_plan_generator.h"
+#include "session/session.h"
+
+// 前向声明
+static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Value> &results);
 #include "common/lang/limits.h"
 
 #include <type_traits>
@@ -169,8 +177,22 @@ RC CastExpr::try_get_value(Value &result) const
 ////////////////////////////////////////////////////////////////////////////////
 
 ComparisonExpr::ComparisonExpr(CompOp comp, unique_ptr<Expression> left, unique_ptr<Expression> right)
-    : comp_(comp), left_(std::move(left)), right_(std::move(right))
+    : comp_(comp), left_(std::move(left)), right_(std::move(right)), filter_unit_(nullptr)
 {
+}
+
+ComparisonExpr::ComparisonExpr(CompOp comp, unique_ptr<Expression> left, unique_ptr<class Stmt> sub_query)
+    : comp_(comp), left_(std::move(left)), sub_query_(std::move(sub_query)), filter_unit_(nullptr)
+{
+}
+
+ComparisonExpr::ComparisonExpr(CompOp comp, unique_ptr<Expression> left, FilterUnit *filter_unit)
+    : comp_(comp), left_(std::move(left)), filter_unit_(filter_unit)
+{
+  // 创建一个占位符右侧表达式，避免 "invalid right children number" 错误
+  Value placeholder_value;
+  placeholder_value.set_boolean(true);
+  right_ = make_unique<ValueExpr>(placeholder_value);
 }
 
 ComparisonExpr::~ComparisonExpr() {}
@@ -274,30 +296,79 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
       return RC::SUCCESS;
     }
 
-    if (right_->type() == ExprType::LIST) {
-      ListExpr *list_expr = static_cast<ListExpr *>(right_.get());
-      list_expr->reset();
-    }
-
     bool found = false;
-    Value right_value;
 
-    // Check all values in the list
-    while (RC::SUCCESS == (rc = right_->get_value(tuple, right_value))) {
-      if (left_value.compare(right_value) == 0) {
-        found = true;
-        break;
+    // Handle subquery case
+    if (sub_query_ || filter_unit_) {
+      // Use a static cache to avoid re-executing the subquery
+      static std::vector<Value> cached_sub_query_results;
+      static bool cache_initialized = false;
+
+      if (!cache_initialized) {
+        RC rc = RC::SUCCESS;
+
+        if (filter_unit_ && filter_unit_->sub_query()) {
+          // Use FilterUnit's subquery (preferred)
+          LOG_DEBUG("Using FilterUnit subquery (first time)");
+          rc = execute_subquery_and_collect_results(filter_unit_->sub_query().get(), cached_sub_query_results);
+        } else if (sub_query_) {
+          // Use direct subquery
+          LOG_DEBUG("Using direct subquery (first time)");
+          rc = execute_subquery_and_collect_results(sub_query_.get(), cached_sub_query_results);
+        } else {
+          LOG_WARN("No subquery found in filter_unit or sub_query");
+          return RC::INTERNAL;
+        }
+
+        if (rc != RC::SUCCESS) {
+          LOG_WARN("Failed to execute subquery for IN/NOT IN operation. rc=%s", strrc(rc));
+          return rc;
+        }
+
+        cache_initialized = true;
+        LOG_DEBUG("Subquery cache initialized with %d results", (int)cached_sub_query_results.size());
+      } else {
+        LOG_DEBUG("Using cached subquery results (%d results)", (int)cached_sub_query_results.size());
+      }
+
+      std::vector<Value> &sub_query_results = cached_sub_query_results;
+
+
+
+      // Check if left_value is in sub_query_results
+      for (const Value &sub_value : sub_query_results) {
+        if (left_value.compare(sub_value) == 0) {
+          found = true;
+          break;
+        }
       }
     }
+    // Handle list case (existing logic)
+    else if (right_) {
+      if (right_->type() == ExprType::LIST) {
+        ListExpr *list_expr = static_cast<ListExpr *>(right_.get());
+        list_expr->reset();
+      }
 
-    // Handle empty list case
-    if (rc == RC::RECORD_EOF && !found) {
-      // Empty list or no match found
-      bool result = (comp_ == NOT_IN_OP); // NOT IN returns true, IN returns false
-      value.set_boolean(result);
-      return RC::SUCCESS;
-    } else if (rc != RC::SUCCESS && rc != RC::RECORD_EOF) {
-      return rc;
+      Value right_value;
+
+      // Check all values in the list
+      while (RC::SUCCESS == (rc = right_->get_value(tuple, right_value))) {
+        if (left_value.compare(right_value) == 0) {
+          found = true;
+          break;
+        }
+      }
+
+      // Handle empty list case
+      if (rc == RC::RECORD_EOF && !found) {
+        // Empty list or no match found
+        bool result = (comp_ == NOT_IN_OP); // NOT IN returns true, IN returns false
+        value.set_boolean(result);
+        return RC::SUCCESS;
+      } else if (rc != RC::SUCCESS && rc != RC::RECORD_EOF) {
+        return rc;
+      }
     }
 
     // Set result based on whether we found a match
@@ -1252,5 +1323,167 @@ RC ListExpr::try_get_value(Value &value) const
 
   RC rc = exprs_[current_index_]->try_get_value(value);
   current_index_++;
+  return rc;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+SubQueryInExpr::SubQueryInExpr(unique_ptr<Expression> left, unique_ptr<class Stmt> sub_query, bool is_not_in)
+    : left_(std::move(left)), sub_query_(std::move(sub_query)), is_not_in_(is_not_in)
+{}
+
+SubQueryInExpr::~SubQueryInExpr() {}
+
+unique_ptr<Expression> SubQueryInExpr::copy() const
+{
+  // Note: We can't easily copy a Stmt, so this is a limitation
+  // In practice, this should not be called during normal execution
+  LOG_WARN("SubQueryInExpr::copy() is not fully implemented");
+  return nullptr;
+}
+
+RC SubQueryInExpr::get_value(const Tuple &tuple, Value &value) const
+{
+  // This will be implemented when we have the execution context
+  // For now, return unimplemented
+  LOG_WARN("SubQueryInExpr::get_value() is not yet implemented");
+  return RC::UNIMPLEMENTED;
+}
+
+RC SubQueryInExpr::try_get_value(Value &value) const
+{
+  // Cannot evaluate subquery without execution context
+  return RC::UNIMPLEMENTED;
+}
+
+RC SubQueryInExpr::eval(Chunk &chunk, vector<uint8_t> &select)
+{
+  // This will be implemented when we have the execution context
+  LOG_WARN("SubQueryInExpr::eval() is not yet implemented");
+  return RC::UNIMPLEMENTED;
+}
+
+// 执行子查询并收集结果
+static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Value> &results)
+{
+  LOG_WARN("Starting subquery execution");
+
+  if (!sub_query) {
+    LOG_WARN("sub_query is null");
+    return RC::INVALID_ARGUMENT;
+  }
+
+  LOG_WARN("sub_query is valid, creating logical plan");
+
+  // 创建逻辑计划
+  LogicalPlanGenerator logical_plan_generator;
+  unique_ptr<LogicalOperator> logical_operator;
+  RC rc = logical_plan_generator.create(sub_query, logical_operator);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to create logical plan for sub-query. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  LOG_WARN("Successfully created logical plan, creating physical plan");
+
+  // 创建物理计划
+  PhysicalPlanGenerator physical_plan_generator;
+  unique_ptr<PhysicalOperator> physical_operator;
+  rc = physical_plan_generator.create(*logical_operator, physical_operator, nullptr);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to create physical plan for sub-query. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  LOG_WARN("Successfully created physical plan");
+
+  // 调试：检查物理计划的类型
+  LOG_WARN("Physical operator type: %s", typeid(*physical_operator).name());
+  if (physical_operator->children().size() > 0) {
+    LOG_WARN("Physical operator has %d children", (int)physical_operator->children().size());
+    LOG_WARN("First child type: %s", typeid(*physical_operator->children()[0]).name());
+  } else {
+    LOG_WARN("Physical operator has no children");
+  }
+
+  // 执行子查询
+  // 获取当前 Session 和 Trx
+  LOG_WARN("Getting current session and transaction");
+  Session *session = Session::current_session();
+  Trx *trx = nullptr;
+  if (session != nullptr) {
+    LOG_DEBUG("Session found, getting transaction");
+    trx = session->current_trx();
+  } else {
+    LOG_WARN("No current session found");
+  }
+  if (trx == nullptr) {
+    LOG_WARN("failed to get current transaction for sub-query execution");
+    return RC::INTERNAL;
+  }
+
+  LOG_DEBUG("Opening physical operator");
+  rc = physical_operator->open(trx);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to open sub-query physical operator. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  LOG_DEBUG("Physical operator opened successfully");
+
+  // 收集所有结果
+  LOG_DEBUG("Starting to collect subquery results");
+
+  // 首先检查 tuple schema
+  TupleSchema schema;
+  rc = physical_operator->tuple_schema(schema);
+  if (rc == RC::SUCCESS) {
+    LOG_DEBUG("Physical operator tuple schema has %d cells", schema.cell_num());
+    for (int i = 0; i < schema.cell_num(); i++) {
+      LOG_DEBUG("Cell %d: %s", i, schema.cell_at(i).alias());
+    }
+  } else {
+    LOG_WARN("Failed to get tuple schema from physical operator. rc=%s", strrc(rc));
+  }
+
+  int row_count = 0;
+  while (RC::SUCCESS == (rc = physical_operator->next())) {
+    row_count++;
+    LOG_DEBUG("Processing row %d", row_count);
+
+    Tuple *tuple = physical_operator->current_tuple();
+    if (tuple == nullptr) {
+      LOG_WARN("sub-query returned null tuple at row %d", row_count);
+      continue;
+    }
+
+    LOG_WARN("Got tuple at row %d, type: %s", row_count, typeid(*tuple).name());
+    LOG_WARN("Tuple cell_num: %d", tuple->cell_num());
+
+    // 假设子查询返回单列
+    Value value;
+    rc = tuple->cell_at(0, value);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to get value from sub-query result at row %d. rc=%s", row_count, strrc(rc));
+
+      // 尝试获取更多调试信息
+      LOG_WARN("Tuple type: %s", typeid(*tuple).name());
+
+      physical_operator->close();
+      return rc;
+    }
+
+    LOG_DEBUG("sub-query returned value at row %d: %s", row_count, value.to_string().c_str());
+    results.push_back(value);
+  }
+
+  LOG_DEBUG("Finished collecting subquery results. Total rows: %d", row_count);
+
+  physical_operator->close();
+
+  if (rc == RC::RECORD_EOF) {
+    rc = RC::SUCCESS;
+  }
+
   return rc;
 }
