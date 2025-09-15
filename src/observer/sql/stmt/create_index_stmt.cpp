@@ -40,12 +40,16 @@ RC CreateIndexStmt::create(Db *db, const CreateIndexSqlNode &create_index, Stmt 
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  // 检查所有字段是否存在（暂时只支持单字段索引的向后兼容）
-  const FieldMeta *field_meta = table->table_meta().field(create_index.attribute_names[0].c_str());
-  if (nullptr == field_meta) {
-    LOG_WARN("no such field in table. db=%s, table=%s, field name=%s",
-             db->name(), table_name, create_index.attribute_names[0].c_str());
-    return RC::SCHEMA_FIELD_NOT_EXIST;
+  // 检查所有字段是否存在
+  vector<const FieldMeta *> field_metas;
+  for (const string &field_name : create_index.attribute_names) {
+    const FieldMeta *field_meta = table->table_meta().field(field_name.c_str());
+    if (nullptr == field_meta) {
+      LOG_WARN("no such field in table. db=%s, table=%s, field name=%s",
+               db->name(), table_name, field_name.c_str());
+      return RC::SCHEMA_FIELD_NOT_EXIST;
+    }
+    field_metas.push_back(field_meta);
   }
 
   Index *index = table->find_index(create_index.index_name.c_str());
@@ -54,6 +58,10 @@ RC CreateIndexStmt::create(Db *db, const CreateIndexSqlNode &create_index, Stmt 
     return RC::SCHEMA_INDEX_NAME_REPEAT;
   }
 
-  stmt = new CreateIndexStmt(table, field_meta, create_index.index_name);
+  if (field_metas.size() == 1) {
+    stmt = new CreateIndexStmt(table, field_metas[0], create_index.index_name, create_index.is_unique);
+  } else {
+    stmt = new CreateIndexStmt(table, field_metas, create_index.index_name, create_index.is_unique);
+  }
   return RC::SUCCESS;
 }

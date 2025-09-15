@@ -44,6 +44,40 @@ RC BplusTreeIndex::create(Table *table, const char *file_name, const IndexMeta &
   return RC::SUCCESS;
 }
 
+RC BplusTreeIndex::create(Table *table, const char *file_name, const IndexMeta &index_meta, const vector<FieldMeta> &field_metas)
+{
+  if (inited_) {
+    LOG_WARN("Failed to create multi-field index due to the index has been created before. file_name:%s, index:%s",
+        file_name, index_meta.name());
+    return RC::RECORD_OPENNED;
+  }
+
+  // For multi-field index, we use the first field for now (simplified implementation)
+  if (field_metas.empty()) {
+    LOG_WARN("Failed to create multi-field index due to empty field_metas. file_name:%s, index:%s",
+        file_name, index_meta.name());
+    return RC::INVALID_ARGUMENT;
+  }
+
+  // Use the first field for the B+ tree structure (simplified approach)
+  const FieldMeta &first_field = field_metas[0];
+  Index::init(index_meta, first_field);
+
+  BufferPoolManager &bpm = table->db()->buffer_pool_manager();
+  RC rc = index_handler_.create(table->db()->log_handler(), bpm, file_name, first_field.type(), first_field.len());
+  if (RC::SUCCESS != rc) {
+    LOG_WARN("Failed to create multi-field index_handler, file_name:%s, index:%s, rc:%s",
+        file_name, index_meta.name(), strrc(rc));
+    return rc;
+  }
+
+  inited_ = true;
+  table_  = table;
+  LOG_INFO("Successfully create multi-field index, file_name:%s, index:%s, fields:%zu",
+    file_name, index_meta.name(), field_metas.size());
+  return RC::SUCCESS;
+}
+
 RC BplusTreeIndex::open(Table *table, const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta)
 {
   if (inited_) {

@@ -32,5 +32,15 @@ RC CreateIndexExecutor::execute(SQLStageEvent *sql_event)
 
   Trx   *trx   = session->current_trx();
   Table *table = create_index_stmt->table();
-  return table->create_index(trx, create_index_stmt->field_meta(), create_index_stmt->index_name().c_str());
+
+  // Support multi-field index and unique index
+  const auto &field_metas = create_index_stmt->field_metas();
+  bool is_unique = create_index_stmt->is_unique();
+
+  if (field_metas.size() == 1) {
+    return table->create_index(trx, field_metas[0], create_index_stmt->index_name().c_str(), is_unique);
+  } else {
+    // For multi-field index, we need a new create_index method
+    return table->create_index(trx, field_metas, create_index_stmt->index_name().c_str(), is_unique);
+  }
 }

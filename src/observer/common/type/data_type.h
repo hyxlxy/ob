@@ -123,3 +123,12 @@ public:
   static RC parse_date_string(const string &date_str, int &date_int);
   static RC format_date_int(int date_int, string &date_str);
 };
+
+class UndefinedType : public DataType
+{
+public:
+  UndefinedType() : DataType(AttrType::UNDEFINED) {}
+  virtual ~UndefinedType() {}
+
+  RC to_string(const Value &val, string &result) const override;
+};

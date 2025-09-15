@@ -1,27 +1,3 @@
-### 2025-09-03 22:24:40.212
-INSERT INTO students VALUES (1, 'Alice', 20, '2003-01-01');
-### 2025-09-03 22:24:40.212
-INSERT INTO students VALUES (2, 'Bob', 21, '2002-05-15');
-### 2025-09-03 22:24:40.213
-INSERT INTO students VALUES (3, 'Charlie', 19, '2004-12-10');
-### 2025-09-03 22:24:40.214
--- 测试UPDATE语句（更新所有记录）
-### 2025-09-03 22:24:40.215
-UPDATE students SET age = 25;
-### 2025-09-03 22:24:40.217
--- 测试UPDATE语句（更新字符串字段）
-### 2025-09-03 22:24:40.217
-UPDATE students SET name = 'Updated';
-### 2025-09-03 22:24:40.217
--- 查看更新后的数据
-### 2025-09-03 22:24:53.612
-UPDATE test SET name = 'new';
-### 2025-09-03 22:49:24.500
--- 测试LIKE功能
-### 2025-09-03 22:49:24.507
-CREATE TABLE users (
-### 2025-09-03 22:49:24.509
-    email CHAR(50)
 ### 2025-09-03 22:49:24.510
 INSERT INTO users VALUES (1, 'Alice', 'alice@example.com');
 ### 2025-09-03 22:49:24.510
@@ -1998,3 +1974,27 @@ INSERT INTO join_table_2 VALUES (4, 17);
 Select * from join_table_1 inner join join_table_2 on join_table_1.name<join_table_2.age and join_table_1.id=join_table_2.id;
 ### 2025-09-14 17:37:58.037
 exit;
+### 2025-09-15 20:26:09.678
+select * from ssq_1 where col1 = (select max(ssq_2.col2) from ssq_2);
+### 2025-09-15 20:26:53.398
+select * from ssq_1 where col1 = (select ssq_2.col2 from ssq_2 limit 1);
+### 2025-09-15 20:27:36.066
+create table ssq_single(col2 int);
+### 2025-09-15 20:37:44.589
+create table test_null(id int not null, name char(20) null, age int);
+### 2025-09-15 20:39:06.541
+create table test_basic(id int, name char(20));
+### 2025-09-15 20:39:28.276
+select * from ssq_1 where col1 = (select ssq_2.col2 from ssq_2);
+### 2025-09-15 21:46:10.817
+create table multi_index(id int, col1 int, col2 int);
+### 2025-09-15 21:54:24.074
+create table unique_test(id int, name char(20));
+### 2025-09-15 21:55:09.327
+create table unique_test2(id int, name char(20));
+### 2025-09-15 22:03:01.676
+create table null_test(id int not null, name char(20) null, age int);
+### 2025-09-15 22:31:42.480
+create table null_test3(id int not null, name char(20) null, age int);
+### 2025-09-15 22:32:20.440
+create table unique_constraint_test(id int, name char(20));

@@ -242,9 +242,12 @@ struct UpdateSqlNode
  */
 struct AttrInfoSqlNode
 {
-  AttrType type;    ///< Type of attribute
-  string   name;    ///< Attribute name
-  size_t   length;  ///< Length of attribute
+  AttrType type;      ///< Type of attribute
+  string   name;      ///< Attribute name
+  size_t   length;    ///< Length of attribute
+  bool     nullable;  ///< Whether the attribute can be NULL (default: true)
+
+  AttrInfoSqlNode() : type(AttrType::UNDEFINED), length(0), nullable(true) {}
 };
 
 /**

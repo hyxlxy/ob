@@ -226,7 +226,18 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value &    value = values[i];
-    if (field->type() != value.attr_type()) {
+
+    // Handle NULL values
+    if (value.attr_type() == AttrType::UNDEFINED) {
+      if (!field->nullable()) {
+        LOG_WARN("Cannot insert NULL into NOT NULL field. table name:%s,field name:%s",
+            table_meta_.name(), field->name());
+        rc = RC::INVALID_ARGUMENT;
+        break;
+      }
+      // For NULL values, just set the record data to 0 (which represents NULL)
+      rc = set_value_to_record(record_data, value, field);
+    } else if (field->type() != value.attr_type()) {
       Value real_value;
       rc = Value::cast_to(value, field->type(), real_value);
       if (OB_FAIL(rc)) {
@@ -251,6 +262,13 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
 
 RC Table::set_value_to_record(char *record_data, const Value &value, const FieldMeta *field)
 {
+  // Handle NULL values
+  if (value.attr_type() == AttrType::UNDEFINED) {
+    // For NULL values, set the field data to all zeros
+    memset(record_data + field->offset(), 0, field->len());
+    return RC::SUCCESS;
+  }
+
   size_t       copy_len = field->len();
   const size_t data_len = value.length();
 
@@ -291,6 +309,21 @@ RC Table::get_chunk_scanner(ChunkFileScanner &scanner, Trx *trx, ReadWriteMode m
 RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name)
 {
   return engine_->create_index(trx, field_meta, index_name);
+}
+
+RC Table::create_index(Trx *trx, const vector<const FieldMeta *> &field_metas, const char *index_name)
+{
+  return engine_->create_index(trx, field_metas, index_name);
+}
+
+RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name, bool is_unique)
+{
+  return engine_->create_index(trx, field_meta, index_name, is_unique);
+}
+
+RC Table::create_index(Trx *trx, const vector<const FieldMeta *> &field_metas, const char *index_name, bool is_unique)
+{
+  return engine_->create_index(trx, field_metas, index_name, is_unique);
 }
 
 RC Table::delete_record(const Record &record)

@@ -27,8 +27,14 @@ class FieldMeta;
 class CreateIndexStmt : public Stmt
 {
 public:
-  CreateIndexStmt(Table *table, const FieldMeta *field_meta, const string &index_name)
-      : table_(table), field_meta_(field_meta), index_name_(index_name)
+  CreateIndexStmt(Table *table, const FieldMeta *field_meta, const string &index_name, bool is_unique = false)
+      : table_(table), field_meta_(field_meta), index_name_(index_name), is_unique_(is_unique)
+  {
+    field_metas_.push_back(field_meta);
+  }
+
+  CreateIndexStmt(Table *table, const vector<const FieldMeta *> &field_metas, const string &index_name, bool is_unique = false)
+      : table_(table), field_meta_(field_metas.empty() ? nullptr : field_metas[0]), field_metas_(field_metas), index_name_(index_name), is_unique_(is_unique)
   {}
 
   virtual ~CreateIndexStmt() = default;
@@ -37,13 +43,17 @@ public:
 
   Table           *table() const { return table_; }
   const FieldMeta *field_meta() const { return field_meta_; }
+  const vector<const FieldMeta *> &field_metas() const { return field_metas_; }
   const string    &index_name() const { return index_name_; }
+  bool             is_unique() const { return is_unique_; }
 
 public:
   static RC create(Db *db, const CreateIndexSqlNode &create_index, Stmt *&stmt);
 
 private:
   Table           *table_      = nullptr;
-  const FieldMeta *field_meta_ = nullptr;
+  const FieldMeta *field_meta_ = nullptr;  // for backward compatibility
+  vector<const FieldMeta *> field_metas_;  // for multi-field index
   string           index_name_;
+  bool             is_unique_  = false;
 };

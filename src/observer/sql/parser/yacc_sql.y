@@ -117,6 +117,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         INNER
         ON
         NOT
+        NULL_T
         LIKE
         SET
         LOAD
@@ -416,6 +417,33 @@ attr_def:
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
+      $$->nullable = true;  // default nullable
+      // For VECTOR(n), store bytes for [dimension(int32) + n float32 values]
+      if ($$->type == AttrType::VECTORS) {
+        $$->length = static_cast<int>(sizeof(int) + ($4 * sizeof(float)));
+      } else {
+        $$->length = $4;
+      }
+    }
+    | ID type LBRACE number RBRACE NULL_T
+    {
+      $$ = new AttrInfoSqlNode;
+      $$->type = (AttrType)$2;
+      $$->name = $1;
+      $$->nullable = true;  // explicitly nullable
+      // For VECTOR(n), store bytes for [dimension(int32) + n float32 values]
+      if ($$->type == AttrType::VECTORS) {
+        $$->length = static_cast<int>(sizeof(int) + ($4 * sizeof(float)));
+      } else {
+        $$->length = $4;
+      }
+    }
+    | ID type LBRACE number RBRACE NOT NULL_T
+    {
+      $$ = new AttrInfoSqlNode;
+      $$->type = (AttrType)$2;
+      $$->name = $1;
+      $$->nullable = false;  // explicitly not nullable
       // For VECTOR(n), store bytes for [dimension(int32) + n float32 values]
       if ($$->type == AttrType::VECTORS) {
         $$->length = static_cast<int>(sizeof(int) + ($4 * sizeof(float)));
@@ -428,6 +456,33 @@ attr_def:
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
+      $$->nullable = true;  // default nullable
+      // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension)
+      if ($$->type == AttrType::VECTORS) {
+        $$->length = static_cast<int>(sizeof(int));
+      } else {
+        $$->length = 4;
+      }
+    }
+    | ID type NULL_T
+    {
+      $$ = new AttrInfoSqlNode;
+      $$->type = (AttrType)$2;
+      $$->name = $1;
+      $$->nullable = true;  // explicitly nullable
+      // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension)
+      if ($$->type == AttrType::VECTORS) {
+        $$->length = static_cast<int>(sizeof(int));
+      } else {
+        $$->length = 4;
+      }
+    }
+    | ID type NOT NULL_T
+    {
+      $$ = new AttrInfoSqlNode;
+      $$->type = (AttrType)$2;
+      $$->name = $1;
+      $$->nullable = false;  // explicitly not nullable
       // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension)
       if ($$->type == AttrType::VECTORS) {
         $$->length = static_cast<int>(sizeof(int));
@@ -530,6 +585,11 @@ value:
     }
     |FLOAT_LITERAL {
       $$ = new Value((float)$1);
+      @$ = @1;
+    }
+    |NULL_T {
+      $$ = new Value();
+      $$->set_type(AttrType::UNDEFINED);
       @$ = @1;
     }
     |vector_literal {

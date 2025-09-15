@@ -156,6 +156,11 @@ RC HeapTableEngine::get_chunk_scanner(ChunkFileScanner &scanner, Trx *trx, ReadW
 
 RC HeapTableEngine::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name)
 {
+  return create_index(trx, field_meta, index_name, false);
+}
+
+RC HeapTableEngine::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name, bool is_unique)
+{
   if (common::is_blank(index_name) || nullptr == field_meta) {
     LOG_INFO("Invalid input arguments, table name is %s, index_name is blank or attribute_name is blank", table_meta_->name());
     return RC::INVALID_ARGUMENT;
@@ -163,9 +168,9 @@ RC HeapTableEngine::create_index(Trx *trx, const FieldMeta *field_meta, const ch
 
   IndexMeta new_index_meta;
 
-  RC rc = new_index_meta.init(index_name, *field_meta);
+  RC rc = new_index_meta.init(index_name, *field_meta, is_unique);
   if (rc != RC::SUCCESS) {
-    LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s, field_name:%s", 
+    LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s, field_name:%s",
              table_meta_->name(), index_name, field_meta->name());
     return rc;
   }
@@ -250,6 +255,117 @@ RC HeapTableEngine::create_index(Trx *trx, const FieldMeta *field_meta, const ch
   table_meta_->swap(new_table_meta);
 
   LOG_INFO("Successfully added a new index (%s) on the table (%s)", index_name, table_meta_->name());
+  return rc;
+}
+
+RC HeapTableEngine::create_index(Trx *trx, const vector<const FieldMeta *> &field_metas, const char *index_name)
+{
+  return create_index(trx, field_metas, index_name, false);
+}
+
+RC HeapTableEngine::create_index(Trx *trx, const vector<const FieldMeta *> &field_metas, const char *index_name, bool is_unique)
+{
+  if (common::is_blank(index_name) || field_metas.empty()) {
+    LOG_INFO("Invalid input arguments, table name is %s, index_name is blank or field_metas is empty", table_meta_->name());
+    return RC::INVALID_ARGUMENT;
+  }
+
+  // Convert to FieldMeta vector (not pointers)
+  vector<FieldMeta> fields;
+  for (const FieldMeta *field_meta : field_metas) {
+    if (nullptr == field_meta) {
+      LOG_INFO("Invalid field_meta pointer in field_metas");
+      return RC::INVALID_ARGUMENT;
+    }
+    fields.push_back(*field_meta);
+  }
+
+  IndexMeta new_index_meta;
+  RC rc = new_index_meta.init(index_name, fields, is_unique);
+  if (rc != RC::SUCCESS) {
+    LOG_INFO("Failed to init IndexMeta for multi-field index in table:%s, index_name:%s",
+             table_meta_->name(), index_name);
+    return rc;
+  }
+
+  // 创建索引相关数据
+  BplusTreeIndex *index      = new BplusTreeIndex();
+  string          index_file = table_index_file(db_->path().c_str(), table_meta_->name(), index_name);
+
+  rc = index->create(table_, index_file.c_str(), new_index_meta, fields);
+  if (rc != RC::SUCCESS) {
+    delete index;
+    LOG_ERROR("Failed to create bplus tree index for multi-field. file name=%s, rc=%d:%s", index_file.c_str(), rc, strrc(rc));
+    return rc;
+  }
+
+  // 遍历当前的所有数据，插入这个索引
+  RecordScanner *scanner = nullptr;
+  rc = get_record_scanner(scanner, trx, ReadWriteMode::READ_ONLY);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to create scanner while creating multi-field index. table=%s, index=%s, rc=%s",
+             table_meta_->name(), index_name, strrc(rc));
+    return rc;
+  }
+
+  Record record;
+  while (OB_SUCC(rc = scanner->next(record))) {
+    rc = index->insert_entry(record.data(), &record.rid());
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to insert record into multi-field index while creating index. table=%s, index=%s, rc=%s",
+               table_meta_->name(), index_name, strrc(rc));
+      return rc;
+    }
+  }
+  if (RC::RECORD_EOF == rc) {
+    rc = RC::SUCCESS;
+  } else {
+    LOG_WARN("failed to insert record into multi-field index while creating index. table=%s, index=%s, rc=%s",
+             table_meta_->name(), index_name, strrc(rc));
+    return rc;
+  }
+  scanner->close_scan();
+  delete scanner;
+  LOG_INFO("inserted all records into new multi-field index. table=%s, index=%s", table_meta_->name(), index_name);
+
+  indexes_.push_back(index);
+
+  /// 接下来将这个索引放到表的元数据中
+  TableMeta new_table_meta(*table_meta_);
+  rc = new_table_meta.add_index(new_index_meta);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to add multi-field index (%s) on table (%s). error=%d:%s", index_name, table_meta_->name(), rc, strrc(rc));
+    return rc;
+  }
+
+  /// 内存中有一份元数据，磁盘文件也有一份元数据。修改磁盘文件时，先创建一个临时文件，写入完成后再rename为正式文件
+  /// 这样可以防止文件内容不完整
+  // 创建元数据临时文件
+  string  tmp_file = table_meta_file(db_->path().c_str(), table_meta_->name()) + ".tmp";
+  fstream fs;
+  fs.open(tmp_file, ios_base::out | ios_base::binary | ios_base::trunc);
+  if (!fs.is_open()) {
+    LOG_ERROR("Failed to open file for write. file name=%s, errmsg=%s", tmp_file.c_str(), strerror(errno));
+    return RC::IOERR_OPEN;
+  }
+
+  // 将元数据序列化到json (simplified version)
+  new_table_meta.serialize(fs);
+  fs.close();
+
+  string meta_file = table_meta_file(db_->path().c_str(), table_meta_->name());
+
+  int ret = rename(tmp_file.c_str(), meta_file.c_str());
+  if (ret != 0) {
+    LOG_ERROR("Failed to rename tmp meta file (%s) to normal meta file (%s) while creating multi-field index (%s) on table (%s). "
+              "system error=%d:%s",
+              tmp_file.c_str(), meta_file.c_str(), index_name, table_meta_->name(), errno, strerror(errno));
+    return RC::IOERR_WRITE;
+  }
+
+  table_meta_->swap(new_table_meta);
+
+  LOG_INFO("Successfully added a new multi-field index (%s) on the table (%s)", index_name, table_meta_->name());
   return rc;
 }
 

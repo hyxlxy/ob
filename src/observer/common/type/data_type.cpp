@@ -20,7 +20,7 @@ See the Mulan PSL v2 for more details. */
 #include <iomanip>
 
 array<unique_ptr<DataType>, static_cast<int>(AttrType::MAXTYPE)> DataType::type_instances_ = {
-    make_unique<DataType>(AttrType::UNDEFINED),
+    make_unique<UndefinedType>(),
     make_unique<CharType>(),
     make_unique<IntegerType>(),
     make_unique<FloatType>(),
@@ -198,5 +198,12 @@ RC DateType::format_date_int(int date_int, string &date_str)
       << std::setw(2) << day;
 
   date_str = oss.str();
+  return RC::SUCCESS;
+}
+
+RC UndefinedType::to_string(const Value &val, string &result) const
+{
+  ASSERT(val.attr_type() == AttrType::UNDEFINED, "invalid type");
+  result = "NULL";
   return RC::SUCCESS;
 }

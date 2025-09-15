@@ -108,15 +108,8 @@ RC ExpressionBinder::bind_expression(unique_ptr<Expression> &expr, vector<unique
     } break;
 
     case ExprType::SUBQUERY: {
-      // 标量子查询表达式已经在语法解析阶段创建，直接添加到bound_expressions中
-      printf("DEBUG: [BINDER] Binding SubQueryExpr, ptr=%p, type=%d\n", expr.get(), static_cast<int>(expr->type()));
-      printf("DEBUG: [BINDER] Before move: expr.get()=%p, type=%d\n", expr.get(), static_cast<int>(expr->type()));
+      // 标量子查询表达式，直接添加到bound_expressions中
       bound_expressions.emplace_back(std::move(expr));
-      printf("DEBUG: [BINDER] After move: bound_expressions.size()=%d\n", (int)bound_expressions.size());
-      if (!bound_expressions.empty()) {
-        printf("DEBUG: [BINDER] Last bound expr: ptr=%p, type=%d\n",
-               bound_expressions.back().get(), static_cast<int>(bound_expressions.back()->type()));
-      }
       return RC::SUCCESS;
     } break;
 
@@ -570,3 +563,5 @@ RC ExpressionBinder::bind_list_expression(
   bound_expressions.emplace_back(std::move(expr));
   return RC::SUCCESS;
 }
+
+
