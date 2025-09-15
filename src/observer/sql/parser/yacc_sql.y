@@ -813,6 +813,23 @@ expression:
     | aggregate_expr {
       $$ = $1;
     }
+    | LBRACE sub_query RBRACE {
+      printf("DEBUG: [PARSER] Parsing scalar subquery\n");
+      ParsedSqlNode *parsed_node = $2;
+      if (parsed_node && parsed_node->flag == SCF_SELECT) {
+        printf("DEBUG: [PARSER] Creating SubQueryExpr\n");
+        // Transfer ownership of the SelectSqlNode
+        std::unique_ptr<SelectSqlNode> select_node(new SelectSqlNode(std::move(parsed_node->selection)));
+        $$ = new SubQueryExpr(std::move(select_node));
+        $$->set_name(token_name(sql_string, &@$));
+        delete parsed_node;
+        printf("DEBUG: [PARSER] SubQueryExpr created successfully, ptr=%p, type=%d\n", $$, static_cast<int>($$->type()));
+      } else {
+        printf("ERROR: [PARSER] Invalid subquery node\n");
+        $$ = nullptr;
+        delete parsed_node;
+      }
+    }
     ;
 
 rel_attr:

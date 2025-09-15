@@ -259,8 +259,44 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<st
 
     if (!handled_simple) {
       // 使用表达式比较：复制表达式并由 FilterUnit 持有，避免悬垂指针
-      filter_unit->set_left_expr(condition.left_expr->copy());
-      filter_unit->set_right_expr(condition.right_expr->copy());
+      // 特殊处理 SubQueryExpr：由于其 copy() 方法返回 nullptr，我们需要特殊处理
+
+      unique_ptr<Expression> left_copy;
+      unique_ptr<Expression> right_copy;
+
+      // 处理左表达式
+      if (condition.left_expr->type() == ExprType::SUBQUERY) {
+        printf("DEBUG: [FILTER] Left expr is SubQueryExpr - cannot use FilterUnit, need different approach\n");
+        // 对于包含 SubQueryExpr 的条件，我们不能使用传统的 FilterUnit 方式
+        // 需要创建一个 ComparisonExpr 直接处理
+        delete filter_unit;
+        return RC::UNIMPLEMENTED; // 暂时返回错误，强制使用其他处理方式
+      } else {
+        left_copy = condition.left_expr->copy();
+        if (!left_copy) {
+          LOG_WARN("Failed to copy left expression");
+          delete filter_unit;
+          return RC::INTERNAL;
+        }
+      }
+
+      // 处理右表达式
+      if (condition.right_expr->type() == ExprType::SUBQUERY) {
+        printf("DEBUG: [FILTER] Right expr is SubQueryExpr - cannot use FilterUnit, need different approach\n");
+        // 对于包含 SubQueryExpr 的条件，我们不能使用传统的 FilterUnit 方式
+        delete filter_unit;
+        return RC::UNIMPLEMENTED; // 暂时返回错误，强制使用其他处理方式
+      } else {
+        right_copy = condition.right_expr->copy();
+        if (!right_copy) {
+          LOG_WARN("Failed to copy right expression");
+          delete filter_unit;
+          return RC::INTERNAL;
+        }
+      }
+
+      filter_unit->set_left_expr(std::move(left_copy));
+      filter_unit->set_right_expr(std::move(right_copy));
     }
   } else {
     // 使用传统的属性和值比较

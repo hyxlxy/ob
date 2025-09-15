@@ -59,6 +59,7 @@ enum class ExprType
   IN_VALUES,    ///< IN操作（值列表）
   SUBQUERY_IN,  ///< IN操作（子查询）
   LIST,         ///< 表达式列表
+  SUBQUERY,     ///< 标量子查询
 };
 
 /**
@@ -671,4 +672,60 @@ public:
 private:
   std::vector<std::unique_ptr<Expression>> exprs_;
   mutable size_t current_index_ = 0;
+};
+
+/**
+ * @brief 标量子查询表达式
+ * @ingroup Expression
+ */
+class SubQueryExpr : public Expression
+{
+public:
+  SubQueryExpr(std::unique_ptr<class SelectSqlNode> sub_query);
+  virtual ~SubQueryExpr() = default;
+
+  ExprType type() const override { return ExprType::SUBQUERY; }
+  AttrType value_type() const override { return AttrType::UNDEFINED; }
+
+  RC get_value(const Tuple &tuple, Value &value) const override;
+  RC try_get_value(Value &value) const override;
+
+  unique_ptr<Expression> copy() const override
+  {
+    // SubQueryExpr 的复制是复杂的，因为 SelectSqlNode 包含不可复制的 unique_ptr
+    // 为了支持表达式复制，我们创建一个特殊的副本
+    printf("DEBUG: [COPY] SubQueryExpr::copy() called - creating executable copy\n");
+
+    // 我们不能真正复制 SelectSqlNode，但是我们可以创建一个新的 SubQueryExpr
+    // 它引用相同的 SelectSqlNode。这在技术上是不安全的，但对于我们的用例
+    // （在同一个查询执行期间）应该是可以工作的。
+
+    // 创建一个新的 SubQueryExpr，使用原始指针来共享 SelectSqlNode
+    // 注意：这要求原始的 SubQueryExpr 在副本的生命周期内保持有效
+
+    // 为了避免 unique_ptr 的所有权问题，我们创建一个特殊的 SubQueryExpr
+    // 它不拥有 SelectSqlNode，而是引用原始的
+
+    // 暂时返回一个特殊的 ValueExpr，它知道如何执行子查询
+    // 我们将在 ValueExpr 中嵌入对原始 SubQueryExpr 的引用
+
+    // 实际上，让我们返回一个新的 SubQueryExpr，但是使用 nullptr 作为 sub_query_
+    // 然后在 get_value 中检查这种情况并委托给原始的 SubQueryExpr
+
+    // 创建一个新的 SubQueryExpr，但是不拥有 SelectSqlNode
+    auto copy_expr = make_unique<SubQueryExpr>(nullptr);
+    // 设置一个指向原始 SubQueryExpr 的指针，用于委托执行
+    // 注意：我们需要访问 private 成员，所以我们使用 const_cast
+    const_cast<SubQueryExpr*>(copy_expr.get())->original_subquery_ = this;
+    return std::move(copy_expr);
+  }
+
+private:
+  std::unique_ptr<class SelectSqlNode> sub_query_;
+  mutable Value cached_result_;
+  mutable bool result_cached_ = false;
+
+  // 用于支持 copy() 操作的委托指针
+  // 当 sub_query_ 为 nullptr 时，委托给这个原始的 SubQueryExpr 执行
+  mutable const SubQueryExpr* original_subquery_ = nullptr;
 };

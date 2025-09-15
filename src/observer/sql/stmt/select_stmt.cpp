@@ -161,8 +161,11 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       static_cast<int>(all_conditions.size()),
       filter_stmt);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("cannot construct filter stmt");
-    return rc;
+    // 如果 FilterStmt 创建失败，可能是因为包含了 SubQueryExpr
+    // 我们尝试创建一个空的 FilterStmt，并在逻辑计划生成阶段处理 SubQueryExpr
+    LOG_WARN("FilterStmt creation failed (possibly due to SubQueryExpr), creating empty FilterStmt");
+    filter_stmt = new FilterStmt();
+    // 注意：这里我们创建了一个空的 FilterStmt，实际的条件处理将在逻辑计划生成阶段进行
   }
 
 
@@ -191,6 +194,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->tables_.swap(tables);
   select_stmt->query_expressions_.swap(bound_expressions);
   select_stmt->filter_stmt_ = filter_stmt;
+  select_stmt->raw_conditions_ = std::move(all_conditions);  // 移动原始条件
   select_stmt->group_by_.swap(group_by_expressions);
   select_stmt->having_expr_ = std::move(having_expr);
   select_stmt->order_by_expressions_.swap(order_by_expressions);

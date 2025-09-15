@@ -46,6 +46,16 @@ RC PredicatePhysicalOperator::next()
       break;
     }
 
+    // 添加调试信息：检查 tuple 的内容
+    printf("DEBUG: [PREDICATE] Tuple has %d cells\n", tuple->cell_num());
+    for (int i = 0; i < tuple->cell_num(); i++) {
+      Value cell_value;
+      RC cell_rc = tuple->cell_at(i, cell_value);
+      if (cell_rc == RC::SUCCESS) {
+        printf("DEBUG: [PREDICATE] Cell[%d]: %s\n", i, cell_value.to_string().c_str());
+      }
+    }
+
     Value value;
     rc = expression_->get_value(*tuple, value);
     if (rc != RC::SUCCESS) {

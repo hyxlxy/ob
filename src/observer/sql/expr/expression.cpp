@@ -16,12 +16,14 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/tuple.h"
 #include "sql/expr/arithmetic_operator.hpp"
 #include <set>
+#include <limits>
 #include "common/type/vector_type.h"
 #include "common/log/log.h"
 #include "sql/stmt/select_stmt.h"
 #include "sql/stmt/filter_stmt.h"
 #include "sql/optimizer/logical_plan_generator.h"
 #include "sql/optimizer/physical_plan_generator.h"
+#include "sql/operator/project_physical_operator.h"
 #include "session/session.h"
 
 // 前向声明
@@ -84,7 +86,15 @@ bool like_match(const char *text, const char *pattern) {
 
 RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
 {
-  return tuple.find_cell(TupleCellSpec(table_name(), field_name()), value);
+  printf("DEBUG: [FIELD] FieldExpr looking for table='%s', field='%s'\n",
+         table_name() ? table_name() : "NULL",
+         field_name() ? field_name() : "NULL");
+
+  RC rc = tuple.find_cell(TupleCellSpec(table_name(), field_name()), value);
+
+  printf("DEBUG: [FIELD] FieldExpr find_cell result: rc=%s\n", strrc(rc));
+
+  return rc;
 }
 
 bool FieldExpr::equal(const Expression &other) const
@@ -276,12 +286,18 @@ RC ComparisonExpr::try_get_value(Value &cell) const
 
 RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
 {
+  printf("DEBUG: [COMPARISON] ComparisonExpr::get_value() starting: left_type=%d right_type=%d\n",
+         static_cast<int>(left_->type()), static_cast<int>(right_->type()));
+
   LOG_DEBUG("ComparisonExpr::get_value() starting: left_type=%d right_type=%d",
             static_cast<int>(left_->type()), static_cast<int>(right_->type()));
 
   Value left_value;
+  printf("DEBUG: [COMPARISON] About to call left_->get_value(), left_type=%d\n", static_cast<int>(left_->type()));
   RC rc = left_->get_value(tuple, left_value);
   if (rc != RC::SUCCESS) {
+    printf("DEBUG: [COMPARISON] left_->get_value() failed: left_type=%d rc=%s\n",
+           static_cast<int>(left_->type()), strrc(rc));
     LOG_WARN("ComparisonExpr::get_value() failed to get value of left expression: left_type=%d rc=%s",
              static_cast<int>(left_->type()), strrc(rc));
     return rc;
@@ -376,12 +392,14 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
 
   // Regular comparison operations
   Value right_value;
+  printf("DEBUG: ComparisonExpr: About to get right value, right_type=%d\n", static_cast<int>(right_->type()));
   rc = right_->get_value(tuple, right_value);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("ComparisonExpr::get_value() failed to get value of right expression: right_type=%d rc=%s",
+    printf("ERROR: ComparisonExpr: failed to get value of right expression: right_type=%d rc=%s\n",
              static_cast<int>(right_->type()), strrc(rc));
     return rc;
   }
+  printf("DEBUG: ComparisonExpr: Got right value successfully: %s\n", right_value.to_string().c_str());
   LOG_DEBUG("ComparisonExpr::get_value() right value SUCCESS: right_type=%d value_type=%d",
             static_cast<int>(right_->type()), static_cast<int>(right_value.attr_type()));
 
@@ -1457,17 +1475,38 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
     LOG_WARN("Got tuple at row %d, type: %s", row_count, typeid(*tuple).name());
     LOG_WARN("Tuple cell_num: %d", tuple->cell_num());
 
-    // 假设子查询返回单列
+    // 处理不同类型的元组
     Value value;
-    rc = tuple->cell_at(0, value);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to get value from sub-query result at row %d. rc=%s", row_count, strrc(rc));
 
-      // 尝试获取更多调试信息
-      LOG_WARN("Tuple type: %s", typeid(*tuple).name());
+    if (tuple->cell_num() == 0) {
+      // 对于聚合查询，ExpressionTuple 可能没有表达式
+      LOG_WARN("Tuple has 0 cells, this might be an empty ExpressionTuple");
 
-      physical_operator->close();
-      return rc;
+      // 检查物理操作符是否是 ProjectPhysicalOperator
+      if (typeid(*physical_operator).name() == typeid(ProjectPhysicalOperator).name()) {
+        LOG_WARN("Physical operator is ProjectPhysicalOperator with empty expressions");
+        // 对于空的 ExpressionTuple，我们跳过这个结果
+        continue;
+      } else {
+        LOG_WARN("Unknown tuple type with 0 cells");
+        physical_operator->close();
+        return RC::INVALID_ARGUMENT;
+      }
+    } else {
+      // 正常情况：从元组单元格获取值
+      rc = tuple->cell_at(0, value);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to get value from sub-query result at row %d. rc=%s", row_count, strrc(rc));
+        LOG_WARN("Tuple type: %s", typeid(*tuple).name());
+
+        // 尝试调试 ExpressionTuple 的内容
+        if (typeid(*tuple).name() == typeid(ExpressionTuple<unique_ptr<Expression>>).name()) {
+          LOG_WARN("This is an ExpressionTuple, but cell_at failed");
+        }
+
+        physical_operator->close();
+        return rc;
+      }
     }
 
     LOG_DEBUG("sub-query returned value at row %d: %s", row_count, value.to_string().c_str());
@@ -1483,4 +1522,86 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
   }
 
   return rc;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SubQueryExpr
+
+SubQueryExpr::SubQueryExpr(std::unique_ptr<SelectSqlNode> sub_query)
+    : sub_query_(std::move(sub_query))
+{
+  printf("DEBUG: [CONSTRUCTOR] SubQueryExpr constructor called, this=%p, type=%d, has_subquery=%s\n",
+         this, static_cast<int>(type()), sub_query_ ? "true" : "false");
+}
+
+RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
+{
+  // 如果这是一个委托副本（sub_query_ 为 nullptr），委托给原始的 SubQueryExpr
+  if (!sub_query_ && original_subquery_) {
+    printf("DEBUG: SubQueryExpr: Delegating to original subquery, this=%p, original=%p\n", this, original_subquery_);
+    return original_subquery_->get_value(tuple, value);
+  }
+
+  if (result_cached_) {
+    printf("DEBUG: SubQueryExpr: Using cached result: %s\n", cached_result_.to_string().c_str());
+    value = cached_result_;
+    return RC::SUCCESS;
+  }
+
+  printf("DEBUG: SubQueryExpr: Executing subquery for the first time\n");
+
+  // 检查是否有有效的子查询
+  if (!sub_query_) {
+    LOG_WARN("SubQueryExpr has no subquery to execute");
+    return RC::INTERNAL;
+  }
+
+  // Convert SelectSqlNode to SelectStmt
+  Db *db = Session::current_session()->get_current_db();
+  if (db == nullptr) {
+    LOG_WARN("No current database for subquery execution");
+    return RC::INTERNAL;
+  }
+
+  Stmt *stmt = nullptr;
+  RC rc = SelectStmt::create(db, *sub_query_, stmt);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("Failed to create SelectStmt from subquery. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  // Execute the subquery
+  std::vector<Value> results;
+  rc = execute_subquery_and_collect_results(stmt, results);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("Failed to execute scalar subquery. rc=%s", strrc(rc));
+    delete stmt;
+    return rc;
+  }
+
+  delete stmt;
+
+  // Scalar subquery should return exactly one value
+  if (results.empty()) {
+    // Return NULL for empty result - use a special float value to represent NULL
+    cached_result_.set_float(std::numeric_limits<float>::max());
+    printf("DEBUG: SubQueryExpr: Subquery returned empty result, using NULL\n");
+  } else if (results.size() == 1) {
+    cached_result_ = results[0];
+    printf("DEBUG: SubQueryExpr: Subquery returned single value: %s\n", cached_result_.to_string().c_str());
+  } else {
+    printf("ERROR: Scalar subquery returned %d values, expected 1\n", (int)results.size());
+    return RC::INVALID_ARGUMENT;
+  }
+
+  result_cached_ = true;
+  value = cached_result_;
+  printf("DEBUG: SubQueryExpr: Caching result and returning: %s\n", value.to_string().c_str());
+  return RC::SUCCESS;
+}
+
+RC SubQueryExpr::try_get_value(Value &value) const
+{
+  // Scalar subqueries cannot be evaluated without context
+  return RC::UNIMPLEMENTED;
 }
