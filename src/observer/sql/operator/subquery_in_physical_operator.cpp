@@ -16,6 +16,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/select_stmt.h"
 #include "sql/optimizer/logical_plan_generator.h"
 #include "sql/optimizer/physical_plan_generator.h"
+#include "session/session.h"
 #include "common/log/log.h"
 
 SubQueryInPhysicalOperator::SubQueryInPhysicalOperator(unique_ptr<Expression> left_expr, 
@@ -121,7 +122,8 @@ RC SubQueryInPhysicalOperator::execute_sub_query(Trx *trx, std::vector<Value> &s
   // Create physical plan for sub-query
   PhysicalPlanGenerator physical_plan_generator;
   unique_ptr<PhysicalOperator> physical_operator;
-  rc = physical_plan_generator.create(*logical_operator, physical_operator);
+  Session *session = Session::current_session();
+  rc = physical_plan_generator.create(*logical_operator, physical_operator, session);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create physical plan for sub-query. rc=%s", strrc(rc));
     return rc;

@@ -428,7 +428,7 @@ select ssq_2.col2 from ssq_2;
 -- 测试用例4: 验证主表数据
 ### 2025-09-15 09:05:43.010
 select * from ssq_1;
-### 2025-09-15 09:14:08.454
-select * from ssq_1 where col1 not in (select ssq_2.col2 from ssq_2);
 ### 2025-09-15 09:15:04.084
 select * from ssq_1 where col1 in (select ssq_2.col2 from ssq_2);
+### 2025-09-15 09:51:17.230
+select * from ssq_1 where col1 not in (select ssq_2.col2 from ssq_2);
