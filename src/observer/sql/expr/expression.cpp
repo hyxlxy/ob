@@ -300,21 +300,18 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
 
     // Handle subquery case
     if (sub_query_ || filter_unit_) {
-      // Use a static cache to avoid re-executing the subquery
-      static std::vector<Value> cached_sub_query_results;
-      static bool cache_initialized = false;
-
-      if (!cache_initialized) {
+      // Use instance-level caching to avoid re-executing the same subquery
+      if (sub_query_results_.empty() && !sub_query_executed_) {
         RC rc = RC::SUCCESS;
 
         if (filter_unit_ && filter_unit_->sub_query()) {
           // Use FilterUnit's subquery (preferred)
-          LOG_DEBUG("Using FilterUnit subquery (first time)");
-          rc = execute_subquery_and_collect_results(filter_unit_->sub_query().get(), cached_sub_query_results);
+          LOG_DEBUG("Executing FilterUnit subquery (first time)");
+          rc = execute_subquery_and_collect_results(filter_unit_->sub_query().get(), sub_query_results_);
         } else if (sub_query_) {
           // Use direct subquery
-          LOG_DEBUG("Using direct subquery (first time)");
-          rc = execute_subquery_and_collect_results(sub_query_.get(), cached_sub_query_results);
+          LOG_DEBUG("Executing direct subquery (first time)");
+          rc = execute_subquery_and_collect_results(sub_query_.get(), sub_query_results_);
         } else {
           LOG_WARN("No subquery found in filter_unit or sub_query");
           return RC::INTERNAL;
@@ -325,13 +322,13 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
           return rc;
         }
 
-        cache_initialized = true;
-        LOG_DEBUG("Subquery cache initialized with %d results", (int)cached_sub_query_results.size());
+        sub_query_executed_ = true;
+        LOG_DEBUG("Subquery executed with %d results", (int)sub_query_results_.size());
       } else {
-        LOG_DEBUG("Using cached subquery results (%d results)", (int)cached_sub_query_results.size());
+        LOG_DEBUG("Using cached subquery results (%d results)", (int)sub_query_results_.size());
       }
 
-      std::vector<Value> &sub_query_results = cached_sub_query_results;
+      std::vector<Value> &sub_query_results = sub_query_results_;
 
 
 
@@ -1389,7 +1386,8 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
   // 创建物理计划
   PhysicalPlanGenerator physical_plan_generator;
   unique_ptr<PhysicalOperator> physical_operator;
-  rc = physical_plan_generator.create(*logical_operator, physical_operator, nullptr);
+  Session *session = Session::current_session();
+  rc = physical_plan_generator.create(*logical_operator, physical_operator, session);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create physical plan for sub-query. rc=%s", strrc(rc));
     return rc;
@@ -1409,7 +1407,6 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
   // 执行子查询
   // 获取当前 Session 和 Trx
   LOG_WARN("Getting current session and transaction");
-  Session *session = Session::current_session();
   Trx *trx = nullptr;
   if (session != nullptr) {
     LOG_DEBUG("Session found, getting transaction");

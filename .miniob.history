@@ -388,10 +388,6 @@ SELECT * FROM ssq_1 WHERE col1 NOT IN (SELECT ssq_2.col2 FROM ssq_2);
 DROP TABLE IF EXISTS ssq_1;
 ### 2025-09-14 22:32:48.502
 DROP TABLE IF EXISTS ssq_2;
-### 2025-09-14 22:32:48.502
-CREATE TABLE ssq_1(id int, col1 int, feat1 float);
-### 2025-09-14 22:32:48.502
-CREATE TABLE ssq_2(id int, col2 int, feat2 float);
 ### 2025-09-14 22:32:48.503
 INSERT INTO ssq_1 VALUES (54, 96, 87.95);
 ### 2025-09-14 22:32:48.503
@@ -430,5 +426,23 @@ select ssq_2.col2 from ssq_2;
 select * from ssq_1;
 ### 2025-09-15 09:15:04.084
 select * from ssq_1 where col1 in (select ssq_2.col2 from ssq_2);
-### 2025-09-15 09:51:17.230
+### 2025-09-15 10:44:35.539
+select * from ssq_1 where id in (select ssq_2.id from ssq_2);
+### 2025-09-15 10:45:13.230
+CREATE TABLE ssq_1(id int, col1 int, feat1 float);
+### 2025-09-15 10:45:13.235
+CREATE TABLE ssq_2(id int, col2 int, feat2 float);
+### 2025-09-15 10:45:13.235
+INSERT INTO ssq_1 VALUES (1, 4, 11.2);
+### 2025-09-15 10:45:13.236
+INSERT INTO ssq_1 VALUES (2, 2, 12.0);
+### 2025-09-15 10:45:13.236
+INSERT INTO ssq_1 VALUES (3, 3, 13.5);
+### 2025-09-15 10:45:13.237
+INSERT INTO ssq_2 VALUES (1, 2, 13.0);
+### 2025-09-15 10:45:13.237
+INSERT INTO ssq_2 VALUES (2, 7, 10.5);
+### 2025-09-15 10:45:13.237
+INSERT INTO ssq_2 VALUES (5, 3, 12.6);
+### 2025-09-15 10:45:13.238
 select * from ssq_1 where col1 not in (select ssq_2.col2 from ssq_2);

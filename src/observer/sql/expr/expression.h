@@ -363,6 +363,10 @@ private:
   unique_ptr<Expression> right_;
   std::unique_ptr<class Stmt> sub_query_;  // For IN/NOT IN subquery operations
   class FilterUnit *filter_unit_;  // Alternative way to access subquery
+
+  // Subquery result caching
+  mutable std::vector<Value> sub_query_results_;
+  mutable bool sub_query_executed_ = false;
 };
 
 /**
