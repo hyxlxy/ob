@@ -116,8 +116,25 @@ RC BplusTreeIndex::close()
 
 RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
 {
-  // For now, let's disable the uniqueness check to avoid the buffer pool issue
-  // TODO: Implement proper uniqueness checking without causing buffer pool problems
+  // Check for uniqueness if this is a unique index
+  if (index_meta_.is_unique()) {
+    // First check if the key already exists
+    BplusTreeScanner scanner(index_handler_);
+    const char *key_data = record + field_meta_.offset();
+
+    RC rc = scanner.open(key_data, field_meta_.len(), true, key_data, field_meta_.len(), true);
+    if (rc == RC::SUCCESS) {
+      RID existing_rid;
+      rc = scanner.next_entry(existing_rid);
+      scanner.close();
+
+      if (rc == RC::SUCCESS) {
+        // Key already exists, this violates uniqueness constraint
+        LOG_WARN("Unique constraint violation: key already exists in index %s", index_meta_.name());
+        return RC::RECORD_DUPLICATE_KEY;
+      }
+    }
+  }
 
   return index_handler_.insert_entry(record + field_meta_.offset(), rid);
 }
