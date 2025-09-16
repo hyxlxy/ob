@@ -197,8 +197,8 @@ public:
     const FieldMeta *field_meta = field_expr->field().meta();
     cell.reset();
 
-    // Check if this field is nullable and contains NULL value
-    if (field_meta->nullable()) {
+    // Check for NULL values only in nullable string fields
+    if (field_meta->nullable() && field_meta->type() == AttrType::CHARS) {
       const char *field_data = this->record_->data() + field_meta->offset();
       bool is_null = true;
       for (int i = 0; i < field_meta->len(); i++) {
