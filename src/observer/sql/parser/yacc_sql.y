@@ -416,7 +416,7 @@ attr_def:
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
-      $$->nullable = true;  // default nullable
+      $$->nullable = false;  // default NOT NULL
       // For VECTOR(n), store bytes for [dimension(int32) + n float32 values]
       if ($$->type == AttrType::VECTORS) {
         $$->length = static_cast<int>(sizeof(int) + ($4 * sizeof(float)));
@@ -455,7 +455,7 @@ attr_def:
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
-      $$->nullable = true;  // default nullable
+      $$->nullable = false;  // default NOT NULL
       // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension)
       if ($$->type == AttrType::VECTORS) {
         $$->length = static_cast<int>(sizeof(int));
@@ -589,6 +589,7 @@ value:
     |NULL_T {
       $$ = new Value();
       $$->set_type(AttrType::UNDEFINED);
+      $$->set_null(true);
       @$ = @1;
     }
     |vector_literal {

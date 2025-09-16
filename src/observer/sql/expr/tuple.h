@@ -204,6 +204,7 @@ public:
       bool is_null = this->record_->data()[field_meta->offset() + field_meta->len() - 1] == '1';
       if (is_null) {
         cell.set_null(true);
+        // Don't set data for NULL values
       } else {
         // For non-NULL values, use data length excluding the NULL flag byte
         cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len() - 1);

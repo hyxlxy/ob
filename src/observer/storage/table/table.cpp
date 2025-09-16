@@ -264,17 +264,28 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
 {
   // Handle NULL values
   if (value.attr_type() == AttrType::UNDEFINED) {
-    // For NULL values, set the field data to all zeros
-    memset(record_data + field->offset(), 0, field->len());
+    if (field->nullable()) {
+      // For nullable fields, set the field data to zeros and set NULL flag in last byte
+      memset(record_data + field->offset(), 0, field->len());
+      record_data[field->offset() + field->len() - 1] = '1';  // Set NULL flag
+    } else {
+      // For non-nullable fields, set the field data to all zeros
+      memset(record_data + field->offset(), 0, field->len());
+    }
     return RC::SUCCESS;
   }
 
   size_t       copy_len = field->len();
   const size_t data_len = value.length();
 
+  // For nullable fields, reserve last byte for NULL flag
+  if (field->nullable()) {
+    copy_len = field->len() - 1;
+  }
+
   if (field->type() == AttrType::CHARS) {
     if (copy_len > data_len) {
-      copy_len = data_len + 1;
+      copy_len = data_len;
     }
   } else if (field->type() == AttrType::VECTORS) {
     // 对于向量类型，需要检查数据长度是否超过字段定义的长度
@@ -293,6 +304,12 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
   }
 
   memcpy(record_data + field->offset(), value.data(), copy_len);
+
+  // For nullable fields, set NULL flag to '0' (not NULL)
+  if (field->nullable()) {
+    record_data[field->offset() + field->len() - 1] = '0';
+  }
+
   return RC::SUCCESS;
 }
 
