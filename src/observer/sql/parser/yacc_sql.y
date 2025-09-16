@@ -1012,7 +1012,6 @@ condition:
       $$->right_expr.reset($3);
       $$->comp = $2;
     }
-    /* TEMPORARILY COMMENTED OUT DUE TO SYNTAX CONFLICTS
     | expression IN LBRACE expression_list RBRACE
     {
       $$ = new ConditionSqlNode;
@@ -1057,7 +1056,6 @@ condition:
       }
       $$->comp = NOT_IN_VALUES_OP;
     }
-    */
     | expression IN LBRACE sub_query RBRACE
     {
       $$ = new ConditionSqlNode;

@@ -316,8 +316,8 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
   LOG_DEBUG("ComparisonExpr::get_value() left value SUCCESS: left_type=%d value_type=%d",
             static_cast<int>(left_->type()), static_cast<int>(left_value.attr_type()));
 
-  // Handle IN and NOT IN operations
-  if (comp_ == IN_OP || comp_ == NOT_IN_OP) {
+  // Handle IN and NOT IN operations (both subquery and values)
+  if (comp_ == IN_OP || comp_ == NOT_IN_OP || comp_ == IN_VALUES_OP || comp_ == NOT_IN_VALUES_OP) {
     if (is_null_like_numeric(left_value)) {
       value.set_boolean(false);
       return RC::SUCCESS;
@@ -396,7 +396,7 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
     }
 
     // Set result based on whether we found a match
-    bool result = found ? (comp_ == IN_OP) : (comp_ == NOT_IN_OP);
+    bool result = found ? (comp_ == IN_OP || comp_ == IN_VALUES_OP) : (comp_ == NOT_IN_OP || comp_ == NOT_IN_VALUES_OP);
     value.set_boolean(result);
     return RC::SUCCESS;
   }
