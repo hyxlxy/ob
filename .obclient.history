@@ -1,27 +1,3 @@
-### 2025-09-03 22:49:24.510
-INSERT INTO users VALUES (1, 'Alice', 'alice@example.com');
-### 2025-09-03 22:49:24.510
-INSERT INTO users VALUES (2, 'Bob', 'bob@test.org');
-### 2025-09-03 22:49:24.511
-INSERT INTO users VALUES (3, 'Charlie', 'charlie@example.com');
-### 2025-09-03 22:49:24.511
-INSERT INTO users VALUES (4, 'David', 'david@company.net');
-### 2025-09-03 22:49:24.512
-INSERT INTO users VALUES (5, 'Eve', 'eve@test.org');
-### 2025-09-03 22:49:24.512
--- 查看所有数据
-### 2025-09-03 22:49:24.513
-SELECT * FROM users;
-### 2025-09-03 22:49:24.513
--- 测试LIKE操作 - 以'A'开头的名字
-### 2025-09-03 22:49:24.514
--- 测试LIKE操作 - 包含'li'的名字
-### 2025-09-03 22:49:24.514
-SELECT * FROM users WHERE name LIKE '%li%';
-### 2025-09-03 22:49:24.514
--- 测试LIKE操作 - 以'e'结尾的名字
-### 2025-09-03 22:49:24.515
-SELECT * FROM users WHERE name LIKE '%e';
 ### 2025-09-03 22:49:24.515
 -- 测试LIKE操作 - 单字符通配符
 ### 2025-09-03 22:49:24.515
@@ -1998,3 +1974,27 @@ create table null_test(id int not null, name char(20) null, age int);
 create table null_test3(id int not null, name char(20) null, age int);
 ### 2025-09-15 22:32:20.440
 create table unique_constraint_test(id int, name char(20));
+### 2025-09-16 08:27:48.113
+create table null_display_test(id int, name char(20));
+### 2025-09-16 08:34:06.340
+create table null_debug_test(id int, name char(20));
+### 2025-09-16 08:46:45.559
+create table null_display_test2(id int, name char(20));
+### 2025-09-16 08:47:24.599
+create table unique_constraint_test2(id int, name char(20));
+### 2025-09-16 08:53:09.453
+insert into unique_test_final values (1, 'alice');
+### 2025-09-16 08:53:09.455
+insert into unique_test_final values (2, 'bob');
+### 2025-09-16 08:53:09.456
+create unique index u_name_final on unique_test_final(name);
+### 2025-09-16 08:58:14.423
+create table ssq_1(id int, col1 int, feat1 float);
+### 2025-09-16 08:58:46.925
+select * from ssq_1 where (select ssq_2.id from ssq_2 where col2 = 87) = id;
+### 2025-09-16 08:59:23.037
+create table null_test_final(id int not null, name char(20) null);
+### 2025-09-16 08:59:59.896
+create table multi_index_test(id int, col1 int, col2 int);
+### 2025-09-16 09:00:36.982
+create table unique_test_final(id int, name char(20));

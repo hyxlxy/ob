@@ -196,6 +196,24 @@ public:
     FieldExpr       *field_expr = speces_[index];
     const FieldMeta *field_meta = field_expr->field().meta();
     cell.reset();
+
+    // Check if this field is nullable and contains NULL value
+    if (field_meta->nullable()) {
+      const char *field_data = this->record_->data() + field_meta->offset();
+      bool is_null = true;
+      for (int i = 0; i < field_meta->len(); i++) {
+        if (field_data[i] != 0) {
+          is_null = false;
+          break;
+        }
+      }
+
+      if (is_null) {
+        cell.set_type(AttrType::UNDEFINED);
+        return RC::SUCCESS;
+      }
+    }
+
     cell.set_type(field_meta->type());
     cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
     return RC::SUCCESS;

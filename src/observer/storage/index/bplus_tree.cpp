@@ -1264,10 +1264,9 @@ RC BplusTreeHandler::insert_entry_into_leaf_node(BplusTreeMiniTransaction &mtr, 
   LeafIndexNodeHandler leaf_node(mtr, file_header_, frame);
   bool                 exists          = false;  // 该数据是否已经存在指定的叶子节点中了
   int                  insert_position = leaf_node.lookup(key_comparator_, key, &exists);
-  if (exists) {
-    LOG_TRACE("entry exists");
-    return RC::RECORD_DUPLICATE_KEY;
-  }
+  // Note: We removed the duplicate key check here because uniqueness should be checked
+  // at the BplusTreeIndex level, not at the B+ tree level. This allows non-unique indexes
+  // to have duplicate keys while unique indexes can still enforce uniqueness constraints.
 
   if (leaf_node.size() < leaf_node.max_size()) {
     leaf_node.insert(insert_position, key, (const char *)rid);

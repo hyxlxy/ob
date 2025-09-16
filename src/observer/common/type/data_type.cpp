@@ -204,6 +204,7 @@ RC DateType::format_date_int(int date_int, string &date_str)
 RC UndefinedType::to_string(const Value &val, string &result) const
 {
   ASSERT(val.attr_type() == AttrType::UNDEFINED, "invalid type");
+  LOG_DEBUG("UndefinedType::to_string called, returning NULL");
   result = "NULL";
   return RC::SUCCESS;
 }
