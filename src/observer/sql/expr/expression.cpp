@@ -1490,8 +1490,8 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
         continue;
       } else {
         LOG_WARN("Unknown tuple type with 0 cells");
-        physical_operator->close();
-        return RC::INVALID_ARGUMENT;
+        rc = RC::INVALID_ARGUMENT;
+        break;
       }
     } else {
       // 正常情况：从元组单元格获取值
@@ -1505,8 +1505,7 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
           LOG_WARN("This is an ExpressionTuple, but cell_at failed");
         }
 
-        physical_operator->close();
-        return rc;
+        break;
       }
     }
 

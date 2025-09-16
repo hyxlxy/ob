@@ -1,7 +1,3 @@
-### 2025-09-03 22:50:11.565
-INSERT INTO users VALUES (1, 'Alice');
-### 2025-09-03 22:50:11.567
-INSERT INTO users VALUES (2, 'Bob');
 ### 2025-09-03 22:50:11.568
 SELECT * FROM users WHERE name LIKE 'A%';
 ### 2025-09-04 07:21:56.665
@@ -1998,3 +1994,7 @@ CREATE TABLE null_test_int(id int, num int null);
 create table multi_index_test(id int, col1 int, col2 int);
 ### 2025-09-16 09:28:08.599
 create table unique_test_final(id int, name char(20));
+### 2025-09-16 10:49:34.453
+select * from ssq_1 where id = (select ssq_2.id from ssq_2 where col2 = 86);
+### 2025-09-16 10:50:26.736
+select * from ssq_1 where id = (select ssq_2.id from ssq_2 where col2 = 87);

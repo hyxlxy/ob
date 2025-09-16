@@ -75,7 +75,9 @@ RC PredicatePhysicalOperator::next()
 
 RC PredicatePhysicalOperator::close()
 {
-  children_[0]->close();
+  if (!children_.empty() && children_[0] != nullptr) {
+    children_[0]->close();
+  }
   return RC::SUCCESS;
 }
 
