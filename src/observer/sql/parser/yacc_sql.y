@@ -4,8 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sstream>
-#include <iomanip>
 
 #include "common/log/log.h"
 #include "common/lang/string.h"
@@ -879,9 +877,11 @@ expression:
     | aggregate_expr {
       $$ = $1;
     }
+    /* TEMPORARILY COMMENTED OUT - CAUSES PARSING ISSUES
     | sub_query_expr {
       $$ = $1;
     }
+    */
     ;
 
 sub_query_expr:
@@ -1057,7 +1057,6 @@ condition:
       $$->comp = NOT_IN_VALUES_OP;
     }
     */
-    /* TEMPORARILY COMMENTED OUT DUE TO SYNTAX CONFLICTS
     | expression IN LBRACE sub_query RBRACE
     {
       $$ = new ConditionSqlNode;
@@ -1072,7 +1071,6 @@ condition:
       $$->sub_query.reset($5);
       $$->comp = NOT_IN_OP;
     }
-    */
     | EXISTS LBRACE sub_query RBRACE
     {
       $$ = new ConditionSqlNode;
