@@ -197,6 +197,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <cstring>             opt_as_alias
 %type <expression>          aggregate_expr
 %type <expression>          count_expr
+%type <expression>          sub_query_expr
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
 %type <expression>          having
@@ -677,11 +678,24 @@ update_stmt:      /*  update 语句的语法解析树*/
       $$->update.relation_name = $2;
       $$->update.attribute_name = $4;
       $$->update.value = *$6;
+      $$->update.is_sub_query = false;
       if ($7 != nullptr) {
         $$->update.conditions.swap(*$7);
         delete $7;
       }
       delete $6;
+    }
+    | UPDATE ID SET ID EQ LBRACE sub_query RBRACE where
+    {
+      $$ = new ParsedSqlNode(SCF_UPDATE);
+      $$->update.relation_name = $2;
+      $$->update.attribute_name = $4;
+      $$->update.sub_query.reset($7);
+      $$->update.is_sub_query = true;
+      if ($9 != nullptr) {
+        $$->update.conditions.swap(*$9);
+        delete $9;
+      }
     }
 
     ;
@@ -865,22 +879,55 @@ expression:
     | aggregate_expr {
       $$ = $1;
     }
-    | LBRACE sub_query RBRACE {
-      printf("DEBUG: [PARSER] Parsing scalar subquery\n");
-      ParsedSqlNode *parsed_node = $2;
-      if (parsed_node && parsed_node->flag == SCF_SELECT) {
-        printf("DEBUG: [PARSER] Creating SubQueryExpr\n");
-        // Transfer ownership of the SelectSqlNode
-        std::unique_ptr<SelectSqlNode> select_node(new SelectSqlNode(std::move(parsed_node->selection)));
-        $$ = new SubQueryExpr(std::move(select_node));
-        $$->set_name(token_name(sql_string, &@$));
-        delete parsed_node;
-        printf("DEBUG: [PARSER] SubQueryExpr created successfully, ptr=%p, type=%d\n", $$, static_cast<int>($$->type()));
-      } else {
-        printf("ERROR: [PARSER] Invalid subquery node\n");
-        $$ = nullptr;
-        delete parsed_node;
+    | sub_query_expr {
+      $$ = $1;
+    }
+    ;
+
+sub_query_expr:
+    LBRACE SELECT projection_list FROM rel_list join_list where group_by having order_by RBRACE
+    {
+      fprintf(stderr, "DEBUG: [PARSER] Parsing scalar subquery with FROM\n");
+      ParsedSqlNode *parsed_node = new ParsedSqlNode(SCF_SELECT);
+      if ($3 != nullptr) {
+        parsed_node->selection.expressions.swap(*$3);
+        delete $3;
       }
+      if ($5 != nullptr) {
+        for (auto &it : *$5) {
+          parsed_node->selection.relations.push_back(it.table_name);
+          parsed_node->selection.relation_aliases.push_back(it.alias);
+        }
+        delete $5;
+      }
+      // Handle other clauses...
+
+      fprintf(stderr, "DEBUG: [PARSER] Creating SubQueryExpr\n");
+      std::unique_ptr<SelectSqlNode> select_node(new SelectSqlNode(std::move(parsed_node->selection)));
+      $$ = new SubQueryExpr(std::move(select_node));
+      $$->set_name(token_name(sql_string, &@$));
+      delete parsed_node;
+      fprintf(stderr, "DEBUG: [PARSER] SubQueryExpr created successfully\n");
+    }
+    | LBRACE SELECT projection_list order_by RBRACE
+    {
+      fprintf(stderr, "DEBUG: [PARSER] Parsing scalar subquery without FROM\n");
+      ParsedSqlNode *parsed_node = new ParsedSqlNode(SCF_SELECT);
+      if ($3 != nullptr) {
+        parsed_node->selection.expressions.swap(*$3);
+        delete $3;
+      }
+      if ($4 != nullptr) {
+        parsed_node->selection.order_by.swap(*$4);
+        delete $4;
+      }
+
+      fprintf(stderr, "DEBUG: [PARSER] Creating SubQueryExpr\n");
+      std::unique_ptr<SelectSqlNode> select_node(new SelectSqlNode(std::move(parsed_node->selection)));
+      $$ = new SubQueryExpr(std::move(select_node));
+      $$->set_name(token_name(sql_string, &@$));
+      delete parsed_node;
+      fprintf(stderr, "DEBUG: [PARSER] SubQueryExpr created successfully\n");
     }
     ;
 
@@ -964,6 +1011,7 @@ condition:
       $$->right_expr.reset($3);
       $$->comp = $2;
     }
+    /* TEMPORARILY COMMENTED OUT DUE TO SYNTAX CONFLICTS
     | expression IN LBRACE expression_list RBRACE
     {
       $$ = new ConditionSqlNode;
@@ -1008,6 +1056,8 @@ condition:
       }
       $$->comp = NOT_IN_VALUES_OP;
     }
+    */
+    /* TEMPORARILY COMMENTED OUT DUE TO SYNTAX CONFLICTS
     | expression IN LBRACE sub_query RBRACE
     {
       $$ = new ConditionSqlNode;
@@ -1022,6 +1072,7 @@ condition:
       $$->sub_query.reset($5);
       $$->comp = NOT_IN_OP;
     }
+    */
     | EXISTS LBRACE sub_query RBRACE
     {
       $$ = new ConditionSqlNode;

@@ -33,6 +33,7 @@ Value::Value(const Value &other)
   this->attr_type_ = other.attr_type_;
   this->length_    = other.length_;
   this->own_data_  = other.own_data_;
+  this->is_null_   = other.is_null_;
   switch (this->attr_type_) {
     case AttrType::CHARS:
     case AttrType::VECTORS: {
@@ -50,6 +51,7 @@ Value::Value(Value &&other)
   this->attr_type_ = other.attr_type_;
   this->length_    = other.length_;
   this->own_data_  = other.own_data_;
+  this->is_null_   = other.is_null_;
   this->value_     = other.value_;
   other.own_data_  = false;
   other.length_    = 0;
@@ -64,6 +66,7 @@ Value &Value::operator=(const Value &other)
   this->attr_type_ = other.attr_type_;
   this->length_    = other.length_;
   this->own_data_  = other.own_data_;
+  this->is_null_   = other.is_null_;
   switch (this->attr_type_) {
     case AttrType::CHARS:
     case AttrType::VECTORS: {
@@ -86,6 +89,7 @@ Value &Value::operator=(Value &&other)
   this->attr_type_ = other.attr_type_;
   this->length_    = other.length_;
   this->own_data_  = other.own_data_;
+  this->is_null_   = other.is_null_;
   this->value_     = other.value_;
   other.own_data_  = false;
   other.length_    = 0;
@@ -108,6 +112,7 @@ void Value::reset()
   attr_type_ = AttrType::UNDEFINED;
   length_    = 0;
   own_data_  = false;
+  is_null_   = false;
 }
 
 void Value::set_data(char *data, int length)
@@ -119,6 +124,10 @@ void Value::set_data(char *data, int length)
     case AttrType::INTS: {
       value_.int_value_ = *(int *)data;
       length_           = length;
+      LOG_DEBUG("Value::set_data INT: value=%d, data_bytes=[%02x %02x %02x %02x]",
+                value_.int_value_,
+                (unsigned char)data[0], (unsigned char)data[1],
+                (unsigned char)data[2], (unsigned char)data[3]);
     } break;
     case AttrType::FLOATS: {
       value_.float_value_ = *(float *)data;
@@ -258,6 +267,10 @@ const char *Value::data() const
 
 string Value::to_string() const
 {
+  if (is_null_) {
+    return "NULL";
+  }
+
   string res;
   RC     rc = DataType::type_instance(this->attr_type_)->to_string(*this, res);
   if (OB_FAIL(rc)) {

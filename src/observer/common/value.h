@@ -90,6 +90,7 @@ public:
   void set_data(const char *data, int length) { this->set_data(const_cast<char *>(data), length); }
   void set_value(const Value &value);
   void set_boolean(bool val);
+  void set_null(bool is_null = true) { is_null_ = is_null; }
 
   string to_string() const;
 
@@ -99,6 +100,7 @@ public:
 
   int      length() const { return length_; }
   AttrType attr_type() const { return attr_type_; }
+  bool     is_null() const { return is_null_; }
 
 public:
   /**
@@ -132,4 +134,5 @@ private:
 
   /// 是否申请并占有内存, 目前对于 CHARS 类型 own_data_ 为true, 其余类型 own_data_ 为false
   bool own_data_ = false;
+  bool is_null_  = false;
 };

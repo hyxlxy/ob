@@ -1,57 +1,3 @@
-### 2025-09-04 07:56:23.135
-INSERT INTO vectors VALUES (3, 'vec3', '[1.5, 2.5, 3.5]');
-### 2025-09-04 07:56:23.137
-SELECT * FROM vectors;
-### 2025-09-04 07:56:23.137
--- 3. 测试向量算术运算（如果支持）
-### 2025-09-04 07:56:23.137
--- SELECT id, name, embedding + embedding FROM vectors;
-### 2025-09-04 07:56:23.138
--- 4. 测试向量距离函数（如果支持）
-### 2025-09-04 07:56:23.138
--- SELECT L2_DISTANCE('[1.0, 2.0, 3.0]', '[4.0, 5.0, 6.0]');
-### 2025-09-04 07:58:37.123
-CREATE TABLE test (id INT, vec VECTOR(3));
-### 2025-09-04 07:59:18.698
-CREATE TABLE test (id INT, name CHAR(10));
-### 2025-09-04 08:10:30.192
-CREATE TABLE simple_test (id INT);
-### 2025-09-04 08:11:00.921
-CREATE TABLE vector_test (id INT, vec VECTOR(3));
-### 2025-09-04 08:11:26.534
-INSERT INTO vector_test VALUES (1, '[1.0, 2.0, 3.0]');
-### 2025-09-04 08:18:31.190
-SELECT [1.0, 2.0, 3.0];
-### 2025-09-04 08:19:01.468
-SELECT * FROM vector_test;
-### 2025-09-04 08:23:28.298
--- 测试高维向量功能
-### 2025-09-04 08:23:28.302
--- 1. 测试创建高维向量表
-### 2025-09-04 08:23:28.302
-CREATE TABLE high_dim_vectors (
-### 2025-09-04 08:23:28.303
-    embedding VECTOR(1000)
-### 2025-09-04 08:23:28.304
--- 查看表结构
-### 2025-09-04 08:23:28.304
-DESC high_dim_vectors;
-### 2025-09-04 08:23:28.305
--- 2. 测试插入中等维度向量（100维）
-### 2025-09-04 08:23:28.305
-INSERT INTO high_dim_vectors VALUES (1, 'vec100', '[1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0,11.0,12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0,20.0,21.0,22.0,23.0,24.0,25.0,26.0,27.0,28.0,29.0,30.0,31.0,32.0,33.0,34.0,35.0,36.0,37.0,38.0,39.0,40.0,41.0,42.0,43.0,44.0,45.0,46.0,47.0,48.0,49.0,50.0,51.0,52.0,53.0,54.0,55.0,56.0,57.0,58.0,59.0,60.0,61.0,62.0,63.0,64.0,65.0,66.0,67.0,68.0,69.0,70.0,71.0,72.0,73.0,74.0,75.0,76.0,77.0,78.0,79.0,80.0,81.0,82.0,83.0,84.0,85.0,86.0,87.0,88.0,89.0,90.0,91.0,92.0,93.0,94.0,95.0,96.0,97.0,98.0,99.0,100.0]');
-### 2025-09-04 08:23:28.306
--- 3. 测试插入小维度向量
-### 2025-09-04 08:23:28.306
-INSERT INTO high_dim_vectors VALUES (2, 'vec3', '[1.0, 2.0, 3.0]');
-### 2025-09-04 08:23:28.306
--- 查看插入的数据
-### 2025-09-04 08:23:28.307
-SELECT id, name FROM high_dim_vectors;
-### 2025-09-04 08:23:28.308
--- 4. 测试向量比较（基本功能验证）
-### 2025-09-04 08:23:28.308
-SELECT * FROM high_dim_vectors WHERE id = 1;
 ### 2025-09-04 08:23:39.926
 CREATE TABLE test_high_dim (id INT, vec VECTOR(5000));
 ### 2025-09-04 08:24:10.027
@@ -1118,8 +1064,6 @@ UPDATE Update_table_1 SET col1 = (SELECT 42) WHERE id = 1;
 UPDATE Update_table_1 SET col2 = (SELECT col1 FROM Update_table_1 WHERE id = 1) WHERE id = 1;
 ### 2025-09-13 02:21:09.739
 -- Test UPDATE-SELECT functionality
-### 2025-09-13 02:21:09.754
-CREATE TABLE test_table(id int, value int);
 ### 2025-09-13 02:21:09.756
 CREATE TABLE source_table(id int, data int);
 ### 2025-09-13 02:21:09.757
@@ -1164,8 +1108,6 @@ SELECT id, col1, (col1 - 6) as col1_minus_6 FROM exp_table;
 -- Debug: show the calculation
 ### 2025-09-13 15:41:23.874
 SELECT id, col1, (col1 - 6) as diff FROM exp_table;
-### 2025-09-13 15:41:40.870
-SELECT 1;
 ### 2025-09-13 15:41:40.871
 SELECT 1 + 2;
 ### 2025-09-13 15:44:47.223
@@ -1896,8 +1838,6 @@ create table null_test_final(id int not null, name char(20) null);
 CREATE TABLE null_table(id int not null, num int null, price float not null, birthday date null);
 ### 2025-09-16 09:22:16.139
 CREATE TABLE null_table(id int not null, num int null, price float not null);
-### 2025-09-16 09:25:28.673
-CREATE TABLE like_table(id int, name char(30));
 ### 2025-09-16 09:26:04.478
 INSERT INTO ssq_1 VALUES (10, 98, 45.84);
 ### 2025-09-16 09:26:04.480
@@ -1976,10 +1916,6 @@ select * from ssq_1 where col1 IN (select ssq_2.col2 from ssq_2);
 select * from ssq_1 where col1 = (select ssq_2.col2 from ssq_2 where ssq_2.id = 1);
 ### 2025-09-16 11:32:16.439
 -- 测试改进后的错误消息
-### 2025-09-16 11:32:16.463
-CREATE TABLE ssq_1(id int, col1 int, feat1 float);
-### 2025-09-16 11:32:16.465
-CREATE TABLE ssq_2(id int, col2 int, feat2 float);
 ### 2025-09-16 11:32:16.465
 INSERT INTO ssq_1 VALUES (16, 51, 62.18);
 ### 2025-09-16 11:32:16.467
@@ -1998,3 +1934,67 @@ select * from ssq_1 where col1 = (select ssq_2.col2 from ssq_2);
 CREATE TABLE unique_test(id int, name char(10));
 ### 2025-09-16 14:34:18.212
 CREATE TABLE null_test(id int not null, num int null, name char(10) null);
+### 2025-09-16 16:03:12.751
+-- 测试NULL值和0值的区别
+### 2025-09-16 16:09:39.944
+-- 测试NULL检测逻辑
+### 2025-09-16 16:10:13.190
+-- 测试LIKE查询问题
+### 2025-09-16 16:26:28.838
+-- 简单的调试测试
+### 2025-09-16 16:37:07.914
+-- 测试NULL标志位系统
+### 2025-09-16 16:37:57.092
+-- 测试修复后的LIKE查询
+### 2025-09-16 16:38:48.768
+-- 测试真正的NULL值
+### 2025-09-16 16:39:46.118
+-- 测试修复后的子查询
+### 2025-09-16 16:39:46.143
+CREATE TABLE ssq_1(id int, col1 int, feat1 float);
+### 2025-09-16 16:39:46.145
+CREATE TABLE ssq_2(id int, col2 int, feat2 float);
+### 2025-09-16 16:39:46.146
+INSERT INTO ssq_1 VALUES (1, 10, 1.5);
+### 2025-09-16 16:39:46.147
+INSERT INTO ssq_1 VALUES (2, 20, 2.5);
+### 2025-09-16 16:39:46.148
+INSERT INTO ssq_2 VALUES (1, 100, 10.5);
+### 2025-09-16 16:39:46.149
+INSERT INTO ssq_2 VALUES (2, 200, 20.5);
+### 2025-09-16 16:39:46.151
+SELECT * FROM ssq_1;
+### 2025-09-16 16:39:46.158
+SELECT * FROM ssq_2;
+### 2025-09-16 16:39:46.173
+SELECT * FROM ssq_1 WHERE col1 = (SELECT ssq_2.col2 FROM ssq_2 WHERE ssq_2.id = 1);
+### 2025-09-16 16:48:31.052
+-- 测试简单的子查询
+### 2025-09-16 16:49:20.684
+CREATE TABLE basic_test(id int, name char(10));
+### 2025-09-16 16:50:05.686
+CREATE TABLE test_where(id int, value int);
+### 2025-09-16 16:57:51.864
+CREATE TABLE like_table(id int, name char(30));
+### 2025-09-16 16:59:21.075
+SELECT (SELECT 1) as result;
+### 2025-09-16 16:59:56.057
+SELECT 1 as result;
+### 2025-09-16 17:02:03.102
+CREATE TABLE test_sub(id int, value int);
+### 2025-09-16 17:02:47.853
+CREATE TABLE t1(id int, value int);
+### 2025-09-16 17:03:50.647
+SELECT * FROM t1 WHERE value = (SELECT 1);
+### 2025-09-16 17:05:13.399
+SELECT (1);
+### 2025-09-16 17:07:41.431
+SELECT 1;
+### 2025-09-16 17:15:43.654
+SELECT (SELECT 1);
+### 2025-09-16 17:20:30.797
+SELECT (SELECT 1 ORDER BY 1);
+### 2025-09-16 17:21:03.619
+CREATE TABLE test_table(id int, value int);
+### 2025-09-16 17:24:24.923
+-- 测试update-select功能

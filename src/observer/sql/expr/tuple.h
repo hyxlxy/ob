@@ -197,54 +197,24 @@ public:
     const FieldMeta *field_meta = field_expr->field().meta();
     cell.reset();
 
-    // Check for NULL values in nullable fields
+    // Use NULL flag bit system like reference code
+    cell.set_type(field_meta->type());
     if (field_meta->nullable()) {
-      const char *field_data = this->record_->data() + field_meta->offset();
-      bool is_null = false;
-
-      switch (field_meta->type()) {
-        case AttrType::CHARS: {
-          // For string fields, check if all bytes are zero
-          is_null = true;
-          for (int i = 0; i < field_meta->len(); i++) {
-            if (field_data[i] != 0) {
-              is_null = false;
-              break;
-            }
-          }
-          break;
-        }
-        case AttrType::INTS: {
-          // For integer fields, check if value is 0 (assuming 0 represents NULL)
-          int int_value = *(int*)field_data;
-          is_null = (int_value == 0);
-          break;
-        }
-        case AttrType::FLOATS: {
-          // For float fields, check if value is 0.0 (assuming 0.0 represents NULL)
-          float float_value = *(float*)field_data;
-          is_null = (float_value == 0.0f);
-          break;
-        }
-        case AttrType::DATES: {
-          // For date fields, check if value is 0 (assuming 0 represents NULL)
-          int date_value = *(int*)field_data;
-          is_null = (date_value == 0);
-          break;
-        }
-        default:
-          is_null = false;
-          break;
-      }
-
+      // Check NULL flag in the last byte of the field
+      bool is_null = this->record_->data()[field_meta->offset() + field_meta->len() - 1] == '1';
       if (is_null) {
-        cell.set_type(AttrType::UNDEFINED);
-        return RC::SUCCESS;
+        cell.set_null(true);
+      } else {
+        // For non-NULL values, use data length excluding the NULL flag byte
+        cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len() - 1);
+        cell.set_null(false);
       }
+    } else {
+      // For non-nullable fields, use full length and set not null
+      cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
+      cell.set_null(false);
     }
 
-    cell.set_type(field_meta->type());
-    cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
     return RC::SUCCESS;
   }
 

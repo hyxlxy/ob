@@ -94,6 +94,17 @@ RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
 
   printf("DEBUG: [FIELD] FieldExpr find_cell result: rc=%s\n", strrc(rc));
 
+  if (rc == RC::SUCCESS) {
+    if (value.attr_type() == AttrType::INTS) {
+      printf("DEBUG: [FIELD] FieldExpr INT result: value_type=%d, int_value=%d\n",
+             (int)value.attr_type(), value.get_int());
+    } else if (value.attr_type() == AttrType::UNDEFINED) {
+      printf("DEBUG: [FIELD] FieldExpr NULL result: value_type=UNDEFINED\n");
+    } else {
+      printf("DEBUG: [FIELD] FieldExpr result: value_type=%d\n", (int)value.attr_type());
+    }
+  }
+
   return rc;
 }
 
