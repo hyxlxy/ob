@@ -1,73 +1,3 @@
-### 2025-09-03 22:50:11.568
-SELECT * FROM users WHERE name LIKE 'A%';
-### 2025-09-04 07:21:56.665
-CREATE TABLE test (id INT, value INT);
-### 2025-09-04 07:25:12.030
--- 测试表达式功能
-### 2025-09-04 07:25:12.034
--- 1. 测试基本算术表达式
-### 2025-09-04 07:25:12.035
-SELECT 10 - 3;
-### 2025-09-04 07:25:12.036
-SELECT 4 * 5;
-### 2025-09-04 07:25:12.036
-SELECT 20 / 4;
-### 2025-09-04 07:25:12.037
-SELECT -5;
-### 2025-09-04 07:25:12.037
--- 2. 测试复杂表达式
-### 2025-09-04 07:25:12.038
-SELECT 1 + 2 * 3;
-### 2025-09-04 07:25:12.038
-SELECT (1 + 2) * 3;
-### 2025-09-04 07:25:12.039
-SELECT 10 / 2 + 3 * 4;
-### 2025-09-04 07:25:12.040
--- 3. 测试浮点数表达式
-### 2025-09-04 07:25:12.040
-SELECT 3.14 * 2;
-### 2025-09-04 07:25:12.041
-SELECT 10.5 / 2.5;
-### 2025-09-04 07:25:12.041
--- 4. 测试多个表达式
-### 2025-09-04 07:25:12.041
-SELECT 1 + 1, 2 * 3, 10 / 2;
-### 2025-09-04 07:25:12.042
--- 5. 测试CALC语句
-### 2025-09-04 07:25:12.042
-CALC 1 + 2 * 3;
-### 2025-09-04 07:25:12.043
-CALC (10 + 5) / 3;
-### 2025-09-04 07:25:12.043
-CALC -7 + 3;
-### 2025-09-04 07:25:12.044
--- 6. 测试表中的表达式
-### 2025-09-04 07:25:12.044
-CREATE TABLE numbers (a INT, b INT, c FLOAT);
-### 2025-09-04 07:25:12.078
-INSERT INTO numbers VALUES (10, 5, 3.14);
-### 2025-09-04 07:25:12.080
-INSERT INTO numbers VALUES (20, 8, 2.71);
-### 2025-09-04 07:25:12.081
-SELECT * FROM numbers;
-### 2025-09-04 07:25:12.083
--- 测试表字段的表达式
-### 2025-09-04 07:25:12.083
-SELECT a, b, a + b FROM numbers;
-### 2025-09-04 07:25:12.085
-SELECT a, b, a - b, a * b, a / b FROM numbers;
-### 2025-09-04 07:25:12.087
-SELECT a, c, a * c FROM numbers;
-### 2025-09-04 07:56:23.125
--- 测试向量基础功能
-### 2025-09-04 07:56:23.131
--- 1. 测试创建包含向量类型的表
-### 2025-09-04 07:56:23.131
-CREATE TABLE vectors (
-### 2025-09-04 07:56:23.132
-    embedding VECTOR(3)
-### 2025-09-04 07:56:23.133
-DESC vectors;
 ### 2025-09-04 07:56:23.133
 -- 2. 测试插入向量数据
 ### 2025-09-04 07:56:23.134
@@ -1936,8 +1866,6 @@ create table ssq_single(col2 int);
 create table test_null(id int not null, name char(20) null, age int);
 ### 2025-09-15 20:39:06.541
 create table test_basic(id int, name char(20));
-### 2025-09-15 20:39:28.276
-select * from ssq_1 where col1 = (select ssq_2.col2 from ssq_2);
 ### 2025-09-15 21:46:10.817
 create table multi_index(id int, col1 int, col2 int);
 ### 2025-09-15 21:54:24.074
@@ -1976,10 +1904,6 @@ CREATE TABLE null_table(id int not null, num int null, price float not null, bir
 CREATE TABLE null_table(id int not null, num int null, price float not null);
 ### 2025-09-16 09:25:28.673
 CREATE TABLE like_table(id int, name char(30));
-### 2025-09-16 09:26:04.453
-CREATE TABLE ssq_1(id int, col1 int, feat1 float);
-### 2025-09-16 09:26:04.477
-CREATE TABLE ssq_2(id int, col2 int, feat2 float);
 ### 2025-09-16 09:26:04.478
 INSERT INTO ssq_1 VALUES (10, 98, 45.84);
 ### 2025-09-16 09:26:04.480
@@ -1996,5 +1920,81 @@ create table multi_index_test(id int, col1 int, col2 int);
 create table unique_test_final(id int, name char(20));
 ### 2025-09-16 10:49:34.453
 select * from ssq_1 where id = (select ssq_2.id from ssq_2 where col2 = 86);
-### 2025-09-16 10:50:26.736
+### 2025-09-16 11:17:07.179
+-- 完整的子查询测试
+### 2025-09-16 11:17:07.203
+DROP TABLE IF EXISTS ssq_1;
+### 2025-09-16 11:17:07.204
+DROP TABLE IF EXISTS ssq_2;
+### 2025-09-16 11:17:07.204
+DROP TABLE IF EXISTS ssq_3;
+### 2025-09-16 11:17:07.205
+DROP TABLE IF EXISTS ssq_4;
+### 2025-09-16 11:17:07.208
+CREATE TABLE ssq_3(id int, col3 int, feat3 float);
+### 2025-09-16 11:17:07.245
+CREATE TABLE ssq_4(id int, col4 char(20));
+### 2025-09-16 11:17:07.257
+INSERT INTO ssq_1 VALUES (1, 10, 1.1);
+### 2025-09-16 11:17:07.258
+INSERT INTO ssq_1 VALUES (2, 20, 2.2);
+### 2025-09-16 11:17:07.259
+INSERT INTO ssq_1 VALUES (3, 30, 3.3);
+### 2025-09-16 11:17:07.261
+INSERT INTO ssq_2 VALUES (1, 87, 1.1);
+### 2025-09-16 11:17:07.261
+INSERT INTO ssq_2 VALUES (2, 86, 2.2);
+### 2025-09-16 11:17:07.262
+INSERT INTO ssq_2 VALUES (3, 51, 3.3);
+### 2025-09-16 11:17:07.263
+INSERT INTO ssq_2 VALUES (4, 10, 4.4);
+### 2025-09-16 11:17:07.264
+-- 测试简单的子查询（之前修复的）
+### 2025-09-16 11:17:07.264
 select * from ssq_1 where id = (select ssq_2.id from ssq_2 where col2 = 87);
+### 2025-09-16 11:18:07.487
+-- 检查数据是否正确
+### 2025-09-16 11:19:20.461
+-- 调试子查询问题
+### 2025-09-16 11:19:20.484
+-- 首先测试简单查询
+### 2025-09-16 11:19:20.488
+-- 然后测试子查询（这个应该会失败）
+### 2025-09-16 11:28:30.133
+-- 测试子查询解析问题
+### 2025-09-16 11:28:30.170
+-- 测试简单的子查询（这个应该工作）
+### 2025-09-16 11:28:30.170
+select ssq_2.col2 from ssq_2;
+### 2025-09-16 11:28:30.176
+-- 测试有问题的子查询
+### 2025-09-16 11:30:14.426
+-- 测试正确的子查询语法
+### 2025-09-16 11:30:14.448
+-- 首先创建测试数据
+### 2025-09-16 11:30:14.457
+-- 测试正确的 IN 子查询
+### 2025-09-16 11:30:14.457
+select * from ssq_1 where col1 IN (select ssq_2.col2 from ssq_2);
+### 2025-09-16 11:30:14.465
+-- 测试标量子查询（应该只返回一个值）
+### 2025-09-16 11:30:14.465
+select * from ssq_1 where col1 = (select ssq_2.col2 from ssq_2 where ssq_2.id = 1);
+### 2025-09-16 11:32:16.439
+-- 测试改进后的错误消息
+### 2025-09-16 11:32:16.463
+CREATE TABLE ssq_1(id int, col1 int, feat1 float);
+### 2025-09-16 11:32:16.465
+CREATE TABLE ssq_2(id int, col2 int, feat2 float);
+### 2025-09-16 11:32:16.465
+INSERT INTO ssq_1 VALUES (16, 51, 62.18);
+### 2025-09-16 11:32:16.467
+INSERT INTO ssq_1 VALUES (17, 52, 63.19);
+### 2025-09-16 11:32:16.469
+INSERT INTO ssq_2 VALUES (1, 86, 1.1);
+### 2025-09-16 11:32:16.470
+INSERT INTO ssq_2 VALUES (2, 87, 2.2);
+### 2025-09-16 11:32:16.472
+-- 这个查询应该显示改进后的错误消息
+### 2025-09-16 11:32:16.472
+select * from ssq_1 where col1 = (select ssq_2.col2 from ssq_2);
