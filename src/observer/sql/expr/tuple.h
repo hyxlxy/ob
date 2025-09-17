@@ -206,8 +206,9 @@ public:
         cell.set_null(true);
         // Don't set data for NULL values
       } else {
-        // For non-NULL values, use data length excluding the NULL flag byte
-        cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len() - 1);
+        // For non-NULL values, use full data length but exclude NULL flag byte from actual data
+        size_t data_len = field_meta->len() - 1;
+        cell.set_data(this->record_->data() + field_meta->offset(), data_len);
         cell.set_null(false);
       }
     } else {

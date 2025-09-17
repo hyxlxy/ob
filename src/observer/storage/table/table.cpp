@@ -278,16 +278,19 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
   size_t       copy_len = field->len();
   const size_t data_len = value.length();
 
-  // For nullable fields, reserve last byte for NULL flag
-  if (field->nullable()) {
-    copy_len = field->len() - 1;
-  }
-
   if (field->type() == AttrType::CHARS) {
+    // For CHARS type, handle nullable fields specially
+    if (field->nullable()) {
+      copy_len = field->len() - 1;  // Reserve last byte for NULL flag
+    }
     if (copy_len > data_len) {
       copy_len = data_len;
     }
   } else if (field->type() == AttrType::VECTORS) {
+    // For VECTORS type, handle nullable fields specially
+    if (field->nullable()) {
+      copy_len = field->len() - 1;  // Reserve last byte for NULL flag
+    }
     // 对于向量类型，需要检查数据长度是否超过字段定义的长度
     if (data_len > copy_len) {
       LOG_WARN("Vector data length (%zu) exceeds field length (%zu) for field %s",
@@ -297,17 +300,25 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
     // 对于向量类型，使用实际数据长度
     copy_len = data_len;
   } else {
-    // 对于其他类型，使用较小的长度以防止越界
-    if (data_len < copy_len) {
-      copy_len = data_len;
-    }
+    // For fixed-length types (INT, FLOAT, DATE, etc.), always use full data length
+    // The NULL flag for nullable fields will be handled separately
+    copy_len = data_len;
   }
 
   memcpy(record_data + field->offset(), value.data(), copy_len);
 
   // For nullable fields, set NULL flag to '0' (not NULL)
   if (field->nullable()) {
-    record_data[field->offset() + field->len() - 1] = '0';
+    if (field->type() == AttrType::CHARS || field->type() == AttrType::VECTORS) {
+      // For variable-length types, NULL flag is at the end
+      record_data[field->offset() + field->len() - 1] = '0';
+    } else {
+      // For fixed-length types, we need to place NULL flag after the data
+      // but within the field's allocated space
+      if (copy_len < field->len()) {
+        record_data[field->offset() + field->len() - 1] = '0';
+      }
+    }
   }
 
   return RC::SUCCESS;
