@@ -886,11 +886,9 @@ expression:
     | aggregate_expr {
       $$ = $1;
     }
-    /* TEMPORARILY COMMENTED OUT - CAUSES PARSING ISSUES
     | sub_query_expr {
       $$ = $1;
     }
-    */
     ;
 
 sub_query_expr:
