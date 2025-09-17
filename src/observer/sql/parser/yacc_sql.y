@@ -907,7 +907,30 @@ sub_query_expr:
         }
         delete $5;
       }
-      // Handle other clauses...
+
+      if ($6 != nullptr) {
+        parsed_node->selection.joins.swap(*$6);
+        delete $6;
+      }
+
+      if ($7 != nullptr) {
+        parsed_node->selection.conditions.swap(*$7);
+        delete $7;
+      }
+
+      if ($8 != nullptr) {
+        parsed_node->selection.group_by.swap(*$8);
+        delete $8;
+      }
+
+      if ($9 != nullptr) {
+        parsed_node->selection.having_expr.reset($9);
+      }
+
+      if ($10 != nullptr) {
+        parsed_node->selection.order_by.swap(*$10);
+        delete $10;
+      }
 
       fprintf(stderr, "DEBUG: [PARSER] Creating SubQueryExpr\n");
       std::unique_ptr<SelectSqlNode> select_node(new SelectSqlNode(std::move(parsed_node->selection)));

@@ -163,7 +163,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   if (rc != RC::SUCCESS) {
     // 如果 FilterStmt 创建失败，可能是因为包含了 SubQueryExpr
     // 我们尝试创建一个空的 FilterStmt，并在逻辑计划生成阶段处理 SubQueryExpr
-    LOG_WARN("FilterStmt creation failed (possibly due to SubQueryExpr), creating empty FilterStmt");
+    LOG_WARN("FilterStmt creation failed (possibly due to SubQueryExpr), creating empty FilterStmt. Raw conditions count: %zu", all_conditions.size());
     filter_stmt = new FilterStmt();
     // 注意：这里我们创建了一个空的 FilterStmt，实际的条件处理将在逻辑计划生成阶段进行
   }

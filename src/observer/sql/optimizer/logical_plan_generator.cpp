@@ -114,7 +114,6 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
   // 如果 FilterStmt 为空但有原始条件，尝试处理包含 SubQueryExpr 的条件
   if (!predicate_oper && !select_stmt->raw_conditions().empty()) {
-    printf("DEBUG: [LOGICAL_PLAN] FilterStmt is empty but raw_conditions exist, trying to handle SubQueryExpr\n");
     rc = create_predicate_from_raw_conditions(select_stmt->raw_conditions(), predicate_oper, tables);
     if (OB_FAIL(rc)) {
       LOG_WARN("failed to create predicate from raw conditions. rc=%s", strrc(rc));
