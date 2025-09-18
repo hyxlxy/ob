@@ -223,9 +223,16 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
   RC rc = RC::SUCCESS;
   result = false;
 
-  // NULL-like numeric handling: if either side is a special NULL-like numeric (e.g. division-by-zero),
-  // the comparison yields UNKNOWN -> treated as false in WHERE.
-  if (is_null_like_numeric(left) || is_null_like_numeric(right)) {
+  // Handle IS [NOT] NULL first (special SQL 3-valued logic)
+  if (comp_ == IS_NULL_OP || comp_ == IS_NOT_NULL_OP) {
+    bool is_null_sql = left.is_null() || left.attr_type() == AttrType::UNDEFINED || is_null_like_numeric(left);
+    result = (comp_ == IS_NULL_OP) ? is_null_sql : !is_null_sql;
+    return rc;
+  }
+
+  // NULL-like numeric handling for other comparisons: UNKNOWN -> false in WHERE
+  if (is_null_like_numeric(left) || is_null_like_numeric(right) || left.is_null() || right.is_null() ||
+      left.attr_type() == AttrType::UNDEFINED || right.attr_type() == AttrType::UNDEFINED) {
     return rc; // result=false
   }
 
@@ -791,8 +798,20 @@ RC ArithmeticExpr::execute_calc(
         binary_operator<LEFT_CONSTANT, RIGHT_CONSTANT, int, AddOperator>(
             (int *)left.data(), (int *)right.data(), (int *)result.data(), result.capacity());
       } else if (attr_type == AttrType::FLOATS) {
-        binary_operator<LEFT_CONSTANT, RIGHT_CONSTANT, float, AddOperator>(
-            (float *)left.data(), (float *)right.data(), (float *)result.data(), result.capacity());
+        // Use manual double precision calculation for better accuracy
+        float *lptr = (float *)left.data();
+        float *rptr = (float *)right.data();
+        float *optr = (float *)result.data();
+        const int n = result.capacity();
+        for (int i = 0; i < n; i++) {
+          const float lv = LEFT_CONSTANT ? lptr[0] : lptr[i];
+          const float rv = RIGHT_CONSTANT ? rptr[0] : rptr[i];
+          // Use double precision calculation
+          double lv_double = static_cast<double>(lv);
+          double rv_double = static_cast<double>(rv);
+          double result_double = lv_double + rv_double;
+          optr[i] = static_cast<float>(result_double);
+        }
       } else {
         rc = RC::UNIMPLEMENTED;
       }
@@ -802,8 +821,20 @@ RC ArithmeticExpr::execute_calc(
         binary_operator<LEFT_CONSTANT, RIGHT_CONSTANT, int, SubtractOperator>(
             (int *)left.data(), (int *)right.data(), (int *)result.data(), result.capacity());
       } else if (attr_type == AttrType::FLOATS) {
-        binary_operator<LEFT_CONSTANT, RIGHT_CONSTANT, float, SubtractOperator>(
-            (float *)left.data(), (float *)right.data(), (float *)result.data(), result.capacity());
+        // Use manual double precision calculation for better accuracy
+        float *lptr = (float *)left.data();
+        float *rptr = (float *)right.data();
+        float *optr = (float *)result.data();
+        const int n = result.capacity();
+        for (int i = 0; i < n; i++) {
+          const float lv = LEFT_CONSTANT ? lptr[0] : lptr[i];
+          const float rv = RIGHT_CONSTANT ? rptr[0] : rptr[i];
+          // Use double precision calculation
+          double lv_double = static_cast<double>(lv);
+          double rv_double = static_cast<double>(rv);
+          double result_double = lv_double - rv_double;
+          optr[i] = static_cast<float>(result_double);
+        }
       } else {
         rc = RC::UNIMPLEMENTED;
       }
@@ -813,8 +844,20 @@ RC ArithmeticExpr::execute_calc(
         binary_operator<LEFT_CONSTANT, RIGHT_CONSTANT, int, MultiplyOperator>(
             (int *)left.data(), (int *)right.data(), (int *)result.data(), result.capacity());
       } else if (attr_type == AttrType::FLOATS) {
-        binary_operator<LEFT_CONSTANT, RIGHT_CONSTANT, float, MultiplyOperator>(
-            (float *)left.data(), (float *)right.data(), (float *)result.data(), result.capacity());
+        // Use manual double precision calculation for better accuracy
+        float *lptr = (float *)left.data();
+        float *rptr = (float *)right.data();
+        float *optr = (float *)result.data();
+        const int n = result.capacity();
+        for (int i = 0; i < n; i++) {
+          const float lv = LEFT_CONSTANT ? lptr[0] : lptr[i];
+          const float rv = RIGHT_CONSTANT ? rptr[0] : rptr[i];
+          // Use double precision calculation
+          double lv_double = static_cast<double>(lv);
+          double rv_double = static_cast<double>(rv);
+          double result_double = lv_double * rv_double;
+          optr[i] = static_cast<float>(result_double);
+        }
       } else {
         rc = RC::UNIMPLEMENTED;
       }
@@ -825,6 +868,7 @@ RC ArithmeticExpr::execute_calc(
             (int *)left.data(), (int *)right.data(), (int *)result.data(), result.capacity());
       } else if (attr_type == AttrType::FLOATS) {
         // Division with NULL-like handling on vectorized path: right==0 -> sentinel (numeric_limits<float>::max())
+        // Use double precision for calculation to match MySQL 8.0 behavior
         float *lptr = (float *)left.data();
         float *rptr = (float *)right.data();
         float *optr = (float *)result.data();
@@ -833,7 +877,15 @@ RC ArithmeticExpr::execute_calc(
         for (int i = 0; i < n; i++) {
           const float lv = LEFT_CONSTANT ? lptr[0] : lptr[i];
           const float rv = RIGHT_CONSTANT ? rptr[0] : rptr[i];
-          optr[i] = (rv == 0.0f ? null_like : (lv / rv));
+          if (rv == 0.0f) {
+            optr[i] = null_like;
+          } else {
+            // Use double precision calculation
+            double lv_double = static_cast<double>(lv);
+            double rv_double = static_cast<double>(rv);
+            double result_double = lv_double / rv_double;
+            optr[i] = static_cast<float>(result_double);
+          }
         }
       } else {
         rc = RC::UNIMPLEMENTED;
@@ -843,8 +895,17 @@ RC ArithmeticExpr::execute_calc(
       if (attr_type == AttrType::INTS) {
         unary_operator<LEFT_CONSTANT, int, NegateOperator>((int *)left.data(), (int *)result.data(), result.capacity());
       } else if (attr_type == AttrType::FLOATS) {
-        unary_operator<LEFT_CONSTANT, float, NegateOperator>(
-            (float *)left.data(), (float *)result.data(), result.capacity());
+        // Use manual double precision calculation for better accuracy
+        float *lptr = (float *)left.data();
+        float *optr = (float *)result.data();
+        const int n = result.capacity();
+        for (int i = 0; i < n; i++) {
+          const float lv = LEFT_CONSTANT ? lptr[0] : lptr[i];
+          // Use double precision calculation
+          double lv_double = static_cast<double>(lv);
+          double result_double = -lv_double;
+          optr[i] = static_cast<float>(result_double);
+        }
       } else {
         rc = RC::UNIMPLEMENTED;
       }

@@ -139,6 +139,8 @@ FORMAT                                  RETURN_TOKEN(FORMAT);
 PRIMARY                                 RETURN_TOKEN(PRIMARY);
 KEY                                     RETURN_TOKEN(KEY);
 ANALYZE                                 RETURN_TOKEN(ANALYZE);
+IS                                      RETURN_TOKEN(IS);
+
 IN                                      RETURN_TOKEN(IN);
 EXISTS                                  RETURN_TOKEN(EXISTS);
 UNIQUE                                  RETURN_TOKEN(UNIQUE);

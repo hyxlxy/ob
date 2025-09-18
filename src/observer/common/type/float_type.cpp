@@ -33,7 +33,11 @@ RC FloatType::add(const Value &left, const Value &right, Value &result) const
     result.reset();
     return RC::SUCCESS;
   }
-  result.set_float(left.get_float() + right.get_float());
+  // 使用双精度计算以提高精度，与MySQL 8.0保持一致
+  double left_val = static_cast<double>(left.get_float());
+  double right_val = static_cast<double>(right.get_float());
+  double add_result = left_val + right_val;
+  result.set_float(static_cast<float>(add_result));
   return RC::SUCCESS;
 }
 RC FloatType::subtract(const Value &left, const Value &right, Value &result) const
@@ -43,7 +47,11 @@ RC FloatType::subtract(const Value &left, const Value &right, Value &result) con
     result.reset();
     return RC::SUCCESS;
   }
-  result.set_float(left.get_float() - right.get_float());
+  // 使用双精度计算以提高精度，与MySQL 8.0保持一致
+  double left_val = static_cast<double>(left.get_float());
+  double right_val = static_cast<double>(right.get_float());
+  double subtract_result = left_val - right_val;
+  result.set_float(static_cast<float>(subtract_result));
   return RC::SUCCESS;
 }
 RC FloatType::multiply(const Value &left, const Value &right, Value &result) const
@@ -53,7 +61,11 @@ RC FloatType::multiply(const Value &left, const Value &right, Value &result) con
     result.reset();
     return RC::SUCCESS;
   }
-  result.set_float(left.get_float() * right.get_float());
+  // 使用双精度计算以提高精度，与MySQL 8.0保持一致
+  double left_val = static_cast<double>(left.get_float());
+  double right_val = static_cast<double>(right.get_float());
+  double multiply_result = left_val * right_val;
+  result.set_float(static_cast<float>(multiply_result));
   return RC::SUCCESS;
 }
 
@@ -65,9 +77,10 @@ RC FloatType::divide(const Value &left, const Value &right, Value &result) const
     return RC::SUCCESS;
   }
 
-  float left_val = left.get_float();
-  float right_val = right.get_float();
-  float division_result = left_val / right_val;
+  // 使用双精度计算以提高精度，与MySQL 8.0保持一致
+  double left_val = static_cast<double>(left.get_float());
+  double right_val = static_cast<double>(right.get_float());
+  double division_result = left_val / right_val;
 
   // 检查结果是否为无穷大或NaN，如果是则返回NULL
   if (std::isinf(division_result) || std::isnan(division_result)) {
@@ -75,13 +88,16 @@ RC FloatType::divide(const Value &left, const Value &right, Value &result) const
     return RC::SUCCESS;
   }
 
-  result.set_float(division_result);
+  result.set_float(static_cast<float>(division_result));
   return RC::SUCCESS;
 }
 
 RC FloatType::negative(const Value &val, Value &result) const
 {
-  result.set_float(-val.get_float());
+  // 使用双精度计算以提高精度，与MySQL 8.0保持一致
+  double val_double = static_cast<double>(val.get_float());
+  double negative_result = -val_double;
+  result.set_float(static_cast<float>(negative_result));
   return RC::SUCCESS;
 }
 

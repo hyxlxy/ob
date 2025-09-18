@@ -1,10 +1,4 @@
 ### 2025-09-04 09:27:22.228
--- 测试COUNT(column)
-### 2025-09-04 09:27:22.228
-SELECT COUNT(age) FROM students;
-### 2025-09-04 09:27:22.228
--- 测试SUM
-### 2025-09-04 09:27:22.228
 SELECT SUM(score) FROM students;
 ### 2025-09-04 09:27:22.229
 -- 测试AVG
@@ -1398,8 +1392,6 @@ select min(col1), avg(col2) from exp_table;
 -- Test the user's specific queries
 ### 2025-09-14 10:00:18.761
 -- Final test of all functionality
-### 2025-09-14 10:00:18.780
-create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
 ### 2025-09-14 10:00:18.816
 insert into exp_table VALUES (2, 4, 7, 5.5, 2.76);
 ### 2025-09-14 10:00:18.821
@@ -1998,3 +1990,11 @@ select * from ssq_1 where col1 = (select ssq_2.col2 from ssq_2 where ssq_2.id = 
 select * from ssq_1;
 ### 2025-09-17 11:13:04.074
 select * from ssq_1 where col1 = (select ssq_2.col2 from ssq_2 where ssq_2.col2 = 10);
+### 2025-09-18 09:29:58.494
+-- Test expression calculation precision
+### 2025-09-18 09:35:30.214
+create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
+### 2025-09-18 09:36:56.969
+create table exp_table(id int, col1 int, col2 int, col3 float, col4 float); insert into exp_table VALUES (4, 4, 2, 4.55, 8.24); select id, -(col2*(-8)+1)+(col4+4)*(col1+col3*5) from exp_table;
+### 2025-09-18 09:40:27.790
+-- Try to reproduce the precision issue

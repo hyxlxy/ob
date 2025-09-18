@@ -60,6 +60,8 @@ enum CompOp
   NOT_IN_VALUES_OP, ///< "NOT IN (values)"
   EXISTS_OP,    ///< "EXISTS"
   NOT_EXISTS_OP,///< "NOT EXISTS"
+  IS_NULL_OP,     ///< "IS NULL"
+  IS_NOT_NULL_OP, ///< "IS NOT NULL"
   NO_OP
 };
 

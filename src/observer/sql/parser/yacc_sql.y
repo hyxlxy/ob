@@ -129,6 +129,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         ANALYZE
         IN
         EXISTS
+        IS
+
         UNIQUE
         EQ
         LT
@@ -1098,6 +1100,22 @@ condition:
       $$->left_expr.reset($1);
       $$->sub_query.reset($5);
       $$->comp = NOT_IN_OP;
+    }
+    | expression IS NULL_T
+    {
+      $$ = new ConditionSqlNode;
+      $$->left_expr.reset($1);
+      Value __nullv; __nullv.set_type(AttrType::UNDEFINED); __nullv.set_null(true);
+      $$->right_expr.reset(new ValueExpr(__nullv));
+      $$->comp = IS_NULL_OP;
+    }
+    | expression IS NOT NULL_T
+    {
+      $$ = new ConditionSqlNode;
+      $$->left_expr.reset($1);
+      Value __nullv2; __nullv2.set_type(AttrType::UNDEFINED); __nullv2.set_null(true);
+      $$->right_expr.reset(new ValueExpr(__nullv2));
+      $$->comp = IS_NOT_NULL_OP;
     }
     | EXISTS LBRACE sub_query RBRACE
     {

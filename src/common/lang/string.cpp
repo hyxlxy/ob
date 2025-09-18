@@ -271,13 +271,20 @@ char *substr(const char *s, int n1, int n2)
 string double_to_str(double v)
 {
   char buf[256];
-  double rounded_v = round(v * 100.0) / 100.0;
+  // Use a tiny bias before rounding to 2 decimals to better match MySQL's
+  // double-precision evaluation when the stored value is a 32-bit float.
+  // This compensates for cases like 197.875 being represented as 197.874999... in float.
+  double scaled = v * 100.0;
+  double bias = (scaled >= 0.0 ? 1e-8 : -1e-8);
+  scaled += bias;
+  double rounded_v = round(scaled) / 100.0;
+
   snprintf(buf, sizeof(buf), "%.2f", rounded_v);
   size_t len = strlen(buf);
-  while (buf[len - 1] == '0') {
+  while (len > 0 && buf[len - 1] == '0') {
     len--;
   }
-  if (buf[len - 1] == '.') {
+  if (len > 0 && buf[len - 1] == '.') {
     len--;
   }
 

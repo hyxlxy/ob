@@ -11,6 +11,7 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include <limits>
+#include <type_traits>
 
 #if defined(USE_SIMD)
 #include "common/math/simd_util.h"
@@ -134,7 +135,15 @@ struct AddOperator
   template <class T>
   static inline T operation(T left, T right)
   {
-    return left + right;
+    // Use double precision for float calculations to match MySQL 8.0 behavior
+    if constexpr (std::is_same_v<T, float>) {
+      double left_double = static_cast<double>(left);
+      double right_double = static_cast<double>(right);
+      double result_double = left_double + right_double;
+      return static_cast<T>(result_double);
+    } else {
+      return left + right;
+    }
   }
 
 #if defined(USE_SIMD)
@@ -149,7 +158,15 @@ struct SubtractOperator
   template <class T>
   static inline T operation(T left, T right)
   {
-    return left - right;
+    // Use double precision for float calculations to match MySQL 8.0 behavior
+    if constexpr (std::is_same_v<T, float>) {
+      double left_double = static_cast<double>(left);
+      double right_double = static_cast<double>(right);
+      double result_double = left_double - right_double;
+      return static_cast<T>(result_double);
+    } else {
+      return left - right;
+    }
   }
 #if defined(USE_SIMD)
   static inline __m256 operation(__m256 left, __m256 right) { return _mm256_sub_ps(left, right); }
@@ -163,7 +180,15 @@ struct MultiplyOperator
   template <class T>
   static inline T operation(T left, T right)
   {
-    return left * right;
+    // Use double precision for float calculations to match MySQL 8.0 behavior
+    if constexpr (std::is_same_v<T, float>) {
+      double left_double = static_cast<double>(left);
+      double right_double = static_cast<double>(right);
+      double result_double = left_double * right_double;
+      return static_cast<T>(result_double);
+    } else {
+      return left * right;
+    }
   }
 #if defined(USE_SIMD)
   static inline __m256 operation(__m256 left, __m256 right) { return _mm256_mul_ps(left, right); }
@@ -188,7 +213,16 @@ struct DivideOperator
         return std::numeric_limits<T>::quiet_NaN();
       }
     }
-    return left / right;
+
+    // Use double precision for float calculations to match MySQL 8.0 behavior
+    if constexpr (std::is_same_v<T, float>) {
+      double left_double = static_cast<double>(left);
+      double right_double = static_cast<double>(right);
+      double result_double = left_double / right_double;
+      return static_cast<T>(result_double);
+    } else {
+      return left / right;
+    }
   }
 
 #if defined(USE_SIMD)
@@ -210,7 +244,14 @@ struct NegateOperator
   template <class T>
   static inline T operation(T input)
   {
-    return -input;
+    // Use double precision for float calculations to match MySQL 8.0 behavior
+    if constexpr (std::is_same_v<T, float>) {
+      double input_double = static_cast<double>(input);
+      double result_double = -input_double;
+      return static_cast<T>(result_double);
+    } else {
+      return -input;
+    }
   }
 };
 
