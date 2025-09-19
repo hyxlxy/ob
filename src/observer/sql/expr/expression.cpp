@@ -323,6 +323,14 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
   LOG_DEBUG("ComparisonExpr::get_value() left value SUCCESS: left_type=%d value_type=%d",
             static_cast<int>(left_->type()), static_cast<int>(left_value.attr_type()));
 
+  // Handle IS [NOT] NULL operations first
+  if (comp_ == IS_NULL_OP || comp_ == IS_NOT_NULL_OP) {
+    bool is_null_sql = left_value.is_null() || left_value.attr_type() == AttrType::UNDEFINED || is_null_like_numeric(left_value);
+    bool result = (comp_ == IS_NULL_OP) ? is_null_sql : !is_null_sql;
+    value.set_boolean(result);
+    return RC::SUCCESS;
+  }
+
   // Handle IN and NOT IN operations (both subquery and values)
   if (comp_ == IN_OP || comp_ == NOT_IN_OP || comp_ == IN_VALUES_OP || comp_ == NOT_IN_VALUES_OP) {
     if (is_null_like_numeric(left_value)) {
