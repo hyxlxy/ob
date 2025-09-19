@@ -368,7 +368,9 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
     }
 
     // Skip type checking for IN operations since ListExpr has UNDEFINED value_type
+    // Also skip for IS NULL operations since they don't need type unification
     if (filter_unit->comp() != IN_OP && filter_unit->comp() != NOT_IN_OP &&
+        filter_unit->comp() != IS_NULL_OP && filter_unit->comp() != IS_NOT_NULL_OP &&
         left->value_type() != right->value_type()) {
       auto left_to_right_cost = implicit_cast_cost(left->value_type(), right->value_type());
       auto right_to_left_cost = implicit_cast_cost(right->value_type(), left->value_type());

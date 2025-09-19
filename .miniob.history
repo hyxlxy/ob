@@ -670,3 +670,15 @@ SELECT * FROM ssq_1 WHERE col1 = (SELECT ssq_2.col2 FROM ssq_2);
 -- Test 3: Valid scalar subquery with WHERE clause (should work)
 ### 2025-09-15 15:56:11.494
 SELECT * FROM ssq_1 WHERE col1 = (SELECT ssq_2.col2 FROM ssq_2 WHERE ssq_2.id = 1);
+### 2025-09-19 10:17:22.632
+SELECT 2 IS NOT NULL;
+### 2025-09-19 10:21:06.255
+SELECT * FROM null_table WHERE 2 IS NULL;
+### 2025-09-19 10:21:28.751
+SELECT * FROM null_table WHERE 2 IS NOT NULL;
+### 2025-09-19 10:21:50.992
+SELECT * FROM null_table WHERE num IS NULL;
+### 2025-09-19 10:22:14.555
+SELECT * FROM null_table WHERE num IS NOT NULL;
+### 2025-09-19 10:22:37.279
+SELECT 2 IS NULL;

@@ -23,7 +23,7 @@ class AnalyzeTableStmt : public Stmt
 public:
   AnalyzeTableStmt(const string &table_name) : table_name_(table_name) {}
   virtual ~AnalyzeTableStmt() = default;
-as
+
   StmtType type() const override { return StmtType::ANALYZE_TABLE; }
 
   const string &table_name() const { return table_name_; }

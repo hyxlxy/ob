@@ -1,13 +1,3 @@
-### 2025-09-04 09:27:22.228
-SELECT SUM(score) FROM students;
-### 2025-09-04 09:27:22.229
--- 测试AVG
-### 2025-09-04 09:27:22.229
-SELECT AVG(score) FROM students;
-### 2025-09-04 09:27:22.230
--- 测试MAX
-### 2025-09-04 09:27:22.230
-SELECT MAX(score) FROM students;
 ### 2025-09-04 09:27:22.230
 -- 测试MIN
 ### 2025-09-04 09:27:22.231
@@ -1748,8 +1738,6 @@ create table ssq_1(id int, col1 int, feat1 float);
 select * from ssq_1 where (select ssq_2.id from ssq_2 where col2 = 87) = id;
 ### 2025-09-16 08:59:23.037
 create table null_test_final(id int not null, name char(20) null);
-### 2025-09-16 09:21:41.712
-CREATE TABLE null_table(id int not null, num int null, price float not null, birthday date null);
 ### 2025-09-16 09:22:16.139
 CREATE TABLE null_table(id int not null, num int null, price float not null);
 ### 2025-09-16 09:26:04.478
@@ -1998,3 +1986,15 @@ create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
 create table exp_table(id int, col1 int, col2 int, col3 float, col4 float); insert into exp_table VALUES (4, 4, 2, 4.55, 8.24); select id, -(col2*(-8)+1)+(col4+4)*(col1+col3*5) from exp_table;
 ### 2025-09-18 09:40:27.790
 -- Try to reproduce the precision issue
+### 2025-09-19 10:12:30.571
+CREATE TABLE null_table(id int not null, num int null, price float not null, birthday date null);
+### 2025-09-19 10:12:45.576
+INSERT INTO null_table VALUES (3, 9, 19.45, '2013-08-23');
+### 2025-09-19 10:13:00.599
+INSERT INTO null_table VALUES (8, null, 48.78, '2013-10-08');
+### 2025-09-19 10:13:15.608
+SELECT * FROM null_table WHERE 2 IS NULL;
+### 2025-09-19 10:13:30.622
+SELECT * FROM null_table WHERE 2 IS NOT NULL;
+### 2025-09-19 10:14:46.931
+SELECT 2 IS NULL;
