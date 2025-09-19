@@ -1,0 +1,62 @@
+{
+  "feature_name": "AGGREGATION",
+  "description": "聚合函数功能验证",
+  "setup_sql": [
+    "CREATE TABLE test_sales(id INT, product VARCHAR(50), quantity INT, price FLOAT);",
+    "INSERT INTO test_sales VALUES (1, 'Apple', 10, 1.5), (2, 'Banana', 20, 0.8), (3, 'Apple', 15, 1.5), (4, 'Orange', 5, 2.0);"
+  ],
+  "cleanup_sql": [
+    "DROP TABLE IF EXISTS test_sales;"
+  ],
+  "test_cases": [
+    {
+      "name": "COUNT函数测试",
+      "description": "验证COUNT聚合函数",
+      "sql": "SELECT COUNT(*) FROM test_sales;",
+      "expected_behavior": "consistent",
+      "timeout": 10
+    },
+    {
+      "name": "SUM函数测试",
+      "description": "验证SUM聚合函数",
+      "sql": "SELECT SUM(quantity) FROM test_sales;",
+      "expected_behavior": "consistent",
+      "timeout": 10
+    },
+    {
+      "name": "AVG函数测试",
+      "description": "验证AVG聚合函数",
+      "sql": "SELECT AVG(price) FROM test_sales;",
+      "expected_behavior": "consistent",
+      "timeout": 10
+    },
+    {
+      "name": "MAX函数测试",
+      "description": "验证MAX聚合函数",
+      "sql": "SELECT MAX(quantity) FROM test_sales;",
+      "expected_behavior": "consistent",
+      "timeout": 10
+    },
+    {
+      "name": "MIN函数测试",
+      "description": "验证MIN聚合函数",
+      "sql": "SELECT MIN(price) FROM test_sales;",
+      "expected_behavior": "consistent",
+      "timeout": 10
+    },
+    {
+      "name": "GROUP BY测试",
+      "description": "验证GROUP BY与聚合函数的组合",
+      "sql": "SELECT product, SUM(quantity) FROM test_sales GROUP BY product;",
+      "expected_behavior": "consistent",
+      "timeout": 10
+    },
+    {
+      "name": "HAVING测试",
+      "description": "验证HAVING子句",
+      "sql": "SELECT product, SUM(quantity) FROM test_sales GROUP BY product HAVING SUM(quantity) > 10;",
+      "expected_behavior": "consistent",
+      "timeout": 10
+    }
+  ]
+}

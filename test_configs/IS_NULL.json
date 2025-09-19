@@ -1,0 +1,82 @@
+{
+  "feature_name": "IS_NULL",
+  "description": "IS NULL和IS NOT NULL操作符功能验证",
+  "setup_sql": [
+    "-- 使用已有的null_table进行测试"
+  ],
+  "cleanup_sql": [
+    "-- 无需清理，使用已有表"
+  ],
+  "test_cases": [
+    {
+      "name": "常量IS NULL测试",
+      "description": "验证非NULL常量的IS NULL操作返回false",
+      "sql": "SELECT * FROM null_table WHERE 1 IS NULL;",
+      "expected_behavior": "consistent",
+      "timeout": 10
+    },
+    {
+      "name": "常量IS NOT NULL测试",
+      "description": "验证非NULL常量的IS NOT NULL操作返回true",
+      "sql": "SELECT * FROM null_table WHERE 1 IS NOT NULL;",
+      "expected_behavior": "consistent",
+      "timeout": 10
+    },
+    {
+      "name": "NULL常量IS NULL测试",
+      "description": "验证NULL IS NULL返回true",
+      "sql": "SELECT * FROM null_table WHERE NULL IS NULL;",
+      "expected_behavior": "consistent",
+      "timeout": 10
+    },
+    {
+      "name": "NULL常量IS NOT NULL测试",
+      "description": "验证NULL IS NOT NULL返回false",
+      "sql": "SELECT * FROM null_table WHERE NULL IS NOT NULL;",
+      "expected_behavior": "consistent",
+      "timeout": 10
+    },
+    {
+      "name": "字段IS NULL测试",
+      "description": "验证字段的IS NULL操作",
+      "sql": "SELECT * FROM null_table WHERE num IS NULL;",
+      "expected_behavior": "consistent",
+      "timeout": 10
+    },
+    {
+      "name": "字段IS NOT NULL测试",
+      "description": "验证字段的IS NOT NULL操作",
+      "sql": "SELECT * FROM null_table WHERE num IS NOT NULL;",
+      "expected_behavior": "consistent",
+      "timeout": 10
+    },
+    {
+      "name": "字符串IS NULL测试",
+      "description": "验证字符串常量的IS NULL操作",
+      "sql": "SELECT * FROM null_table WHERE 'hello' IS NULL;",
+      "expected_behavior": "consistent",
+      "timeout": 10
+    },
+    {
+      "name": "字符串IS NOT NULL测试",
+      "description": "验证字符串常量的IS NOT NULL操作",
+      "sql": "SELECT * FROM null_table WHERE 'hello' IS NOT NULL;",
+      "expected_behavior": "consistent",
+      "timeout": 10
+    },
+    {
+      "name": "复合条件IS NULL测试",
+      "description": "验证复合条件中的IS NULL操作",
+      "sql": "SELECT * FROM null_table WHERE num IS NULL AND price > 0;",
+      "expected_behavior": "consistent",
+      "timeout": 10
+    },
+    {
+      "name": "COUNT与IS NULL测试",
+      "description": "验证聚合函数与IS NULL的组合",
+      "sql": "SELECT COUNT(*) FROM null_table WHERE num IS NOT NULL;",
+      "expected_behavior": "consistent",
+      "timeout": 10
+    }
+  ]
+}

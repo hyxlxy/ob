@@ -1,0 +1,44 @@
+{
+  "feature_name": "JOIN",
+  "description": "表连接操作功能验证",
+  "setup_sql": [
+    "CREATE TABLE test_users(id INT, name VARCHAR(50));",
+    "CREATE TABLE test_orders(id INT, user_id INT, amount FLOAT);",
+    "INSERT INTO test_users VALUES (1, 'Alice'), (2, 'Bob'), (3, 'Charlie');",
+    "INSERT INTO test_orders VALUES (1, 1, 100.0), (2, 1, 200.0), (3, 2, 150.0);"
+  ],
+  "cleanup_sql": [
+    "DROP TABLE IF EXISTS test_users;",
+    "DROP TABLE IF EXISTS test_orders;"
+  ],
+  "test_cases": [
+    {
+      "name": "INNER JOIN基本测试",
+      "description": "验证INNER JOIN的基本功能",
+      "sql": "SELECT u.name, o.amount FROM test_users u INNER JOIN test_orders o ON u.id = o.user_id;",
+      "expected_behavior": "consistent",
+      "timeout": 10
+    },
+    {
+      "name": "LEFT JOIN测试",
+      "description": "验证LEFT JOIN包含左表所有记录",
+      "sql": "SELECT u.name, o.amount FROM test_users u LEFT JOIN test_orders o ON u.id = o.user_id;",
+      "expected_behavior": "consistent",
+      "timeout": 10
+    },
+    {
+      "name": "JOIN条件测试",
+      "description": "验证JOIN的条件过滤",
+      "sql": "SELECT u.name, o.amount FROM test_users u INNER JOIN test_orders o ON u.id = o.user_id WHERE o.amount > 150;",
+      "expected_behavior": "consistent",
+      "timeout": 10
+    },
+    {
+      "name": "多表JOIN测试",
+      "description": "验证多表连接",
+      "sql": "SELECT COUNT(*) FROM test_users u INNER JOIN test_orders o ON u.id = o.user_id;",
+      "expected_behavior": "consistent",
+      "timeout": 10
+    }
+  ]
+}
