@@ -50,8 +50,7 @@ private:
   RC create_plan(ExplainStmt *explain_stmt, unique_ptr<LogicalOperator> &logical_operator);
 
   RC create_group_by_plan(SelectStmt *select_stmt, unique_ptr<LogicalOperator> &logical_operator);
-  RC create_predicate_from_raw_conditions(const vector<ConditionSqlNode> &conditions, unique_ptr<LogicalOperator> &logical_operator);
-  RC create_predicate_from_raw_conditions(const vector<ConditionSqlNode> &conditions, unique_ptr<LogicalOperator> &logical_operator, const vector<Table*> &tables);
+
 
   int implicit_cast_cost(AttrType from, AttrType to);
 

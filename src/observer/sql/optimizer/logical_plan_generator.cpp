@@ -112,14 +112,7 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     return rc;
   }
 
-  // 如果 FilterStmt 为空但有原始条件，尝试处理包含 SubQueryExpr 的条件
-  if (!predicate_oper && !select_stmt->raw_conditions().empty()) {
-    rc = create_predicate_from_raw_conditions(select_stmt->raw_conditions(), predicate_oper, tables);
-    if (OB_FAIL(rc)) {
-      LOG_WARN("failed to create predicate from raw conditions. rc=%s", strrc(rc));
-      return rc;
-    }
-  }
+
 
   for (Table *table : tables) {
 
@@ -369,8 +362,10 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
 
     // Skip type checking for IN operations since ListExpr has UNDEFINED value_type
     // Also skip for IS NULL operations since they don't need type unification
+    // Also skip for SubQueryExpr since they have UNDEFINED value_type until execution
     if (filter_unit->comp() != IN_OP && filter_unit->comp() != NOT_IN_OP &&
         filter_unit->comp() != IS_NULL_OP && filter_unit->comp() != IS_NOT_NULL_OP &&
+        left->type() != ExprType::SUBQUERY && right->type() != ExprType::SUBQUERY &&
         left->value_type() != right->value_type()) {
       auto left_to_right_cost = implicit_cast_cost(left->value_type(), right->value_type());
       auto right_to_left_cost = implicit_cast_cost(right->value_type(), left->value_type());
@@ -685,175 +680,4 @@ bool LogicalPlanGenerator::involves_tables(Expression *expr, LogicalOperator *le
   return false;
 }
 
-RC LogicalPlanGenerator::create_predicate_from_raw_conditions(const vector<ConditionSqlNode> &conditions, unique_ptr<LogicalOperator> &logical_operator)
-{
-  // 默认使用 csq_1 表，这是为了向后兼容
-  vector<Table*> default_tables;
-  Db *db = Session::current_session()->get_current_db();
-  if (db) {
-    Table *table = db->find_table("csq_1");
-    if (table) {
-      default_tables.push_back(table);
-    }
-  }
 
-  return create_predicate_from_raw_conditions(conditions, logical_operator, default_tables);
-}
-
-RC LogicalPlanGenerator::create_predicate_from_raw_conditions(const vector<ConditionSqlNode> &conditions, unique_ptr<LogicalOperator> &logical_operator, const vector<Table*> &tables)
-{
-  printf("DEBUG: [LOGICAL_PLAN] create_predicate_from_raw_conditions called with %d conditions and %zu tables\n", (int)conditions.size(), tables.size());
-
-  if (conditions.empty()) {
-    return RC::SUCCESS;
-  }
-
-  // 目前只处理单个条件的情况
-  if (conditions.size() > 1) {
-    LOG_WARN("Multiple conditions with SubQueryExpr not yet supported");
-    return RC::UNIMPLEMENTED;
-  }
-
-  const ConditionSqlNode &condition = conditions[0];
-
-  // 检查是否包含 SubQueryExpr
-  bool has_subquery = false;
-  if (condition.left_expr && condition.left_expr->type() == ExprType::SUBQUERY) {
-    has_subquery = true;
-    printf("DEBUG: [LOGICAL_PLAN] Found SubQueryExpr in left expression\n");
-  }
-  if (condition.right_expr && condition.right_expr->type() == ExprType::SUBQUERY) {
-    has_subquery = true;
-    printf("DEBUG: [LOGICAL_PLAN] Found SubQueryExpr in right expression\n");
-  }
-
-  if (!has_subquery) {
-    LOG_WARN("No SubQueryExpr found in conditions");
-    return RC::INTERNAL;
-  }
-
-  // 创建 ComparisonExpr 来处理包含 SubQueryExpr 的条件
-  CompOp comp_op = condition.comp;
-  unique_ptr<Expression> left_expr;
-  unique_ptr<Expression> right_expr;
-
-  // 对于包含 SubQueryExpr 的条件，我们需要先绑定表达式，然后再复制
-  // 这是因为原始表达式可能是 UnboundFieldExpr，需要转换为 FieldExpr
-
-  printf("DEBUG: [LOGICAL_PLAN] Original left expression type=%d, right expression type=%d\n",
-         (int)condition.left_expr->type(), (int)condition.right_expr->type());
-
-  // 复制左表达式
-  if (condition.left_expr) {
-    if (condition.left_expr->type() == ExprType::UNBOUND_FIELD) {
-      printf("DEBUG: [LOGICAL_PLAN] Left expression is UNBOUND_FIELD, need to bind it first\n");
-
-      // 对于 UNBOUND_FIELD，我们需要手动绑定它
-      // 创建一个临时的绑定上下文
-      BinderContext binder_context;
-
-      // 使用传入的表列表
-      if (tables.empty()) {
-        LOG_WARN("No tables provided for binding");
-        return RC::INTERNAL;
-      }
-
-      for (Table* table : tables) {
-        binder_context.add_table(table);
-        printf("DEBUG: [LOGICAL_PLAN] Added table '%s' to binder context\n", table->name());
-      }
-
-      // 创建表达式绑定器
-      ExpressionBinder expression_binder(binder_context);
-
-      // 绑定左表达式
-      unique_ptr<Expression> left_expr_copy = condition.left_expr->copy();
-      vector<unique_ptr<Expression>> bound_expressions;
-      RC rc = expression_binder.bind_expression(left_expr_copy, bound_expressions);
-      if (rc != RC::SUCCESS) {
-        LOG_WARN("Failed to bind left expression. rc=%s", strrc(rc));
-        return rc;
-      }
-
-      if (bound_expressions.empty()) {
-        LOG_WARN("No bound expressions returned");
-        return RC::INTERNAL;
-      }
-
-      left_expr = std::move(bound_expressions[0]);
-      printf("DEBUG: [LOGICAL_PLAN] Successfully bound left expression, type=%d\n", (int)left_expr->type());
-    } else {
-      left_expr = condition.left_expr->copy();
-      printf("DEBUG: [LOGICAL_PLAN] Successfully copied left expression, type=%d\n", (int)left_expr->type());
-    }
-
-    if (!left_expr) {
-      LOG_WARN("Failed to copy left expression");
-      return RC::INTERNAL;
-    }
-  }
-
-  // 复制右表达式
-  if (condition.right_expr) {
-    if (condition.right_expr->type() == ExprType::UNBOUND_FIELD) {
-      printf("DEBUG: [LOGICAL_PLAN] Right expression is UNBOUND_FIELD, need to bind it first\n");
-
-      // 对于 UNBOUND_FIELD，我们需要手动绑定它
-      // 创建一个临时的绑定上下文
-      BinderContext binder_context;
-
-      // 使用传入的表列表
-      if (tables.empty()) {
-        LOG_WARN("No tables provided for binding");
-        return RC::INTERNAL;
-      }
-
-      for (Table* table : tables) {
-        binder_context.add_table(table);
-        printf("DEBUG: [LOGICAL_PLAN] Added table '%s' to binder context for right expr\n", table->name());
-      }
-
-      // 创建表达式绑定器
-      ExpressionBinder expression_binder(binder_context);
-
-      // 绑定右表达式
-      unique_ptr<Expression> right_expr_copy = condition.right_expr->copy();
-      vector<unique_ptr<Expression>> bound_expressions;
-      RC rc = expression_binder.bind_expression(right_expr_copy, bound_expressions);
-      if (rc != RC::SUCCESS) {
-        LOG_WARN("Failed to bind right expression. rc=%s", strrc(rc));
-        return rc;
-      }
-
-      if (bound_expressions.empty()) {
-        LOG_WARN("No bound expressions returned for right expr");
-        return RC::INTERNAL;
-      }
-
-      right_expr = std::move(bound_expressions[0]);
-      printf("DEBUG: [LOGICAL_PLAN] Successfully bound right expression, type=%d\n", (int)right_expr->type());
-    } else {
-      right_expr = condition.right_expr->copy();
-      if (!right_expr) {
-        LOG_WARN("Failed to copy right expression");
-        return RC::INTERNAL;
-      }
-      printf("DEBUG: [LOGICAL_PLAN] Successfully copied right expression, type=%d\n", (int)right_expr->type());
-    }
-  }
-
-  if (!left_expr || !right_expr) {
-    LOG_WARN("Failed to create expressions for predicate");
-    return RC::INTERNAL;
-  }
-
-  // 创建 ComparisonExpr
-  auto comparison_expr = make_unique<ComparisonExpr>(comp_op, std::move(left_expr), std::move(right_expr));
-  printf("DEBUG: [LOGICAL_PLAN] Created ComparisonExpr with comp_op=%d\n", (int)comp_op);
-
-  // 创建 PredicateLogicalOperator（使用单个表达式）
-  logical_operator = make_unique<PredicateLogicalOperator>(std::move(comparison_expr));
-
-  printf("DEBUG: [LOGICAL_PLAN] Created PredicateLogicalOperator successfully\n");
-  return RC::SUCCESS;
-}

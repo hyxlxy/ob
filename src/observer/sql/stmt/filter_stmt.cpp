@@ -266,11 +266,14 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<st
 
       // 处理左表达式
       if (condition.left_expr->type() == ExprType::SUBQUERY) {
-        printf("DEBUG: [FILTER] Left expr is SubQueryExpr - cannot use FilterUnit, need different approach\n");
-        // 对于包含 SubQueryExpr 的条件，我们不能使用传统的 FilterUnit 方式
-        // 需要创建一个 ComparisonExpr 直接处理
-        delete filter_unit;
-        return RC::UNIMPLEMENTED; // 暂时返回错误，强制使用其他处理方式
+        printf("DEBUG: [FILTER] Left expr is SubQueryExpr - using expression directly\n");
+        // 对于 SubQueryExpr，我们可以直接复制它，因为 SubQueryExpr::copy() 已经实现
+        left_copy = condition.left_expr->copy();
+        if (!left_copy) {
+          LOG_WARN("Failed to copy left SubQueryExpr");
+          delete filter_unit;
+          return RC::INTERNAL;
+        }
       } else {
         left_copy = condition.left_expr->copy();
         if (!left_copy) {
@@ -282,10 +285,14 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<st
 
       // 处理右表达式
       if (condition.right_expr->type() == ExprType::SUBQUERY) {
-        printf("DEBUG: [FILTER] Right expr is SubQueryExpr - cannot use FilterUnit, need different approach\n");
-        // 对于包含 SubQueryExpr 的条件，我们不能使用传统的 FilterUnit 方式
-        delete filter_unit;
-        return RC::UNIMPLEMENTED; // 暂时返回错误，强制使用其他处理方式
+        printf("DEBUG: [FILTER] Right expr is SubQueryExpr - using expression directly\n");
+        // 对于 SubQueryExpr，我们可以直接复制它，因为 SubQueryExpr::copy() 已经实现
+        right_copy = condition.right_expr->copy();
+        if (!right_copy) {
+          LOG_WARN("Failed to copy right SubQueryExpr");
+          delete filter_unit;
+          return RC::INTERNAL;
+        }
       } else {
         right_copy = condition.right_expr->copy();
         if (!right_copy) {
