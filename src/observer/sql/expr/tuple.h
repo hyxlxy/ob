@@ -210,13 +210,25 @@ public:
         // For non-NULL values, use original type and exclude NULL flag byte from actual data
         cell.set_type(field_meta->type());
         size_t data_len = field_meta->len() - 1;
-        cell.set_data(this->record_->data() + field_meta->offset(), data_len);
+
+        // Special handling for string types (CHARS and TEXTS)
+        if (field_meta->type() == AttrType::CHARS || field_meta->type() == AttrType::TEXTS) {
+          cell.set_string(this->record_->data() + field_meta->offset(), data_len);
+        } else {
+          cell.set_data(this->record_->data() + field_meta->offset(), data_len);
+        }
         cell.set_null(false);
       }
     } else {
       // For non-nullable fields, use full length and set not null
       cell.set_type(field_meta->type());
-      cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
+
+      // Special handling for string types (CHARS and TEXTS)
+      if (field_meta->type() == AttrType::CHARS || field_meta->type() == AttrType::TEXTS) {
+        cell.set_string(this->record_->data() + field_meta->offset(), field_meta->len());
+      } else {
+        cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
+      }
       cell.set_null(false);
     }
 

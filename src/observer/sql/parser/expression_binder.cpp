@@ -189,6 +189,8 @@ RC ExpressionBinder::bind_unbound_field_expression(
     table = context_.find_table(table_name);
     if (nullptr == table) {
       LOG_INFO("no such table in from list: %s", table_name);
+      // 检查是否可能是关联子查询中的外层表引用
+      LOG_WARN("Table '%s' not found in current context. This might be a correlated subquery reference.", table_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
   }

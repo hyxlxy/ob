@@ -1,0 +1,4 @@
+CREATE TABLE test_basic(id int, name char(10));
+INSERT INTO test_basic VALUES (1, 'hello');
+SELECT * FROM test_basic;
+DROP TABLE test_basic;

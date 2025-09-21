@@ -18,7 +18,134 @@ except:
   print("cannot load argparse module")
   exit(1)
 
+try:
+  import mysql.connector
+  MYSQL_AVAILABLE = True
+except ImportError:
+  MYSQL_AVAILABLE = False
+  print("Warning: mysql-connector-python not available. MySQL comparison will be disabled.")
+
 _logger = logging.getLogger('MiniOBTest')
+
+class MySQLConnector:
+  """
+  MySQL 8.0连接器，用于执行SQL并获取结果
+  """
+
+  def __init__(self, host='localhost', user='root', password='hxl', database='test'):
+    self.host = host
+    self.user = user
+    self.password = password
+    self.database = database
+    self.connection = None
+
+  def connect(self):
+    """连接到MySQL数据库"""
+    if not MYSQL_AVAILABLE:
+      raise Exception("MySQL connector not available. Please install mysql-connector-python")
+
+    try:
+      # 先连接到MySQL服务器（不指定数据库）
+      self.connection = mysql.connector.connect(
+        host=self.host,
+        user=self.user,
+        password=self.password,
+        autocommit=True,
+        ssl_disabled=True
+      )
+
+      # 创建数据库（如果不存在）
+      cursor = self.connection.cursor()
+      cursor.execute(f"CREATE DATABASE IF NOT EXISTS {self.database}")
+      cursor.execute(f"USE {self.database}")
+      cursor.close()
+
+      return True
+    except mysql.connector.Error as err:
+      _logger.error(f"Failed to connect to MySQL: {err}")
+      return False
+
+  def disconnect(self):
+    """断开MySQL连接"""
+    if self.connection:
+      self.connection.close()
+      self.connection = None
+
+  def execute_sql(self, sql):
+    """
+    执行SQL语句并返回结果
+    返回格式与MiniOB保持一致
+    """
+    if not self.connection:
+      return "ERROR: Not connected to MySQL"
+
+    try:
+      cursor = self.connection.cursor()
+
+      # 处理特殊的MiniOB命令
+      sql_upper = sql.strip().upper()
+      if sql_upper.startswith('-- ECHO'):
+        # 处理echo命令
+        return sql.strip()
+      elif sql_upper.startswith('--'):
+        # 跳过注释
+        return sql.strip()
+      elif not sql.strip():
+        # 跳过空行
+        return ""
+
+      # 首先输出SQL语句（模拟MiniOB的行为）
+      sql_clean = sql.strip().upper()
+      if not sql_clean.endswith(';'):
+        sql_clean += ';'
+      result_lines = [sql_clean]
+
+      # 执行SQL
+      cursor.execute(sql)
+
+      # 获取结果
+      if cursor.description:
+        # SELECT查询
+        columns = [desc[0].upper() for desc in cursor.description]
+        rows = cursor.fetchall()
+
+        # 添加列名
+        result_lines.append(' | '.join(columns))
+
+        # 添加数据行
+        for row in rows:
+          formatted_row = []
+          for value in row:
+            if value is None:
+              formatted_row.append('NULL')
+            else:
+              formatted_row.append(str(value).upper())
+          result_lines.append(' | '.join(formatted_row))
+
+        return '\n'.join(result_lines)
+      else:
+        # INSERT/UPDATE/DELETE等操作
+        result_lines.append("SUCCESS")
+        return '\n'.join(result_lines)
+
+    except mysql.connector.Error as err:
+      error_msg = str(err)
+      # 将MySQL错误转换为类似MiniOB的格式
+      sql_clean = sql.strip().upper()
+      if not sql_clean.endswith(';'):
+        sql_clean += ';'
+
+      if "Duplicate entry" in error_msg:
+        return sql_clean + "\nFAILURE"
+      elif "doesn't exist" in error_msg:
+        return sql_clean + "\nFAILURE"
+      elif "syntax error" in error_msg or "SQL syntax" in error_msg:
+        return sql_clean + "\nSQL_SYNTAX > FAILED TO PARSE SQL"
+      else:
+        return sql_clean + "\nFAILURE"
+    finally:
+      if 'cursor' in locals():
+        cursor.close()
 
 """
 Case程序自动化运行脚本
@@ -660,6 +787,13 @@ class TestSuite:
     self.__need_start_server = True
     self.__test_names = None # 如果指定测试哪些Case，就不再遍历所有的cases
     self.__miniob_server = None
+    # MySQL对比相关
+    self.__mysql_compare = False
+    self.__mysql_connector = None
+    self.__mysql_host = 'localhost'
+    self.__mysql_user = 'root'
+    self.__mysql_password = 'hxl'
+    self.__mysql_database = 'test'
 
   def set_test_names(self, tests):
     self.__test_names = tests
@@ -697,6 +831,20 @@ class TestSuite:
   def set_report_only(self, report_only):
     self.__report_only = report_only
 
+  def set_mysql_compare(self, mysql_compare, host='localhost', user='root', password='hxl', database='test'):
+    """设置MySQL对比参数"""
+    self.__mysql_compare = mysql_compare
+    self.__mysql_host = host
+    self.__mysql_user = user
+    self.__mysql_password = password
+    self.__mysql_database = database
+
+    if mysql_compare:
+      self.__mysql_connector = MySQLConnector(host, user, password, database)
+      if not self.__mysql_connector.connect():
+        raise Exception(f"Failed to connect to MySQL at {host} with user {user}")
+      _logger.info(f"Connected to MySQL 8.0 at {host} for comparison")
+
   def __compare_files(self, file1, file2):
     with open(file1, 'r') as f1, open(file2, 'r') as f2:
       lines1 = f1.readlines()
@@ -710,6 +858,40 @@ class TestSuite:
           _logger.info('file1=%s, file2=%s, line1=%s, line2=%s', file1, file2, lines1[i], lines2[i])
           return False
       return True
+
+  def __generate_mysql_result(self, test_case: TestCase) -> str:
+    """
+    使用MySQL 8.0执行测试用例并生成结果文件
+    """
+    if not self.__mysql_connector:
+      raise Exception("MySQL connector not initialized")
+
+    mysql_result_file = test_case.result_file(self.__test_result_base_dir) + '.mysql'
+
+    # 首先清理MySQL数据库
+    try:
+      self.__mysql_connector.execute_sql("DROP DATABASE IF EXISTS miniob_test")
+      self.__mysql_connector.execute_sql("CREATE DATABASE miniob_test")
+      self.__mysql_connector.execute_sql("USE miniob_test")
+    except Exception as e:
+      _logger.warning(f"Failed to setup MySQL test database: {e}")
+
+    results = []
+    for command_line in test_case.command_lines():
+      command_line = command_line.strip()
+      if not command_line:
+        continue
+
+      # 执行SQL并获取结果
+      result = self.__mysql_connector.execute_sql(command_line)
+      results.append(result)
+
+    # 写入MySQL结果文件
+    with open(mysql_result_file, 'w') as f:
+      for result in results:
+        f.write(result + '\n')
+
+    return mysql_result_file
 
   def run_case(self, test_case, timeout=20) -> Result:
     # eventlet.monkey_patch()
@@ -749,6 +931,23 @@ class TestSuite:
     if self.__report_only:
       shutil.copy(result_tmp_file_name, result_file_name)
       return True
+    elif self.__mysql_compare:
+      # MySQL对比模式
+      try:
+        mysql_result_file = self.__generate_mysql_result(test_case)
+        result = self.__compare_files(result_tmp_file_name, mysql_result_file)
+
+        if result:
+          _logger.info(f"✅ {test_case.get_name()}: MiniOB result matches MySQL 8.0")
+        else:
+          _logger.error(f"❌ {test_case.get_name()}: MiniOB result differs from MySQL 8.0")
+          _logger.error(f"   MiniOB result: {result_tmp_file_name}")
+          _logger.error(f"   MySQL result:  {mysql_result_file}")
+
+        return result
+      except Exception as e:
+        _logger.error(f"Failed to compare with MySQL: {e}")
+        return False
     else:
       result = self.__compare_files(result_tmp_file_name, result_file_name)
       if not GlobalConfig.debug:
@@ -832,6 +1031,12 @@ class TestSuite:
     _logger.info("All done. %d passed, %d failed, %d timeout", success_count, failure_count, timeout_count)
     _logger.debug(eval_result.get_message())
     self.__clean_server_if_need()
+
+    # 清理MySQL连接
+    if self.__mysql_connector:
+      self.__mysql_connector.disconnect()
+      _logger.info("Disconnected from MySQL")
+
     return True
 
   def __start_server_if_need(self, clean_data_dir: bool):
@@ -868,6 +1073,20 @@ def __init_options():
   # 是否仅仅生成结果，而不对结果做校验。一般在新生成一个case时使用
   options_parser.add_argument('--report-only', action='store_true', dest='report_only', default=False,
                               help='just report the result')
+
+  # 是否与MySQL 8.0进行对比
+  options_parser.add_argument('--mysql-compare', action='store_true', dest='mysql_compare', default=False,
+                              help='compare results with MySQL 8.0')
+
+  # MySQL连接参数
+  options_parser.add_argument('--mysql-host', action='store', dest='mysql_host', default='localhost',
+                              help='MySQL host (default: localhost)')
+  options_parser.add_argument('--mysql-user', action='store', dest='mysql_user', default='root',
+                              help='MySQL user (default: root)')
+  options_parser.add_argument('--mysql-password', action='store', dest='mysql_password', default='hxl',
+                              help='MySQL password (default: hxl)')
+  options_parser.add_argument('--mysql-database', action='store', dest='mysql_database', default='test',
+                              help='MySQL database (default: test)')
 
   # 当前miniob的代码目录
   options_parser.add_argument('--project-dir', action='store', dest='project_dir', default='')
@@ -956,6 +1175,14 @@ def __init_test_suite(options) -> TestSuite:
 
   if options.report_only:
     test_suite.set_report_only(True)
+
+  # 设置MySQL对比
+  if options.mysql_compare:
+    test_suite.set_mysql_compare(True,
+                                options.mysql_host,
+                                options.mysql_user,
+                                options.mysql_password,
+                                options.mysql_database)
 
   return test_suite
 

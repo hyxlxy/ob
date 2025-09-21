@@ -281,7 +281,20 @@ string Value::to_string() const
   return res;
 }
 
-int Value::compare(const Value &other) const { return DataType::type_instance(this->attr_type_)->compare(*this, other); }
+int Value::compare(const Value &other) const
+{
+  // Handle NULL value comparisons specially
+  bool this_is_null = (this->attr_type_ == AttrType::UNDEFINED || this->is_null_);
+  bool other_is_null = (other.attr_type_ == AttrType::UNDEFINED || other.is_null_);
+
+  if (this_is_null || other_is_null) {
+    // Use UndefinedType's compare method for any NULL comparisons
+    return DataType::type_instance(AttrType::UNDEFINED)->compare(*this, other);
+  }
+
+  // For non-NULL values, use the normal type-specific comparison
+  return DataType::type_instance(this->attr_type_)->compare(*this, other);
+}
 
 int Value::get_int() const
 {

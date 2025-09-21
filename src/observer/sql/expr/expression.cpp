@@ -1513,6 +1513,11 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
   rc = physical_plan_generator.create(*logical_operator, physical_operator, session);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create physical plan for sub-query. rc=%s", strrc(rc));
+    // 如果是未实现的功能，可能是关联子查询
+    if (rc == RC::UNIMPLEMENTED) {
+      LOG_WARN("Physical plan generation failed for subquery. This might be a correlated subquery.");
+      return RC::UNIMPLEMENTED;
+    }
     return rc;
   }
 
@@ -1677,6 +1682,11 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
   RC rc = SelectStmt::create(db, *sub_query_, stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("Failed to create SelectStmt from subquery. rc=%s", strrc(rc));
+    // 如果是字段不存在错误，可能是关联子查询，返回更友好的错误
+    if (rc == RC::SCHEMA_TABLE_NOT_EXIST || rc == RC::SCHEMA_FIELD_MISSING || rc == RC::SCHEMA_FIELD_NOT_EXIST) {
+      LOG_WARN("Subquery contains references to outer query fields (correlated subquery). This is not yet fully supported.");
+      return RC::UNIMPLEMENTED;
+    }
     return rc;
   }
 

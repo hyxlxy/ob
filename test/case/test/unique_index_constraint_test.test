@@ -1,0 +1,7 @@
+CREATE TABLE unique_test(id int, name char(10));
+CREATE UNIQUE INDEX unique_test_id_idx ON unique_test(id);
+INSERT INTO unique_test VALUES (1, 'Alice');
+INSERT INTO unique_test VALUES (2, 'Bob');
+INSERT INTO unique_test VALUES (1, 'Charlie');
+SELECT * FROM unique_test;
+DROP TABLE unique_test;

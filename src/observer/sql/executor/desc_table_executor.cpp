@@ -166,57 +166,72 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
           break;
         }
 
-        // Compare values based on operator
-        int cmp_result = left_value.compare(right_value);
+        // Handle NULL values according to SQL semantics
         bool condition_match = false;
 
-        switch (filter_unit->comp()) {
-          case EQUAL_TO:
-            condition_match = (cmp_result == 0);
-            break;
-          case LESS_THAN:
-            condition_match = (cmp_result < 0);
-            break;
-          case GREAT_THAN:
-            condition_match = (cmp_result > 0);
-            break;
-          case LESS_EQUAL:
-            condition_match = (cmp_result <= 0);
-            break;
-          case GREAT_EQUAL:
-            condition_match = (cmp_result >= 0);
-            break;
-          case NOT_EQUAL:
-            condition_match = (cmp_result != 0);
-            break;
-          case LIKE_OP:
-            if (left_value.attr_type() == AttrType::CHARS && right_value.attr_type() == AttrType::CHARS) {
-              condition_match = like_match(left_value.get_string().c_str(), right_value.get_string().c_str());
-            }
-            break;
-          case IN_VALUES_OP:
-          case NOT_IN_VALUES_OP:
-            {
-              // 处理IN/NOT IN操作
-              const std::vector<Value> &values = filter_unit->right_values();
-              bool found = false;
-              for (const Value &val : values) {
-                if (left_value.compare(val) == 0) {
-                  found = true;
-                  break;
+        // Special handling for IS NULL and IS NOT NULL
+        if (filter_unit->comp() == IS_NULL_OP) {
+          condition_match = (left_value.attr_type() == AttrType::UNDEFINED || left_value.is_null());
+        } else if (filter_unit->comp() == IS_NOT_NULL_OP) {
+          condition_match = !(left_value.attr_type() == AttrType::UNDEFINED || left_value.is_null());
+        } else {
+          // For other operators, if either value is NULL, the result is UNKNOWN (false in WHERE clause)
+          if (left_value.attr_type() == AttrType::UNDEFINED || left_value.is_null() ||
+              right_value.attr_type() == AttrType::UNDEFINED || right_value.is_null()) {
+            condition_match = false; // NULL comparisons are UNKNOWN, treated as false in WHERE
+          } else {
+            // Compare non-NULL values
+            int cmp_result = left_value.compare(right_value);
+
+            switch (filter_unit->comp()) {
+              case EQUAL_TO:
+                condition_match = (cmp_result == 0);
+                break;
+              case LESS_THAN:
+                condition_match = (cmp_result < 0);
+                break;
+              case GREAT_THAN:
+                condition_match = (cmp_result > 0);
+                break;
+              case LESS_EQUAL:
+                condition_match = (cmp_result <= 0);
+                break;
+              case GREAT_EQUAL:
+                condition_match = (cmp_result >= 0);
+                break;
+              case NOT_EQUAL:
+                condition_match = (cmp_result != 0);
+                break;
+              case LIKE_OP:
+                if (left_value.attr_type() == AttrType::CHARS && right_value.attr_type() == AttrType::CHARS) {
+                  condition_match = like_match(left_value.get_string().c_str(), right_value.get_string().c_str());
                 }
-              }
-              condition_match = (filter_unit->comp() == IN_VALUES_OP) ? found : !found;
+                break;
+              case IN_VALUES_OP:
+              case NOT_IN_VALUES_OP:
+                {
+                  // 处理IN/NOT IN操作
+                  const std::vector<Value> &values = filter_unit->right_values();
+                  bool found = false;
+                  for (const Value &val : values) {
+                    if (left_value.compare(val) == 0) {
+                      found = true;
+                      break;
+                    }
+                  }
+                  condition_match = (filter_unit->comp() == IN_VALUES_OP) ? found : !found;
+                }
+                break;
+              case NOT_LIKE_OP:
+                if (left_value.attr_type() == AttrType::CHARS && right_value.attr_type() == AttrType::CHARS) {
+                  condition_match = !like_match(left_value.get_string().c_str(), right_value.get_string().c_str());
+                }
+                break;
+              default:
+                condition_match = false;
+                break;
             }
-            break;
-          case NOT_LIKE_OP:
-            if (left_value.attr_type() == AttrType::CHARS && right_value.attr_type() == AttrType::CHARS) {
-              condition_match = !like_match(left_value.get_string().c_str(), right_value.get_string().c_str());
-            }
-            break;
-          default:
-            condition_match = false;
-            break;
+          }
         }
 
         if (!condition_match) {

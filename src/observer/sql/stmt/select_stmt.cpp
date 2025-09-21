@@ -108,6 +108,11 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     RC rc = expression_binder.bind_expression(expression, bound_expressions);
     if (OB_FAIL(rc)) {
       LOG_INFO("bind expression failed. rc=%s", strrc(rc));
+      // 如果是字段不存在错误，可能是关联子查询，返回更友好的错误
+      if (rc == RC::SCHEMA_TABLE_NOT_EXIST || rc == RC::SCHEMA_FIELD_MISSING || rc == RC::SCHEMA_FIELD_NOT_EXIST) {
+        LOG_WARN("Field binding failed in SELECT clause. This might be a correlated subquery reference.");
+        return RC::UNIMPLEMENTED;
+      }
       return rc;
     }
   }

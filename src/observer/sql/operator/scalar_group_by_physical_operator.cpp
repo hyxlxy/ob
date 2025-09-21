@@ -112,6 +112,18 @@ RC ScalarGroupByPhysicalOperator::open(Trx *trx)
   // 得到最终聚合后的值
   if (group_value_) {
     rc = evaluate(*group_value_);
+  } else {
+    // 如果没有任何数据行，仍然需要创建聚合器并计算结果
+    // 对于COUNT，结果是0；对于AVG/SUM/MIN/MAX，结果是NULL
+    AggregatorList aggregator_list;
+    create_aggregator_list(aggregator_list);
+
+    CompositeTuple composite_tuple;
+    group_value_ = make_unique<GroupValueType>(std::move(aggregator_list), std::move(composite_tuple));
+
+    if (group_value_) {
+      rc = evaluate(*group_value_);
+    }
   }
 
   emitted_ = false;

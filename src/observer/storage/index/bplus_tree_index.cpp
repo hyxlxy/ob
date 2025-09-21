@@ -118,25 +118,28 @@ RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
 {
   // Check for uniqueness if this is a unique index
   if (index_meta_.is_unique()) {
-    // First check if the key already exists
-    BplusTreeScanner scanner(index_handler_);
-    const char *key_data = record + field_meta_.offset();
+    // If the index is empty, no need to check for duplicates
+    if (!index_handler_.is_empty()) {
+      // Check if the key already exists
+      BplusTreeScanner scanner(index_handler_);
+      const char *key_data = record + field_meta_.offset();
 
-    RC rc = scanner.open(key_data, field_meta_.len(), true, key_data, field_meta_.len(), true);
-    if (rc == RC::SUCCESS) {
-      RID existing_rid;
-      rc = scanner.next_entry(existing_rid);
-      scanner.close();
-
+      RC rc = scanner.open(key_data, field_meta_.len(), true, key_data, field_meta_.len(), true);
       if (rc == RC::SUCCESS) {
-        // Key already exists, this violates uniqueness constraint
-        LOG_WARN("Unique constraint violation: key already exists in index %s", index_meta_.name());
-        return RC::RECORD_DUPLICATE_KEY;
+        RID existing_rid;
+        rc = scanner.next_entry(existing_rid);
+        scanner.close();
+
+        if (rc == RC::SUCCESS) {
+          // Key already exists, this violates uniqueness constraint
+          LOG_WARN("Unique constraint violation: key already exists in index %s", index_meta_.name());
+          return RC::RECORD_DUPLICATE_KEY;
+        }
+      } else {
+        // If scanner.open failed for non-empty index, this is an error
+        LOG_WARN("Scanner open failed for uniqueness check in non-empty index %s, rc=%s", index_meta_.name(), strrc(rc));
+        return rc;
       }
-    } else {
-      // If scanner.open failed, it might be because the index is empty or other issues
-      // We should still proceed with the insertion in this case
-      LOG_DEBUG("Scanner open failed for uniqueness check in index %s, rc=%s", index_meta_.name(), strrc(rc));
     }
   }
 

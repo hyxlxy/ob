@@ -202,6 +202,27 @@ RC DateType::format_date_int(int date_int, string &date_str)
   return RC::SUCCESS;
 }
 
+int UndefinedType::compare(const Value &left, const Value &right) const
+{
+  // Handle NULL value comparisons according to SQL standards
+  // In SQL, NULL values have special comparison semantics for ORDER BY
+
+  bool left_is_null = (left.attr_type() == AttrType::UNDEFINED || left.is_null());
+  bool right_is_null = (right.attr_type() == AttrType::UNDEFINED || right.is_null());
+
+  if (left_is_null && right_is_null) {
+    return 0;  // NULL == NULL for sorting purposes
+  } else if (left_is_null) {
+    return -1; // NULL < non-NULL (NULL values sort first in ASC order, matching MySQL 8.0)
+  } else if (right_is_null) {
+    return 1;  // non-NULL > NULL
+  }
+
+  // If neither is NULL but we're in UndefinedType::compare, something is wrong
+  LOG_WARN("UndefinedType::compare called with non-NULL values");
+  return 0;
+}
+
 RC UndefinedType::to_string(const Value &val, string &result) const
 {
   ASSERT(val.attr_type() == AttrType::UNDEFINED, "invalid type");

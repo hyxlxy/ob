@@ -130,5 +130,6 @@ public:
   UndefinedType() : DataType(AttrType::UNDEFINED) {}
   virtual ~UndefinedType() {}
 
+  int compare(const Value &left, const Value &right) const override;
   RC to_string(const Value &val, string &result) const override;
 };

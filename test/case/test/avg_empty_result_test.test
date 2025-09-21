@@ -1,0 +1,6 @@
+CREATE TABLE aggregation_func(id int, price float, birthday date);
+INSERT INTO aggregation_func VALUES (1, 10.5, '2020-01-01');
+INSERT INTO aggregation_func VALUES (2, 20.0, '2021-01-01');
+INSERT INTO aggregation_func VALUES (3, 30.5, '2022-01-01');
+SELECT AVG(price) FROM aggregation_func WHERE birthday > '2037-12-01';
+DROP TABLE aggregation_func;

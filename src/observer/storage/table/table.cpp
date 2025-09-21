@@ -207,20 +207,23 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
   // }
   RC rc = RC::SUCCESS;
 
-  if (table_meta_.storage_engine() == StorageEngine::HEAP) {
-    engine_ = make_unique<HeapTableEngine>(&table_meta_, db_, this);
-  }  else if (table_meta_.storage_engine() == StorageEngine::LSM) {
-    engine_ = make_unique<LsmTableEngine>(&table_meta_, db_, this);
-  } else {
-    rc = RC::UNSUPPORTED;
-    LOG_ERROR("Unsupported storage engine type: %d", table_meta_.storage_engine());
-    return rc;
-  }
+  // 视图不需要存储引擎
+  if (!table_meta_.is_view()) {
+    if (table_meta_.storage_engine() == StorageEngine::HEAP) {
+      engine_ = make_unique<HeapTableEngine>(&table_meta_, db_, this);
+    }  else if (table_meta_.storage_engine() == StorageEngine::LSM) {
+      engine_ = make_unique<LsmTableEngine>(&table_meta_, db_, this);
+    } else {
+      rc = RC::UNSUPPORTED;
+      LOG_ERROR("Unsupported storage engine type: %d", table_meta_.storage_engine());
+      return rc;
+    }
 
-  rc = engine_->open();
-  if (rc != RC::SUCCESS) {
-    LOG_ERROR("Failed to open table %s due to engine open failed.", base_dir);
-    return rc;
+    rc = engine_->open();
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to open table %s due to engine open failed.", base_dir);
+      return rc;
+    }
   }
 
   return rc;
@@ -228,11 +231,19 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
 
 RC Table::insert_record(Record &record)
 {
+  if (is_view()) {
+    LOG_WARN("Cannot insert into view: %s", name());
+    return RC::UNIMPLEMENTED;
+  }
   return engine_->insert_record(record);
 }
 
 RC Table::visit_record(const RID &rid, function<bool(Record &)> visitor)
 {
+  if (is_view()) {
+    LOG_WARN("Cannot visit record in view: %s", name());
+    return RC::UNIMPLEMENTED;
+  }
   return engine_->visit_record(rid, visitor);
 }
 
@@ -252,6 +263,10 @@ RC Table::update_record_with_trx(const Record &old_record, const Record &new_rec
 
 RC Table::get_record(const RID &rid, Record &record)
 {
+  if (is_view()) {
+    LOG_WARN("Cannot get record from view: %s", name());
+    return RC::UNIMPLEMENTED;
+  }
   return engine_->get_record(rid, record);
 }
 
@@ -377,6 +392,10 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
 
 RC Table::get_record_scanner(RecordScanner *&scanner, Trx *trx, ReadWriteMode mode)
 {
+  if (is_view()) {
+    LOG_WARN("Cannot get record scanner from view: %s", name());
+    return RC::UNIMPLEMENTED;
+  }
   return engine_->get_record_scanner(scanner, trx, mode);
 }
 
