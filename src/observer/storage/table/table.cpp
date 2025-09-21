@@ -128,6 +128,57 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
   return rc;
 }
 
+RC Table::create_view(Db *db, int32_t table_id, const char *path, const char *name,
+                      const vector<string> &attr_names, const string &select_sql)
+{
+  if (table_id < 0) {
+    LOG_WARN("invalid table id. table_id=%d, table_name=%s", table_id, name);
+    return RC::INVALID_ARGUMENT;
+  }
+
+  if (common::is_blank(name)) {
+    LOG_WARN("Name cannot be empty");
+    return RC::INVALID_ARGUMENT;
+  }
+
+  LOG_INFO("Begin to create view %s", name);
+
+  // 创建元数据文件
+  int fd = ::open(path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+  if (fd < 0) {
+    if (EEXIST == errno) {
+      LOG_ERROR("Failed to create view file, it has been created. %s, EEXIST, %s", path, strerror(errno));
+      return RC::SCHEMA_TABLE_EXIST;
+    }
+    LOG_ERROR("Create view file failed. filename=%s, errmsg=%d:%s", path, errno, strerror(errno));
+    return RC::IOERR_OPEN;
+  }
+  close(fd);
+
+  // 初始化视图元数据
+  RC rc = table_meta_.init_view(table_id, name, attr_names, select_sql);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to init view meta. name:%s, ret:%d", name, rc);
+    return rc;
+  }
+
+  // 保存元数据到文件
+  fstream fs;
+  fs.open(path, ios_base::out | ios_base::binary);
+  if (!fs.is_open()) {
+    LOG_ERROR("Failed to open file for write. file name=%s, errmsg=%s", path, strerror(errno));
+    return RC::IOERR_OPEN;
+  }
+
+  table_meta_.serialize(fs);
+  fs.close();
+
+  db_ = db;
+
+  LOG_INFO("Successfully created view %s", name);
+  return RC::SUCCESS;
+}
+
 RC Table::open(Db *db, const char *meta_file, const char *base_dir)
 {
   // 加载元数据文件
@@ -370,5 +421,9 @@ Index *Table::find_index_by_field(const char *field_name) const
 
 RC Table::sync()
 {
+  // 视图不需要同步数据文件
+  if (is_view()) {
+    return RC::SUCCESS;
+  }
   return engine_->sync();
 }

@@ -27,6 +27,8 @@ static const Json::StaticString FIELD_STORAGE_ENGINE("storage_engine");
 static const Json::StaticString FIELD_FIELDS("fields");
 static const Json::StaticString FIELD_INDEXES("indexes");
 static const Json::StaticString FIELD_PRIMARY_KEYS("primary_keys");
+static const Json::StaticString FIELD_TABLE_TYPE("table_type");
+static const Json::StaticString FIELD_SELECT_SQL("select_sql");
 
 TableMeta::TableMeta(const TableMeta &other)
     : table_id_(other.table_id_),
@@ -35,6 +37,8 @@ TableMeta::TableMeta(const TableMeta &other)
       indexes_(other.indexes_),
       storage_format_(other.storage_format_),
       storage_engine_(other.storage_engine_),
+      table_type_(other.table_type_),
+      select_sql_(other.select_sql_),
       record_size_(other.record_size_)
 {}
 
@@ -101,6 +105,46 @@ RC TableMeta::init(int32_t table_id, const char *name, const vector<FieldMeta> *
   storage_format_ = storage_format;
   storage_engine_ = storage_engine;
   LOG_INFO("Sussessfully initialized table meta. table id=%d, name=%s", table_id, name);
+  return RC::SUCCESS;
+}
+
+RC TableMeta::init_view(int32_t table_id, const char *name, const vector<string> &attr_names,
+                        const string &select_sql)
+{
+  if (table_id < 0) {
+    LOG_WARN("invalid table id. table id = %d, table name = %s", table_id, name);
+    return RC::INVALID_ARGUMENT;
+  }
+
+  if (common::is_blank(name)) {
+    LOG_WARN("Name cannot be empty");
+    return RC::INVALID_ARGUMENT;
+  }
+
+  table_id_ = table_id;
+  name_ = name;
+  table_type_ = TableType::VIEW;
+  select_sql_ = select_sql;
+
+  // 为视图创建字段元数据
+  // 注意：这里简化处理，实际应该从SELECT语句中推导字段类型
+  for (size_t i = 0; i < attr_names.size(); i++) {
+    FieldMeta field_meta;
+    RC rc = field_meta.init(attr_names[i].c_str(), AttrType::CHARS, 0, 255, true, false);
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to init field meta. field name=%s", attr_names[i].c_str());
+      return rc;
+    }
+    fields_.push_back(field_meta);
+  }
+
+  // 计算记录大小（视图不需要实际存储，但保持接口一致）
+  record_size_ = 0;
+  for (const FieldMeta &field : fields_) {
+    record_size_ += field.len();
+  }
+
+  LOG_INFO("Successfully initialized view meta. table id=%d, name=%s", table_id, name);
   return RC::SUCCESS;
 }
 
@@ -203,6 +247,12 @@ int TableMeta::serialize(ostream &ss) const
   }
   table_value[FIELD_PRIMARY_KEYS] = std::move(primary_keys_value);
 
+  // 添加视图相关字段
+  table_value[FIELD_TABLE_TYPE] = static_cast<int>(table_type_);
+  if (table_type_ == TableType::VIEW) {
+    table_value[FIELD_SELECT_SQL] = select_sql_;
+  }
+
   Json::StreamWriterBuilder builder;
   Json::StreamWriter       *writer = builder.newStreamWriter();
 
@@ -243,7 +293,14 @@ int TableMeta::deserialize(istream &is)
   string table_name = table_name_value.asString();
 
   const Json::Value &fields_value = table_value[FIELD_FIELDS];
-  if (!fields_value.isArray() || fields_value.size() <= 0) {
+  // 检查是否为视图，视图可能没有字段信息
+  const Json::Value &table_type_value = table_value[FIELD_TABLE_TYPE];
+  bool is_view = false;
+  if (!table_type_value.empty() && table_type_value.isInt()) {
+    is_view = (static_cast<TableType>(table_type_value.asInt()) == TableType::VIEW);
+  }
+
+  if (!is_view && (!fields_value.isArray() || fields_value.size() <= 0)) {
     LOG_ERROR("Invalid table meta. fields is not array, json value=%s", fields_value.toStyledString().c_str());
     return -1;
   }
@@ -265,7 +322,7 @@ int TableMeta::deserialize(istream &is)
   int32_t storage_engine = storage_engine_value.asInt();
 
   RC  rc        = RC::SUCCESS;
-  int field_num = fields_value.size();
+  int field_num = fields_value.isArray() ? fields_value.size() : 0;
 
   vector<FieldMeta> fields(field_num);
   for (int i = 0; i < field_num; i++) {
@@ -287,7 +344,13 @@ int TableMeta::deserialize(istream &is)
   storage_engine_ = static_cast<StorageEngine>(storage_engine);
   name_.swap(table_name);
   fields_.swap(fields);
-  record_size_ = fields_.back().offset() + fields_.back().len() - fields_.begin()->offset();
+
+  // 视图没有字段时，record_size_设为0
+  if (field_num > 0) {
+    record_size_ = fields_.back().offset() + fields_.back().len() - fields_.begin()->offset();
+  } else {
+    record_size_ = 0;
+  }
 
   for (const FieldMeta &field_meta : fields_) {
     if (!field_meta.visible()) {
@@ -335,6 +398,28 @@ int TableMeta::deserialize(istream &is)
       primary_keys.push_back(field_name);
     }
     primary_keys_.swap(primary_keys);
+  }
+
+  // 处理视图相关字段
+  if (!table_type_value.empty()) {
+    if (!table_type_value.isInt()) {
+      LOG_ERROR("Invalid table meta. table type is not int, json value=%s", table_type_value.toStyledString().c_str());
+      return -1;
+    }
+    table_type_ = static_cast<TableType>(table_type_value.asInt());
+  } else {
+    table_type_ = TableType::TABLE; // 默认为普通表
+  }
+
+  if (table_type_ == TableType::VIEW) {
+    const Json::Value &select_sql_value = table_value[FIELD_SELECT_SQL];
+    if (!select_sql_value.empty()) {
+      if (!select_sql_value.isString()) {
+        LOG_ERROR("Invalid table meta. select sql is not string, json value=%s", select_sql_value.toStyledString().c_str());
+        return -1;
+      }
+      select_sql_ = select_sql_value.asString();
+    }
   }
 
   return (int)(is.tellg() - old_pos);

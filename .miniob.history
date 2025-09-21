@@ -350,8 +350,6 @@ exit;
 q
 ### 2025-09-14 22:09:09.271
 DESC ssq_1;
-### 2025-09-14 22:09:32.806
-SHOW TABLES;
 ### 2025-09-14 22:26:36.165
 -- Test NOT IN subquery functionality
 ### 2025-09-14 22:26:36.177
@@ -720,3 +718,45 @@ SELECT col2 FROM ssq_2;
 INSERT INTO ssq_2 VALUES (5, 99, 50.0);
 ### 2025-09-20 18:34:39.819
 SELECT * FROM ssq_1 WHERE col1 = (SELECT ssq_2.col2 FROM ssq_2 WHERE ssq_2.id = 5);
+### 2025-09-20 19:19:31.351
+select * from ssq_1 where col1 = (select ssq_2.col2 from ssq_2);
+### 2025-09-20 19:20:23.227
+SHOW TABLES;
+### 2025-09-20 19:25:20.446
+SELECT * FROM null_table where null=5;
+### 2025-09-20 19:26:13.041
+SELECT * FROM null_table where null IS NULL;
+### 2025-09-20 19:54:16.703
+CREATE TABLE test_order(id int, name char(10), score float);
+### 2025-09-20 19:55:16.909
+INSERT INTO test_order VALUES (3, 'Alice', 85.5); INSERT INTO test_order VALUES (1, 'Bob', 92.0); INSERT INTO test_order VALUES (2, 'Charlie', 78.5); SELECT * FROM test_order ORDER BY id;
+### 2025-09-20 19:56:09.137
+INSERT INTO test_order VALUES (3, 'Alice', 85.5);
+### 2025-09-20 19:57:02.416
+INSERT INTO test_order VALUES (1, 'Bob', 92.0);
+### 2025-09-20 19:58:57.166
+INSERT INTO test_order VALUES (2, 'Charlie', 78.5);
+### 2025-09-20 19:59:23.724
+SELECT * FROM test_order ORDER BY id;
+### 2025-09-20 20:50:36.304
+CREATE TABLE test_table(id int, name char(10), score float);
+### 2025-09-20 20:51:21.662
+INSERT INTO test_table VALUES (1, 'Alice', 85.5); INSERT INTO test_table VALUES (2, 'Bob', 92.0); INSERT INTO test_table VALUES (3, 'Charlie', 78.5);
+### 2025-09-20 21:01:54.554
+CREATE VIEW high_score_view AS SELECT id, name FROM test_table WHERE score > 80;
+### 2025-09-20 21:02:41.273
+DROP VIEW high_score_view;
+### 2025-09-20 21:17:10.146
+CREATE TABLE test_table(id int, name char(10), score float); CREATE INDEX idx_id ON test_table(id); CREATE INDEX idx_name ON test_table(name); SHOW INDEX FROM test_table;
+### 2025-09-21 09:08:12.334
+CREATE INDEX idx_id ON test_table(id);
+### 2025-09-21 09:13:17.298
+CREATE VIEW test_view AS SELECT id, name FROM test_table WHERE score > 80;
+### 2025-09-21 09:28:09.572
+CREATE TABLE test_table(id int, name char(10), score float); SHOW INDEX FROM test_table;
+### 2025-09-21 09:28:52.911
+SHOW INDEX FROM test_table;
+### 2025-09-21 09:29:23.760
+CREATE VIEW test_view AS SELECT id, name FROM test_order WHERE score > 80;
+### 2025-09-21 09:29:53.318
+DROP VIEW test_view;

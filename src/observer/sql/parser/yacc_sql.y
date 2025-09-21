@@ -132,6 +132,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         IS
 
         UNIQUE
+        VIEW
         EQ
         LT
         GT
@@ -217,6 +218,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <sql_node>            drop_table_stmt
 %type <sql_node>            analyze_table_stmt
 %type <sql_node>            show_tables_stmt
+%type <sql_node>            show_index_stmt
 %type <sql_node>            desc_table_stmt
 %type <sql_node>            create_index_stmt
 %type <sql_node>            drop_index_stmt
@@ -227,6 +229,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <sql_node>            load_data_stmt
 %type <sql_node>            explain_stmt
 %type <sql_node>            set_variable_stmt
+%type <sql_node>            create_view_stmt
+%type <sql_node>            drop_view_stmt
 %type <sql_node>            help_stmt
 %type <sql_node>            exit_stmt
 %type <sql_node>            command_wrapper
@@ -258,6 +262,7 @@ command_wrapper:
   | drop_table_stmt
   | analyze_table_stmt
   | show_tables_stmt
+  | show_index_stmt
   | desc_table_stmt
   | create_index_stmt
   | drop_index_stmt
@@ -268,6 +273,8 @@ command_wrapper:
   | load_data_stmt
   | explain_stmt
   | set_variable_stmt
+  | create_view_stmt
+  | drop_view_stmt
   | help_stmt
   | exit_stmt
     ;
@@ -323,6 +330,14 @@ analyze_table_stmt:  /* analyze table 语法的语法解析树*/
 show_tables_stmt:
     SHOW TABLES {
       $$ = new ParsedSqlNode(SCF_SHOW_TABLES);
+    }
+    ;
+
+show_index_stmt:
+    SHOW INDEX FROM ID
+    {
+      $$ = new ParsedSqlNode(SCF_SHOW_INDEX);
+      $$->show_index.relation_name = $4;
     }
     ;
 
@@ -392,6 +407,35 @@ create_table_stmt:    /*create table 语句的语法解析树*/
       if ($9 != nullptr) {
         create_table.storage_format = $9;
       }
+    }
+    ;
+
+create_view_stmt:
+    CREATE VIEW ID AS select_stmt
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_VIEW);
+      CreateViewSqlNode &create_view = $$->create_view;
+      create_view.relation_name = $3;
+      create_view.create_view_select = std::make_unique<SelectSqlNode>(std::move($5->selection));
+      delete $5;
+    }
+    | CREATE VIEW ID LBRACE attr_list RBRACE AS select_stmt
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_VIEW);
+      CreateViewSqlNode &create_view = $$->create_view;
+      create_view.relation_name = $3;
+      create_view.attribute_names = std::move(*$5);
+      create_view.create_view_select = std::make_unique<SelectSqlNode>(std::move($8->selection));
+      delete $5;
+      delete $8;
+    }
+    ;
+
+drop_view_stmt:
+    DROP VIEW ID
+    {
+      $$ = new ParsedSqlNode(SCF_DROP_VIEW);
+      $$->drop_view.relation_name = $3;
     }
     ;
 

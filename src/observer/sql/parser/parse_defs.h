@@ -346,6 +346,37 @@ struct SetVariableSqlNode
   Value  value;
 };
 
+/**
+ * @brief 描述一个create view语句
+ * @ingroup SQLParser
+ * @details 创建视图语句的解析结果
+ */
+struct CreateViewSqlNode
+{
+  string                    relation_name;       ///< View name
+  vector<string>            attribute_names;     ///< Attribute names (optional)
+  unique_ptr<SelectSqlNode> create_view_select;  ///< SELECT statement for view
+};
+
+/**
+ * @brief 描述一个drop view语句
+ * @ingroup SQLParser
+ * @details 删除视图语句的解析结果
+ */
+struct DropViewSqlNode
+{
+  string relation_name;  ///< View name
+};
+
+/**
+ * @brief 描述一个show index语句
+ * @ingroup SQLParser
+ */
+struct ShowIndexSqlNode
+{
+  string relation_name;  ///< Table name
+};
+
 class ParsedSqlNode;
 
 /**
@@ -401,6 +432,9 @@ enum SqlCommandFlag
   SCF_EXIT,
   SCF_EXPLAIN,
   SCF_SET_VARIABLE,  ///< 设置变量
+  SCF_CREATE_VIEW,   ///< 创建视图
+  SCF_DROP_VIEW,     ///< 删除视图
+  SCF_SHOW_INDEX,    ///< 显示索引
 };
 /**
  * @brief 表示一个SQL语句
@@ -425,6 +459,9 @@ public:
   LoadDataSqlNode     load_data;
   ExplainSqlNode      explain;
   SetVariableSqlNode  set_variable;
+  CreateViewSqlNode   create_view;
+  DropViewSqlNode     drop_view;
+  ShowIndexSqlNode    show_index;
 
 public:
   ParsedSqlNode();

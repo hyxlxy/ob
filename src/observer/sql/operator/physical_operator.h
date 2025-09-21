@@ -37,6 +37,8 @@ enum class PhysicalOperatorType
   TABLE_SCAN,
   TABLE_SCAN_VEC,
   INDEX_SCAN,
+  VECTOR_INDEX_SCAN,
+  VIEW_SCAN,
   NESTED_LOOP_JOIN,
   HASH_JOIN,
   EXPLAIN,
@@ -48,12 +50,15 @@ enum class PhysicalOperatorType
   STRING_LIST,
   DELETE,
   INSERT,
+  UPDATE,
   SCALAR_GROUP_BY,
   HASH_GROUP_BY,
   GROUP_BY_VEC,
   AGGREGATE_VEC,
   EXPR_VEC,
   SORT,
+  ORDER_BY,
+  LIMIT,
 };
 
 /**

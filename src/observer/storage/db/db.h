@@ -71,10 +71,26 @@ public:
       const StorageFormat storage_format = StorageFormat::ROW_FORMAT);
 
   /**
+   * @brief 创建一个视图
+   * @param view_name 视图名
+   * @param attr_names 属性名列表（可选）
+   * @param select_sql SELECT语句的SQL文本
+   * @param select_stmt SELECT语句对象
+   */
+  RC create_view(const char *view_name, const vector<string> &attr_names,
+                 const string &select_sql, class SelectStmt *select_stmt);
+
+  /**
    * @brief 删除表
    * @param table_name 表名
    */
   RC drop_table(const char *table_name);
+
+  /**
+   * @brief 删除视图
+   * @param view_name 视图名
+   */
+  RC drop_view(const char *view_name);
 
   /**
    * @brief 根据表名查找表

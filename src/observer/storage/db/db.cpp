@@ -177,6 +177,30 @@ RC Db::create_table(const char *table_name, span<const AttrInfoSqlNode> attribut
   return RC::SUCCESS;
 }
 
+RC Db::create_view(const char *view_name, const vector<string> &attr_names,
+                   const string &select_sql, SelectStmt *select_stmt)
+{
+  if (opened_tables_.count(view_name) != 0) {
+    LOG_WARN("View %s has been opened before.", view_name);
+    return RC::SCHEMA_TABLE_EXIST;
+  }
+
+  string view_file_path = table_meta_file(path_.c_str(), view_name);
+  Table *view = new Table();
+  int32_t table_id = next_table_id_++;
+
+  RC rc = view->create_view(this, table_id, view_file_path.c_str(), view_name, attr_names, select_sql);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to create view %s.", view_name);
+    delete view;
+    return rc;
+  }
+
+  opened_tables_[view_name] = view;
+  LOG_INFO("Create view success. view name=%s, table_id:%d", view_name, table_id);
+  return RC::SUCCESS;
+}
+
 RC Db::drop_table(const char *table_name)
 {
   if (nullptr == table_name || common::is_blank(table_name)) {
@@ -257,6 +281,49 @@ RC Db::drop_table(const char *table_name)
   }
 
   return rc;
+}
+
+RC Db::drop_view(const char *view_name)
+{
+  if (nullptr == view_name || common::is_blank(view_name)) {
+    LOG_WARN("Invalid view name");
+    return RC::INVALID_ARGUMENT;
+  }
+
+  // 检查视图是否存在
+  auto iter = opened_tables_.find(view_name);
+  if (iter == opened_tables_.end()) {
+    LOG_WARN("View not found: %s", view_name);
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+
+  Table *view = iter->second;
+
+  // 检查是否为视图
+  if (!view->is_view()) {
+    LOG_WARN("Cannot drop table %s using DROP VIEW", view_name);
+    return RC::INVALID_ARGUMENT;
+  }
+
+  // 从内存中移除视图
+  opened_tables_.erase(iter);
+
+  // 删除视图对象
+  delete view;
+
+  // 删除元数据文件
+  string meta_file = table_meta_file(path_.c_str(), view_name);
+  if (filesystem::exists(meta_file)) {
+    if (!filesystem::remove(meta_file)) {
+      LOG_ERROR("Failed to remove view meta file: %s", meta_file.c_str());
+      return RC::FILE_REMOVE;
+    } else {
+      LOG_INFO("Removed view meta file: %s", meta_file.c_str());
+    }
+  }
+
+  LOG_INFO("Successfully dropped view: %s", view_name);
+  return RC::SUCCESS;
 }
 
 Table *Db::find_table(const char *table_name) const

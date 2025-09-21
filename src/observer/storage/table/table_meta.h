@@ -22,6 +22,15 @@ See the Mulan PSL v2 for more details. */
 #include "storage/index/index_meta.h"
 
 /**
+ * @brief 表类型枚举
+ */
+enum class TableType
+{
+  TABLE,  ///< 普通表
+  VIEW    ///< 视图
+};
+
+/**
  * @brief 表元数据
  *
  */
@@ -38,6 +47,12 @@ public:
   RC init(int32_t table_id, const char *name, const vector<FieldMeta> *trx_fields,
       span<const AttrInfoSqlNode> attributes, const vector<string> &primary_keys, StorageFormat storage_format,
       StorageEngine storage_engine);
+
+  /**
+   * @brief 初始化视图元数据
+   */
+  RC init_view(int32_t table_id, const char *name, const vector<string> &attr_names,
+               const string &select_sql);
 
   RC add_index(const IndexMeta &index);
 
@@ -65,6 +80,11 @@ public:
 
   int record_size() const;
 
+  // 视图相关方法
+  TableType table_type() const { return table_type_; }
+  bool is_view() const { return table_type_ == TableType::VIEW; }
+  const string &select_sql() const { return select_sql_; }
+
 public:
   int  serialize(ostream &os) const override;
   int  deserialize(istream &is) override;
@@ -81,6 +101,8 @@ protected:
   vector<string>    primary_keys_;
   StorageFormat     storage_format_;
   StorageEngine     storage_engine_;
+  TableType         table_type_ = TableType::TABLE;  ///< 表类型
+  string            select_sql_;                      ///< 视图的SELECT语句（仅视图使用）
 
   int record_size_ = 0;
 };

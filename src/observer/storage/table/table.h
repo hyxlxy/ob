@@ -61,6 +61,18 @@ public:
       StorageEngine storage_engine);
 
   /**
+   * 创建一个视图
+   * @param db 数据库实例
+   * @param table_id 表ID
+   * @param path 元数据保存的文件(完整路径)
+   * @param name 视图名
+   * @param attr_names 属性名列表
+   * @param select_sql SELECT语句的SQL文本
+   */
+  RC create_view(Db *db, int32_t table_id, const char *path, const char *name,
+                 const vector<string> &attr_names, const string &select_sql);
+
+  /**
    * 打开一个表
    * @param meta_file 保存表元数据的文件完整路径
    * @param base_dir 表所在的文件夹，表记录数据文件、索引数据文件存放位置
@@ -117,6 +129,10 @@ public:
   const TableMeta &table_meta() const;
 
   RC sync();
+
+  // 视图相关方法
+  bool is_view() const { return table_meta_.is_view(); }
+  const string &select_sql() const { return table_meta_.select_sql(); }
 
 private:
   RC set_value_to_record(char *record_data, const Value &value, const FieldMeta *field);

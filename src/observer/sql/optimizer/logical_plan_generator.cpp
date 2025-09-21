@@ -30,6 +30,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/table_get_logical_operator.h"
 #include "sql/operator/group_by_logical_operator.h"
 #include "sql/operator/sort_logical_operator.h"
+#include "sql/operator/order_by_logical_operator.h"
+#include "sql/operator/limit_logical_operator.h"
 
 #include "sql/stmt/calc_stmt.h"
 #include "sql/stmt/delete_stmt.h"
@@ -199,8 +201,8 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
       order_by_expressions.emplace_back(std::move(ob));
     }
 
-    sort_oper = make_unique<SortLogicalOperator>(std::move(order_by_expressions),
-                                                 select_stmt->order_by_directions());
+    sort_oper = make_unique<OrderByLogicalOperator>(std::move(order_by_expressions),
+                                                    select_stmt->order_by_directions());
     sort_oper->add_child(std::move(*last_oper));
 
     last_oper = &sort_oper;
@@ -363,9 +365,11 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
     // Skip type checking for IN operations since ListExpr has UNDEFINED value_type
     // Also skip for IS NULL operations since they don't need type unification
     // Also skip for SubQueryExpr since they have UNDEFINED value_type until execution
+    // Also skip for NULL values (UNDEFINED type) since they follow special SQL NULL semantics
     if (filter_unit->comp() != IN_OP && filter_unit->comp() != NOT_IN_OP &&
         filter_unit->comp() != IS_NULL_OP && filter_unit->comp() != IS_NOT_NULL_OP &&
         left->type() != ExprType::SUBQUERY && right->type() != ExprType::SUBQUERY &&
+        left->value_type() != AttrType::UNDEFINED && right->value_type() != AttrType::UNDEFINED &&
         left->value_type() != right->value_type()) {
       auto left_to_right_cost = implicit_cast_cost(left->value_type(), right->value_type());
       auto right_to_left_cost = implicit_cast_cost(right->value_type(), left->value_type());
