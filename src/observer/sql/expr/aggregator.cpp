@@ -121,7 +121,9 @@ RC AvgAggregator::accumulate(const Value &value)
 RC AvgAggregator::evaluate(Value& result)
 {
   if (count_ == 0) {
-    result.set_float(0.0f);
+    // MySQL 8.0标准：当所有值都是NULL时，AVG返回NULL
+    result.set_type(AttrType::UNDEFINED);
+    result.set_null(true);
   } else {
     // 直接计算平均值，避免使用Value::divide
     float sum_val = sum_.get_float();

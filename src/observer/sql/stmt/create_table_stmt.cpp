@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "common/types.h"
 #include "sql/stmt/create_table_stmt.h"
+#include "sql/stmt/select_stmt.h"
 #include "event/sql_debug.h"
 
 RC CreateTableStmt::create(Db *db, const CreateTableSqlNode &create_table, Stmt *&stmt)
@@ -23,8 +24,25 @@ RC CreateTableStmt::create(Db *db, const CreateTableSqlNode &create_table, Stmt 
   if (storage_format == StorageFormat::UNKNOWN_FORMAT) {
     return RC::INVALID_ARGUMENT;
   }
-  stmt = new CreateTableStmt(create_table.relation_name, create_table.attr_infos, create_table.primary_keys, storage_format);
-  sql_debug("create table statement: table name %s", create_table.relation_name.c_str());
+
+  // Check if this is CREATE TABLE AS SELECT
+  if (create_table.as_select != nullptr) {
+    // Create SelectStmt from the AS SELECT clause
+    Stmt *select_stmt = nullptr;
+    RC rc = SelectStmt::create(db, *create_table.as_select, select_stmt);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to create select statement for CREATE TABLE AS SELECT. rc=%s", strrc(rc));
+      return rc;
+    }
+
+    stmt = new CreateTableStmt(create_table.relation_name, static_cast<SelectStmt*>(select_stmt), storage_format);
+    sql_debug("create table as select statement: table name %s", create_table.relation_name.c_str());
+  } else {
+    // Regular CREATE TABLE
+    stmt = new CreateTableStmt(create_table.relation_name, create_table.attr_infos, create_table.primary_keys, storage_format);
+    sql_debug("create table statement: table name %s", create_table.relation_name.c_str());
+  }
+
   return RC::SUCCESS;
 }
 

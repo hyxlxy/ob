@@ -116,6 +116,11 @@ RC SubQueryInPhysicalOperator::execute_sub_query(Trx *trx, std::vector<Value> &s
   RC rc = logical_plan_generator.create(sub_query_.get(), logical_operator);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create logical plan for sub-query. rc=%s", strrc(rc));
+    // 如果是字段不存在错误，可能是关联子查询，返回更友好的错误
+    if (rc == RC::SCHEMA_TABLE_NOT_EXIST || rc == RC::SCHEMA_FIELD_MISSING) {
+      LOG_WARN("Subquery contains references to outer query fields (correlated subquery). This is not yet fully supported.");
+      return RC::UNIMPLEMENTED;
+    }
     return rc;
   }
 

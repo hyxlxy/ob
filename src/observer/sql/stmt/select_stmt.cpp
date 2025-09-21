@@ -166,6 +166,11 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       LOG_WARN("Field validation failed in WHERE clause. rc=%d:%s", rc, strrc(rc));
       return rc;
     }
+    // 检查是否是关联子查询错误
+    if (rc == RC::UNIMPLEMENTED) {
+      LOG_WARN("Correlated subquery detected, not yet supported");
+      return rc;
+    }
     // 如果 FilterStmt 创建失败，可能是因为包含了 SubQueryExpr
     // 我们尝试创建一个空的 FilterStmt，并在逻辑计划生成阶段处理 SubQueryExpr
     LOG_WARN("FilterStmt creation failed (possibly due to SubQueryExpr), creating empty FilterStmt. Raw conditions count: %zu", all_conditions.size());

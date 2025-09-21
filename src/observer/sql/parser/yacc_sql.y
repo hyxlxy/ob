@@ -103,6 +103,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         FLOAT_T
         DATE_T
         VECTOR_T
+        TEXT_T
         HELP
         EXIT
         DOT //QUOTE
@@ -408,6 +409,14 @@ create_table_stmt:    /*create table 语句的语法解析树*/
         create_table.storage_format = $9;
       }
     }
+    | CREATE TABLE ID AS select_stmt
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_TABLE);
+      CreateTableSqlNode &create_table = $$->create_table;
+      create_table.relation_name = $3;
+      create_table.as_select = std::make_unique<SelectSqlNode>(std::move($5->selection));
+      delete $5;
+    }
     ;
 
 create_view_stmt:
@@ -506,9 +515,11 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->nullable = false;  // default NOT NULL
-      // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension)
+      // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension); TEXT default 65535
       if ($$->type == AttrType::VECTORS) {
         $$->length = static_cast<int>(sizeof(int));
+      } else if ($$->type == AttrType::TEXTS) {
+        $$->length = 255;  // TEXT default length (reduced for testing)
       } else {
         $$->length = 4;
       }
@@ -519,9 +530,11 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->nullable = true;  // explicitly nullable
-      // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension)
+      // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension); TEXT default 65535
       if ($$->type == AttrType::VECTORS) {
         $$->length = static_cast<int>(sizeof(int));
+      } else if ($$->type == AttrType::TEXTS) {
+        $$->length = 255;  // TEXT default length (reduced for testing)
       } else {
         $$->length = 4;
       }
@@ -536,9 +549,11 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->nullable = false;  // explicitly not nullable
-      // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension)
+      // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension); TEXT default 65535
       if ($$->type == AttrType::VECTORS) {
         $$->length = static_cast<int>(sizeof(int));
+      } else if ($$->type == AttrType::TEXTS) {
+        $$->length = 255;  // TEXT default length (reduced for testing)
       } else {
         $$->length = 4;
       }
@@ -558,6 +573,7 @@ type:
     | FLOAT_T  { $$ = static_cast<int>(AttrType::FLOATS); }
     | DATE_T   { $$ = static_cast<int>(AttrType::DATES); }
     | VECTOR_T { $$ = static_cast<int>(AttrType::VECTORS); }
+    | TEXT_T   { $$ = static_cast<int>(AttrType::TEXTS); }
     ;
 primary_key:
     /* empty */

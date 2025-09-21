@@ -1,0 +1,20 @@
+-- echo Test syntax error for aggregation functions
+CREATE TABLE aggregation_func(id int, num int, price float, addr char(4), birthday date);
+
+-- echo Test invalid COUNT syntax - should return SQL_SYNTAX error
+SELECT count(*,num) FROM aggregation_func;
+
+-- echo Test invalid SUM syntax - should return SQL_SYNTAX error  
+SELECT sum(num,price) FROM aggregation_func;
+
+-- echo Test invalid AVG syntax - should return SQL_SYNTAX error
+SELECT avg(num,price) FROM aggregation_func;
+
+-- echo Test invalid MIN syntax - should return SQL_SYNTAX error
+SELECT min(num,price) FROM aggregation_func;
+
+-- echo Test invalid MAX syntax - should return SQL_SYNTAX error
+SELECT max(num,price) FROM aggregation_func;
+
+-- echo Clean up
+DROP TABLE aggregation_func;

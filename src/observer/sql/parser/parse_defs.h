@@ -265,6 +265,9 @@ struct CreateTableSqlNode
   // TODO: integrate to CreateTableOptions
   string storage_format;  ///< storage format
   string storage_engine;  ///< storage engine
+
+  // For CREATE TABLE AS SELECT syntax
+  std::unique_ptr<SelectSqlNode> as_select;  ///< SELECT statement for CREATE TABLE AS SELECT
 };
 
 /**

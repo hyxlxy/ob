@@ -281,6 +281,14 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
   return rc;
 }
 
+bool ComparisonExpr::is_correlated_subquery() const
+{
+  // 简化的检测：目前总是返回false
+  // 真正的关联子查询检测需要分析子查询中是否引用了外层查询的表
+  // 这需要更复杂的AST分析
+  return false;
+}
+
 RC ComparisonExpr::try_get_value(Value &cell) const
 {
   if (left_->type() == ExprType::VALUE && right_->type() == ExprType::VALUE) {
@@ -342,18 +350,28 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
 
     // Handle subquery case
     if (sub_query_ || filter_unit_) {
-      // Use instance-level caching to avoid re-executing the same subquery
-      if (sub_query_results_.empty() && !sub_query_executed_) {
+      // For correlated subqueries, we need to execute for each row
+      // For non-correlated subqueries, we can cache the results
+      bool is_correlated = is_correlated_subquery();
+
+      std::vector<Value> sub_query_results;
+
+      if (!is_correlated && sub_query_executed_ && !sub_query_results_.empty()) {
+        // Use cached results for non-correlated subqueries
+        LOG_DEBUG("Using cached subquery results (%d results)", (int)sub_query_results_.size());
+        sub_query_results = sub_query_results_;
+      } else {
+        // Execute subquery (always for correlated, first time for non-correlated)
         RC rc = RC::SUCCESS;
 
         if (filter_unit_ && filter_unit_->sub_query()) {
           // Use FilterUnit's subquery (preferred)
-          LOG_DEBUG("Executing FilterUnit subquery (first time)");
-          rc = execute_subquery_and_collect_results(filter_unit_->sub_query().get(), sub_query_results_);
+          LOG_DEBUG("Executing FilterUnit subquery %s", is_correlated ? "(correlated)" : "(first time)");
+          rc = execute_subquery_and_collect_results(filter_unit_->sub_query().get(), sub_query_results);
         } else if (sub_query_) {
           // Use direct subquery
-          LOG_DEBUG("Executing direct subquery (first time)");
-          rc = execute_subquery_and_collect_results(sub_query_.get(), sub_query_results_);
+          LOG_DEBUG("Executing direct subquery %s", is_correlated ? "(correlated)" : "(first time)");
+          rc = execute_subquery_and_collect_results(sub_query_.get(), sub_query_results);
         } else {
           LOG_WARN("No subquery found in filter_unit or sub_query");
           return RC::INTERNAL;
@@ -364,13 +382,14 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
           return rc;
         }
 
-        sub_query_executed_ = true;
-        LOG_DEBUG("Subquery executed with %d results", (int)sub_query_results_.size());
-      } else {
-        LOG_DEBUG("Using cached subquery results (%d results)", (int)sub_query_results_.size());
-      }
+        // Cache results only for non-correlated subqueries
+        if (!is_correlated) {
+          sub_query_results_ = sub_query_results;
+          sub_query_executed_ = true;
+        }
 
-      std::vector<Value> &sub_query_results = sub_query_results_;
+        LOG_DEBUG("Subquery executed with %d results", (int)sub_query_results.size());
+      }
 
 
 
@@ -1477,6 +1496,11 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
   RC rc = logical_plan_generator.create(sub_query, logical_operator);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create logical plan for sub-query. rc=%s", strrc(rc));
+    // 如果是字段不存在错误，可能是关联子查询，返回更友好的错误
+    if (rc == RC::SCHEMA_TABLE_NOT_EXIST || rc == RC::SCHEMA_FIELD_MISSING) {
+      LOG_WARN("Subquery contains references to outer query fields (correlated subquery). This is not yet fully supported.");
+      return RC::UNIMPLEMENTED;
+    }
     return rc;
   }
 

@@ -358,6 +358,11 @@ public:
   template <typename T>
   RC compare_column(const Column &left, const Column &right, vector<uint8_t> &result) const;
 
+  /**
+   * Check if this comparison contains a correlated subquery
+   */
+  bool is_correlated_subquery() const;
+
 private:
   CompOp                 comp_;
   unique_ptr<Expression> left_;

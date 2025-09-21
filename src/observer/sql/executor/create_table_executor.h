@@ -17,6 +17,8 @@ See the Mulan PSL v2 for more details. */
 #include "common/sys/rc.h"
 
 class SQLStageEvent;
+class Session;
+class CreateTableStmt;
 
 /**
  * @brief 创建表的执行器
@@ -29,4 +31,7 @@ public:
   virtual ~CreateTableExecutor() = default;
 
   RC execute(SQLStageEvent *sql_event);
+
+private:
+  RC execute_create_table_as_select(Session *session, CreateTableStmt *create_table_stmt);
 };

@@ -48,6 +48,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/limit_logical_operator.h"
 #include "sql/operator/limit_physical_operator.h"
 #include "sql/operator/table_scan_vec_physical_operator.h"
+#include "sql/operator/view_scan_physical_operator.h"
 #include "sql/optimizer/physical_plan_generator.h"
 
 using namespace std;
@@ -222,6 +223,15 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
   vector<unique_ptr<Expression>> &predicates = table_get_oper.predicates();
   // 看看是否有可以用于索引查找的表达式
   Table *table = table_get_oper.table();
+
+  // 检查是否为视图
+  if (table->is_view()) {
+    LOG_TRACE("creating view scan operator for view: %s", table->name());
+    // 对于视图，我们需要解析其SELECT语句并创建相应的物理计划
+    // 暂时返回错误，提示视图功能尚未完全实现
+    LOG_WARN("VIEW functionality is not fully implemented yet. View name: %s", table->name());
+    return RC::UNIMPLEMENTED;
+  }
 
   Index     *index      = nullptr;
   ValueExpr *value_expr = nullptr;

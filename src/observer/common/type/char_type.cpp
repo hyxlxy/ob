@@ -15,8 +15,8 @@ See the Mulan PSL v2 for more details. */
 
 int CharType::compare(const Value &left, const Value &right) const
 {
-  ASSERT(left.attr_type() == AttrType::CHARS, "left type is not chars");
-  if (right.attr_type() == AttrType::CHARS) {
+  ASSERT(left.attr_type() == AttrType::CHARS || left.attr_type() == AttrType::TEXTS, "left type is not chars or texts");
+  if (right.attr_type() == AttrType::CHARS || right.attr_type() == AttrType::TEXTS) {
     return common::compare_string(
         (void *)left.value_.pointer_value_, left.length_, (void *)right.value_.pointer_value_, right.length_);
   } else if (right.attr_type() == AttrType::INTS) {
@@ -42,7 +42,8 @@ RC CharType::set_value_from_str(Value &val, const string &data) const
 RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
 {
   switch (type) {
-    case AttrType::CHARS: {
+    case AttrType::CHARS:
+    case AttrType::TEXTS: {
       result.set_string(val.get_string().c_str());
       return RC::SUCCESS;
     }
@@ -67,7 +68,7 @@ RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
 
 int CharType::cast_cost(AttrType type)
 {
-  if (type == AttrType::CHARS) {
+  if (type == AttrType::CHARS || type == AttrType::TEXTS) {
     return 0;
   }
   if (type == AttrType::DATES) {
@@ -84,8 +85,10 @@ int CharType::cast_cost(AttrType type)
 
 RC CharType::to_string(const Value &val, string &result) const
 {
-  stringstream ss;
-  ss << val.value_.pointer_value_;
-  result = ss.str();
+  if (val.value_.pointer_value_ == nullptr) {
+    result = "";
+    return RC::SUCCESS;
+  }
+  result = string(val.value_.pointer_value_, val.length_);
   return RC::SUCCESS;
 }

@@ -1,7 +1,7 @@
 -- echo Text Field Tests
--- Test TEXT data type functionality
+-- echo Test TEXT data type functionality
 
--- Create table with TEXT field
+-- echo Create table with TEXT field
 create table text_test(id int, title char(50), content text);
 
 -- Insert normal text data

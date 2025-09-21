@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/stmt.h"
 
 class Db;
+class SelectStmt;
 
 /**
  * @brief 表示创建表的语句
@@ -32,6 +33,12 @@ public:
       StorageFormat storage_format)
       : table_name_(table_name), attr_infos_(attr_infos), primary_keys_(pks), storage_format_(storage_format)
   {}
+
+  // Constructor for CREATE TABLE AS SELECT
+  CreateTableStmt(const string &table_name, SelectStmt *select_stmt, StorageFormat storage_format)
+      : table_name_(table_name), storage_format_(storage_format), select_stmt_(select_stmt)
+  {}
+
   virtual ~CreateTableStmt() = default;
 
   StmtType type() const override { return StmtType::CREATE_TABLE; }
@@ -41,6 +48,10 @@ public:
   const vector<string>          &primary_keys() const { return primary_keys_; }
   const StorageFormat            storage_format() const { return storage_format_; }
 
+  // For CREATE TABLE AS SELECT
+  bool is_as_select() const { return select_stmt_ != nullptr; }
+  SelectStmt *select_stmt() const { return select_stmt_; }
+
   static RC            create(Db *db, const CreateTableSqlNode &create_table, Stmt *&stmt);
   static StorageFormat get_storage_format(const char *format_str);
 
@@ -49,4 +60,5 @@ private:
   vector<AttrInfoSqlNode> attr_infos_;
   vector<string>          primary_keys_;
   StorageFormat           storage_format_;
+  SelectStmt             *select_stmt_ = nullptr;  // For CREATE TABLE AS SELECT
 };

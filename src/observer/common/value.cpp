@@ -256,6 +256,7 @@ const char *Value::data() const
 {
   switch (attr_type_) {
     case AttrType::CHARS:
+    case AttrType::TEXTS:
     case AttrType::VECTORS: {
       return value_.pointer_value_;
     } break;

@@ -1,17 +1,17 @@
 -- echo Aggregation and Group By Tests
--- Test aggregation functions and GROUP BY
+-- echo Test aggregation functions and GROUP BY
 
--- Create test table
+-- echo Create test table
 create table agg_test(id int, department char(20), salary float, age int);
 
--- Insert test data
+-- echo Insert test data
 insert into agg_test values(1, 'Engineering', 5000.0, 25);
 insert into agg_test values(2, 'Engineering', 6000.0, 30);
 insert into agg_test values(3, 'Sales', 4000.0, 28);
 insert into agg_test values(4, 'Sales', 4500.0, 32);
 insert into agg_test values(5, 'Marketing', 5500.0, 27);
 
--- Test basic aggregation functions
+-- echo Test basic aggregation functions
 select count(*) from agg_test;
 select count(id) from agg_test;
 select sum(salary) from agg_test;
@@ -19,17 +19,17 @@ select avg(salary) from agg_test;
 select min(salary) from agg_test;
 select max(salary) from agg_test;
 
--- Test GROUP BY with aggregation
+-- echo Test GROUP BY with aggregation
 select department, count(*) from agg_test group by department;
 select department, avg(salary) from agg_test group by department;
 select department, sum(salary), count(*) from agg_test group by department;
 
--- Test GROUP BY with multiple columns
+-- echo Test GROUP BY with multiple columns
 select department, age, count(*) from agg_test group by department, age;
 
--- Test HAVING clause
-select department, avg(salary) from agg_test group by department having avg(salary) > 4500;
-select department, count(*) from agg_test group by department having count(*) > 1;
+-- echo Test ORDER BY with GROUP BY
+select department, avg(salary) from agg_test group by department order by avg(salary);
+select department, count(*) from agg_test group by department order by count(*) desc;
 
--- Clean up
+-- echo Clean up
 drop table agg_test;

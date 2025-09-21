@@ -168,6 +168,11 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<st
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to create sub-query statement. rc=%s", strrc(rc));
       delete filter_unit;
+      // 如果是字段不存在错误，可能是关联子查询，返回更友好的错误
+      if (rc == RC::SCHEMA_TABLE_NOT_EXIST || rc == RC::SCHEMA_FIELD_MISSING || rc == RC::SCHEMA_FIELD_NOT_EXIST) {
+        LOG_WARN("Subquery contains references to outer query fields (correlated subquery). This is not yet fully supported.");
+        return RC::UNIMPLEMENTED;
+      }
       return rc;
     }
 
