@@ -1,0 +1,32 @@
+-- echo Sub Query Tests
+-- Test sub-query functionality
+
+-- Create test tables
+create table sub_test1(id int, name char(20), score float);
+create table sub_test2(id int, category char(20), threshold float);
+
+-- Insert test data
+insert into sub_test1 values(1, 'Alice', 85.5);
+insert into sub_test1 values(2, 'Bob', 78.0);
+insert into sub_test1 values(3, 'Charlie', 92.5);
+insert into sub_test1 values(4, 'David', 88.0);
+
+insert into sub_test2 values(1, 'Excellent', 90.0);
+insert into sub_test2 values(2, 'Good', 80.0);
+insert into sub_test2 values(3, 'Average', 70.0);
+
+-- Test simple IN sub-query
+select * from sub_test1 where id in (select id from sub_test2 where threshold > 75);
+
+-- Test EXISTS sub-query
+select * from sub_test1 where exists (select 1 from sub_test2 where sub_test2.threshold < sub_test1.score);
+
+-- Test scalar sub-query
+select * from sub_test1 where score > (select avg(threshold) from sub_test2);
+
+-- Test NOT IN sub-query
+select * from sub_test1 where id not in (select id from sub_test2 where threshold > 85);
+
+-- Clean up
+drop table sub_test1;
+drop table sub_test2;

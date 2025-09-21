@@ -133,10 +133,18 @@ RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
         LOG_WARN("Unique constraint violation: key already exists in index %s", index_meta_.name());
         return RC::RECORD_DUPLICATE_KEY;
       }
+    } else {
+      // If scanner.open failed, it might be because the index is empty or other issues
+      // We should still proceed with the insertion in this case
+      LOG_DEBUG("Scanner open failed for uniqueness check in index %s, rc=%s", index_meta_.name(), strrc(rc));
     }
   }
 
-  return index_handler_.insert_entry(record + field_meta_.offset(), rid);
+  RC insert_rc = index_handler_.insert_entry(record + field_meta_.offset(), rid);
+  if (insert_rc != RC::SUCCESS) {
+    LOG_WARN("Failed to insert entry into index %s, rc=%s", index_meta_.name(), strrc(insert_rc));
+  }
+  return insert_rc;
 }
 
 RC BplusTreeIndex::delete_entry(const char *record, const RID *rid)

@@ -1,0 +1,69 @@
+-- echo Platform Issues Fix Tests
+
+create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
+insert into exp_table VALUES (3, 7, 9, 9.21, 1.65);
+insert into exp_table VALUES (3, 4, 3, 7.64, 2.86);
+insert into exp_table VALUES (9, 1, 5, 9.62, 3.0);
+
+select id,-(col2*(-1)+3)+(col4+7)*(col1+col3*5),(1+col2)*col3*1 from exp_table where -(col2*(-2)+2)+(col4+9)*(col1+col3*5) > (7+col2)*col3*1;
+CREATE TABLE join_table_1(id int, name char(20));
+CREATE TABLE join_table_2(id int, age int);
+CREATE TABLE join_table_3(id int, level int);
+
+insert into join_table_1 values(12, 'QJNN6');
+insert into join_table_1 values(2, 'H6NAN');
+insert into join_table_1 values(2, 'UG6GOX');
+
+insert into join_table_2 values(13, 29);
+insert into join_table_2 values(8, 17);
+
+insert into join_table_3 values(12, 18);
+insert into join_table_3 values(2, 20);
+
+Select * from join_table_1 inner join join_table_2 on join_table_1.id=join_table_2.id and join_table_2.level>17;
+CREATE TABLE null_table(id int not null, num int null, price float not null, birthday date null);
+
+insert into null_table VALUES (8, 2, 34.34, '2005-11-20');
+insert into null_table VALUES (8, 6, 35.57, '2014-02-23');
+insert into null_table VALUES (9, null, 40.0, '2010-01-01');
+insert into null_table VALUES (10, 5, 45.0, null);
+insert into null_table VALUES (11, null, 50.0, null);
+
+SELECT count(birthday) FROM null_table;
+SELECT count(*) FROM null_table;
+SELECT count(num) FROM null_table;
+CREATE TABLE ssq_1(id int, col1 int, feat1 float);
+CREATE TABLE ssq_2(id int, col2 int, feat2 float);
+
+INSERT INTO ssq_1 VALUES (83, 87, 54.70);
+INSERT INTO ssq_1 VALUES (84, 88, 55.70);
+INSERT INTO ssq_2 VALUES (1, 87, 60.0);
+INSERT INTO ssq_2 VALUES (2, 89, 65.0);
+
+select * from ssq_1 where col1 = (select ssq_2.col2 from ssq_2 where ssq_2.col2 = 87);
+CREATE TABLE unique_table2(id1 int, id2 int, col1 int, col2 int);
+
+-- Create unique index on multiple columns
+CREATE UNIQUE INDEX index_id on unique_table2(id1,id2);
+
+-- Insert initial unique data
+INSERT INTO unique_table2 VALUES (1,1,1,1);
+
+-- Test unique constraint violation
+INSERT INTO unique_table2 VALUES (1,1,2,2);
+
+-- Test valid insertion
+INSERT INTO unique_table2 VALUES (2,2,1,1);
+
+-- Test another unique constraint violation
+INSERT INTO unique_table2 VALUES (2,2,3,3);
+
+-- Clean up
+drop table exp_table;
+drop table join_table_1;
+drop table join_table_2;
+drop table join_table_3;
+drop table null_table;
+drop table ssq_1;
+drop table ssq_2;
+drop table unique_table2;

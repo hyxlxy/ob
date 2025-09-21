@@ -1,0 +1,41 @@
+-- echo Update Tests
+-- 测试UPDATE功能的各种场景
+
+-- 创建测试表
+create table update_test(id int, name char(20), age int, score float);
+
+-- 插入测试数据
+insert into update_test values(1, 'Alice', 20, 85.5);
+insert into update_test values(2, 'Bob', 21, 78.0);
+insert into update_test values(3, 'Charlie', 19, 92.5);
+insert into update_test values(4, 'David', 22, 88.0);
+
+-- 显示初始数据
+select * from update_test;
+
+-- 测试单字段更新（无条件）
+update update_test set age = 25;
+select * from update_test;
+
+-- 重置数据
+delete from update_test;
+insert into update_test values(1, 'Alice', 20, 85.5);
+insert into update_test values(2, 'Bob', 21, 78.0);
+insert into update_test values(3, 'Charlie', 19, 92.5);
+
+-- 测试带条件的更新
+update update_test set score = 90.0 where id = 1;
+select * from update_test;
+
+-- 测试多条件更新
+update update_test set age = 23 where score > 80 and age < 21;
+select * from update_test;
+
+-- 创建索引后测试更新
+create index idx_id on update_test(id);
+update update_test set name = 'Updated' where id = 2;
+select * from update_test;
+
+-- 测试更新不存在的记录
+update update_test set age = 30 where id = 999;
+select * from update_test;

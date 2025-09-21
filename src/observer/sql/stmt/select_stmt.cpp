@@ -161,6 +161,11 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       static_cast<int>(all_conditions.size()),
       filter_stmt);
   if (rc != RC::SUCCESS) {
+    // 检查是否是字段不存在的错误，如果是则直接返回错误
+    if (rc == RC::SCHEMA_FIELD_NOT_EXIST || rc == RC::SCHEMA_FIELD_MISSING) {
+      LOG_WARN("Field validation failed in WHERE clause. rc=%d:%s", rc, strrc(rc));
+      return rc;
+    }
     // 如果 FilterStmt 创建失败，可能是因为包含了 SubQueryExpr
     // 我们尝试创建一个空的 FilterStmt，并在逻辑计划生成阶段处理 SubQueryExpr
     LOG_WARN("FilterStmt creation failed (possibly due to SubQueryExpr), creating empty FilterStmt. Raw conditions count: %zu", all_conditions.size());

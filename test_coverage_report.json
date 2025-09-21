@@ -1,0 +1,287 @@
+{
+  "summary": {
+    "total_features": 26,
+    "covered_features": 24,
+    "uncovered_features": 2,
+    "coverage_percentage": 92.31,
+    "total_test_cases": 31
+  },
+  "feature_coverage": {
+    "aggregation_and_groupby": [
+      "primary-null-extended",
+      "primary-group-by",
+      "primary-simple-sub-query",
+      "primary-complex-sub-query",
+      "primary-aggregation-func",
+      "vectorized-aggregation-and-group-by",
+      "primary-null"
+    ],
+    "null": [
+      "primary-null-extended",
+      "primary-null"
+    ],
+    "complex-sub-query": [
+      "primary-null-extended"
+    ],
+    "update-select": [
+      "primary-null-extended",
+      "primary-unique-extended",
+      "primary-group-by",
+      "e1",
+      "primary-date-extended",
+      "primary-order-by",
+      "primary-create-view-extended",
+      "primary-multi-index",
+      "primary-unique",
+      "primary-simple-sub-query",
+      "dblab-hash-join",
+      "primary-update-extended",
+      "basic",
+      "primary-join-tables",
+      "primary-multi-index-extended",
+      "primary-complex-sub-query",
+      "primary-aggregation-func",
+      "vectorized-aggregation-and-group-by",
+      "dblab-optimizer",
+      "primary-update",
+      "primary-null",
+      "primary-drop-table",
+      "dblab-sort",
+      "primary-text",
+      "vectorized-basic",
+      "primary-like-extended",
+      "vector-format",
+      "primary-expression",
+      "vector-basic-extended",
+      "primary-date"
+    ],
+    "simple-sub-query": [
+      "primary-null-extended",
+      "primary-unique-extended",
+      "primary-group-by",
+      "e1",
+      "primary-date-extended",
+      "primary-order-by",
+      "primary-create-view-extended",
+      "primary-multi-index",
+      "primary-unique",
+      "primary-simple-sub-query",
+      "dblab-hash-join",
+      "primary-update-extended",
+      "basic",
+      "primary-join-tables",
+      "primary-multi-index-extended",
+      "primary-complex-sub-query",
+      "primary-aggregation-func",
+      "vectorized-aggregation-and-group-by",
+      "dblab-optimizer",
+      "primary-update",
+      "primary-null",
+      "primary-drop-table",
+      "dblab-sort",
+      "primary-text",
+      "vectorized-basic",
+      "primary-show-index-extended",
+      "primary-like-extended",
+      "vector-format",
+      "primary-expression",
+      "vector-basic-extended",
+      "primary-date"
+    ],
+    "like": [
+      "primary-null-extended",
+      "primary-unique-extended",
+      "primary-group-by",
+      "e1",
+      "primary-date-extended",
+      "primary-order-by",
+      "primary-create-view-extended",
+      "primary-multi-index",
+      "primary-unique",
+      "primary-simple-sub-query",
+      "dblab-hash-join",
+      "primary-update-extended",
+      "basic",
+      "primary-join-tables",
+      "primary-multi-index-extended",
+      "primary-complex-sub-query",
+      "primary-aggregation-func",
+      "vectorized-aggregation-and-group-by",
+      "dblab-optimizer",
+      "primary-update",
+      "primary-null",
+      "primary-drop-table",
+      "dblab-sort",
+      "primary-text",
+      "vectorized-basic",
+      "primary-show-index-extended",
+      "primary-like-extended",
+      "primary-expression",
+      "vector-basic-extended",
+      "primary-date"
+    ],
+    "create-table-select": [
+      "primary-null-extended",
+      "primary-unique-extended",
+      "primary-group-by",
+      "e1",
+      "primary-date-extended",
+      "primary-order-by",
+      "primary-create-view-extended",
+      "primary-multi-index",
+      "primary-unique",
+      "primary-simple-sub-query",
+      "dblab-hash-join",
+      "primary-update-extended",
+      "basic",
+      "primary-join-tables",
+      "primary-multi-index-extended",
+      "primary-complex-sub-query",
+      "primary-aggregation-func",
+      "vectorized-aggregation-and-group-by",
+      "dblab-optimizer",
+      "primary-update",
+      "primary-null",
+      "primary-drop-table",
+      "dblab-sort",
+      "primary-text",
+      "vectorized-basic",
+      "primary-show-index-extended",
+      "primary-like-extended",
+      "vector-format",
+      "primary-expression",
+      "vector-basic-extended",
+      "primary-date"
+    ],
+    "unique": [
+      "primary-unique-extended",
+      "primary-unique",
+      "primary-multi-index-extended",
+      "primary-show-index-extended"
+    ],
+    "update": [
+      "primary-unique-extended",
+      "primary-multi-index",
+      "dblab-hash-join",
+      "primary-update-extended",
+      "vectorized-aggregation-and-group-by",
+      "dblab-optimizer",
+      "primary-update",
+      "primary-text",
+      "vectorized-basic"
+    ],
+    "date": [
+      "primary-unique-extended",
+      "primary-date-extended",
+      "primary-multi-index",
+      "primary-update-extended",
+      "primary-aggregation-func",
+      "primary-update",
+      "primary-null",
+      "primary-text",
+      "primary-date"
+    ],
+    "drop-table": [
+      "e1",
+      "primary-multi-index",
+      "primary-drop-table"
+    ],
+    "order-by": [
+      "primary-date-extended",
+      "primary-order-by",
+      "dblab-optimizer",
+      "dblab-sort",
+      "primary-like-extended",
+      "vector-basic-extended"
+    ],
+    "vector_rewrite": [
+      "primary-date-extended",
+      "primary-order-by",
+      "dblab-sort",
+      "vector-basic-extended"
+    ],
+    "big-order-by": [
+      "primary-date-extended",
+      "dblab-optimizer"
+    ],
+    "alias": [
+      "primary-order-by",
+      "primary-create-view-extended",
+      "dblab-hash-join",
+      "basic",
+      "dblab-optimizer",
+      "primary-drop-table",
+      "dblab-sort",
+      "vectorized-basic"
+    ],
+    "create-view": [
+      "primary-create-view-extended"
+    ],
+    "join-tables": [
+      "primary-create-view-extended",
+      "dblab-hash-join",
+      "primary-join-tables",
+      "dblab-optimizer"
+    ],
+    "multi-index": [
+      "primary-multi-index",
+      "primary-update-extended",
+      "basic",
+      "primary-multi-index-extended",
+      "primary-update",
+      "primary-null",
+      "primary-drop-table",
+      "primary-show-index-extended",
+      "primary-expression",
+      "primary-date"
+    ],
+    "expression": [
+      "basic",
+      "primary-expression"
+    ],
+    "text": [
+      "primary-text"
+    ],
+    "vector_format": [
+      "vector-format",
+      "vector-basic-extended"
+    ],
+    "vector_basic": [
+      "vector-format",
+      "vector-basic-extended"
+    ],
+    "vector_search": [
+      "vector-basic-extended"
+    ],
+    "vector_high_dim": [
+      "vector-basic-extended"
+    ]
+  },
+  "uncovered_features": [
+    "update-mvcc",
+    "ann_benchmark"
+  ],
+  "test_cases": {
+    "primary-null-extended": {
+      "content": "-- echo Null Tests\n-- 测试NULL值的各种场景\n\n-- 创建支持NULL的表\ncreate table null_test(id int not null, name char(20) null, age int null, score float null);\n\n-- 插入包含NULL的数据\ninsert into null_test values(1, 'Alice', 20, 85.5);\ninsert into null_test values(2, null, 21, 78.0);\ninsert into null_test values(3, 'Charlie', null, 92.5);\ninsert into null_test values(4, 'David', 22, null);\ninsert into null_test values(5, null, null, null);\n\n-- 查询所有数据\nselect * from null_test;\n\n-- 测试NULL比较\nselect * from null_test where name is null;\nselect * from null_test where name is not null;\nselect * from null_test where age is null;\n\n-- 测试NULL在运算中的行为\nselect id, name, age + 1 from null_test;\nselect id, name, score * 2 from null_test;\n\n-- 测试聚合函数对NULL的处理\nselect count(*) from null_test;\nselect count(name) from null_test;\nselect count(age) from null_test;\nselect avg(age) from null_test;\nselect sum(score) from null_test;\n\n-- 测试插入NULL到NOT NULL字段（应该失败）\ninsert into null_test values(null, 'Test', 25, 90.0);\n",
+      "sql_commands": [
+        "create table null_test(id int not null, name char(20) null, age int null, score float null);",
+        "insert into null_test values(1, 'Alice', 20, 85.5);",
+        "insert into null_test values(2, null, 21, 78.0);",
+        "insert into null_test values(3, 'Charlie', null, 92.5);",
+        "insert into null_test values(4, 'David', 22, null);",
+        "insert into null_test values(5, null, null, null);",
+        "select * from null_test;",
+        "select * from null_test where name is null;",
+        "select * from null_test where name is not null;",
+        "select * from null_test where age is null;",
+        "select id, name, age + 1 from null_test;",
+        "select id, name, score * 2 from null_test;",
+        "select count(*) from null_test;",
+        "select count(name) from null_test;",
+        "select count(age) from null_test;",
+        "select avg(age) from null_test;",
+        "select sum(score) from null_test;",
+        "insert into null_test values(null, 'Test', 25, 90.0);"
+      ],
+      "features_covered": 

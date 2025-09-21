@@ -17,14 +17,19 @@ See the Mulan PSL v2 for more details. */
 
 RC SumAggregator::accumulate(const Value &value)
 {
+  // SUM函数应该跳过NULL值
+  if (value.attr_type() == AttrType::UNDEFINED) {
+    return RC::SUCCESS;
+  }
+
   if (value_.attr_type() == AttrType::UNDEFINED) {
     value_ = value;
     return RC::SUCCESS;
   }
-  
-  ASSERT(value.attr_type() == value_.attr_type(), "type mismatch. value type: %s, value_.type: %s", 
+
+  ASSERT(value.attr_type() == value_.attr_type(), "type mismatch. value type: %s, value_.type: %s",
         attr_type_to_string(value.attr_type()), attr_type_to_string(value_.attr_type()));
-  
+
   Value::add(value, value_, value_);
   return RC::SUCCESS;
 }
@@ -37,8 +42,12 @@ RC SumAggregator::evaluate(Value& result)
 
 RC CountAggregator::accumulate(const Value &value)
 {
-  // 安全的计数实现，不依赖传入的value内容
-  count_++;
+  // COUNT函数应该只计算非NULL值
+  // 对于COUNT(*)，传入的value是常量1，不会是NULL
+  // 对于COUNT(column)，需要检查value是否为NULL
+  if (value.attr_type() != AttrType::UNDEFINED) {
+    count_++;
+  }
   return RC::SUCCESS;
 }
 
@@ -51,6 +60,11 @@ RC CountAggregator::evaluate(Value& result)
 
 RC MaxAggregator::accumulate(const Value &value)
 {
+  // MAX函数应该跳过NULL值
+  if (value.attr_type() == AttrType::UNDEFINED) {
+    return RC::SUCCESS;
+  }
+
   if (first_) {
     value_ = value;
     first_ = false;
@@ -70,6 +84,11 @@ RC MaxAggregator::evaluate(Value& result)
 
 RC MinAggregator::accumulate(const Value &value)
 {
+  // MIN函数应该跳过NULL值
+  if (value.attr_type() == AttrType::UNDEFINED) {
+    return RC::SUCCESS;
+  }
+
   if (first_) {
     value_ = value;
     first_ = false;
@@ -89,6 +108,11 @@ RC MinAggregator::evaluate(Value& result)
 
 RC AvgAggregator::accumulate(const Value &value)
 {
+  // AVG函数应该跳过NULL值
+  if (value.attr_type() == AttrType::UNDEFINED) {
+    return RC::SUCCESS;
+  }
+
   Value::add(value, sum_, sum_);
   count_++;
   return RC::SUCCESS;

@@ -1,0 +1,15 @@
+-- echo Count NULL Fix Test
+
+create table count_test(id int not null, name char(20) null, birthday date null);
+
+insert into count_test values(1, 'Alice', '2020-01-01');
+insert into count_test values(2, 'Bob', null);
+insert into count_test values(3, null, '2021-01-01');
+insert into count_test values(4, 'David', null);
+insert into count_test values(5, null, null);
+
+select count(*) from count_test;
+select count(name) from count_test;
+select count(birthday) from count_test;
+
+drop table count_test;

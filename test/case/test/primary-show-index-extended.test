@@ -1,0 +1,23 @@
+-- echo Show Index Tests
+-- 测试SHOW INDEX功能
+
+-- 创建测试表
+create table index_test(id int, name char(20), age int, score float);
+
+-- 创建各种索引
+create index idx_id on index_test(id);
+create index idx_name on index_test(name);
+create unique index idx_age_unique on index_test(age);
+
+-- 显示索引信息
+show index from index_test;
+
+-- 插入数据测试索引
+insert into index_test values(1, 'Alice', 20, 85.5);
+insert into index_test values(2, 'Bob', 21, 78.0);
+
+-- 再次显示索引信息
+show index from index_test;
+
+-- 测试不存在的表
+show index from non_existent_table;

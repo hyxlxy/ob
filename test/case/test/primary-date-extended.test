@@ -1,0 +1,29 @@
+-- echo Date Type Tests
+-- 测试日期类型的基本功能
+
+-- 创建包含日期字段的表
+create table date_test(id int, birth_date date, name char(20));
+
+-- 测试正常日期插入
+insert into date_test values(1, '2023-01-01', 'Alice');
+insert into date_test values(2, '1990-12-31', 'Bob');
+insert into date_test values(3, '2000-02-29', 'Charlie'); -- 闰年2月29日
+
+-- 测试边界日期
+insert into date_test values(4, '1900-01-01', 'David');
+insert into date_test values(5, '2099-12-31', 'Eve');
+
+-- 测试非法日期（应该返回FAILURE）
+insert into date_test values(6, '2023-02-29', 'Invalid1'); -- 非闰年2月29日
+insert into date_test values(7, '2023-13-01', 'Invalid2'); -- 无效月份
+insert into date_test values(8, '2023-04-31', 'Invalid3'); -- 4月没有31日
+insert into date_test values(9, '2023-00-01', 'Invalid4'); -- 无效月份0
+insert into date_test values(10, '2023-01-00', 'Invalid5'); -- 无效日期0
+
+-- 查询测试
+select * from date_test;
+select * from date_test where birth_date > '2000-01-01';
+select * from date_test where birth_date = '2023-01-01';
+
+-- 排序测试
+-- sort select * from date_test order by birth_date;

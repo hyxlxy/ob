@@ -1,0 +1,31 @@
+-- echo Like Tests
+-- 测试LIKE操作符功能
+
+-- 创建测试表
+create table like_test(id int, name char(30), description char(50));
+
+-- 插入测试数据
+insert into like_test values(1, 'Alice', 'Student from Beijing');
+insert into like_test values(2, 'Bob', 'Teacher in Shanghai');
+insert into like_test values(3, 'Charlie', 'Engineer from Shenzhen');
+insert into like_test values(4, 'David', 'Doctor in Beijing');
+insert into like_test values(5, 'Eve', 'Artist from Guangzhou');
+
+-- 测试%通配符
+select * from like_test where name like 'A%';
+select * from like_test where description like '%Beijing%';
+select * from like_test where description like '%from%';
+
+-- 测试_通配符
+select * from like_test where name like '_ob';
+select * from like_test where name like 'A____';
+
+-- 测试组合通配符
+select * from like_test where description like '%from _____';
+select * from like_test where name like '%e';
+
+-- 测试精确匹配
+select * from like_test where name like 'Alice';
+
+-- 测试空结果
+select * from like_test where name like 'xyz%';

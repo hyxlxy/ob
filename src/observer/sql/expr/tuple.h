@@ -198,21 +198,24 @@ public:
     cell.reset();
 
     // Use NULL flag bit system like reference code
-    cell.set_type(field_meta->type());
     if (field_meta->nullable()) {
       // Check NULL flag in the last byte of the field
       bool is_null = this->record_->data()[field_meta->offset() + field_meta->len() - 1] == '1';
       if (is_null) {
+        // For NULL values, set type to UNDEFINED
+        cell.set_type(AttrType::UNDEFINED);
         cell.set_null(true);
         // Don't set data for NULL values
       } else {
-        // For non-NULL values, use full data length but exclude NULL flag byte from actual data
+        // For non-NULL values, use original type and exclude NULL flag byte from actual data
+        cell.set_type(field_meta->type());
         size_t data_len = field_meta->len() - 1;
         cell.set_data(this->record_->data() + field_meta->offset(), data_len);
         cell.set_null(false);
       }
     } else {
       // For non-nullable fields, use full length and set not null
+      cell.set_type(field_meta->type());
       cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
       cell.set_null(false);
     }

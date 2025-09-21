@@ -1,0 +1,19 @@
+-- echo ANN Benchmark Tests
+
+create table ann_test(id int, embedding vector(3));
+
+insert into ann_test values(1, '[1.0, 2.0, 3.0]');
+insert into ann_test values(2, '[2.0, 3.0, 4.0]');
+insert into ann_test values(3, '[3.0, 4.0, 5.0]');
+insert into ann_test values(4, '[4.0, 5.0, 6.0]');
+insert into ann_test values(5, '[5.0, 6.0, 7.0]');
+
+create index ann_idx on ann_test using ivfflat(embedding) with (lists=2);
+
+select * from ann_test order by l2_distance(embedding, '[1.5, 2.5, 3.5]') limit 3;
+
+select * from ann_test order by cosine_distance(embedding, '[2.0, 3.0, 4.0]') limit 2;
+
+select * from ann_test order by inner_product(embedding, '[1.0, 1.0, 1.0]') desc limit 3;
+
+drop table ann_test;

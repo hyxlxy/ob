@@ -1,0 +1,46 @@
+-- echo View Tests
+-- 测试视图的创建、查询和删除功能
+
+-- 创建基础表
+create table students(id int, name char(20), age int, score float);
+create table courses(id int, name char(20), credits int);
+create table enrollments(student_id int, course_id int, grade float);
+
+-- 插入测试数据
+insert into students values(1, 'Alice', 20, 85.5);
+insert into students values(2, 'Bob', 21, 78.0);
+insert into students values(3, 'Charlie', 19, 92.5);
+
+insert into courses values(1, 'Math', 3);
+insert into courses values(2, 'Physics', 4);
+insert into courses values(3, 'Chemistry', 3);
+
+insert into enrollments values(1, 1, 88.0);
+insert into enrollments values(1, 2, 82.0);
+insert into enrollments values(2, 1, 75.0);
+insert into enrollments values(3, 3, 95.0);
+
+-- 创建简单视图
+create view high_score_students as select * from students where score > 80;
+
+-- 查询视图
+select * from high_score_students;
+
+-- 创建复杂视图（多表连接）
+create view student_grades as 
+select s.name as student_name, c.name as course_name, e.grade 
+from students s, courses c, enrollments e 
+where s.id = e.student_id and c.id = e.course_id;
+
+-- 查询复杂视图
+select * from student_grades;
+
+-- 测试视图的条件查询
+select * from student_grades where grade > 85;
+
+-- 删除视图
+drop view high_score_students;
+drop view student_grades;
+
+-- 验证视图已删除（应该失败）
+select * from high_score_students;

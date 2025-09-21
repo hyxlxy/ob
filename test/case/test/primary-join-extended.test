@@ -1,0 +1,32 @@
+-- echo Join Tests
+-- Test INNER JOIN functionality
+
+-- Create test tables
+create table join_test1(id int, name char(20), dept_id int);
+create table join_test2(id int, dept_name char(30), location char(20));
+
+-- Insert test data
+insert into join_test1 values(1, 'Alice', 10);
+insert into join_test1 values(2, 'Bob', 20);
+insert into join_test1 values(3, 'Charlie', 10);
+insert into join_test1 values(4, 'David', 30);
+
+insert into join_test2 values(10, 'Engineering', 'Building A');
+insert into join_test2 values(20, 'Sales', 'Building B');
+insert into join_test2 values(30, 'Marketing', 'Building C');
+
+-- Test basic INNER JOIN
+select * from join_test1 inner join join_test2 on join_test1.dept_id = join_test2.id;
+
+-- Test JOIN with specific columns
+select join_test1.name, join_test2.dept_name from join_test1 inner join join_test2 on join_test1.dept_id = join_test2.id;
+
+-- Test JOIN with WHERE clause
+select join_test1.name, join_test2.dept_name from join_test1 inner join join_test2 on join_test1.dept_id = join_test2.id where join_test2.location = 'Building A';
+
+-- Test JOIN with multiple conditions
+select * from join_test1 inner join join_test2 on join_test1.dept_id = join_test2.id and join_test2.id > 15;
+
+-- Clean up
+drop table join_test1;
+drop table join_test2;

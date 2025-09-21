@@ -1637,7 +1637,13 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
   }
 
   // Convert SelectSqlNode to SelectStmt
-  Db *db = Session::current_session()->get_current_db();
+  Session *session = Session::current_session();
+  if (!session) {
+    LOG_WARN("No current session for subquery execution");
+    return RC::INTERNAL;
+  }
+
+  Db *db = session->get_current_db();
   if (db == nullptr) {
     LOG_WARN("No current database for subquery execution");
     return RC::INTERNAL;
@@ -1687,3 +1693,5 @@ RC SubQueryExpr::try_get_value(Value &value) const
   // Scalar subqueries cannot be evaluated without context
   return RC::UNIMPLEMENTED;
 }
+
+
