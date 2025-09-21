@@ -170,9 +170,17 @@ RC CreateTableExecutor::execute_create_table_as_select(Session *session, CreateT
     return RC::INTERNAL;
   }
 
+  // Reset the physical operator to start from the beginning
+  // We need to close and reopen to get all data, not just continue from where we left off
+  physical_operator->close();
+  rc = physical_operator->open(nullptr);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to reopen physical operator for data insertion. rc=%s", strrc(rc));
+    return rc;
+  }
+
   // Insert each row from the SELECT result
-  // First, insert the tuple we already fetched for schema derivation
-  do {
+  while ((rc = physical_operator->next()) == RC::SUCCESS) {
     Tuple *tuple = physical_operator->current_tuple();
     if (tuple == nullptr) {
       LOG_WARN("failed to get current tuple from SELECT result");
@@ -208,7 +216,7 @@ RC CreateTableExecutor::execute_create_table_as_select(Session *session, CreateT
       LOG_WARN("failed to insert record for CREATE TABLE AS SELECT. rc=%s", strrc(rc));
       break;
     }
-  } while ((rc = physical_operator->next()) == RC::SUCCESS);
+  }
 
   physical_operator->close();
 

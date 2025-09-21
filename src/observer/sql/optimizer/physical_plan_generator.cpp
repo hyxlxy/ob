@@ -15,6 +15,9 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "sql/expr/expression.h"
 #include "session/session.h"
+#include "sql/parser/parse.h"
+#include "sql/stmt/select_stmt.h"
+#include "sql/optimizer/logical_plan_generator.h"
 #include "sql/operator/aggregate_vec_physical_operator.h"
 #include "sql/operator/calc_logical_operator.h"
 #include "sql/operator/calc_physical_operator.h"
@@ -228,12 +231,7 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
   if (table->is_view()) {
     LOG_TRACE("creating plan for view: %s", table->name());
 
-    // 对于视图，我们需要解析视图的SELECT语句并创建相应的物理计划
-    // 暂时简化实现：创建一个表扫描操作符，但标记为视图
-    // 在实际执行时，应该执行视图的SELECT语句
 
-    // 创建一个简单的表扫描操作符作为占位符
-    // 实际的VIEW查询应该通过重写查询来实现
     unique_ptr<TableScanPhysicalOperator> table_scan_oper(new TableScanPhysicalOperator(table, ReadWriteMode::READ_ONLY));
 
     // 添加谓词过滤
@@ -247,8 +245,8 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
       oper = std::move(table_scan_oper);
     }
 
-    LOG_INFO("Created physical plan for view: %s", table->name());
-    return RC::SUCCESS;
+    // 对于视图，需要解析并执行视图的SELECT语句
+    return create_plan_for_view(table, predicates, oper, session);
   }
 
   Index     *index      = nullptr;
@@ -593,4 +591,85 @@ RC PhysicalPlanGenerator::create_vec_plan(ExplainLogicalOperator &explain_oper, 
 
   oper = std::move(explain_physical_oper);
   return rc;
+}
+
+RC PhysicalPlanGenerator::create_plan_for_view(Table *table, vector<unique_ptr<Expression>> &predicates,
+                                               unique_ptr<PhysicalOperator> &oper, Session *session)
+{
+  LOG_TRACE("Creating physical plan for view: %s", table->name());
+
+  // 获取视图的SELECT SQL
+  const string &select_sql = table->select_sql();
+  if (select_sql.empty()) {
+    LOG_ERROR("View %s has empty SELECT SQL", table->name());
+    return RC::INTERNAL;
+  }
+
+  LOG_DEBUG("View %s SELECT SQL: %s", table->name(), select_sql.c_str());
+
+  try {
+    // 解析视图的SELECT语句
+    ParsedSqlResult parsed_sql_result;
+    RC rc = parse(select_sql.c_str(), &parsed_sql_result);
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to parse view SQL for view %s: %s", table->name(), select_sql.c_str());
+      return rc;
+    }
+
+    // 检查解析结果
+    if (parsed_sql_result.sql_nodes().empty() ||
+        parsed_sql_result.sql_nodes()[0]->flag != SCF_SELECT) {
+      LOG_ERROR("View SQL is not a SELECT statement for view %s", table->name());
+      return RC::SQL_SYNTAX;
+    }
+
+    // 获取SELECT节点
+    ParsedSqlNode *parsed_node = parsed_sql_result.sql_nodes()[0].get();
+    SelectSqlNode &select_node = parsed_node->selection;
+
+    // 创建SelectStmt
+    Stmt *select_stmt = nullptr;
+    rc = SelectStmt::create(session->get_current_db(), select_node, select_stmt);
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to create SelectStmt for view %s", table->name());
+      return rc;
+    }
+
+    // 创建逻辑计划
+    LogicalPlanGenerator logical_plan_generator;
+    unique_ptr<LogicalOperator> logical_operator;
+    rc = logical_plan_generator.create(select_stmt, logical_operator);
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to create logical plan for view %s", table->name());
+      delete select_stmt;
+      return rc;
+    }
+
+    // 创建物理计划
+    rc = create(*logical_operator, oper, session);
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to create physical plan for view %s", table->name());
+      delete select_stmt;
+      return rc;
+    }
+
+    // 如果有额外的谓词，需要添加谓词过滤
+    if (!predicates.empty()) {
+      LOG_DEBUG("Adding predicates to view query for view %s", table->name());
+      // 为了简化，暂时只支持第一个谓词
+      // 在完整实现中，应该将所有谓词组合成AND表达式
+      unique_ptr<PredicatePhysicalOperator> predicate_oper(
+          new PredicatePhysicalOperator(std::move(predicates[0])));
+      predicate_oper->add_child(std::move(oper));
+      oper = std::move(predicate_oper);
+    }
+
+    delete select_stmt;
+    LOG_INFO("Successfully created physical plan for view: %s", table->name());
+    return RC::SUCCESS;
+
+  } catch (const std::exception &e) {
+    LOG_ERROR("Exception while creating plan for view %s: %s", table->name(), e.what());
+    return RC::INTERNAL;
+  }
 }
