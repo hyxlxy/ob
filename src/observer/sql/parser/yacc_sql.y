@@ -239,9 +239,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <sql_node>            commands
 %type <sql_node>            sub_query
 
+%left EQ LT GT LE GE NE LIKE IN
 %left '+' '-'
 %left '*' '/'
-%left EQ LT GT LE GE NE LIKE IN
 %left NOT
 %nonassoc UMINUS
 %%
@@ -897,11 +897,7 @@ opt_as_alias:
     ;
 
 expression:
-    expression comp_op expression {
-      $$ = new ComparisonExpr($2, unique_ptr<Expression>($1), unique_ptr<Expression>($3));
-      $$->set_name(token_name(sql_string, &@$));
-    }
-    | expression '+' expression {
+    expression '+' expression {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::ADD, $1, $3, sql_string, &@$);
     }
     | expression '-' expression {
@@ -912,6 +908,10 @@ expression:
     }
     | expression '/' expression {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::DIV, $1, $3, sql_string, &@$);
+    }
+    | expression comp_op expression {
+      $$ = new ComparisonExpr($2, unique_ptr<Expression>($1), unique_ptr<Expression>($3));
+      $$->set_name(token_name(sql_string, &@$));
     }
     | LBRACE expression RBRACE {
       // Simple parentheses for grouping - just return the inner expression

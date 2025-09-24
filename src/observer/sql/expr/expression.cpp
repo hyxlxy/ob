@@ -461,7 +461,13 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
          left_value.to_string().c_str(), right_value.to_string().c_str(),
          bool_value ? "true" : "false", static_cast<int>(comp_));
   LOG_DEBUG("ComparisonExpr::get_value() SUCCESS: result=%s", bool_value ? "true" : "false");
+
+  printf("DEBUG: [COMPARISON] About to set boolean value: %s\n", bool_value ? "true" : "false");
   value.set_boolean(bool_value);
+  printf("DEBUG: [COMPARISON] After set_boolean, value=%s, attr_type=%d\n",
+         value.to_string().c_str(), static_cast<int>(value.attr_type()));
+  printf("DEBUG: [COMPARISON] ComparisonExpr::get_value() returning: rc=%s, value=%s\n",
+         strrc(rc), value.to_string().c_str());
   return rc;
 }
 

@@ -1,113 +1,3 @@
-### 2025-09-08 11:05:29.949
-EXIT;
-### 2025-09-08 11:05:41.403
--- 测试JOIN语法解析
-### 2025-09-08 11:05:41.418
-USE test_db;
-### 2025-09-08 11:12:31.406
-HELP;
-### 2025-09-08 11:13:05.396
-SHOW TABLES;
-### 2025-09-08 11:14:01.644
-SELECT * FROM classes;
-### 2025-09-08 11:14:42.859
--- 插入测试数据
-### 2025-09-08 11:15:12.853
-SELECT * FROM students JOIN classes ON students.class_id = classes.id;
-### 2025-09-08 11:16:49.573
-INSERT INTO students VALUES (1, 'Alice', 1);
-### 2025-09-08 11:17:28.056
-INSERT INTO classes VALUES (1, 'Math');
-### 2025-09-08 11:17:56.169
-SELECT students.name, classes.class_name FROM students, classes WHERE students.class_id = classes.id;
-### 2025-09-08 11:18:26.074
-SELECT students.name, classes.class_name FROM students JOIN classes ON students.class_id = classes.id;
-### 2025-09-08 11:57:37.186
--- echo initialization
-### 2025-09-08 19:08:40.307
-CREATE TABLE date_table(id int, u_date date); INSERT INTO date_table VALUES (1,'2020-01-21'); INSERT INTO date_table VALUES (3,'2020-1-01'); SELECT * FROM date_table;
-### 2025-09-08 19:10:30.631
-CREATE TABLE date_table(id int, u_date date);
-### 2025-09-08 19:11:39.151
-CREATE TABLE TEST (ID INT, C1 VECTOR(3), C2 VECTOR(3));
-### 2025-09-08 19:11:39.197
-INSERT INTO TEST VALUES(1, '[1,1,1]', '[1,2,3]');
-### 2025-09-08 19:35:14.206
--- Test date validation
-### 2025-09-08 19:41:01.753
--- Test date WHERE clause
-### 2025-09-08 19:42:09.853
--- Test big order by with multiple tables and fields
-### 2025-09-08 19:43:13.885
--- Test simple order by
-### 2025-09-08 19:44:28.120
--- Test without order by
-### 2025-09-08 19:49:22.349
--- echo 1. create table
-### 2025-09-08 19:55:29.852
--- Test UPDATE statement
-### 2025-09-08 20:03:54.874
--- Test expression evaluation
-### 2025-09-08 20:07:59.110
-INSERT INTO test_expr VALUES (1, 15);
-### 2025-09-08 20:07:59.113
-INSERT INTO test_expr VALUES (2, 8);
-### 2025-09-08 20:07:59.115
-INSERT INTO test_expr VALUES (3, 20);
-### 2025-09-08 20:07:59.116
-SELECT * FROM test_expr WHERE val - 9 > 5;
-### 2025-09-08 20:10:35.284
-DROP TABLE TEST;
-### 2025-09-08 20:10:35.345
-INSERT INTO TEST VALUES(1, '[1,1,1]');
-### 2025-09-08 20:22:36.011
--- Test basic functions
-### 2025-09-08 20:22:36.024
--- 1. Create table
-### 2025-09-08 20:22:36.073
--- 2. Insert data
-### 2025-09-08 20:22:36.081
--- 3. Query data
-### 2025-09-08 20:22:36.087
--- 4. Query with WHERE
-### 2025-09-08 20:31:02.991
-DROP INDEX idx_age;
-### 2025-09-08 20:31:58.444
-DROP INDEX idx_age ON students;
-### 2025-09-08 20:32:38.949
-CREATE INDEX idx_age ON students(age);
-### 2025-09-08 20:35:12.583
--- Clean up first
-### 2025-09-08 20:35:12.635
--- Create table
-### 2025-09-08 20:35:12.647
--- Insert data
-### 2025-09-08 20:35:12.654
--- Query data
-### 2025-09-08 20:35:12.656
--- Query with WHERE
-### 2025-09-08 20:35:12.659
--- Query with LIKE
-### 2025-09-08 20:35:12.662
--- DESC table
-### 2025-09-08 20:35:12.663
--- Test expressions (our fix)
-### 2025-09-08 20:36:01.607
-DROP TABLE students;
-### 2025-09-08 20:36:01.645
-CREATE TABLE students(id int, name char(20), age int);
-### 2025-09-08 20:36:01.664
-INSERT INTO students VALUES (1, 'Alice', 20);
-### 2025-09-08 20:36:01.670
-INSERT INTO students VALUES (2, 'Bob', 21);
-### 2025-09-08 20:36:01.673
-INSERT INTO students VALUES (3, 'Charlie', 22);
-### 2025-09-08 20:36:01.675
-SELECT * FROM students;
-### 2025-09-08 20:36:01.677
-SELECT * FROM students WHERE age > 20;
-### 2025-09-08 20:36:01.680
-SELECT * FROM students WHERE name LIKE 'A%';
 ### 2025-09-08 20:36:01.682
 DESC students;
 ### 2025-09-08 20:36:01.683
@@ -192,8 +82,6 @@ SELECT * FROM exp_table WHERE col1 - 3 > 4;
 INSERT INTO exp_table VALUES (2, 20, 8);
 ### 2025-09-09 09:48:25.365
 INSERT INTO exp_table VALUES (3, 3, 15);
-### 2025-09-09 09:48:25.366
-SELECT * FROM exp_table;
 ### 2025-09-09 09:48:25.368
 SELECT * FROM exp_table WHERE col1 > 5;
 ### 2025-09-09 09:48:25.369
@@ -236,8 +124,6 @@ select 9 = 9/2;
 -- Creates a sample table and runs checks for constant and column expressions
 ### 2025-09-09 10:55:59.951
 -- 1) Prepare demo table
-### 2025-09-09 10:55:59.952
-DROP TABLE IF EXISTS exp_table;
 ### 2025-09-09 10:55:59.952
 CREATE TABLE exp_table(
 ### 2025-09-09 10:55:59.953
@@ -890,8 +776,6 @@ UPDATE Update_table_1 SET col2 = (SELECT COUNT(*) FROM Update_table_1) WHERE id 
 SELECT * FROM Update_table_1;
 ### 2025-09-13 15:19:04.660
 -- Test expression functionality
-### 2025-09-13 15:19:04.706
--- Test the problematic query
 ### 2025-09-13 15:19:04.731
 -- Debug: Show all data first
 ### 2025-09-13 15:19:04.732
@@ -1050,8 +934,6 @@ FROM exp_table
 WHERE 2*col1*(col2+4) > 7;
 ### 2025-09-13 16:31:57.924
 -- Manual calculation for each row
-### 2025-09-13 16:31:57.955
-CREATE TABLE exp_table(id int, col1 int, col2 int, col3 float, col4 float);
 ### 2025-09-13 16:31:57.956
 INSERT INTO exp_table VALUES (2, 5, 5, 5.0, 2.28);
 ### 2025-09-13 16:31:57.957
@@ -1646,18 +1528,6 @@ create table unique_test_final(id int, name char(20));
 select * from ssq_1 where id = (select ssq_2.id from ssq_2 where col2 = 86);
 ### 2025-09-16 11:17:07.179
 -- 完整的子查询测试
-### 2025-09-16 11:17:07.203
-DROP TABLE IF EXISTS ssq_1;
-### 2025-09-16 11:17:07.204
-DROP TABLE IF EXISTS ssq_2;
-### 2025-09-16 11:17:07.204
-DROP TABLE IF EXISTS ssq_3;
-### 2025-09-16 11:17:07.205
-DROP TABLE IF EXISTS ssq_4;
-### 2025-09-16 11:17:07.208
-CREATE TABLE ssq_3(id int, col3 int, feat3 float);
-### 2025-09-16 11:17:07.245
-CREATE TABLE ssq_4(id int, col4 char(20));
 ### 2025-09-16 11:17:07.257
 INSERT INTO ssq_1 VALUES (1, 10, 1.1);
 ### 2025-09-16 11:17:07.258
@@ -1734,10 +1604,6 @@ CREATE TABLE null_test(id int not null, num int null, name char(10) null);
 -- 测试真正的NULL值
 ### 2025-09-16 16:39:46.118
 -- 测试修复后的子查询
-### 2025-09-16 16:39:46.143
-CREATE TABLE ssq_1(id int, col1 int, feat1 float);
-### 2025-09-16 16:39:46.145
-CREATE TABLE ssq_2(id int, col2 int, feat2 float);
 ### 2025-09-16 16:39:46.146
 INSERT INTO ssq_1 VALUES (1, 10, 1.5);
 ### 2025-09-16 16:39:46.147
@@ -1746,10 +1612,6 @@ INSERT INTO ssq_1 VALUES (2, 20, 2.5);
 INSERT INTO ssq_2 VALUES (1, 100, 10.5);
 ### 2025-09-16 16:39:46.149
 INSERT INTO ssq_2 VALUES (2, 200, 20.5);
-### 2025-09-16 16:39:46.151
-SELECT * FROM ssq_1;
-### 2025-09-16 16:39:46.158
-SELECT * FROM ssq_2;
 ### 2025-09-16 16:39:46.173
 SELECT * FROM ssq_1 WHERE col1 = (SELECT ssq_2.col2 FROM ssq_2 WHERE ssq_2.id = 1);
 ### 2025-09-16 16:48:31.052
@@ -1856,8 +1718,6 @@ select * from ssq_1 where id = (select ssq_2.id from ssq_2 where col2 = 20);
 select * from ssq_1 where id = (select ssq_2.id from ssq_2 where col2 = 94);
 ### 2025-09-17 11:08:44.100
 select * from ssq_2;
-### 2025-09-17 11:09:04.346
-select * from ssq_1 where col1 = (select ssq_2.col2 from ssq_2);
 ### 2025-09-17 11:12:07.131
 select * from ssq_1 where col1 IN (select ssq_2.col2 from ssq_2);
 ### 2025-09-17 11:12:25.537
@@ -1868,8 +1728,6 @@ select * from ssq_1;
 select * from ssq_1 where col1 = (select ssq_2.col2 from ssq_2 where ssq_2.col2 = 10);
 ### 2025-09-18 09:29:58.494
 -- Test expression calculation precision
-### 2025-09-18 09:35:30.214
-create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
 ### 2025-09-18 09:36:56.969
 create table exp_table(id int, col1 int, col2 int, col3 float, col4 float); insert into exp_table VALUES (4, 4, 2, 4.55, 8.24); select id, -(col2*(-8)+1)+(col4+4)*(col1+col3*5) from exp_table;
 ### 2025-09-18 09:40:27.790
@@ -1996,5 +1854,147 @@ CREATE TABLE ssq_2(id int, num int);
 INSERT INTO ssq_1 VALUES (1, 2, 3);
 ### 2025-09-24 23:53:25.893
 INSERT INTO ssq_2 VALUES (1, 100);
-### 2025-09-24 23:53:25.894
+### 2025-09-25 00:18:38.141
+-- Test new issues
+### 2025-09-25 00:18:38.167
+-- Issue 1: Arithmetic expression in WHERE clause
+### 2025-09-25 00:18:38.168
+-- Issue 2: Correlated subquery crash
+### 2025-09-25 00:18:38.168
+SELECT * FROM table_alias_1 t1 WHERE id IN (SELECT t2.id FROM table_alias_2 t2 WHERE t2.col2 >= t1.col1);
+### 2025-09-25 00:22:54.213
+-- Test arithmetic expressions in detail
+### 2025-09-25 00:25:08.043
+-- Test simple comparison expressions
+### 2025-09-25 00:29:57.288
+-- Test field binding issue
+### 2025-09-25 01:02:42.449
+-- Test user's specific issues with exact data
+### 2025-09-25 01:02:42.475
+-- Issue 1: exp_table arithmetic expression problem
+### 2025-09-25 01:02:42.476
+DROP TABLE IF EXISTS exp_table;
+### 2025-09-25 01:02:42.476
+DROP TABLE IF EXISTS exp_table2;
+### 2025-09-25 01:02:42.477
+CREATE TABLE exp_table(id int, col1 int, col2 int, col3 float, col4 float);
+### 2025-09-25 01:02:42.478
+CREATE TABLE exp_table2(id int, col1 int);
+### 2025-09-25 01:02:42.478
+INSERT INTO exp_table VALUES (9, 2, 4, 4.35, 5.17);
+### 2025-09-25 01:02:42.479
+INSERT INTO exp_table VALUES (1, 6, 9, 2.34, 2.78);
+### 2025-09-25 01:02:42.480
+INSERT INTO exp_table VALUES (8, 3, 1, 4.31, 2.44);
+### 2025-09-25 01:02:42.481
+SELECT * FROM exp_table;
+### 2025-09-25 01:02:42.484
+-- Test the problematic query
+### 2025-09-25 01:02:42.484
+SELECT * FROM exp_table WHERE col1 - 2 > 6;
+### 2025-09-25 01:02:42.488
+-- Issue 2: ssq subquery crash
+### 2025-09-25 01:02:42.488
+DROP TABLE IF EXISTS ssq_1;
+### 2025-09-25 01:02:42.488
+DROP TABLE IF EXISTS ssq_2;
+### 2025-09-25 01:02:42.488
+DROP TABLE IF EXISTS ssq_3;
+### 2025-09-25 01:02:42.489
+DROP TABLE IF EXISTS ssq_4;
+### 2025-09-25 01:02:42.489
+CREATE TABLE ssq_3(id int, col3 int, feat3 float);
+### 2025-09-25 01:02:42.490
+CREATE TABLE ssq_4(id int, col4 char(20));
+### 2025-09-25 01:02:42.490
+-- Add some data to ssq_2 to test
+### 2025-09-25 01:02:42.491
+INSERT INTO ssq_2 VALUES (1, 10, 1.5);
+### 2025-09-25 01:02:42.491
+INSERT INTO ssq_2 VALUES (2, 20, 2.5);
+### 2025-09-25 01:02:42.491
+-- Check data first
+### 2025-09-25 01:02:42.492
+SELECT * FROM ssq_1;
+### 2025-09-25 01:02:42.493
+SELECT * FROM ssq_2;
+### 2025-09-25 01:02:42.494
+-- Test the problematic subquery
+### 2025-09-25 01:02:42.495
 SELECT * FROM ssq_1 WHERE col1 = (SELECT ssq_2.col2 FROM ssq_2);
+### 2025-09-25 01:04:30.458
+-- Test simple arithmetic expressions
+### 2025-09-25 01:09:00.495
+-- Test expression type debugging
+### 2025-09-25 01:21:49.812
+-- Test user reported issues with debug build
+### 2025-09-25 01:21:49.835
+-- Issue 1: Arithmetic expression problem
+### 2025-09-25 01:21:49.835
+create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
+### 2025-09-25 01:21:49.836
+insert into exp_table VALUES (9, 2, 4, 4.35, 5.17);
+### 2025-09-25 01:21:49.837
+insert into exp_table VALUES (1, 6, 9, 2.34, 2.78);
+### 2025-09-25 01:21:49.837
+insert into exp_table VALUES (8, 3, 1, 4.31, 2.44);
+### 2025-09-25 01:21:49.838
+-- This should work but user reports it's incorrect
+### 2025-09-25 01:21:49.839
+-- Issue 2: Subquery crash
+### 2025-09-25 01:21:49.839
+CREATE TABLE ssq_1(id int, col1 int, feat1 float);
+### 2025-09-25 01:21:49.840
+CREATE TABLE ssq_2(id int, col2 int, feat2 float);
+### 2025-09-25 01:21:49.840
+INSERT INTO ssq_1 VALUES (64, 91, 6.10);
+### 2025-09-25 01:21:49.841
+INSERT INTO ssq_1 VALUES (65, 92, 7.20);
+### 2025-09-25 01:21:49.842
+INSERT INTO ssq_1 VALUES (66, 93, 8.30);
+### 2025-09-25 01:21:49.842
+INSERT INTO ssq_2 VALUES (1, 10, 1.1);
+### 2025-09-25 01:21:49.843
+INSERT INTO ssq_2 VALUES (2, 20, 2.2);
+### 2025-09-25 01:21:49.844
+INSERT INTO ssq_2 VALUES (3, 30, 3.3);
+### 2025-09-25 01:21:49.844
+INSERT INTO ssq_2 VALUES (4, 94, 4.4);
+### 2025-09-25 01:21:49.845
+INSERT INTO ssq_2 VALUES (5, 99, 5.5);
+### 2025-09-25 01:21:49.845
+INSERT INTO ssq_2 VALUES (6, 10, 6.6);
+### 2025-09-25 01:21:49.846
+INSERT INTO ssq_2 VALUES (7, 20, 7.7);
+### 2025-09-25 01:21:49.847
+-- This should cause server crash according to user
+### 2025-09-25 01:21:49.847
+select * from ssq_1 where col1 = (select ssq_2.col2 from ssq_2);
+### 2025-09-25 01:22:29.376
+-- Test only arithmetic expression issue
+### 2025-09-25 01:23:15.677
+-- Check table structure
+### 2025-09-25 01:23:51.470
+-- Test arithmetic expressions step by step
+### 2025-09-25 01:33:02.087
+-- Test simple comparison without arithmetic
+### 2025-09-25 01:39:12.723
+-- Test comparison expression in SELECT
+### 2025-09-25 01:48:14.130
+-- Test single comparison expression
+### 2025-09-25 01:53:31.005
+-- Minimal test for comparison expression
+### 2025-09-25 01:58:24.989
+-- Test to debug find_cell() calls
+### 2025-09-25 02:09:46.827
+-- Test arithmetic expression fix
+### 2025-09-25 02:10:23.966
+-- Test aggregation and GROUP BY functionality
+### 2025-09-25 02:11:04.683
+-- Test comprehensive fix
+### 2025-09-25 02:13:11.057
+select * from exp_table where col1 - 2 > 6;
+### 2025-09-25 02:15:31.747
+-- Test arithmetic expressions that should return results
+### 2025-09-25 02:16:24.960
+-- Test GROUP BY functionality
