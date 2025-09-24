@@ -152,6 +152,9 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     return rc;
   }
 
+  // HAVING: place predicate after group by (declare at function scope to avoid use-after-scope)
+  unique_ptr<LogicalOperator> having_oper;
+
   if (group_by_oper) {
     if (*last_oper) {
       group_by_oper->add_child(std::move(*last_oper));
@@ -159,8 +162,6 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
     last_oper = &group_by_oper;
 
-    // HAVING: place predicate after group by
-    unique_ptr<LogicalOperator> having_oper;
     if (select_stmt->having_expr() != nullptr) {
       // bind having expression
       unique_ptr<Expression> having_expr = select_stmt->having_expr()->copy();

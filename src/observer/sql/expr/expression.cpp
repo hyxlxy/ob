@@ -1278,18 +1278,39 @@ unique_ptr<Aggregator> AggregateExpr::create_aggregator() const
 
 RC AggregateExpr::get_value(const Tuple &tuple, Value &value) const
 {
+  // 添加调试信息和安全检查
+  printf("DEBUG: [AGGREGATE] AggregateExpr::get_value() called, name='%s'\n", name());
+
+  // 检查是否存在循环引用
+  static thread_local int recursion_depth = 0;
+  if (recursion_depth > 10) {
+    printf("ERROR: [AGGREGATE] Recursion depth exceeded in AggregateExpr::get_value()\n");
+    value.set_int(0);
+    return RC::INTERNAL;
+  }
+
+  recursion_depth++;
+
   // 首先尝试从tuple中按名称查找聚合结果
   RC rc = tuple.find_cell(TupleCellSpec(name()), value);
   if (rc == RC::SUCCESS) {
+    printf("DEBUG: [AGGREGATE] Found aggregate result in tuple: %s\n", value.to_string().c_str());
+    recursion_depth--;
     return rc;
   }
 
+  printf("DEBUG: [AGGREGATE] Aggregate result not found in tuple, trying child expression\n");
+
   // 如果找不到，则从子表达式获取值（用于聚合过程中）
   if (child_) {
-    return child_->get_value(tuple, value);
+    rc = child_->get_value(tuple, value);
+    recursion_depth--;
+    return rc;
   } else {
     // 对于COUNT(*)，没有子表达式，返回一个虚拟值
+    printf("DEBUG: [AGGREGATE] COUNT(*) case, returning 1\n");
     value.set_int(1);
+    recursion_depth--;
     return RC::SUCCESS;
   }
 }

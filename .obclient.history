@@ -1,29 +1,3 @@
-### 2025-09-04 10:54:39.410
-CREATE TABLE scores (cls CHAR(8), uid INT, score INT);
-### 2025-09-04 10:54:39.426
-INSERT INTO scores VALUES ('A',1,80),('A',2,88),('A',3,92),('B',4,60),('B',5,61),('B',6,78);
-### 2025-09-04 10:54:39.430
--- group by only
-### 2025-09-04 10:54:39.430
-SELECT cls, COUNT(*), SUM(score), AVG(score) FROM scores GROUP BY cls;
-### 2025-09-04 10:54:39.434
--- having on aggregate
-### 2025-09-04 10:54:39.434
-SELECT cls, COUNT(*) FROM scores GROUP BY cls HAVING COUNT(*) > 2;
-### 2025-09-08 09:48:48.674
-DESC classes;
-### 2025-09-08 10:25:12.518
-CREATE TABLE students (
-### 2025-09-08 10:25:12.519
-    name CHAR(20),
-### 2025-09-08 10:25:12.520
-    class_id INT
-### 2025-09-08 10:25:12.521
-CREATE TABLE classes (
-### 2025-09-08 10:25:12.522
-    id INT,
-### 2025-09-08 10:25:12.522
-    class_name CHAR(20)
 ### 2025-09-08 10:25:12.554
 -- 测试INNER JOIN
 ### 2025-09-08 10:25:12.555
@@ -1998,3 +1972,29 @@ INSERT INTO aggregation_func VALUES (1, 10, 1.5, 'A');
 INSERT INTO aggregation_func VALUES (2, 20, 2.5, 'B');
 ### 2025-09-24 18:39:20.080
 SELECT sum(num) FROM aggregation_func;
+### 2025-09-24 22:14:25.302
+CREATE TABLE t_group_by(id int, score int);
+### 2025-09-24 22:14:25.304
+INSERT INTO t_group_by VALUES (1, 2);
+### 2025-09-24 22:14:25.306
+INSERT INTO t_group_by VALUES (1, 3);
+### 2025-09-24 22:14:25.306
+INSERT INTO t_group_by VALUES (2, 1);
+### 2025-09-24 22:14:25.307
+INSERT INTO t_group_by VALUES (2, 4);
+### 2025-09-24 22:14:25.308
+-- Test basic GROUP BY first
+### 2025-09-24 22:14:25.308
+SELECT id, sum(score) FROM t_group_by GROUP BY id;
+### 2025-09-24 22:14:25.311
+-- Test HAVING clause that crashes
+### 2025-09-24 22:14:25.311
+SELECT id, sum(score) FROM t_group_by GROUP BY id HAVING sum(score) > 4;
+### 2025-09-24 22:17:35.836
+-- Test HAVING clause crash debugging
+### 2025-09-24 22:18:18.810
+-- Test subqueries that were causing crashes
+### 2025-09-24 22:18:18.839
+-- Test correlated subquery
+### 2025-09-24 22:18:18.840
+select * from table_alias_1 t1 where id in (select t2.id from table_alias_2 t2 where t2.col2 >= t1.col1);
