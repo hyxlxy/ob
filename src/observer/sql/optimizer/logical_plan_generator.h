@@ -58,6 +58,9 @@ private:
   bool is_join_condition(Expression *expr, const vector<Table *> &tables);
   bool involves_tables(Expression *expr, LogicalOperator *left_oper, LogicalOperator *right_oper);
 
+  // HAVING子句聚合表达式收集辅助函数
+  void collect_having_aggregates(Expression *expr, vector<Expression *> &aggregate_expressions);
+
 private:
   BinderContext binder_context_;
   bool          binder_ctx_initialized_ = false;

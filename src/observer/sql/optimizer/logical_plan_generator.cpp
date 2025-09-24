@@ -606,9 +606,14 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
     find_unbound_column(expression);
   }
 
-  // collect all aggregate expressions
+  // collect all aggregate expressions from SELECT list
   for (unique_ptr<Expression> &expression : query_expressions) {
     collector(expression);
+  }
+
+  // also collect aggregate expressions from HAVING clause (借鉴参考代码思路)
+  if (select_stmt->having_expr() != nullptr) {
+    ExpressionIterator::collect_having_aggregates(select_stmt->having_expr(), aggregate_expressions);
   }
 
   if (group_by_expressions.empty() && aggregate_expressions.empty()) {
@@ -684,5 +689,7 @@ bool LogicalPlanGenerator::involves_tables(Expression *expr, LogicalOperator *le
 
   return false;
 }
+
+
 
 

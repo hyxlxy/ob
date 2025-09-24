@@ -1,51 +1,3 @@
-### 2025-09-08 10:25:12.554
--- 测试INNER JOIN
-### 2025-09-08 10:25:12.555
-INNER JOIN classes ON students.class_id = classes.id;
-### 2025-09-08 10:25:12.556
--- 测试简化的JOIN语法
-### 2025-09-08 10:25:12.556
-SELECT students.name, classes.class_name 
-### 2025-09-08 10:25:12.557
-FROM students 
-### 2025-09-08 10:25:12.557
-JOIN classes ON students.class_id = classes.id;
-### 2025-09-08 10:34:04.020
--- 测试多表查询（传统语法）
-### 2025-09-08 10:34:04.058
--- 测试传统多表查询语法
-### 2025-09-08 10:34:15.814
--- 测试JOIN功能（单行版本）
-### 2025-09-08 10:34:15.823
-CREATE DATABASE test_db;
-### 2025-09-08 10:34:15.824
--- 创建学生表
-### 2025-09-08 10:34:15.824
-CREATE TABLE students (id INT, name CHAR(20), class_id INT);
-### 2025-09-08 10:34:15.826
--- 创建班级表
-### 2025-09-08 10:34:15.826
-CREATE TABLE classes (id INT, class_name CHAR(20));
-### 2025-09-08 10:34:15.827
--- 插入学生数据
-### 2025-09-08 10:34:15.829
-INSERT INTO students VALUES (2, 'Bob', 1);
-### 2025-09-08 10:34:15.831
-INSERT INTO students VALUES (3, 'Charlie', 2);
-### 2025-09-08 10:34:15.832
-INSERT INTO students VALUES (4, 'David', 2);
-### 2025-09-08 10:34:15.834
--- 插入班级数据
-### 2025-09-08 10:34:15.836
-INSERT INTO classes VALUES (2, 'Science');
-### 2025-09-08 10:34:15.838
--- 查看原始数据
-### 2025-09-08 10:34:15.845
--- 测试INNER JOIN（单行）
-### 2025-09-08 10:34:15.845
-SELECT students.name, classes.class_name FROM students INNER JOIN classes ON students.class_id = classes.id;
-### 2025-09-08 11:05:29.930
--- 测试基本SELECT语法
 ### 2025-09-08 11:05:29.949
 EXIT;
 ### 2025-09-08 11:05:41.403
@@ -1972,24 +1924,10 @@ INSERT INTO aggregation_func VALUES (1, 10, 1.5, 'A');
 INSERT INTO aggregation_func VALUES (2, 20, 2.5, 'B');
 ### 2025-09-24 18:39:20.080
 SELECT sum(num) FROM aggregation_func;
-### 2025-09-24 22:14:25.302
-CREATE TABLE t_group_by(id int, score int);
-### 2025-09-24 22:14:25.304
-INSERT INTO t_group_by VALUES (1, 2);
-### 2025-09-24 22:14:25.306
-INSERT INTO t_group_by VALUES (1, 3);
-### 2025-09-24 22:14:25.306
-INSERT INTO t_group_by VALUES (2, 1);
-### 2025-09-24 22:14:25.307
-INSERT INTO t_group_by VALUES (2, 4);
 ### 2025-09-24 22:14:25.308
 -- Test basic GROUP BY first
-### 2025-09-24 22:14:25.308
-SELECT id, sum(score) FROM t_group_by GROUP BY id;
 ### 2025-09-24 22:14:25.311
 -- Test HAVING clause that crashes
-### 2025-09-24 22:14:25.311
-SELECT id, sum(score) FROM t_group_by GROUP BY id HAVING sum(score) > 4;
 ### 2025-09-24 22:17:35.836
 -- Test HAVING clause crash debugging
 ### 2025-09-24 22:18:18.810
@@ -1998,3 +1936,65 @@ SELECT id, sum(score) FROM t_group_by GROUP BY id HAVING sum(score) > 4;
 -- Test correlated subquery
 ### 2025-09-24 22:18:18.840
 select * from table_alias_1 t1 where id in (select t2.id from table_alias_2 t2 where t2.col2 >= t1.col1);
+### 2025-09-24 22:36:48.746
+-- Test HAVING clause issue
+### 2025-09-24 22:47:06.760
+-- Test HAVING clause with detailed verification
+### 2025-09-24 22:48:09.510
+-- Simple HAVING test
+### 2025-09-24 22:52:23.399
+-- Expected: id=1 sum=5, id=2 sum=5, id=3 sum=10
+### 2025-09-24 22:52:23.399
+SELECT id, sum(score) FROM t_group_by GROUP BY id;
+### 2025-09-24 22:52:23.401
+-- Expected: only id=3 (sum=10 > 6)
+### 2025-09-24 22:52:23.402
+SELECT id, sum(score) FROM t_group_by GROUP BY id HAVING sum(score) > 6;
+### 2025-09-24 23:32:00.747
+-- Test UPDATE crash
+### 2025-09-24 23:45:34.160
+-- Simple HAVING debug test
+### 2025-09-24 23:46:26.407
+-- Test HAVING with different values
+### 2025-09-24 23:53:25.810
+-- Test original user issues
+### 2025-09-24 23:53:25.831
+CREATE TABLE t_group_by(id int, score int);
+### 2025-09-24 23:53:25.861
+INSERT INTO t_group_by VALUES (1, 2);
+### 2025-09-24 23:53:25.862
+INSERT INTO t_group_by VALUES (1, 3);
+### 2025-09-24 23:53:25.862
+INSERT INTO t_group_by VALUES (2, 1);
+### 2025-09-24 23:53:25.862
+INSERT INTO t_group_by VALUES (2, 4);
+### 2025-09-24 23:53:25.863
+INSERT INTO t_group_by VALUES (3, 10);
+### 2025-09-24 23:53:25.863
+-- Original issue: select id, sum(score) from t_group_by group by id having sum(score)>4;
+### 2025-09-24 23:53:25.863
+SELECT id, sum(score) FROM t_group_by GROUP BY id HAVING sum(score) > 4;
+### 2025-09-24 23:53:25.867
+-- Test UPDATE (should not crash)
+### 2025-09-24 23:53:25.867
+CREATE TABLE text_table(id int, info char(20));
+### 2025-09-24 23:53:25.889
+INSERT INTO text_table VALUES (1, 'original data');
+### 2025-09-24 23:53:25.890
+INSERT INTO text_table VALUES (2, 'old data');
+### 2025-09-24 23:53:25.890
+UPDATE text_table SET info='a tmp data' WHERE id = 2;
+### 2025-09-24 23:53:25.891
+SELECT * FROM text_table;
+### 2025-09-24 23:53:25.892
+-- Test subqueries (should not crash)
+### 2025-09-24 23:53:25.892
+CREATE TABLE ssq_1(col1 int, col2 int, col3 int);
+### 2025-09-24 23:53:25.893
+CREATE TABLE ssq_2(id int, num int);
+### 2025-09-24 23:53:25.893
+INSERT INTO ssq_1 VALUES (1, 2, 3);
+### 2025-09-24 23:53:25.893
+INSERT INTO ssq_2 VALUES (1, 100);
+### 2025-09-24 23:53:25.894
+SELECT * FROM ssq_1 WHERE col1 = (SELECT ssq_2.col2 FROM ssq_2);

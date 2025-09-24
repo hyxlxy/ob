@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/sys/rc.h"
 #include "common/lang/functional.h"
 #include "common/lang/memory.h"
+#include <vector>
 
 class Expression;
 
@@ -24,4 +25,5 @@ class ExpressionIterator
 {
 public:
   static RC iterate_child_expr(Expression &expr, function<RC(unique_ptr<Expression> &)> callback);
+  static RC collect_having_aggregates(Expression *expr, std::vector<Expression *> &aggregate_expressions);
 };

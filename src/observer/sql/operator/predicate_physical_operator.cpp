@@ -74,8 +74,16 @@ RC PredicatePhysicalOperator::next()
     LOG_DEBUG("PredicatePhysicalOperator::next() get_value SUCCESS: expr_type=%d value_type=%d",
               static_cast<int>(expression_->type()), static_cast<int>(value.attr_type()));
 
+    // 添加详细的调试信息
+    printf("DEBUG: [PREDICATE] Expression evaluation result: value_type=%d, value=%s, boolean=%s\n",
+           static_cast<int>(value.attr_type()), value.to_string().c_str(),
+           value.get_boolean() ? "true" : "false");
+
     if (value.get_boolean()) {
+      printf("DEBUG: [PREDICATE] Tuple PASSED the predicate\n");
       return rc;
+    } else {
+      printf("DEBUG: [PREDICATE] Tuple FAILED the predicate, continuing to next tuple\n");
     }
   }
   return rc;

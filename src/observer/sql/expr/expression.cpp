@@ -449,12 +449,17 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
             static_cast<int>(right_->type()), static_cast<int>(right_value.attr_type()));
 
   bool bool_value = false;
+  printf("DEBUG: [COMPARISON] About to compare: left=%s, right=%s, comp_op=%d\n",
+         left_value.to_string().c_str(), right_value.to_string().c_str(), static_cast<int>(comp_));
   rc = compare_value(left_value, right_value, bool_value);
   if (rc != RC::SUCCESS) {
     LOG_WARN("ComparisonExpr::get_value() compare_value failed: rc=%s", strrc(rc));
     return rc;
   }
 
+  printf("DEBUG: [COMPARISON] Comparison result: %s > %s = %s (comp_op=%d)\n",
+         left_value.to_string().c_str(), right_value.to_string().c_str(),
+         bool_value ? "true" : "false", static_cast<int>(comp_));
   LOG_DEBUG("ComparisonExpr::get_value() SUCCESS: result=%s", bool_value ? "true" : "false");
   value.set_boolean(bool_value);
   return rc;

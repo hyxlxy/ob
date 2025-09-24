@@ -117,3 +117,72 @@ RC ExpressionIterator::iterate_child_expr(Expression &expr, function<RC(unique_p
 
   return rc;
 }
+
+RC ExpressionIterator::collect_having_aggregates(Expression *expr, std::vector<Expression *> &aggregate_expressions)
+{
+  if (expr == nullptr) {
+    return RC::SUCCESS;
+  }
+
+  RC rc = RC::SUCCESS;
+
+  switch (expr->type()) {
+    case ExprType::COMPARISON: {
+      auto *comp_expr = dynamic_cast<ComparisonExpr *>(expr);
+      if (comp_expr) {
+        rc = collect_having_aggregates(comp_expr->left().get(), aggregate_expressions);
+        if (OB_FAIL(rc)) {
+          break;
+        }
+        rc = collect_having_aggregates(comp_expr->right().get(), aggregate_expressions);
+      }
+    } break;
+
+    case ExprType::CONJUNCTION: {
+      auto *conjunction_expr = dynamic_cast<ConjunctionExpr *>(expr);
+      if (conjunction_expr) {
+        for (auto &child : conjunction_expr->children()) {
+          rc = collect_having_aggregates(child.get(), aggregate_expressions);
+          if (OB_FAIL(rc)) {
+            break;
+          }
+        }
+      }
+    } break;
+
+    case ExprType::AGGREGATION: {
+      aggregate_expressions.push_back(expr);
+    } break;
+
+    case ExprType::ARITHMETIC: {
+      auto *arith_expr = dynamic_cast<ArithmeticExpr *>(expr);
+      if (arith_expr) {
+        rc = collect_having_aggregates(arith_expr->left().get(), aggregate_expressions);
+        if (OB_FAIL(rc)) {
+          break;
+        }
+        rc = collect_having_aggregates(arith_expr->right().get(), aggregate_expressions);
+      }
+    } break;
+
+    case ExprType::CAST:
+    case ExprType::FUNCTION:
+    case ExprType::NONE:
+    case ExprType::STAR:
+    case ExprType::UNBOUND_FIELD:
+    case ExprType::FIELD:
+    case ExprType::VALUE:
+    case ExprType::SUBQUERY:
+    case ExprType::IN_VALUES:
+    case ExprType::SUBQUERY_IN:
+    case ExprType::LIST: {
+      // Do nothing for these types
+    } break;
+
+    default: {
+      LOG_WARN("Unknown expression type in collect_having_aggregates: %d", static_cast<int>(expr->type()));
+    }
+  }
+
+  return rc;
+}

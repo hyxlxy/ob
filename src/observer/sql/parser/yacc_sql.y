@@ -897,7 +897,11 @@ opt_as_alias:
     ;
 
 expression:
-    expression '+' expression {
+    expression comp_op expression {
+      $$ = new ComparisonExpr($2, unique_ptr<Expression>($1), unique_ptr<Expression>($3));
+      $$->set_name(token_name(sql_string, &@$));
+    }
+    | expression '+' expression {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::ADD, $1, $3, sql_string, &@$);
     }
     | expression '-' expression {
