@@ -102,7 +102,12 @@ RC PlainCommunicator::write_state(SessionEvent *event, bool &need_disconnect)
     const char *result = RC::SUCCESS == sql_result->return_code() ? "SUCCESS" : "FAILURE";
     snprintf(buf, buf_size, "%s\n", result);
   } else {
-    snprintf(buf, buf_size, "%s > %s\n", strrc(sql_result->return_code()), state_string.c_str());
+    // 对于语法错误，直接返回FAILURE而不是SQL_SYNTAX > Failed to parse sql
+    if (sql_result->return_code() == RC::SQL_SYNTAX) {
+      snprintf(buf, buf_size, "FAILURE\n");
+    } else {
+      snprintf(buf, buf_size, "%s > %s\n", strrc(sql_result->return_code()), state_string.c_str());
+    }
   }
 
   RC rc = writer_->writen(buf, strlen(buf));
