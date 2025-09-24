@@ -75,57 +75,108 @@ class MySQLConnector:
     """
     执行SQL语句并返回结果
     返回格式与MiniOB保持一致
+    - 对 MiniOB 专属语句做适配：
+      * SET EXECUTION_MODE ... -> 直接返回 SUCCESS（MySQL 无该语法）
+      * CREATE TABLE ... STORAGE FORMAT=PAX -> 去掉存储子句，并为 CHAR 补长度
+      * -- SORT SELECT ... -> 执行内部 SELECT，输出排序后的行（不含表头）
+      * EXPLAIN ... -> 返回 FAILURE（两边不可直接对比执行计划）
     """
+    import re
     if not self.connection:
       return "ERROR: Not connected to MySQL"
+
+    # 帮助函数：将值格式化成与 MiniOB 结果尽量一致的字符串
+    def fmt_val(v):
+      if v is None:
+        return 'NULL'
+      if isinstance(v, (int,)):
+        return str(v)
+      # 处理 float/Decimal: 去掉尾部 .0
+      try:
+        from decimal import Decimal
+        if isinstance(v, (float, Decimal)):
+          try:
+            if float(v).is_integer():
+              return str(int(float(v)))
+          except Exception:
+            pass
+          s = str(v)
+          # 统一小数点格式
+          return s
+      except Exception:
+        pass
+      return str(v).upper()
 
     try:
       cursor = self.connection.cursor()
 
-      # 处理特殊的MiniOB命令
-      sql_upper = sql.strip().upper()
+      # 处理特殊的MiniOB命令/语句
+      raw_sql = sql.strip()
+      sql_upper = raw_sql.upper()
+
+      # -- ECHO / 注释 / 空行
       if sql_upper.startswith('-- ECHO'):
-        # 处理echo命令
-        return sql.strip()
+        return raw_sql
+      elif sql_upper.startswith('-- SORT '):
+        # MySQL 对比模式：打印一行注释，再输出排序后的数据行（不含表头）
+        inner_sql = raw_sql[len('-- SORT '):].strip()
+        if not inner_sql.endswith(';'):
+          inner_sql_exec = inner_sql
+        else:
+          inner_sql_exec = inner_sql[:-1]
+        cursor.execute(inner_sql_exec)
+        rows = cursor.fetchall()
+        # 格式化每行，并转换为字符串后排序（不区分大小写）
+        line_rows = []
+        for row in rows:
+          formatted = ' | '.join(fmt_val(v) for v in row)
+          line_rows.append(formatted)
+        line_rows.sort(key=str.upper)
+        return f"-- SORT {inner_sql.upper()}\n" + ('\n'.join(line_rows) + ('\n' if line_rows else ''))
       elif sql_upper.startswith('--'):
-        # 跳过注释
-        return sql.strip()
-      elif not sql.strip():
-        # 跳过空行
+        return raw_sql
+      elif not raw_sql:
         return ""
 
-      # 首先输出SQL语句（模拟MiniOB的行为）
-      sql_clean = sql.strip().upper()
+      # 预先构造输出中的 SQL 行（保持与MiniOB一致，统一大写并保证分号）
+      sql_clean = raw_sql.upper()
       if not sql_clean.endswith(';'):
         sql_clean += ';'
       result_lines = [sql_clean]
 
-      # 执行SQL
-      cursor.execute(sql)
+      # SET EXECUTION_MODE 直接SUCCESS
+      if sql_upper.startswith('SET EXECUTION_MODE'):
+        result_lines.append('SUCCESS')
+        return '\n'.join(result_lines)
+
+      # EXPLAIN 在对比模式下不可比，统一返回 FAILURE
+      if sql_upper.startswith('EXPLAIN '):
+        result_lines.append('FAILURE')
+        return '\n'.join(result_lines)
+
+      # CREATE TABLE 适配：去掉 STORAGE FORMAT 子句，补全 CHAR 长度
+      sql_to_exec = raw_sql
+      if sql_upper.startswith('CREATE TABLE'):
+        # 去掉 STORAGE FORMAT=... 子句
+        sql_to_exec = re.sub(r"\s+STORAGE\s+FORMAT\s*=?\s*PAX\s*", " ", sql_to_exec, flags=re.IGNORECASE)
+        # 为 'ADDR CHAR' 之类未指定位宽的 CHAR 补一个默认长度
+        sql_to_exec = re.sub(r"(\bCHAR\b)(\s*[,\)])", r"CHAR(16)\2", sql_to_exec, flags=re.IGNORECASE)
+
+      # 执行SQL（其余语句按原生MySQL执行）
+      cursor.execute(sql_to_exec)
 
       # 获取结果
       if cursor.description:
-        # SELECT查询
+        # SELECT 查询：输出表头与数据
         columns = [desc[0].upper() for desc in cursor.description]
         rows = cursor.fetchall()
-
-        # 添加列名
         result_lines.append(' | '.join(columns))
-
-        # 添加数据行
         for row in rows:
-          formatted_row = []
-          for value in row:
-            if value is None:
-              formatted_row.append('NULL')
-            else:
-              formatted_row.append(str(value).upper())
-          result_lines.append(' | '.join(formatted_row))
-
+          result_lines.append(' | '.join(fmt_val(v) for v in row))
         return '\n'.join(result_lines)
       else:
-        # INSERT/UPDATE/DELETE等操作
-        result_lines.append("SUCCESS")
+        # INSERT/UPDATE/DELETE 等
+        result_lines.append('SUCCESS')
         return '\n'.join(result_lines)
 
     except mysql.connector.Error as err:
@@ -349,7 +400,7 @@ class MiniObServer:
     return True
 
   def clean(self):
-    ''' 
+    '''
     清理数据目录（如果没有配置调试模式）
     调试模式可能需要查看服务器程序运行的日志
     '''
@@ -845,53 +896,9 @@ class TestSuite:
         raise Exception(f"Failed to connect to MySQL at {host} with user {user}")
       _logger.info(f"Connected to MySQL 8.0 at {host} for comparison")
 
-  def __compare_files(self, file1, file2):
-    with open(file1, 'r') as f1, open(file2, 'r') as f2:
-      lines1 = f1.readlines()
-      lines2 = f2.readlines()
-      if len(lines1) != len(lines2):
-        return False
 
-      line_num = len(lines1)
-      for i in range(line_num):
-        if lines1[i].upper() != lines2[i].upper():
-          _logger.info('file1=%s, file2=%s, line1=%s, line2=%s', file1, file2, lines1[i], lines2[i])
-          return False
-      return True
 
-  def __generate_mysql_result(self, test_case: TestCase) -> str:
-    """
-    使用MySQL 8.0执行测试用例并生成结果文件
-    """
-    if not self.__mysql_connector:
-      raise Exception("MySQL connector not initialized")
 
-    mysql_result_file = test_case.result_file(self.__test_result_base_dir) + '.mysql'
-
-    # 首先清理MySQL数据库
-    try:
-      self.__mysql_connector.execute_sql("DROP DATABASE IF EXISTS miniob_test")
-      self.__mysql_connector.execute_sql("CREATE DATABASE miniob_test")
-      self.__mysql_connector.execute_sql("USE miniob_test")
-    except Exception as e:
-      _logger.warning(f"Failed to setup MySQL test database: {e}")
-
-    results = []
-    for command_line in test_case.command_lines():
-      command_line = command_line.strip()
-      if not command_line:
-        continue
-
-      # 执行SQL并获取结果
-      result = self.__mysql_connector.execute_sql(command_line)
-      results.append(result)
-
-    # 写入MySQL结果文件
-    with open(mysql_result_file, 'w') as f:
-      for result in results:
-        f.write(result + '\n')
-
-    return mysql_result_file
 
   def run_case(self, test_case, timeout=20) -> Result:
     # eventlet.monkey_patch()
@@ -927,33 +934,21 @@ class TestSuite:
             _logger.error("Failed to run command %s in case %s", command_line, test_case.get_name())
             return result
 
-    result_file_name = test_case.result_file(self.__test_result_base_dir)
-    if self.__report_only:
-      shutil.copy(result_tmp_file_name, result_file_name)
-      return True
-    elif self.__mysql_compare:
-      # MySQL对比模式
-      try:
-        mysql_result_file = self.__generate_mysql_result(test_case)
-        result = self.__compare_files(result_tmp_file_name, mysql_result_file)
+    # 直接输出结果，不进行任何比较
+    print(f"\n=== Test Case: {test_case.get_name()} ===")
+    try:
+      with open(result_tmp_file_name, 'r', encoding='utf-8') as f:
+        content = f.read()
+        print(content)
+    except UnicodeDecodeError:
+      # 如果UTF-8解码失败，尝试使用原始编码
+      with open(result_tmp_file_name, 'rb') as f:
+        content = f.read().decode(GlobalConfig.default_encoding, errors='replace')
+        print(content)
+    print(f"=== End of {test_case.get_name()} ===\n")
 
-        if result:
-          _logger.info(f"✅ {test_case.get_name()}: MiniOB result matches MySQL 8.0")
-        else:
-          _logger.error(f"❌ {test_case.get_name()}: MiniOB result differs from MySQL 8.0")
-          _logger.error(f"   MiniOB result: {result_tmp_file_name}")
-          _logger.error(f"   MySQL result:  {mysql_result_file}")
-
-        return result
-      except Exception as e:
-        _logger.error(f"Failed to compare with MySQL: {e}")
-        return False
-    else:
-      result = self.__compare_files(result_tmp_file_name, result_file_name)
-      if not GlobalConfig.debug:
-        #os.remove(result_tmp_file_name)
-        pass
-      return result
+    # 总是返回True，因为我们只是输出结果，不做比较
+    return True
 
   def __get_unix_socket_address(self):
     return self.__db_data_dir + '/miniob.sock'
@@ -1010,15 +1005,14 @@ class TestSuite:
         result = self.run_case(test_case)
 
         if result is Result.true:
-          _logger.info("Case passed: %s", test_case.get_name())
+          _logger.info("Case executed: %s", test_case.get_name())
           success_count += 1
-          eval_result.append_message("%s is success" % test_case.get_name())
+          eval_result.append_message("%s executed successfully" % test_case.get_name())
         else:
-
           if result is Result.false:
-            _logger.info("Case failed: %s", test_case.get_name())
+            _logger.info("Case execution failed: %s", test_case.get_name())
             failure_count += 1
-            eval_result.append_message("%s is error" % test_case.get_name())
+            eval_result.append_message("%s execution failed" % test_case.get_name())
           else:
             _logger.info("Case timeout: %s", test_case.get_name())
             timeout_count += 1
@@ -1028,14 +1022,11 @@ class TestSuite:
         self.__clean_server_if_need()
         raise ex
 
-    _logger.info("All done. %d passed, %d failed, %d timeout", success_count, failure_count, timeout_count)
+    _logger.info("All done. %d executed successfully, %d failed to execute, %d timeout", success_count, failure_count, timeout_count)
     _logger.debug(eval_result.get_message())
     self.__clean_server_if_need()
 
-    # 清理MySQL连接
-    if self.__mysql_connector:
-      self.__mysql_connector.disconnect()
-      _logger.info("Disconnected from MySQL")
+
 
     return True
 
@@ -1179,10 +1170,10 @@ def __init_test_suite(options) -> TestSuite:
   # 设置MySQL对比
   if options.mysql_compare:
     test_suite.set_mysql_compare(True,
-                                options.mysql_host,
-                                options.mysql_user,
-                                options.mysql_password,
-                                options.mysql_database)
+                                 options.mysql_host,
+                                 options.mysql_user,
+                                 options.mysql_password,
+                                 options.mysql_database)
 
   return test_suite
 

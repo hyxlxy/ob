@@ -1,17 +1,3 @@
-### 2025-09-04 09:33:50.633
-SELECT AVG(id) FROM test;
-### 2025-09-04 09:38:19.964
-SELECT id, COUNT(*) FROM test GROUP BY id;
-### 2025-09-04 09:38:55.680
-SELECT id, SUM(id), AVG(id) FROM test GROUP BY id;
-### 2025-09-04 09:47:08.714
-SELECT id, COUNT(*) FROM test GROUP BY id HAVING COUNT(*) > 1;
-### 2025-09-04 10:00:27.468
-SELECT * FROM students JOIN classes ON students.id = classes.id;
-### 2025-09-04 10:14:51.061
-SELECT COUNT(*), SUM(id), AVG(id) FROM test;
-### 2025-09-04 10:17:07.112
-SELECT s.name, c.class_name FROM students s JOIN classes c ON s.class_id = c.id;
 ### 2025-09-04 10:24:58.922
 -- setup in default DB
 ### 2025-09-04 10:24:58.937
@@ -1998,3 +1984,17 @@ INSERT INTO base_table VALUES (1, 'Alice');
 INSERT INTO base_table VALUES (2, 'Bob');
 ### 2025-09-21 20:45:40.871
 create database test_db; use test_db; CREATE TABLE base_table(id int, name char(10));
+### 2025-09-24 10:39:32.365
+create table test_t1(id int, col1 int, col2 float);
+### 2025-09-24 10:39:47.583
+create table test_t2(id int, col3 char(10), col4 int);
+### 2025-09-24 10:40:02.390
+insert into test_t1 values(1, 10, 1.1);
+### 2025-09-24 10:41:26.516
+create table big_order_t1(id int, col1 int, col2 float);
+### 2025-09-24 10:42:18.659
+create table test_order(id int, name char(10), score float);
+### 2025-09-24 10:42:56.854
+drop table big_order_t1;
+### 2025-09-24 10:43:33.800
+drop table t1;
