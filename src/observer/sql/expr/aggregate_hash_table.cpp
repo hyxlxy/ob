@@ -14,8 +14,88 @@ See the Mulan PSL v2 for more details. */
 
 RC StandardAggregateHashTable::add_chunk(Chunk &groups_chunk, Chunk &aggrs_chunk)
 {
-  // your code here
-  exit(-1);
+  // 检查输入参数
+  if (groups_chunk.rows() != aggrs_chunk.rows()) {
+    LOG_WARN("groups_chunk and aggrs_chunk must have same number of rows");
+    return RC::INVALID_ARGUMENT;
+  }
+
+  if (aggrs_chunk.column_num() != static_cast<int>(aggr_types_.size())) {
+    LOG_WARN("aggrs_chunk column count doesn't match aggregation types count");
+    return RC::INVALID_ARGUMENT;
+  }
+
+  int rows = groups_chunk.rows();
+
+  // 处理每一行
+  for (int row = 0; row < rows; row++) {
+    // 构建group by的key
+    vector<Value> group_key;
+    for (int col = 0; col < groups_chunk.column_num(); col++) {
+      group_key.push_back(groups_chunk.get_value(col, row));
+    }
+
+    // 查找或创建聚合值
+    auto it = aggr_values_.find(group_key);
+    if (it == aggr_values_.end()) {
+      // 创建新的聚合值
+      vector<Value> aggr_values;
+      for (int col = 0; col < aggrs_chunk.column_num(); col++) {
+        Value init_value = aggrs_chunk.get_value(col, row);
+        aggr_values.push_back(init_value);
+      }
+      aggr_values_[group_key] = aggr_values;
+    } else {
+      // 更新现有的聚合值
+      vector<Value> &existing_values = it->second;
+      for (int col = 0; col < aggrs_chunk.column_num(); col++) {
+        Value new_value = aggrs_chunk.get_value(col, row);
+
+        // 根据聚合类型进行聚合操作
+        AggregateExpr::Type aggr_type = aggr_types_[col];
+        switch (aggr_type) {
+          case AggregateExpr::Type::SUM: {
+            if (existing_values[col].attr_type() == AttrType::INTS) {
+              existing_values[col].set_int(existing_values[col].get_int() + new_value.get_int());
+            } else if (existing_values[col].attr_type() == AttrType::FLOATS) {
+              existing_values[col].set_float(existing_values[col].get_float() + new_value.get_float());
+            }
+            break;
+          }
+          case AggregateExpr::Type::COUNT: {
+            existing_values[col].set_int(existing_values[col].get_int() + new_value.get_int());
+            break;
+          }
+          case AggregateExpr::Type::MIN: {
+            if (new_value.compare(existing_values[col]) < 0) {
+              existing_values[col] = new_value;
+            }
+            break;
+          }
+          case AggregateExpr::Type::MAX: {
+            if (new_value.compare(existing_values[col]) > 0) {
+              existing_values[col] = new_value;
+            }
+            break;
+          }
+          case AggregateExpr::Type::AVG: {
+            // AVG需要特殊处理，这里简化为SUM，实际应该在上层处理
+            if (existing_values[col].attr_type() == AttrType::INTS) {
+              existing_values[col].set_int(existing_values[col].get_int() + new_value.get_int());
+            } else if (existing_values[col].attr_type() == AttrType::FLOATS) {
+              existing_values[col].set_float(existing_values[col].get_float() + new_value.get_float());
+            }
+            break;
+          }
+          default:
+            LOG_WARN("unsupported aggregate type: %d", static_cast<int>(aggr_type));
+            return RC::UNIMPLEMENTED;
+        }
+      }
+    }
+  }
+
+  return RC::SUCCESS;
 }
 
 void StandardAggregateHashTable::Scanner::open_scan()

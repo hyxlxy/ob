@@ -20,15 +20,25 @@ See the Mulan PSL v2 for more details. */
 class GroupByVecPhysicalOperator : public PhysicalOperator
 {
 public:
-  GroupByVecPhysicalOperator(vector<unique_ptr<Expression>> &&group_by_exprs, vector<Expression *> &&expressions){};
+  GroupByVecPhysicalOperator(vector<unique_ptr<Expression>> &&group_by_exprs, vector<Expression *> &&expressions);
 
   virtual ~GroupByVecPhysicalOperator() = default;
 
   PhysicalOperatorType type() const override { return PhysicalOperatorType::GROUP_BY_VEC; }
 
-  RC open(Trx *trx) override { return RC::UNIMPLEMENTED; }
-  RC next(Chunk &chunk) override { return RC::UNIMPLEMENTED; }
-  RC close() override { return RC::UNIMPLEMENTED; }
+  RC open(Trx *trx) override;
+  RC next(Chunk &chunk) override;
+  RC close() override;
 
 private:
+  vector<unique_ptr<Expression>> group_by_expressions_;  ///< GROUP BY表达式
+  vector<Expression *>           aggregate_expressions_; ///< 聚合表达式
+  vector<Expression *>           value_expressions_;     ///< 用于计算聚合值的表达式
+
+  unique_ptr<StandardAggregateHashTable>                hash_table_;
+  unique_ptr<StandardAggregateHashTable::Scanner>       scanner_;
+  Chunk                                                  input_chunk_;
+  Chunk                                                  group_chunk_;
+  Chunk                                                  aggr_chunk_;
+  bool                                                   opened_ = false;
 };

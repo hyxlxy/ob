@@ -1,17 +1,3 @@
-### 2025-09-04 10:24:58.922
--- setup in default DB
-### 2025-09-04 10:24:58.937
-DROP TABLE classes;
-### 2025-09-04 10:24:58.994
--- Comma style join
-### 2025-09-04 10:24:59.002
--- Explicit JOIN without alias
-### 2025-09-04 10:28:58.007
-DROP TABLE IF EXISTS students;
-### 2025-09-04 10:28:58.015
-DROP TABLE IF EXISTS classes;
-### 2025-09-04 10:54:39.401
-DROP TABLE IF EXISTS scores;
 ### 2025-09-04 10:54:39.410
 CREATE TABLE scores (cls CHAR(8), uid INT, score INT);
 ### 2025-09-04 10:54:39.426
@@ -1998,3 +1984,17 @@ create table test_order(id int, name char(10), score float);
 drop table big_order_t1;
 ### 2025-09-24 10:43:33.800
 drop table t1;
+### 2025-09-24 18:38:25.864
+CREATE TABLE test_pax(id int, num int) storage format=pax;
+### 2025-09-24 18:38:48.297
+INSERT INTO test_pax VALUES (1, 10);
+### 2025-09-24 18:39:20.045
+set execution_mode='chunk_iterator';
+### 2025-09-24 18:39:20.071
+CREATE TABLE aggregation_func(id int, num int, price float, addr char) storage format=pax;
+### 2025-09-24 18:39:20.071
+INSERT INTO aggregation_func VALUES (1, 10, 1.5, 'A');
+### 2025-09-24 18:39:20.079
+INSERT INTO aggregation_func VALUES (2, 20, 2.5, 'B');
+### 2025-09-24 18:39:20.080
+SELECT sum(num) FROM aggregation_func;

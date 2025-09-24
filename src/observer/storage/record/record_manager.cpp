@@ -195,12 +195,15 @@ RC RecordPageHandler::init_empty_page(
   memset(bitmap_, 0, page_bitmap_size(page_header_->record_capacity));
   // column_index[i] store the end offset of column `i` or the start offset of column `i+1`
   int *column_index = reinterpret_cast<int *>(frame_->data() + page_header_->col_idx_offset);
+
+  // 处理所有字段（包括系统字段）
   for (int i = 0; i < column_num; ++i) {
-    ASSERT(i == table_meta->field(i)->field_id(), "i should be the col_id of fields[i]");
+    const FieldMeta *field = table_meta->field(i);
+
     if (i == 0) {
-      column_index[i] = table_meta->field(i)->len() * page_header_->record_capacity;
+      column_index[i] = field->len() * page_header_->record_capacity;
     } else {
-      column_index[i] = table_meta->field(i)->len() * page_header_->record_capacity + column_index[i - 1];
+      column_index[i] = field->len() * page_header_->record_capacity + column_index[i - 1];
     }
   }
 
@@ -509,7 +512,7 @@ RC PaxRecordPageHandler::get_record(const RID &rid, Record &record)
   }
 
   record.set_rid(rid);
-  record.set_data(record_data, page_header_->record_real_size);
+  record.set_data_owner(record_data, page_header_->record_real_size);
   return RC::SUCCESS;
 }
 

@@ -99,8 +99,31 @@ void AggregateVecPhysicalOperator::update_aggregate_state(void *state, const Col
 
 RC AggregateVecPhysicalOperator::next(Chunk &chunk)
 {
-  // your code here
-  exit(-1);
+  // 如果已经输出过结果，返回EOF
+  static bool has_output = false;
+  if (has_output) {
+    return RC::RECORD_EOF;
+  }
+
+  // 重置输出chunk
+  output_chunk_.reset_data();
+
+  // 为每个聚合结果添加数据到输出chunk
+  for (size_t aggr_idx = 0; aggr_idx < aggregate_expressions_.size(); aggr_idx++) {
+    auto *aggregate_expr = static_cast<AggregateExpr *>(aggregate_expressions_[aggr_idx]);
+    if (aggregate_expr->aggregate_type() == AggregateExpr::Type::SUM) {
+      if (aggregate_expr->value_type() == AttrType::INTS) {
+        append_to_column<SumState<int>, int>(aggr_values_.at(aggr_idx), output_chunk_.column(aggr_idx));
+      } else if (aggregate_expr->value_type() == AttrType::FLOATS) {
+        append_to_column<SumState<float>, float>(aggr_values_.at(aggr_idx), output_chunk_.column(aggr_idx));
+      }
+    }
+  }
+
+  // 引用输出chunk
+  chunk.reference(output_chunk_);
+  has_output = true;
+  return RC::SUCCESS;
 }
 
 RC AggregateVecPhysicalOperator::close()
