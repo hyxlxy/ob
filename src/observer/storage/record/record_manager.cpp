@@ -16,6 +16,9 @@ See the Mulan PSL v2 for more details. */
 #include "storage/common/condition_filter.h"
 #include "storage/trx/trx.h"
 #include "storage/clog/log_handler.h"
+#include "storage/common/chunk.h"
+#include "storage/common/column.h"
+#include "storage/field/field_meta.h"
 
 using namespace common;
 
@@ -416,8 +419,44 @@ bool RecordPageHandler::is_full() const { return page_header_->record_num >= pag
 
 RC PaxRecordPageHandler::insert_record(const char *data, RID *rid)
 {
-  // your code here
-  exit(-1);
+  ASSERT(rw_mode_ != ReadWriteMode::READ_ONLY,
+         "cannot insert record into page while the page is readonly");
+
+  if (page_header_->record_num == page_header_->record_capacity) {
+    LOG_WARN("Page is full, page_num %d:%d.", disk_buffer_pool_->file_desc(), frame_->page_num());
+    return RC::RECORD_NOMEM;
+  }
+
+  // 找到空闲位置
+  Bitmap bitmap(bitmap_, page_header_->record_capacity);
+  int    index = bitmap.next_unsetted_bit(0);
+  bitmap.set_bit(index);
+  page_header_->record_num++;
+
+  RC rc = log_handler_.insert_record(frame_, RID(get_page_num(), index), data);
+  if (OB_FAIL(rc)) {
+    LOG_ERROR("Failed to insert record. page_num %d:%d. rc=%s", disk_buffer_pool_->file_desc(), frame_->page_num(), strrc(rc));
+    // return rc; // ignore errors
+  }
+
+  // PAX格式：按列存储数据
+  // 将记录数据按字段拆分并存储到对应的列区域
+  const char *field_data = data;
+  for (int col_id = 0; col_id < page_header_->column_num; col_id++) {
+    int field_len = get_field_len(col_id);
+    char *col_data_ptr = get_field_data(index, col_id);
+    memcpy(col_data_ptr, field_data, field_len);
+    field_data += field_len;
+  }
+
+  frame_->mark_dirty();
+
+  if (rid) {
+    rid->page_num = get_page_num();
+    rid->slot_num = index;
+  }
+
+  return RC::SUCCESS;
 }
 
 RC PaxRecordPageHandler::delete_record(const RID *rid)
@@ -446,15 +485,75 @@ RC PaxRecordPageHandler::delete_record(const RID *rid)
 
 RC PaxRecordPageHandler::get_record(const RID &rid, Record &record)
 {
-  // your code here
-  exit(-1);
+  if (rid.slot_num >= page_header_->record_capacity) {
+    LOG_ERROR("Invalid slot_num %d, exceed page's record capacity, frame=%s, page_header=%s",
+              rid.slot_num, frame_->to_string().c_str(), page_header_->to_string().c_str());
+    return RC::RECORD_INVALID_RID;
+  }
+
+  Bitmap bitmap(bitmap_, page_header_->record_capacity);
+  if (!bitmap.get_bit(rid.slot_num)) {
+    LOG_ERROR("Invalid slot_num:%d, slot is empty, page_num %d.", rid.slot_num, frame_->page_num());
+    return RC::RECORD_NOT_EXIST;
+  }
+
+  // PAX格式：从各列重构完整记录
+  char *record_data = new char[page_header_->record_real_size];
+  char *field_ptr = record_data;
+
+  for (int col_id = 0; col_id < page_header_->column_num; col_id++) {
+    int field_len = get_field_len(col_id);
+    char *col_data_ptr = get_field_data(rid.slot_num, col_id);
+    memcpy(field_ptr, col_data_ptr, field_len);
+    field_ptr += field_len;
+  }
+
+  record.set_rid(rid);
+  record.set_data(record_data, page_header_->record_real_size);
+  return RC::SUCCESS;
 }
 
 // TODO: specify the column_ids that chunk needed. currenly we get all columns
 RC PaxRecordPageHandler::get_chunk(Chunk &chunk)
 {
-  // your code here
-  exit(-1);
+  // 清空chunk
+  chunk.reset();
+
+  if (page_header_->record_num == 0) {
+    return RC::RECORD_EOF;
+  }
+
+  // 获取bitmap以确定哪些记录是有效的
+  Bitmap bitmap(bitmap_, page_header_->record_capacity);
+
+  // 为每一列创建Column并添加到chunk中
+  for (int col_id = 0; col_id < page_header_->column_num; col_id++) {
+    int field_len = get_field_len(col_id);
+
+    // 根据字段长度推断数据类型
+    AttrType attr_type = AttrType::INTS; // 默认为int
+    if (field_len == sizeof(int)) {
+      attr_type = AttrType::INTS;
+    } else if (field_len == sizeof(float)) {
+      attr_type = AttrType::FLOATS;
+    } else {
+      attr_type = AttrType::CHARS;
+    }
+
+    auto column = make_unique<Column>(attr_type, field_len, page_header_->record_capacity);
+
+    // 复制有效记录的列数据
+    for (int slot_num = 0; slot_num < page_header_->record_capacity; slot_num++) {
+      if (bitmap.get_bit(slot_num)) {
+        char *col_data_ptr = get_field_data(slot_num, col_id);
+        column->append_one(col_data_ptr);
+      }
+    }
+
+    chunk.add_column(std::move(column), col_id);
+  }
+
+  return RC::SUCCESS;
 }
 
 char *PaxRecordPageHandler::get_field_data(SlotNum slot_num, int col_id)
