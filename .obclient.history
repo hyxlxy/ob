@@ -1,65 +1,3 @@
-### 2025-09-08 20:36:01.682
-DESC students;
-### 2025-09-08 20:36:01.683
-SELECT * FROM students WHERE age - 20 > 0;
-### 2025-09-08 20:37:07.066
-CREATE TABLE test_expr(id int, val int);
-### 2025-09-08 20:37:46.093
-SELECT * FROM test_expr WHERE val - 20 > 0;
-### 2025-09-08 21:17:57.274
-CREATE TABLE test_table(id int, name char(20), score float);
-### 2025-09-08 21:17:57.295
-INSERT INTO test_table VALUES (1, 'Alice', 85.5);
-### 2025-09-08 21:17:57.296
-INSERT INTO test_table VALUES (2, 'Bob', 92.0);
-### 2025-09-08 21:17:57.297
-INSERT INTO test_table VALUES (3, 'Charlie', 78.5);
-### 2025-09-08 21:17:57.300
-SELECT * FROM test_table ORDER BY score DESC;
-### 2025-09-08 21:17:57.303
-UPDATE test_table SET score = 90.0 WHERE id = 1;
-### 2025-09-08 21:17:57.305
-SELECT * FROM test_table WHERE id = 1;
-### 2025-09-08 21:17:57.307
-SELECT * FROM test_table WHERE score - 80 > 5;
-### 2025-09-08 21:24:57.546
--- 测试修复的功能
-### 2025-09-08 21:24:57.555
--- 1. 测试big-order-by修复
-### 2025-09-08 21:24:57.555
-CREATE TABLE big_order_by_0(id int, num int, price float, addr char(10), birthday date);
-### 2025-09-08 21:24:57.592
-CREATE TABLE big_order_by_1(id int, num int, price float, addr char(10), birthday date);
-### 2025-09-08 21:24:57.604
-INSERT INTO big_order_by_0 VALUES (2, 20, 2.5, 'B', '2020-01-02');
-### 2025-09-08 21:24:57.606
-INSERT INTO big_order_by_0 VALUES (1, 10, 1.5, 'A', '2020-01-01');
-### 2025-09-08 21:24:57.607
-INSERT INTO big_order_by_1 VALUES (4, 40, 4.5, 'D', '2020-01-04');
-### 2025-09-08 21:24:57.609
-INSERT INTO big_order_by_1 VALUES (3, 30, 3.5, 'C', '2020-01-03');
-### 2025-09-08 21:24:57.610
--- 测试多表连接ORDER BY
-### 2025-09-08 21:24:57.610
-SELECT * FROM big_order_by_0, big_order_by_1 ORDER BY big_order_by_0.id, big_order_by_1.id;
-### 2025-09-08 21:24:57.613
-DROP TABLE big_order_by_0;
-### 2025-09-08 21:24:57.622
-DROP TABLE big_order_by_1;
-### 2025-09-08 21:24:57.629
--- 2. 测试UPDATE修复
-### 2025-09-08 21:24:57.629
-CREATE TABLE update_table_1(id int, t_name char(20), col1 int, col2 int);
-### 2025-09-08 21:24:57.636
-CREATE INDEX index_id on update_table_1(id);
-### 2025-09-08 21:24:57.644
-INSERT INTO update_table_1 VALUES (34, 'NWHIX6FR9ZOZAXUYPIS', 45, 40);
-### 2025-09-08 21:24:57.645
-INSERT INTO update_table_1 VALUES (48, 'GB51UKHK77GOIM', 22, 45);
-### 2025-09-08 21:24:57.645
--- 测试UPDATE语句
-### 2025-09-08 21:24:57.645
-UPDATE update_table_1 SET t_name='6I0CY0JHC6QQ1UV81JLZ' WHERE id=34;
 ### 2025-09-08 21:24:57.646
 -- 验证UPDATE结果
 ### 2025-09-08 21:24:57.646
@@ -1040,8 +978,6 @@ select 8*4*(7+6)+3/0 > 9;
 -- Test FINAL FIXED division by zero handling (should return no rows)
 ### 2025-09-14 08:33:52.816
 -- Test the exact query you provided
-### 2025-09-14 08:33:52.849
-create table exp_table2(id int, col1 int);
 ### 2025-09-14 09:04:49.150
 -- Query 1
 ### 2025-09-14 09:04:49.160
@@ -1068,8 +1004,6 @@ select id, 2/1*8 as left_side, 1+col3*col3/4 as right_side, (2/1*8 < 1+col3*col3
 -- Clean test with fresh database
 ### 2025-09-14 09:06:11.665
 -- Verify data
-### 2025-09-14 09:06:11.665
-select * from exp_table;
 ### 2025-09-14 09:06:11.669
 -- Test WHERE condition components
 ### 2025-09-14 09:06:11.670
@@ -1930,8 +1864,6 @@ SELECT * FROM ssq_1 WHERE col1 = (SELECT ssq_2.col2 FROM ssq_2);
 -- Test user reported issues with debug build
 ### 2025-09-25 01:21:49.835
 -- Issue 1: Arithmetic expression problem
-### 2025-09-25 01:21:49.835
-create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
 ### 2025-09-25 01:21:49.836
 insert into exp_table VALUES (9, 2, 4, 4.35, 5.17);
 ### 2025-09-25 01:21:49.837
@@ -1998,3 +1930,71 @@ select * from exp_table where col1 - 2 > 6;
 -- Test arithmetic expressions that should return results
 ### 2025-09-25 02:16:24.960
 -- Test GROUP BY functionality
+### 2025-09-25 17:20:05.636
+create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
+### 2025-09-25 17:20:21.610
+create table exp_table2(id int, col1 int);
+### 2025-09-25 17:21:15.422
+select 3*6/(7+5) as test1;
+### 2025-09-25 17:22:24.653
+insert into exp_table VALUES (2, 3, 1, 2.5, 4.5);
+### 2025-09-25 17:22:39.852
+insert into exp_table VALUES (8, 2, 3, 1.5, 6.7);
+### 2025-09-25 17:24:17.091
+select 6/2*3 as test;
+### 2025-09-25 17:24:31.978
+select 3*6/12 as test;
+### 2025-09-25 17:25:59.138
+select 1/2 as test;
+### 2025-09-25 17:26:17.356
+select 3/6 as test;
+### 2025-09-25 17:27:00.392
+insert into exp_table2 VALUES (1, 1);
+### 2025-09-25 17:27:18.949
+insert into exp_table2 VALUES (2, 2);
+### 2025-09-25 17:27:34.169
+insert into exp_table2 VALUES (3, 3);
+### 2025-09-25 17:27:55.445
+insert into exp_table2 VALUES (4, 4);
+### 2025-09-25 17:28:11.846
+insert into exp_table2 VALUES (5, 5);
+### 2025-09-25 17:28:54.546
+select 1>1 as test;
+### 2025-09-25 17:29:10.344
+select 2>1 as test;
+### 2025-09-25 17:29:27.037
+select * from exp_table;
+### 2025-09-25 17:29:45.294
+select * from exp_table2;
+### 2025-09-25 17:30:22.892
+select 3*1/(1+5) as test;
+### 2025-09-25 17:30:43.833
+select 1/0 as div_by_zero;
+### 2025-09-25 17:31:01.214
+select 2+3*4 as precedence;
+### 2025-09-25 17:37:51.142
+select 3*2/6 as test1, (3*2)/6 as test2, 3*(2/6) as test3;
+### 2025-09-25 17:39:55.388
+select 6/(7-2)*3 as test;
+### 2025-09-25 17:40:20.546
+select 1+2/3*4 as test;
+### 2025-09-25 17:40:41.079
+select 3*2/6 as test1, 3.0*2/6 as test2;
+### 2025-09-25 17:45:39.184
+delete from exp_table2;
+### 2025-09-25 17:46:00.060
+insert into exp_table2 VALUES (1, 6);
+### 2025-09-25 17:46:21.512
+insert into exp_table2 VALUES (2, 4);
+### 2025-09-25 17:46:45.877
+insert into exp_table2 VALUES (3, 8);
+### 2025-09-25 17:47:08.667
+insert into exp_table2 VALUES (4, 2);
+### 2025-09-25 17:47:34.441
+insert into exp_table2 VALUES (5, 10);
+### 2025-09-25 17:47:56.537
+select exp_table.id,3*exp_table2.col1/(exp_table.col2+5) from exp_table,exp_table2 where exp_table2.col1/(7-exp_table.col2)*3>1;
+### 2025-09-25 17:48:30.022
+select exp_table.id,5*exp_table2.col1/(exp_table.col2+9) from exp_table,exp_table2 where 1+exp_table2.col1/(4-exp_table.col2)*3>=2;
+### 2025-09-25 17:49:17.232
+select 3*2/6 as test1, 6/(7-2)*3 as test2, 1+2/3*4 as test3;
