@@ -284,7 +284,8 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
     // Select value to write (try cast when type mismatches)
     const Value *write_value = orig_value;
     Value        casted_value;
-    if (orig_value->attr_type() != field_meta->type()) {
+
+    if (orig_value->attr_type() != field_meta->type() && orig_value->attr_type() != AttrType::UNDEFINED) {
       RC cast_rc = Value::cast_to(*orig_value, field_meta->type(), casted_value);
       if (cast_rc == RC::SUCCESS) {
         write_value = &casted_value;
@@ -298,15 +299,45 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
     // Update the specific field in the new record
     char *record_data = new_record.data();
 
-    // Handle different field types properly
-    if (field_meta->type() == AttrType::CHARS) {
-      // For string fields, handle length and zero-fill
-      size_t copy_len = std::min(static_cast<size_t>(field_meta->len()), static_cast<size_t>(write_value->length()));
-      memset(record_data + field_meta->offset(), 0, field_meta->len()); // Clear the field first
-      memcpy(record_data + field_meta->offset(), write_value->data(), copy_len);
+    // Handle NULL values properly
+    if (write_value->attr_type() == AttrType::UNDEFINED || write_value->is_null()) {
+
+      if (field_meta->nullable()) {
+        // For nullable fields, set the field data to zeros and set NULL flag in last byte
+        memset(record_data + field_meta->offset(), 0, field_meta->len());
+        record_data[field_meta->offset() + field_meta->len() - 1] = '1';  // Set NULL flag
+
+      } else {
+        // For non-nullable fields, set the field data to all zeros
+        memset(record_data + field_meta->offset(), 0, field_meta->len());
+
+      }
     } else {
-      // For other types, copy the exact field length
-      memcpy(record_data + field_meta->offset(), write_value->data(), field_meta->len());
+      // Handle non-NULL values
+      if (field_meta->type() == AttrType::CHARS) {
+        // For string fields, handle length and zero-fill
+        size_t copy_len = std::min(static_cast<size_t>(field_meta->len() - (field_meta->nullable() ? 1 : 0)),
+                                   static_cast<size_t>(write_value->length()));
+        memset(record_data + field_meta->offset(), 0, field_meta->len()); // Clear the field first
+        memcpy(record_data + field_meta->offset(), write_value->data(), copy_len);
+        // For nullable fields, set NULL flag to '0' (not NULL)
+        if (field_meta->nullable()) {
+          record_data[field_meta->offset() + field_meta->len() - 1] = '0';
+        }
+      } else {
+        // For other types, copy the data
+        size_t copy_len = write_value->length();
+        if (field_meta->nullable()) {
+          // For nullable fields, copy data but leave space for NULL flag
+          copy_len = std::min(copy_len, static_cast<size_t>(field_meta->len() - 1));
+          memcpy(record_data + field_meta->offset(), write_value->data(), copy_len);
+          record_data[field_meta->offset() + field_meta->len() - 1] = '0';  // Set NULL flag to not NULL
+        } else {
+          // For non-nullable fields, copy the exact field length
+          copy_len = std::min(copy_len, static_cast<size_t>(field_meta->len()));
+          memcpy(record_data + field_meta->offset(), write_value->data(), copy_len);
+        }
+      }
     }
 
     // Update the record using transaction
