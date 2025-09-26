@@ -78,6 +78,12 @@ RC MaxAggregator::accumulate(const Value &value)
 
 RC MaxAggregator::evaluate(Value& result)
 {
+  if (first_) {
+    // 没有任何非NULL输入，返回 SQL NULL
+    result.set_type(AttrType::UNDEFINED);
+    result.set_null(true);
+    return RC::SUCCESS;
+  }
   result = value_;
   return RC::SUCCESS;
 }
@@ -102,6 +108,12 @@ RC MinAggregator::accumulate(const Value &value)
 
 RC MinAggregator::evaluate(Value& result)
 {
+  if (first_) {
+    // 没有任何非NULL输入，返回 SQL NULL
+    result.set_type(AttrType::UNDEFINED);
+    result.set_null(true);
+    return RC::SUCCESS;
+  }
   result = value_;
   return RC::SUCCESS;
 }

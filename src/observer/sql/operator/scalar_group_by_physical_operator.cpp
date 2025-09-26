@@ -55,11 +55,6 @@ RC ScalarGroupByPhysicalOperator::open(Trx *trx)
       break;
     }
 
-    // 特殊处理：如果处理时间过长，强制退出
-    if (processed_rows > 100) {
-      LOG_WARN("ScalarGroupByPhysicalOperator: Processing too many rows, breaking early");
-      break;
-    }
     Tuple *child_tuple = child.current_tuple();
     if (nullptr == child_tuple) {
       LOG_WARN("failed to get tuple from child operator. rc=%s", strrc(rc));

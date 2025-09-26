@@ -1735,9 +1735,10 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
 
   // Scalar subquery should return exactly one value
   if (results.empty()) {
-    // Return NULL for empty result - use a special float value to represent NULL
-    cached_result_.set_float(std::numeric_limits<float>::max());
-    printf("DEBUG: SubQueryExpr: Subquery returned empty result, using NULL\n");
+    // 返回真正的 SQL NULL，而不是使用浮点哨兵
+    cached_result_.set_type(AttrType::UNDEFINED);
+    cached_result_.set_null(true);
+    printf("DEBUG: SubQueryExpr: Subquery returned empty result, using SQL NULL\n");
   } else if (results.size() == 1) {
     cached_result_ = results[0];
     printf("DEBUG: SubQueryExpr: Subquery returned single value: %s\n", cached_result_.to_string().c_str());
