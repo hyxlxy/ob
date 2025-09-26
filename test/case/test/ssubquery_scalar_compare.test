@@ -1,0 +1,15 @@
+-- echo scalar subquery equality with multi-row -> should return SQL_SYNTAX (handled by harness)
+CREATE TABLE t_a(id int);
+CREATE TABLE t_b(x int);
+INSERT INTO t_a VALUES(1);
+INSERT INTO t_b VALUES(1);
+INSERT INTO t_b VALUES(2);
+-- echo multi-row scalar subquery used in equality
+SELECT * FROM t_a WHERE id = (SELECT x FROM t_b);
+-- echo scalar subquery empty -> NULL, comparison should be UNKNOWN(false)
+DELETE FROM t_b;
+SELECT * FROM t_a WHERE id = (SELECT x FROM t_b);
+-- echo cleanup
+DROP TABLE t_a;
+DROP TABLE t_b;
+

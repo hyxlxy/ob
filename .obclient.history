@@ -1,6 +1,4 @@
 ### 2025-09-08 21:24:57.653
--- 测试算术表达式
-### 2025-09-08 21:24:57.653
 SELECT * FROM exp_table WHERE col1 - 3 > 4;
 ### 2025-09-09 09:48:25.364
 INSERT INTO exp_table VALUES (2, 20, 8);
@@ -1998,3 +1996,5 @@ select * from text_table;
 SQL"
 ### 2025-09-26 16:22:40.791
 /usr/bin/bash -lc "cat >/tmp/ddl.sql <<'SQL'
+### 2025-09-26 17:09:21.802
+python3 /home/hxl/Desktop/oceambase/miniob-competition-2025/test/case/miniob_test.py --test-cases=ssubquery_scalar_compare --report-only | cat

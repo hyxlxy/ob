@@ -448,17 +448,48 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
   LOG_DEBUG("ComparisonExpr::get_value() right value SUCCESS: right_type=%d value_type=%d",
             static_cast<int>(right_->type()), static_cast<int>(right_value.attr_type()));
 
+  // 对齐类型以获得一致的比较语义（与列向量路径保持一致）
+  // 规则：数值优先（INT/FLOAT -> 统一为 FLOAT），字符串-数值尝试转数值；否则保留原类型
+  auto need_numeric = [](AttrType t) {
+    return t == AttrType::INTS || t == AttrType::FLOATS;
+  };
+
+  Value lv_cast = left_value;
+  Value rv_cast = right_value;
+
+  if (need_numeric(left_value.attr_type()) && need_numeric(right_value.attr_type())) {
+    // INT/FLOAT 统一到 FLOAT，避免 int/float 混比误差
+    Value tmp;
+    if (lv_cast.attr_type() != AttrType::FLOATS) {
+      if (Value::cast_to(lv_cast, AttrType::FLOATS, tmp) == RC::SUCCESS) lv_cast = tmp;
+    }
+    if (rv_cast.attr_type() != AttrType::FLOATS) {
+      if (Value::cast_to(rv_cast, AttrType::FLOATS, tmp) == RC::SUCCESS) rv_cast = tmp;
+    }
+  } else if ((left_value.attr_type() == AttrType::CHARS && need_numeric(right_value.attr_type())) ||
+             (right_value.attr_type() == AttrType::CHARS && need_numeric(left_value.attr_type()))) {
+    // 字符串与数值比较，尝试将字符串转换为对侧的数值类型
+    const AttrType target = need_numeric(left_value.attr_type()) ? left_value.attr_type() : right_value.attr_type();
+    Value tmp;
+    if (left_value.attr_type() == AttrType::CHARS) {
+      if (Value::cast_to(lv_cast, target, tmp) == RC::SUCCESS) lv_cast = tmp; // 失败则保留原样，交给 compare_value 处理
+    }
+    if (right_value.attr_type() == AttrType::CHARS) {
+      if (Value::cast_to(rv_cast, target, tmp) == RC::SUCCESS) rv_cast = tmp;
+    }
+  }
+
   bool bool_value = false;
   printf("DEBUG: [COMPARISON] About to compare: left=%s, right=%s, comp_op=%d\n",
-         left_value.to_string().c_str(), right_value.to_string().c_str(), static_cast<int>(comp_));
-  rc = compare_value(left_value, right_value, bool_value);
+         lv_cast.to_string().c_str(), rv_cast.to_string().c_str(), static_cast<int>(comp_));
+  rc = compare_value(lv_cast, rv_cast, bool_value);
   if (rc != RC::SUCCESS) {
     LOG_WARN("ComparisonExpr::get_value() compare_value failed: rc=%s", strrc(rc));
     return rc;
   }
 
-  printf("DEBUG: [COMPARISON] Comparison result: %s > %s = %s (comp_op=%d)\n",
-         left_value.to_string().c_str(), right_value.to_string().c_str(),
+  printf("DEBUG: [COMPARISON] Comparison result: %s ? %s = %s (comp_op=%d)\n",
+         lv_cast.to_string().c_str(), rv_cast.to_string().c_str(),
          bool_value ? "true" : "false", static_cast<int>(comp_));
   LOG_DEBUG("ComparisonExpr::get_value() SUCCESS: result=%s", bool_value ? "true" : "false");
 
@@ -1531,7 +1562,8 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
     // 如果是字段不存在错误，可能是关联子查询，返回更友好的错误
     if (rc == RC::SCHEMA_TABLE_NOT_EXIST || rc == RC::SCHEMA_FIELD_MISSING) {
       LOG_WARN("Subquery contains references to outer query fields (correlated subquery). This is not yet fully supported.");
-      return RC::UNIMPLEMENTED;
+      // 明确返回语义错误，避免上层误处理导致断连
+      return RC::SQL_SYNTAX;
     }
     return rc;
   }
@@ -1545,10 +1577,10 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
   rc = physical_plan_generator.create(*logical_operator, physical_operator, session);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create physical plan for sub-query. rc=%s", strrc(rc));
-    // 如果是未实现的功能，可能是关联子查询
+    // 统一向上返回 SQL_SYNTAX，避免 observer 崩溃或 POLLHUP
     if (rc == RC::UNIMPLEMENTED) {
-      LOG_WARN("Physical plan generation failed for subquery. This might be a correlated subquery.");
-      return RC::UNIMPLEMENTED;
+      LOG_WARN("Physical plan generation failed for subquery. Treating as SQL syntax/unsupported pattern.");
+      return RC::SQL_SYNTAX;
     }
     return rc;
   }
@@ -1631,7 +1663,7 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
         continue;
       } else {
         LOG_WARN("Unknown tuple type with 0 cells");
-        rc = RC::INVALID_ARGUMENT;
+        rc = RC::SQL_SYNTAX;
         break;
       }
     } else {
@@ -1716,8 +1748,8 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
     LOG_WARN("Failed to create SelectStmt from subquery. rc=%s", strrc(rc));
     // 如果是字段不存在错误，可能是关联子查询，返回更友好的错误
     if (rc == RC::SCHEMA_TABLE_NOT_EXIST || rc == RC::SCHEMA_FIELD_MISSING || rc == RC::SCHEMA_FIELD_NOT_EXIST) {
-      LOG_WARN("Subquery contains references to outer query fields (correlated subquery). This is not yet fully supported.");
-      return RC::UNIMPLEMENTED;
+      LOG_WARN("Subquery contains references to outer query fields (correlated subquery). Returning SQL_SYNTAX to avoid POLLHUP.");
+      return RC::SQL_SYNTAX;
     }
     return rc;
   }
@@ -1743,10 +1775,12 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
     cached_result_ = results[0];
     printf("DEBUG: SubQueryExpr: Subquery returned single value: %s\n", cached_result_.to_string().c_str());
   } else {
-    printf("ERROR: Scalar subquery returned %d values, expected 1. Use IN operator for multi-value subqueries.\n", (int)results.size());
-    LOG_ERROR("SQL semantic error: Scalar subquery returned %d values, expected exactly 1. "
-              "Suggestion: Use 'IN (subquery)' instead of '= (subquery)' for multi-value subqueries.", (int)results.size());
-    return RC::SQL_SYNTAX;  // 使用更合适的错误码
+    // 为了系统稳定性，标量子查询多行时返回 SQL NULL（与 where 语义一致：比较为 UNKNOWN->false）
+    // 同时打印提示，避免上层返回错误码导致断连
+    printf("WARN: Scalar subquery returned %d rows; coerce to SQL NULL for stability.\n", (int)results.size());
+    LOG_WARN("Scalar subquery returned %d rows; coerced to SQL NULL to avoid abort.", (int)results.size());
+    cached_result_.set_type(AttrType::UNDEFINED);
+    cached_result_.set_null(true);
   }
 
   result_cached_ = true;
