@@ -192,14 +192,33 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
   SqlResult *sql_result = event->sql_result();
 
   if (RC::SUCCESS != sql_result->return_code() || !sql_result->has_operator()) {
-    return write_state(event, need_disconnect);
+    // 错误码分类: 区分网络/系统错误和 SQL 语义错误
+    // 只有真正的网络错误才断开连接，SQL 语义错误只返回 FAILURE
+    if (sql_result->return_code() == RC::IOERR_READ || sql_result->return_code() == RC::IOERR_WRITE || 
+        sql_result->return_code() == RC::IOERR_CLOSE || sql_result->return_code() == RC::IOERR_TOO_LONG) {
+      // 网络错误，需要断开连接
+      return write_state(event, need_disconnect);
+    } else {
+      // SQL语义错误，返回FAILURE但不断开连接
+      need_disconnect = false;
+      return write_state(event, need_disconnect);
+    }
   }
 
   rc = sql_result->open();
   if (OB_FAIL(rc)) {
     sql_result->close();
     sql_result->set_return_code(rc);
-    return write_state(event, need_disconnect);
+    // 错误码分类: 区分网络/系统错误和 SQL 语义错误
+    // 只有真正的网络错误才断开连接，SQL 语义错误只返回 FAILURE
+    if (rc == RC::IOERR_READ || rc == RC::IOERR_WRITE || rc == RC::IOERR_CLOSE || rc == RC::IOERR_TOO_LONG) {
+      // 网络错误，需要断开连接
+      return write_state(event, need_disconnect);
+    } else {
+      // SQL语义错误，返回FAILURE但不断开连接
+      need_disconnect = false;
+      return write_state(event, need_disconnect);
+    }
   }
 
   const TupleSchema &schema   = sql_result->tuple_schema();

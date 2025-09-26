@@ -1559,11 +1559,10 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
   RC rc = logical_plan_generator.create(sub_query, logical_operator);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create logical plan for sub-query. rc=%s", strrc(rc));
-    // 如果是字段不存在错误，可能是关联子查询，返回更友好的错误
+    // 关联子查询检测: 将子查询规划阶段的 RC::UNIMPLEMENTED 统一改为 RC::SQL_SYNTAX
     if (rc == RC::SCHEMA_TABLE_NOT_EXIST || rc == RC::SCHEMA_FIELD_MISSING) {
-      LOG_WARN("Subquery contains references to outer query fields (correlated subquery). This is not yet fully supported.");
-      // 明确返回语义错误，避免上层误处理导致断连
-      return RC::SQL_SYNTAX;
+      LOG_WARN("Subquery contains references to outer query fields (correlated subquery). Returning SQL_SYNTAX to avoid POLLHUP.");
+      return RC::SQL_SYNTAX;  // 改为 SQL_SYNTAX 而不是 UNIMPLEMENTED
     }
     return rc;
   }
@@ -1746,10 +1745,10 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
   RC rc = SelectStmt::create(db, *sub_query_, stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("Failed to create SelectStmt from subquery. rc=%s", strrc(rc));
-    // 如果是字段不存在错误，可能是关联子查询，返回更友好的错误
+    // 关联子查询检测: 将子查询规划阶段的 RC::UNIMPLEMENTED 统一改为 RC::SQL_SYNTAX
     if (rc == RC::SCHEMA_TABLE_NOT_EXIST || rc == RC::SCHEMA_FIELD_MISSING || rc == RC::SCHEMA_FIELD_NOT_EXIST) {
       LOG_WARN("Subquery contains references to outer query fields (correlated subquery). Returning SQL_SYNTAX to avoid POLLHUP.");
-      return RC::SQL_SYNTAX;
+      return RC::SQL_SYNTAX;  // 改为 SQL_SYNTAX 而不是 UNIMPLEMENTED
     }
     return rc;
   }
@@ -1775,12 +1774,10 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
     cached_result_ = results[0];
     printf("DEBUG: SubQueryExpr: Subquery returned single value: %s\n", cached_result_.to_string().c_str());
   } else {
-    // 为了系统稳定性，标量子查询多行时返回 SQL NULL（与 where 语义一致：比较为 UNKNOWN->false）
-    // 同时打印提示，避免上层返回错误码导致断连
-    printf("WARN: Scalar subquery returned %d rows; coerce to SQL NULL for stability.\n", (int)results.size());
-    LOG_WARN("Scalar subquery returned %d rows; coerced to SQL NULL to avoid abort.", (int)results.size());
-    cached_result_.set_type(AttrType::UNDEFINED);
-    cached_result_.set_null(true);
+    // 标量子查询多行处理: 当标量子查询返回多行时，明确返回 RC::SQL_SYNTAX 而不是强制为 NULL
+    printf("ERROR: Scalar subquery returned %d values, expected 1. Use IN operator for multi-value subqueries.\n", (int)results.size());
+    LOG_WARN("Scalar subquery returned %d values, expected 1. Use IN operator for multi-value subqueries.", (int)results.size());
+    return RC::SQL_SYNTAX;  // 明确返回 SQL 语义错误
   }
 
   result_cached_ = true;
