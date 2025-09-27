@@ -1000,7 +1000,7 @@ sub_query_expr:
 
       fprintf(stderr, "DEBUG: [PARSER] Creating SubQueryExpr\n");
       std::unique_ptr<SelectSqlNode> select_node(new SelectSqlNode(std::move(parsed_node->selection)));
-      $$ = new SubQueryExpr(std::move(select_node));
+      $$ = new SubQueryExpr(*select_node);
       $$->set_name(token_name(sql_string, &@$));
       delete parsed_node;
       fprintf(stderr, "DEBUG: [PARSER] SubQueryExpr created successfully\n");
@@ -1020,7 +1020,7 @@ sub_query_expr:
 
       fprintf(stderr, "DEBUG: [PARSER] Creating SubQueryExpr\n");
       std::unique_ptr<SelectSqlNode> select_node(new SelectSqlNode(std::move(parsed_node->selection)));
-      $$ = new SubQueryExpr(std::move(select_node));
+      $$ = new SubQueryExpr(*select_node);
       $$->set_name(token_name(sql_string, &@$));
       delete parsed_node;
       fprintf(stderr, "DEBUG: [PARSER] SubQueryExpr created successfully\n");

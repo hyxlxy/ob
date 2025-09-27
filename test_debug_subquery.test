@@ -1,0 +1,19 @@
+-- echo Test subquery debugging
+CREATE TABLE test1(id int, col1 int);
+CREATE TABLE test2(id int, col2 int);
+
+INSERT INTO test1 VALUES (1, 10);
+INSERT INTO test1 VALUES (2, 20);
+
+INSERT INTO test2 VALUES (1, 15);
+INSERT INTO test2 VALUES (2, 34);
+
+-- echo Test simple scalar subquery
+-- sort select * from test1 where col1 = (select col2 from test2 where id = 1);
+
+-- echo Test simple comparison
+-- sort select * from test1 where col1 = 15;
+
+-- echo Clean up
+DROP TABLE test1;
+DROP TABLE test2;

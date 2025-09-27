@@ -1,9 +1,3 @@
-### 2025-09-09 10:55:59.959
-INSERT INTO exp_table VALUES (6, 6, 9, 3.03, 1.15);
-### 2025-09-09 10:55:59.959
-INSERT INTO exp_table VALUES (9, 7, 3, 7.67, 7.86);
-### 2025-09-09 10:55:59.960
--- 3) Quick checks
 ### 2025-09-09 10:55:59.960
 -- 3.1 Arithmetic division semantics
 ### 2025-09-09 10:55:59.960
@@ -1958,8 +1952,6 @@ create table big_order_t1(id int, col1 int, col2 float);
 select * from csq_1 where col1 > (select max(csq_2.col2) from csq_2 where csq_2.feat2 >= (select min(csq_3.feat3) from csq_3));
 ### 2025-09-27 09:31:13.220
 -- 创建测试表
-### 2025-09-27 09:31:13.257
-CREATE TABLE csq_1(id int, col1 int, feat1 float);
 ### 2025-09-27 09:31:13.259
 CREATE TABLE csq_2(id int, col2 int, feat2 float);
 ### 2025-09-27 09:31:13.261
@@ -1998,3 +1990,11 @@ select 'MAX(col2) from csq_2 where feat2 >= 11.0:' as test, max(col2) as result 
 -- 步骤3：测试完整查询
 ### 2025-09-27 09:31:13.283
 select 'Complex subquery result:' as test, id, col1, feat1 from csq_1 where col1 > (select max(csq_2.col2) from csq_2 where csq_2.feat2 >= (select min(csq_3.feat3) from csq_3));
+### 2025-09-27 14:36:15.643
+CREATE TABLE csq_1(id int, col1 int, feat1 float); INSERT INTO csq_1 VALUES (1, 4, 11.2); INSERT INTO csq_1 VALUES (2, 2, 12.0); INSERT INTO csq_1 VALUES (3, 3, 13.5); INSERT INTO csq_1 VALUES (55, 41, 79.73);
+### 2025-09-27 14:36:43.635
+CREATE TABLE test(id int);
+### 2025-09-27 14:37:35.177
+DROP TABLE IF EXISTS csq_1; CREATE TABLE csq_1(id int, col1 int, feat1 float);
+### 2025-09-27 14:56:45.550
+CREATE TABLE csq_1(id int, col1 int, feat1 float);

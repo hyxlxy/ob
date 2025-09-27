@@ -243,7 +243,7 @@ class Result(Enum):
 class GlobalConfig:
   default_encoding = "UTF-8"
   debug = False
-  source_code_build_path_name = "build"
+  source_code_build_path_name = "build_debug"
 
 def __get_build_path(work_dir: str):
   return work_dir + '/' + GlobalConfig.source_code_build_path_name
@@ -1105,7 +1105,7 @@ def __init_options():
 
   options_parser.add_argument('--compile-make-args', action='store', dest='compile_make_args', default='',
                               help='compile args used by make')
-  options_parser.add_argument('--compile-cmake-args', action='store', dest='compile_cmake_args', default='',
+  options_parser.add_argument('--compile-cmake-args', action='store', dest='compile_cmake_args', default='-DCMAKE_BUILD_TYPE=Debug',
                               help='compile args used by cmake')
   # 之前已经编译过，是否需要重新编译，还是直接执行make就可以了
   options_parser.add_argument('--compile-rebuild', action='store_true', default=False, dest='compile_rebuild',

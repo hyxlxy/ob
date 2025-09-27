@@ -23,6 +23,16 @@ See the Mulan PSL v2 for more details. */
 #include "storage/common/chunk.h"
 
 class Tuple;
+class SelectStmt;
+class SelectSqlNode;
+class Stmt;
+class Field;
+class Db;
+class Table;
+class Trx;
+class LogicalOperator;
+class PhysicalOperator;
+class BaseTable;
 
 /**
  * @brief LIKE操作符的模式匹配函数
@@ -656,7 +666,7 @@ private:
   std::unique_ptr<class Stmt> sub_query_;
   bool is_not_in_;
   
-  // Subquery result caching
+  // 子查询结果缓存
   mutable std::vector<Value> sub_query_results_;
   mutable bool sub_query_executed_ = false;
 };
@@ -695,53 +705,51 @@ private:
 class SubQueryExpr : public Expression
 {
 public:
-  SubQueryExpr(std::unique_ptr<class SelectSqlNode> sub_query);
-  virtual ~SubQueryExpr() = default;
+  explicit SubQueryExpr(SelectSqlNode &select_node);
+  virtual ~SubQueryExpr();
 
-  ExprType type() const override { return ExprType::SUBQUERY; }
-  AttrType value_type() const override { return AttrType::UNDEFINED; }
+  RC   open(Trx *trx, const Tuple &tuple);
+  RC   reset();
+  RC   close();
+  bool has_more_row(const Tuple &tuple) const;
 
   RC get_value(const Tuple &tuple, Value &value) const override;
+
   RC try_get_value(Value &value) const override;
 
+  ExprType type() const override;
+
+  AttrType value_type() const override;
+
+  std::unique_ptr<Expression> deep_copy() const;
+
+  RC generate_select_stmt(Db *db, const std::unordered_map<std::string, BaseTable *> &tables) const;
+
+  RC generate_logical_oper() const;
+  RC generate_physical_oper() const;
+
+  size_t res_nums() const { return res_query.size(); }
+
+  bool one_row_ret() const;
+
+  // 初始化子查询
+  RC initialize_subquery() const;
+
+  // 兼容性方法
   unique_ptr<Expression> copy() const override
   {
-    // SubQueryExpr 的复制是复杂的，因为 SelectSqlNode 包含不可复制的 unique_ptr
-    // 为了支持表达式复制，我们创建一个特殊的副本
-    printf("DEBUG: [COPY] SubQueryExpr::copy() called - creating executable copy\n");
-
-    // 我们不能真正复制 SelectSqlNode，但是我们可以创建一个新的 SubQueryExpr
-    // 它引用相同的 SelectSqlNode。这在技术上是不安全的，但对于我们的用例
-    // （在同一个查询执行期间）应该是可以工作的。
-
-    // 创建一个新的 SubQueryExpr，使用原始指针来共享 SelectSqlNode
-    // 注意：这要求原始的 SubQueryExpr 在副本的生命周期内保持有效
-
-    // 为了避免 unique_ptr 的所有权问题，我们创建一个特殊的 SubQueryExpr
-    // 它不拥有 SelectSqlNode，而是引用原始的
-
-    // 暂时返回一个特殊的 ValueExpr，它知道如何执行子查询
-    // 我们将在 ValueExpr 中嵌入对原始 SubQueryExpr 的引用
-
-    // 实际上，让我们返回一个新的 SubQueryExpr，但是使用 nullptr 作为 sub_query_
-    // 然后在 get_value 中检查这种情况并委托给原始的 SubQueryExpr
-
-    // 创建一个新的 SubQueryExpr，但是不拥有 SelectSqlNode
-    auto copy_expr = make_unique<SubQueryExpr>(nullptr);
-    // 设置一个指向原始 SubQueryExpr 的指针，用于委托执行
-    // 由于 original_subquery_ 是 mutable，我们可以直接赋值
-    copy_expr->original_subquery_ = this;
-    printf("DEBUG: [COPY] SubQueryExpr::copy() created copy: this=%p, copy=%p, original_subquery_=%p\n", 
-           this, copy_expr.get(), copy_expr->original_subquery_);
-    return std::move(copy_expr);
+    // 对于子查询，我们返回一个简单的 ValueExpr，值为 NULL
+    // 因为子查询的复制比较复杂，而且通常不需要复制
+    printf("DEBUG: [COPY] SubQueryExpr::copy() called - returning NULL ValueExpr\n");
+    return make_unique<ValueExpr>(Value());
   }
 
 private:
-  std::unique_ptr<class SelectSqlNode> sub_query_;
-  mutable Value cached_result_;
-  mutable bool result_cached_ = false;
+  SelectSqlNode                    &sql_node_;
+  mutable std::unique_ptr<SelectStmt>       select_stmt_;
+  mutable std::unique_ptr<LogicalOperator>  logical_oper_;
+  mutable std::unique_ptr<PhysicalOperator> physical_oper_;
 
-  // 用于支持 copy() 操作的委托指针
-  // 当 sub_query_ 为 nullptr 时，委托给这个原始的 SubQueryExpr 执行
-  mutable const SubQueryExpr* original_subquery_ = nullptr;
+  std::vector<Value> res_query;
+  size_t             visited_index = 0;
 };
