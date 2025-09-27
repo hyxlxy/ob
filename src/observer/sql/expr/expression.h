@@ -725,8 +725,10 @@ public:
     // 创建一个新的 SubQueryExpr，但是不拥有 SelectSqlNode
     auto copy_expr = make_unique<SubQueryExpr>(nullptr);
     // 设置一个指向原始 SubQueryExpr 的指针，用于委托执行
-    // 注意：我们需要访问 private 成员，所以我们使用 const_cast
-    const_cast<SubQueryExpr*>(copy_expr.get())->original_subquery_ = this;
+    // 由于 original_subquery_ 是 mutable，我们可以直接赋值
+    copy_expr->original_subquery_ = this;
+    printf("DEBUG: [COPY] SubQueryExpr::copy() created copy: this=%p, copy=%p, original_subquery_=%p\n", 
+           this, copy_expr.get(), copy_expr->original_subquery_);
     return std::move(copy_expr);
   }
 

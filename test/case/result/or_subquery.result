@@ -1,0 +1,79 @@
+Test OR subquery functionality
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+SUCCESS
+Test OR subquery with MAX and MIN functions
+id | col1 | feat1
+1 | 10 | 5.5
+2 | 20 | 15.3
+3 | 30 | 25.1
+4 | 40 | 35.7
+5 | 50 | 45.9
+6 | 60 | 55.2
+7 | 70 | 65.8
+8 | 80 | 75.4
+9 | 90 | 85.6
+10 | 2 | 51.25
+32 | 77 | 59.79
+Test simple OR with subqueries
+id | col1 | feat1
+1 | 10 | 5.5
+2 | 20 | 15.3
+3 | 30 | 25.1
+4 | 40 | 35.7
+5 | 50 | 45.9
+6 | 60 | 55.2
+7 | 70 | 65.8
+8 | 80 | 75.4
+9 | 90 | 85.6
+10 | 2 | 51.25
+Test OR with scalar subqueries
+id | col1 | feat1
+1 | 10 | 5.5
+2 | 20 | 15.3
+3 | 30 | 25.1
+4 | 40 | 35.7
+5 | 50 | 45.9
+6 | 60 | 55.2
+7 | 70 | 65.8
+8 | 80 | 75.4
+9 | 90 | 85.6
+10 | 2 | 51.25
+32 | 77 | 59.79
+Clean up
+SUCCESS
+SUCCESS
+SUCCESS
