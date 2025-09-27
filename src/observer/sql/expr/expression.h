@@ -655,6 +655,10 @@ private:
   unique_ptr<Expression> left_;
   std::unique_ptr<class Stmt> sub_query_;
   bool is_not_in_;
+  
+  // Subquery result caching
+  mutable std::vector<Value> sub_query_results_;
+  mutable bool sub_query_executed_ = false;
 };
 
 /**

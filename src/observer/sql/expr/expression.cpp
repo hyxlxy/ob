@@ -1522,10 +1522,44 @@ unique_ptr<Expression> SubQueryInExpr::copy() const
 
 RC SubQueryInExpr::get_value(const Tuple &tuple, Value &value) const
 {
-  // This will be implemented when we have the execution context
-  // For now, return unimplemented
-  LOG_WARN("SubQueryInExpr::get_value() is not yet implemented");
-  return RC::UNIMPLEMENTED;
+  if (!left_) {
+    return RC::INVALID_ARGUMENT;
+  }
+
+  Value left_value;
+  RC rc = left_->get_value(tuple, left_value);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+
+  // Execute subquery if not already executed
+  if (!sub_query_executed_) {
+    if (!sub_query_) {
+      LOG_WARN("SubQueryInExpr has no subquery to execute");
+      return RC::INTERNAL;
+    }
+
+    rc = execute_subquery_and_collect_results(sub_query_.get(), sub_query_results_);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("Failed to execute subquery for IN/NOT IN operation. rc=%s", strrc(rc));
+      return rc;
+    }
+    sub_query_executed_ = true;
+  }
+
+  // Check if left_value is in sub_query results
+  bool found = false;
+  for (const Value &sub_value : sub_query_results_) {
+    if (left_value.compare(sub_value) == 0) {
+      found = true;
+      break;
+    }
+  }
+
+  // Set result based on whether we found a match and the operation type
+  bool result = found ? !is_not_in_ : is_not_in_;
+  value.set_boolean(result);
+  return RC::SUCCESS;
 }
 
 RC SubQueryInExpr::try_get_value(Value &value) const
@@ -1536,9 +1570,52 @@ RC SubQueryInExpr::try_get_value(Value &value) const
 
 RC SubQueryInExpr::eval(Chunk &chunk, vector<uint8_t> &select)
 {
-  // This will be implemented when we have the execution context
-  LOG_WARN("SubQueryInExpr::eval() is not yet implemented");
-  return RC::UNIMPLEMENTED;
+  if (!left_) {
+    return RC::INVALID_ARGUMENT;
+  }
+
+  // Execute subquery if not already executed
+  if (!sub_query_executed_) {
+    if (!sub_query_) {
+      LOG_WARN("SubQueryInExpr has no subquery to execute");
+      return RC::INTERNAL;
+    }
+
+    RC rc = execute_subquery_and_collect_results(sub_query_.get(), sub_query_results_);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("Failed to execute subquery for IN/NOT IN operation. rc=%s", strrc(rc));
+      return rc;
+    }
+    sub_query_executed_ = true;
+  }
+
+  // Get left expression column
+  Column left_column;
+  RC rc = left_->get_column(chunk, left_column);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+
+  // Evaluate IN/NOT IN for each row
+  int row_count = chunk.rows();
+  select.resize(row_count);
+  for (int i = 0; i < row_count; i++) {
+    Value left_value = left_column.get_value(i);
+
+    // Check if left_value is in sub_query results
+    bool found = false;
+    for (const Value &sub_value : sub_query_results_) {
+      if (left_value.compare(sub_value) == 0) {
+        found = true;
+        break;
+      }
+    }
+
+    // Set result based on whether we found a match and the operation type
+    select[i] = found ? !is_not_in_ : is_not_in_;
+  }
+
+  return RC::SUCCESS;
 }
 
 // 执行子查询并收集结果

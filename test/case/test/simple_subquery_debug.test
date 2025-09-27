@@ -1,0 +1,19 @@
+-- echo Test simple subquery with equality
+CREATE TABLE ssq_1(id int, col1 int);
+CREATE TABLE ssq_2(id int, col2 int);
+
+-- echo Insert test data
+INSERT INTO ssq_1 VALUES (1, 10);
+INSERT INTO ssq_1 VALUES (2, 20);
+INSERT INTO ssq_1 VALUES (3, 30);
+
+INSERT INTO ssq_2 VALUES (1, 15);
+INSERT INTO ssq_2 VALUES (2, 34);
+INSERT INTO ssq_2 VALUES (3, 25);
+
+-- echo Test simple subquery with equality
+-- sort select * from ssq_1 where id = (select ssq_2.id from ssq_2 where col2 = 34);
+
+-- echo Clean up
+DROP TABLE ssq_1;
+DROP TABLE ssq_2;

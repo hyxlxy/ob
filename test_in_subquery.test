@@ -1,0 +1,21 @@
+-- Test IN subquery
+CREATE TABLE test1(id int, col1 int);
+CREATE TABLE test2(id int, col2 int);
+
+INSERT INTO test1 VALUES (1, 10);
+INSERT INTO test1 VALUES (2, 20);
+INSERT INTO test1 VALUES (3, 30);
+
+INSERT INTO test2 VALUES (1, 15);
+INSERT INTO test2 VALUES (2, 34);
+INSERT INTO test2 VALUES (4, 25);
+
+-- Test IN subquery
+SELECT * FROM test1 WHERE id IN (SELECT id FROM test2);
+
+-- Test NOT IN subquery
+SELECT * FROM test1 WHERE id NOT IN (SELECT id FROM test2);
+
+-- Clean up
+DROP TABLE test1;
+DROP TABLE test2;

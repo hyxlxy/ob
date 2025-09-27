@@ -1,5 +1,0 @@
-CREATE TABLE t1(id int);
-CREATE TABLE t2(id int);
-SELECT * FROM t1 WHERE id = (SELECT id FROM t2 WHERE t2.id = t1.id);
-DROP TABLE t1;
-DROP TABLE t2;

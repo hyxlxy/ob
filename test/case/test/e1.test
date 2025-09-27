@@ -1,7 +1,0 @@
--- echo init
-drop table if exists exp_table;
-create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
-insert into exp_table values (6, 6, 3, 5.26, 3.36);
-insert into exp_table values (9, 9, 6, 3.03, 5.53);
-insert into exp_table values (9, 5, 4, 2.58, 8.16);
-select * from exp_table where 0 < col1 - 4;

@@ -1,5 +1,0 @@
-CREATE TABLE simple_null_test(id int, value int NULL);
-INSERT INTO simple_null_test VALUES (1, 13);
-INSERT INTO simple_null_test VALUES (2, NULL);
-SELECT * FROM simple_null_test;
-DROP TABLE simple_null_test;

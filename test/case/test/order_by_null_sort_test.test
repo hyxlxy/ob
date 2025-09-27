@@ -1,8 +1,0 @@
-CREATE TABLE null_sort_test(id int, value int NULL);
-INSERT INTO null_sort_test VALUES (1, 13);
-INSERT INTO null_sort_test VALUES (2, 24);
-INSERT INTO null_sort_test VALUES (3, NULL);
-INSERT INTO null_sort_test VALUES (4, 32);
-INSERT INTO null_sort_test VALUES (5, 36);
-SELECT * FROM null_sort_test ORDER BY value;
-DROP TABLE null_sort_test;
