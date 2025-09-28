@@ -10,6 +10,8 @@ python3 miniob_test.py
 ```bash
 python3 miniob_test.py --test-cases=`case-name` -
 ```
+python3 miniob_test.py --test-cases=subquery --compile-cmake-args="-DCMAKE_BUILD_TYPE=Debug" --work-dir=/home/hxl/Desktop/oceambase/miniob-competition-2025
+
 python3 miniob_test.py --test-cases='primary-expression' ad
 > 把`case-name` 换成你想测试的用例名称。
 > 如果要运行多个测试用例，则在 --test-cases 参数中使用 ',' 分隔写多个即可

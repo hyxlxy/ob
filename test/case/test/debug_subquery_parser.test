@@ -1,0 +1,14 @@
+CREATE TABLE t1(id int, col1 int);
+INSERT INTO t1 VALUES (1, 4);
+INSERT INTO t1 VALUES (2, 2);
+
+CREATE TABLE t2(id int, col2 int);
+INSERT INTO t2 VALUES (1, 2);
+INSERT INTO t2 VALUES (2, 3);
+
+-- 这个查询应该触发子查询解析
+SELECT * FROM t1 WHERE col1 > (SELECT MAX(col2) FROM t2);
+
+DROP TABLE t1;
+DROP TABLE t2;
+

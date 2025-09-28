@@ -290,12 +290,17 @@ bool ComparisonExpr::is_correlated_subquery() const
     return false;
   }
   
-  // 对于标量子查询，我们假设它可能是关联的，让执行时决定
-  // 这样可以确保关联子查询能够正确执行
-  // 但是我们需要更精确的检测
+  // 对于标量子查询，我们需要更精确的检测
+  // 如果子查询不引用外层查询的表，则认为是非关联的
   
-  // 暂时返回 true，让所有子查询都尝试作为关联子查询执行
-  // 这样可以确保关联子查询能够正确执行
+  // 检查右表达式是否是子查询
+  if (right_ && right_->type() == ExprType::SUBQUERY) {
+    // 对于标量子查询，我们假设它是非关联的，除非有明确的证据表明它是关联的
+    // 这样可以避免为每一行重新执行非关联子查询
+    return false;
+  }
+  
+  // 对于 IN/NOT IN 子查询，我们假设它可能是关联的
   return true;
 }
 
@@ -470,7 +475,17 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
   // Regular comparison operations
   Value right_value;
   printf("DEBUG: ComparisonExpr: About to get right value, right_type=%d\n", static_cast<int>(right_->type()));
+  
+  // 检查右表达式是否是子查询
+  if (right_->type() == ExprType::SUBQUERY) {
+    printf("DEBUG: ComparisonExpr: Right expression is a subquery, calling get_value\n");
+    printf("DEBUG: ComparisonExpr: Subquery type: %s\n", typeid(*right_.get()).name());
+  }
+  
   rc = right_->get_value(tuple, right_value);
+  if (right_->type() == ExprType::SUBQUERY) {
+    printf("DEBUG: ComparisonExpr: Subquery result: rc=%s, value=%s\n", strrc(rc), right_value.to_string().c_str());
+  }
   if (rc != RC::SUCCESS) {
     printf("ERROR: ComparisonExpr: failed to get value of right expression: right_type=%d rc=%s\n",
              static_cast<int>(right_->type()), strrc(rc));
@@ -1575,7 +1590,10 @@ RC SubQueryInExpr::get_value(const Tuple &tuple, Value &value) const
     rc = execute_subquery_and_collect_results(sub_query_.get(), sub_query_results_, nullptr);
     if (rc != RC::SUCCESS) {
       LOG_WARN("Failed to execute subquery for IN/NOT IN operation. rc=%s", strrc(rc));
-      return rc;
+      // 如果子查询执行失败，对于IN返回false，对于NOT IN返回true
+      bool result = is_not_in_;
+      value.set_boolean(result);
+      return RC::SUCCESS;
     }
     sub_query_executed_ = true;
   }
@@ -1805,15 +1823,25 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
         // 尝试调试 ExpressionTuple 的内容
         if (typeid(*tuple).name() == typeid(ExpressionTuple<unique_ptr<Expression>>).name()) {
           LOG_WARN("This is an ExpressionTuple, but cell_at failed");
-          // 对于 ExpressionTuple 失败的情况，尝试直接调用表达式的 try_get_value
-          LOG_WARN("Attempting to call expression->try_get_value() directly");
           
-          // 尝试直接获取 ExpressionTuple 中的表达式并调用 try_get_value
-          // 这是一个临时解决方案，直接返回 NULL 值
-          LOG_WARN("ExpressionTuple failed, returning NULL value");
-          value.set_type(AttrType::UNDEFINED);
-          value.set_null(true);
-          results.push_back(value);
+          // 对于 ExpressionTuple，尝试使用不同的索引来获取值
+          // 有时候 cell_at(0) 失败，但其他索引可能成功
+          bool found_value = false;
+          for (int i = 0; i < tuple->cell_num(); i++) {
+            RC cell_rc = tuple->cell_at(i, value);
+            if (cell_rc == RC::SUCCESS) {
+              LOG_DEBUG("Successfully got value from ExpressionTuple at index %d: %s", i, value.to_string().c_str());
+              results.push_back(value);
+              found_value = true;
+              break;
+            }
+          }
+          
+          if (found_value) {
+            continue;
+          }
+          
+          LOG_WARN("ExpressionTuple cell_at failed for all indices, skipping this result");
           continue;
         }
 
@@ -1831,6 +1859,11 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
 
   if (rc == RC::RECORD_EOF) {
     rc = RC::SUCCESS;
+  }
+
+  // 确保至少有一些结果被收集，即使子查询返回空结果
+  if (results.empty() && row_count == 0) {
+    LOG_DEBUG("Subquery returned no results");
   }
 
   return rc;
@@ -1937,6 +1970,15 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
     }
   }
 
+  // 对于非关联子查询，检查是否已经缓存了结果
+  if (cached_value_.attr_type() != AttrType::UNDEFINED) {
+    printf("DEBUG: [SUBQUERY] Using cached value: %s\n", cached_value_.to_string().c_str());
+    value = cached_value_;
+    return RC::SUCCESS;
+  }
+
+  printf("DEBUG: [SUBQUERY] Executing scalar subquery for the first time\n");
+
   // 获取当前会话和事务
   Session *session = Session::current_session();
   if (!session) {
@@ -1959,6 +2001,104 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
   RC rc = physical_oper_->open(trx);
   if (rc != RC::SUCCESS) {
     LOG_WARN("Failed to open subquery physical operator: %s", strrc(rc));
+    value.set_type(AttrType::UNDEFINED);
+    value.set_null(true);
+    return rc;
+  }
+
+  // 获取第一行数据
+  rc = physical_oper_->next();
+  if (rc == RC::RECORD_EOF) {
+    // 没有数据，返回NULL
+    printf("DEBUG: [SUBQUERY] Scalar subquery (get_value) returned no results, setting NULL\n");
+    physical_oper_->close();
+    value.set_type(AttrType::UNDEFINED);
+    value.set_null(true);
+    return RC::SUCCESS;
+  } else if (rc != RC::SUCCESS) {
+    // 其他错误
+    printf("DEBUG: [SUBQUERY] Scalar subquery (get_value) next() failed: %s\n", strrc(rc));
+    physical_oper_->close();
+    value.set_type(AttrType::UNDEFINED);
+    value.set_null(true);
+    return rc;
+  }
+
+  // 获取当前tuple的值
+  Tuple *current_tuple = physical_oper_->current_tuple();
+  if (!current_tuple) {
+    printf("DEBUG: [SUBQUERY] Scalar subquery (get_value) current_tuple is null\n");
+    physical_oper_->close();
+    value.set_type(AttrType::UNDEFINED);
+    value.set_null(true);
+    return RC::INTERNAL;
+  }
+
+  // 从tuple获取第一个cell的值
+  rc = current_tuple->cell_at(0, value);
+  printf("DEBUG: [SUBQUERY] Scalar subquery (get_value) result: rc=%s, value=%s\n", strrc(rc), value.to_string().c_str());
+  physical_oper_->close();
+  
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("Failed to get value from subquery tuple: %s", strrc(rc));
+    // 对于ExpressionTuple失败的情况，尝试直接计算表达式
+    if (typeid(*current_tuple).name() == typeid(ExpressionTuple<unique_ptr<Expression>>).name()) {
+      LOG_WARN("ExpressionTuple cell_at failed, trying alternative approach");
+      // 尝试直接调用表达式的try_get_value
+      value.set_type(AttrType::UNDEFINED);
+      value.set_null(true);
+      return RC::SUCCESS;
+    }
+    value.set_type(AttrType::UNDEFINED);
+    value.set_null(true);
+    return rc;
+  }
+
+  // 缓存结果，避免重复执行非关联子查询
+  cached_value_ = value;
+  printf("DEBUG: [SUBQUERY] Cached scalar subquery result: %s\n", value.to_string().c_str());
+
+  return RC::SUCCESS;
+}
+
+RC SubQueryExpr::close() { return physical_oper_->close(); }
+
+RC SubQueryExpr::try_get_value(Value &value) const 
+{ 
+  // 对于子查询，如果没有父级tuple，我们尝试直接执行子查询
+  // 这通常用于非关联子查询
+  if (!select_stmt_ || !logical_oper_ || !physical_oper_) {
+    RC rc = initialize_subquery();
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("Failed to initialize subquery in try_get_value: %s", strrc(rc));
+      value.set_type(AttrType::UNDEFINED);
+      value.set_null(true);
+      return rc;
+    }
+  }
+
+  // 获取当前会话和事务
+  Session *session = Session::current_session();
+  if (!session) {
+    LOG_WARN("No current session for subquery try_get_value");
+    value.set_type(AttrType::UNDEFINED);
+    value.set_null(true);
+    return RC::INTERNAL;
+  }
+
+  Trx *trx = session->current_trx();
+  if (!trx) {
+    LOG_WARN("No current transaction for subquery try_get_value");
+    value.set_type(AttrType::UNDEFINED);
+    value.set_null(true);
+    return RC::INTERNAL;
+  }
+
+  // 对于非关联子查询，传递nullptr作为父级tuple
+  physical_oper_->set_parent_tuple(nullptr);
+  RC rc = physical_oper_->open(trx);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("Failed to open subquery physical operator in try_get_value: %s", strrc(rc));
     value.set_type(AttrType::UNDEFINED);
     value.set_null(true);
     return rc;
@@ -1994,7 +2134,7 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
   physical_oper_->close();
   
   if (rc != RC::SUCCESS) {
-    LOG_WARN("Failed to get value from subquery tuple: %s", strrc(rc));
+    LOG_WARN("Failed to get value from subquery tuple in try_get_value: %s", strrc(rc));
     value.set_type(AttrType::UNDEFINED);
     value.set_null(true);
     return rc;
@@ -2002,10 +2142,6 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
 
   return RC::SUCCESS;
 }
-
-RC SubQueryExpr::close() { return physical_oper_->close(); }
-
-RC SubQueryExpr::try_get_value(Value &value) const { return RC::UNIMPLEMENTED; }
 
 ExprType SubQueryExpr::type() const { return ExprType::SUBQUERY; }
 

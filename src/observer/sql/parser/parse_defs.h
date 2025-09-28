@@ -277,6 +277,7 @@ struct CreateTableSqlNode
 struct DropTableSqlNode
 {
   string relation_name;  ///< 要删除的表名
+  bool if_exists;        ///< 是否使用IF EXISTS
 };
 
 /**

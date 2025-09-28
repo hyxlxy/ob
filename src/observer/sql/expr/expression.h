@@ -738,10 +738,10 @@ public:
   // 兼容性方法
   unique_ptr<Expression> copy() const override
   {
-    // 对于子查询，我们返回一个简单的 ValueExpr，值为 NULL
-    // 因为子查询的复制比较复杂，而且通常不需要复制
-    printf("DEBUG: [COPY] SubQueryExpr::copy() called - returning NULL ValueExpr\n");
-    return make_unique<ValueExpr>(Value());
+    // 对于子查询，copy操作比较复杂，暂时返回nullptr表示不支持复制
+    // 这会导致包含子查询的比较表达式copy失败，但这是预期的行为
+    printf("DEBUG: [COPY] SubQueryExpr::copy() called - copy not supported\n");
+    return nullptr;
   }
 
 private:
@@ -752,4 +752,7 @@ private:
 
   std::vector<Value> res_query;
   size_t             visited_index = 0;
+  
+  // 缓存标量子查询的结果，避免重复执行
+  mutable Value cached_value_;
 };

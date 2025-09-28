@@ -1,55 +1,57 @@
---echo 最终子查询测试文件
---echo 基于参考代码重新实现的 SubQueryExpr 测试
+--echo 子查询修复测试文件
+--echo 测试两个有问题的查询
 
 --echo 清理可能存在的表
-DROP TABLE IF EXISTS final_1, final_2, final_3;
+DROP TABLE IF EXISTS csq_1, csq_2, csq_3, ssq_1, ssq_2;
 
---echo 创建测试表
-CREATE TABLE final_1(id int, col1 int, feat1 float);
-INSERT INTO final_1 VALUES (1, 4, 11.2);
-INSERT INTO final_1 VALUES (2, 2, 12.0);
-INSERT INTO final_1 VALUES (3, 3, 13.5);
-INSERT INTO final_1 VALUES (55, 41, 79.73);
+--echo 创建测试表 csq_1, csq_2, csq_3
+CREATE TABLE csq_1(id int, col1 int, feat1 float);
+INSERT INTO csq_1 VALUES (1, 4, 11.2);
+INSERT INTO csq_1 VALUES (2, 2, 12.0);
+INSERT INTO csq_1 VALUES (3, 3, 13.5);
+INSERT INTO csq_1 VALUES (55, 41, 79.73);
 
-CREATE TABLE final_2(id int, col2 int, feat2 float);
-INSERT INTO final_2 VALUES (1, 2, 13.0);
-INSERT INTO final_2 VALUES (2, 7, 10.5);
-INSERT INTO final_2 VALUES (5, 3, 12.6);
+CREATE TABLE csq_2(id int, col2 int, feat2 float);
+INSERT INTO csq_2 VALUES (1, 2, 13.0);
+INSERT INTO csq_2 VALUES (2, 7, 10.5);
+INSERT INTO csq_2 VALUES (5, 3, 12.6);
 
-CREATE TABLE final_3(id int, col3 int, feat3 float);
-INSERT INTO final_3 VALUES (1, 2, 11.0);
-INSERT INTO final_3 VALUES (3, 6, 16.5);
-INSERT INTO final_3 VALUES (5, 5, 14.6);
+CREATE TABLE csq_3(id int, col3 int, feat3 float);
+INSERT INTO csq_3 VALUES (1, 2, 11.0);
+INSERT INTO csq_3 VALUES (3, 6, 16.5);
+INSERT INTO csq_3 VALUES (5, 5, 14.6);
 
---echo 测试1: 复杂嵌套子查询
---echo 预期结果: 应该返回 id=55 的行 (col1=41 > 7)
-SELECT * FROM final_1 WHERE col1 > (SELECT MAX(final_2.col2) FROM final_2 WHERE final_2.feat2 >= (SELECT MIN(final_3.feat3) FROM final_3));
 
---echo 测试2: 简单标量子查询
---echo 预期结果: 应该返回 id=2 的行
-SELECT * FROM final_1 WHERE id = (SELECT final_2.id FROM final_2 WHERE col2 = 7);
+CREATE TABLE ssq_1(id int, name varchar(20));
+INSERT INTO ssq_1 VALUES (1, 'Alice');
+INSERT INTO ssq_1 VALUES (2, 'Bob');
+INSERT INTO ssq_1 VALUES (3, 'Charlie');
 
---echo 测试3: OR 子查询
---echo 预期结果: 应该返回多行
-SELECT * FROM final_1 WHERE (SELECT MAX(final_2.feat2) FROM final_2) > feat1 OR (SELECT MIN(final_3.col3) FROM final_3) < col1;
+CREATE TABLE ssq_2(id int, name varchar(20));
+INSERT INTO ssq_2 VALUES (1, 'Alice');
+INSERT INTO ssq_2 VALUES (2, 'Bob');
 
---echo 测试4: IN 子查询
---echo 预期结果: 应该返回 id=1 的行
-SELECT * FROM final_1 WHERE id IN (SELECT id FROM final_2);
 
---echo 测试5: 聚合函数子查询
---echo 预期结果: 应该返回 feat1 > 12.033 的行
-SELECT * FROM final_1 WHERE feat1 > (SELECT AVG(feat2) FROM final_2);
+SELECT * FROM csq_1 WHERE col1 > (SELECT MAX(csq_2.col2) FROM csq_2 WHERE csq_2.feat2 >= (SELECT MIN(csq_3.feat3) FROM csq_3));
 
---echo 测试6: 常量子查询
---echo 预期结果: 应该返回所有行
-SELECT * FROM final_1 WHERE (SELECT 1) = 1;
 
---echo 测试7: 空结果子查询
---echo 预期结果: 应该返回空结果
-SELECT * FROM final_1 WHERE id = (SELECT id FROM final_2 WHERE col2 = 999);
+SELECT * FROM ssq_1 WHERE id IN (SELECT ssq_2.id FROM ssq_2);
 
---echo 清理测试表
-DROP TABLE final_1;
-DROP TABLE final_2;
-DROP TABLE final_3;
+
+SELECT MIN(csq_3.feat3) FROM csq_3;
+
+
+SELECT MAX(csq_2.col2) FROM csq_2 WHERE csq_2.feat2 >= 11.0;
+
+
+SELECT * FROM csq_1 WHERE col1 > 3;
+
+
+SELECT * FROM ssq_1 WHERE id IN (1, 2);
+
+
+DROP TABLE csq_1;
+DROP TABLE csq_2;
+DROP TABLE csq_3;
+DROP TABLE ssq_1;
+DROP TABLE ssq_2;

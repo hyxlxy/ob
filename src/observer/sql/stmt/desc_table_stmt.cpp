@@ -35,10 +35,17 @@ RC DropTableStmt::create(Db *db, const DropTableSqlNode &drop_table, Stmt *&stmt
   // check whether the table exists
   Table *table = db->find_table(table_name);
   if (nullptr == table) {
-    LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
-    return RC::SCHEMA_TABLE_NOT_EXIST;
+    if (drop_table.if_exists) {
+      // Table doesn't exist but IF EXISTS was specified, so this is not an error
+      LOG_INFO("table %s does not exist, but IF EXISTS was specified", table_name);
+      stmt = new DropTableStmt(drop_table.relation_name, drop_table.if_exists);
+      return RC::SUCCESS;
+    } else {
+      LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+      return RC::SCHEMA_TABLE_NOT_EXIST;
+    }
   }
 
-  stmt = new DropTableStmt(drop_table.relation_name);
+  stmt = new DropTableStmt(drop_table.relation_name, drop_table.if_exists);
   return RC::SUCCESS;
 }

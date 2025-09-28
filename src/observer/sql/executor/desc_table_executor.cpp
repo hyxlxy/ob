@@ -88,6 +88,19 @@ RC DropTableExecutor::execute(SQLStageEvent *sql_event)
   DropTableStmt *drop_table_stmt = static_cast<DropTableStmt *>(stmt);
   const char    *table_name      = drop_table_stmt->table_name().c_str();
 
+  // Check if table exists
+  Table *table = session->get_current_db()->find_table(table_name);
+  if (nullptr == table) {
+    if (drop_table_stmt->if_exists()) {
+      // Table doesn't exist but IF EXISTS was specified, so this is not an error
+      LOG_INFO("table %s does not exist, but IF EXISTS was specified", table_name);
+      return RC::SUCCESS;
+    } else {
+      LOG_WARN("no such table. db=%s, table_name=%s", session->get_current_db()->name(), table_name);
+      return RC::SCHEMA_TABLE_NOT_EXIST;
+    }
+  }
+
   RC rc = session->get_current_db()->drop_table(table_name);
   return rc;
 }

@@ -82,6 +82,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         TABLE
         TABLES
         INDEX
+        IF
+        EXISTS
         CALC
         SELECT
         DESC
@@ -129,7 +131,6 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         KEY
         ANALYZE
         IN
-        EXISTS
         IS
 
         UNIQUE
@@ -319,6 +320,12 @@ drop_table_stmt:    /*drop table 语句的语法解析树*/
     DROP TABLE ID {
       $$ = new ParsedSqlNode(SCF_DROP_TABLE);
       $$->drop_table.relation_name = $3;
+      $$->drop_table.if_exists = false;
+    }
+    | DROP TABLE IF EXISTS ID {
+      $$ = new ParsedSqlNode(SCF_DROP_TABLE);
+      $$->drop_table.relation_name = $5;
+      $$->drop_table.if_exists = true;
     };
 
 analyze_table_stmt:  /* analyze table 语法的语法解析树*/
