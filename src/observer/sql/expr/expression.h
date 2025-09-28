@@ -738,10 +738,10 @@ public:
   // 兼容性方法
   unique_ptr<Expression> copy() const override
   {
-    // 对于子查询，copy操作比较复杂，暂时返回nullptr表示不支持复制
-    // 这会导致包含子查询的比较表达式copy失败，但这是预期的行为
-    printf("DEBUG: [COPY] SubQueryExpr::copy() called - copy not supported\n");
-    return nullptr;
+    // 创建一个新的SubQueryExpr实例，使用相同的SelectSqlNode
+    // 注意：这里我们共享SelectSqlNode的引用，因为它是const的
+    // 这是一个浅拷贝，但应该足够用于子查询的执行
+    return std::make_unique<SubQueryExpr>(const_cast<SelectSqlNode&>(sql_node_));
   }
 
 private:

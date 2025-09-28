@@ -1,47 +1,3 @@
-### 2025-09-09 10:55:59.962
--- 3.2 WHERE with constant predicate: expect 0 rows
-### 2025-09-09 10:55:59.962
-SELECT COUNT(*) FROM exp_table WHERE 9 = 9/2;  -- expect 0
-### 2025-09-09 10:55:59.963
-SELECT *        FROM exp_table WHERE 9 = 9/2;  -- expect 0 rows
-### 2025-09-09 10:55:59.964
--- 3.3 WHERE with true constant: expect all rows
-### 2025-09-09 10:55:59.964
-SELECT COUNT(*) FROM exp_table WHERE 9 = 9;    -- expect 9 (number of inserted rows)
-### 2025-09-09 10:55:59.965
--- 3.4 Column expressions in WHERE
-### 2025-09-09 10:55:59.966
-SELECT COUNT(*) FROM exp_table WHERE col1 - 9 > 9;  -- should work without crash
-### 2025-09-09 10:56:55.933
-insert into exp_table values (8,1,8,2.13,6.85);
-### 2025-09-09 11:00:19.218
-select * from exp_table where col1 - 9 > 4;
-### 2025-09-09 11:56:23.070
-create table if not exists t(a int, b int);
-### 2025-09-09 11:58:26.624
-select 1+2;
-### 2025-09-09 12:02:44.294
-select col1-2 from exp_table;
-### 2025-09-09 12:06:00.110
-explain select * from exp_table where col1-2>0;
-### 2025-09-09 12:08:35.715
-select col1-2>0 from exp_table;
-### 2025-09-09 12:10:09.256
-select * from exp_table where col1 > 0;
-### 2025-09-09 12:17:38.344
-select * from exp_table where col1-2>0;
-### 2025-09-09 12:18:39.872
-select * from exp_table where 1=5/4;
-### 2025-09-09 12:18:51.528
-select * from exp_table where col3 + 1 > col1;
-### 2025-09-09 12:19:33.515
-select * from exp_table where col1*col2 < 0;
-### 2025-09-09 12:20:17.908
-insert into exp_table values (4, 2, 2, -2, 5.5);
-### 2025-09-09 21:40:30.434
-insert into exp_table VALUES (3, 8, 9, 9.42, 9.24);
-### 2025-09-09 21:40:30.436
-insert into exp_table VALUES (4, 6, 8, 3.79, 1.82);
 ### 2025-09-09 21:40:30.438
 insert into exp_table VALUES (8, 5, 4, 2.32, 6.19);
 ### 2025-09-09 21:40:30.439
@@ -1944,34 +1900,8 @@ create table big_order_t1(id int, col1 int, col2 float);
 -- Test the complex query
 ### 2025-09-27 09:29:21.889
 select * from csq_1 where col1 > (select max(csq_2.col2) from csq_2 where csq_2.feat2 >= (select min(csq_3.feat3) from csq_3));
-### 2025-09-27 09:31:13.220
--- 创建测试表
-### 2025-09-27 09:31:13.259
-CREATE TABLE csq_2(id int, col2 int, feat2 float);
-### 2025-09-27 09:31:13.261
-CREATE TABLE csq_3(id int, col3 int, feat3 float);
 ### 2025-09-27 09:31:13.263
 -- 插入数据
-### 2025-09-27 09:31:13.263
-INSERT INTO csq_1 VALUES (1, 4, 11.2);
-### 2025-09-27 09:31:13.267
-INSERT INTO csq_1 VALUES (2, 2, 12.0);
-### 2025-09-27 09:31:13.269
-INSERT INTO csq_1 VALUES (3, 3, 13.5);
-### 2025-09-27 09:31:13.270
-INSERT INTO csq_1 VALUES (55, 41, 79.73);
-### 2025-09-27 09:31:13.274
-INSERT INTO csq_2 VALUES (1, 2, 13.0);
-### 2025-09-27 09:31:13.275
-INSERT INTO csq_2 VALUES (2, 7, 10.5);
-### 2025-09-27 09:31:13.276
-INSERT INTO csq_2 VALUES (5, 3, 12.6);
-### 2025-09-27 09:31:13.277
-INSERT INTO csq_3 VALUES (1, 2, 11.0);
-### 2025-09-27 09:31:13.278
-INSERT INTO csq_3 VALUES (3, 6, 16.5);
-### 2025-09-27 09:31:13.279
-INSERT INTO csq_3 VALUES (5, 5, 14.6);
 ### 2025-09-27 09:31:13.280
 -- 步骤1：测试最内层子查询
 ### 2025-09-27 09:31:13.280
@@ -1990,11 +1920,81 @@ CREATE TABLE csq_1(id int, col1 int, feat1 float); INSERT INTO csq_1 VALUES (1, 
 CREATE TABLE test(id int);
 ### 2025-09-27 14:37:35.177
 DROP TABLE IF EXISTS csq_1; CREATE TABLE csq_1(id int, col1 int, feat1 float);
-### 2025-09-27 14:56:45.550
-CREATE TABLE csq_1(id int, col1 int, feat1 float);
 ### 2025-09-27 16:07:34.230
 CREATE TABLE csq_1(id int, col1 int, feat1 float); INSERT INTO csq_1 VALUES (1, 4, 11.2); INSERT INTO csq_1 VALUES (2, 2, 12.0); INSERT INTO csq_1 VALUES (3, 3, 13.5); INSERT INTO csq_1 VALUES (55, 41, 79.73); CREATE TABLE csq_2(id int, col2 int, feat2 float); INSERT INTO csq_2 VALUES (1, 2, 13.0); INSERT INTO csq_2 VALUES (2, 7, 10.5); INSERT INTO csq_2 VALUES (5, 3, 12.6); CREATE TABLE csq_3(id int, col3 int, feat3 float); INSERT INTO csq_3 VALUES (1, 2, 11.0); INSERT INTO csq_3 VALUES (3, 6, 16.5); INSERT INTO csq_3 VALUES (5, 5, 14.6); SELECT * FROM csq_1 WHERE col1 > (SELECT MAX(csq_2.col2) FROM csq_2 WHERE csq_2.feat2 >= (SELECT MIN(csq_3.feat3) FROM csq_3));
-### 2025-09-27 16:09:16.380
-SELECT * FROM csq_1 WHERE col1 > (SELECT MAX(csq_2.col2) FROM csq_2 WHERE csq_2.feat2 >= (SELECT MIN(csq_3.feat3) FROM csq_3));
 ### 2025-09-27 20:54:51.981
 CREATE TABLE test1(id INT, val INT);
+### 2025-09-28 15:57:20.899
+SELECT * FROM csq_1;
+### 2025-09-28 16:03:21.404
+DROP TABLE IF EXISTS csq_1, csq_2, csq_3, ssq_1, ssq_2;
+### 2025-09-28 16:03:21.422
+-- 创建测试表 csq_1, csq_2, csq_3
+### 2025-09-28 16:03:21.423
+CREATE TABLE csq_1(id int, col1 int, feat1 float);
+### 2025-09-28 16:03:21.440
+INSERT INTO csq_1 VALUES (1, 4, 11.2);
+### 2025-09-28 16:03:21.444
+INSERT INTO csq_1 VALUES (2, 2, 12.0);
+### 2025-09-28 16:03:21.446
+INSERT INTO csq_1 VALUES (3, 3, 13.5);
+### 2025-09-28 16:03:21.448
+INSERT INTO csq_1 VALUES (55, 41, 79.73);
+### 2025-09-28 16:03:21.451
+CREATE TABLE csq_2(id int, col2 int, feat2 float);
+### 2025-09-28 16:03:21.470
+INSERT INTO csq_2 VALUES (1, 2, 13.0);
+### 2025-09-28 16:03:21.472
+INSERT INTO csq_2 VALUES (2, 7, 10.5);
+### 2025-09-28 16:03:21.474
+INSERT INTO csq_2 VALUES (5, 3, 12.6);
+### 2025-09-28 16:03:21.476
+CREATE TABLE csq_3(id int, col3 int, feat3 float);
+### 2025-09-28 16:03:21.494
+INSERT INTO csq_3 VALUES (1, 2, 11.0);
+### 2025-09-28 16:03:21.497
+INSERT INTO csq_3 VALUES (3, 6, 16.5);
+### 2025-09-28 16:03:21.499
+INSERT INTO csq_3 VALUES (5, 5, 14.6);
+### 2025-09-28 16:03:21.501
+CREATE TABLE ssq_1(id int, name varchar(20));
+### 2025-09-28 16:03:21.523
+INSERT INTO ssq_1 VALUES (1, 'Alice');
+### 2025-09-28 16:03:21.526
+INSERT INTO ssq_1 VALUES (2, 'Bob');
+### 2025-09-28 16:03:21.528
+INSERT INTO ssq_1 VALUES (3, 'Charlie');
+### 2025-09-28 16:03:21.530
+CREATE TABLE ssq_2(id int, col2 int, name varchar(20));
+### 2025-09-28 16:03:21.553
+INSERT INTO ssq_2 VALUES (1, 46, 'Alice');
+### 2025-09-28 16:03:21.556
+INSERT INTO ssq_2 VALUES (2, 47, 'Bob');
+### 2025-09-28 16:03:21.558
+-- 测试第一个查询：嵌套子查询
+### 2025-09-28 16:03:21.559
+SELECT * FROM csq_1 WHERE col1 > (SELECT MAX(csq_2.col2) FROM csq_2 WHERE csq_2.feat2 >= (SELECT MIN(csq_3.feat3) FROM csq_3));
+### 2025-09-28 16:04:28.962
+-- 清理可能存在的表
+### 2025-09-28 16:04:29.014
+DROP TABLE IF EXISTS test1, test2;
+### 2025-09-28 16:04:29.040
+-- 创建测试表
+### 2025-09-28 16:04:29.041
+CREATE TABLE test1(id int, value int);
+### 2025-09-28 16:04:29.068
+INSERT INTO test1 VALUES (1, 10);
+### 2025-09-28 16:04:29.072
+INSERT INTO test1 VALUES (2, 20);
+### 2025-09-28 16:04:29.074
+INSERT INTO test1 VALUES (3, 30);
+### 2025-09-28 16:04:29.076
+CREATE TABLE test2(id int, value int);
+### 2025-09-28 16:04:29.096
+INSERT INTO test2 VALUES (1, 15);
+### 2025-09-28 16:04:29.099
+INSERT INTO test2 VALUES (2, 25);
+### 2025-09-28 16:04:29.100
+-- 测试简单子查询
+### 2025-09-28 16:04:29.101
+SELECT * FROM test1 WHERE value > (SELECT MAX(value) FROM test2);
