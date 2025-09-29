@@ -264,47 +264,25 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<st
 
     if (!handled_simple) {
       // 使用表达式比较：复制表达式并由 FilterUnit 持有，避免悬垂指针
-      // 特殊处理 SubQueryExpr：由于其 copy() 方法返回 nullptr，我们需要特殊处理
+      // SubQueryExpr 的 copy() 方法已经修复，现在可以正常复制
 
       unique_ptr<Expression> left_copy;
       unique_ptr<Expression> right_copy;
 
       // 处理左表达式
-      if (condition.left_expr->type() == ExprType::SUBQUERY) {
-        printf("DEBUG: [FILTER] Left expr is SubQueryExpr - using expression directly\n");
-        // 对于 SubQueryExpr，我们可以直接复制它，因为 SubQueryExpr::copy() 已经实现
-        left_copy = condition.left_expr->copy();
-        if (!left_copy) {
-          LOG_WARN("Failed to copy left SubQueryExpr");
-          delete filter_unit;
-          return RC::INTERNAL;
-        }
-      } else {
-        left_copy = condition.left_expr->copy();
-        if (!left_copy) {
-          LOG_WARN("Failed to copy left expression");
-          delete filter_unit;
-          return RC::INTERNAL;
-        }
+      left_copy = condition.left_expr->copy();
+      if (!left_copy) {
+        LOG_WARN("Failed to copy left expression");
+        delete filter_unit;
+        return RC::INTERNAL;
       }
 
       // 处理右表达式
-      if (condition.right_expr->type() == ExprType::SUBQUERY) {
-        printf("DEBUG: [FILTER] Right expr is SubQueryExpr - using expression directly\n");
-        // 对于 SubQueryExpr，我们可以直接复制它，因为 SubQueryExpr::copy() 已经实现
-        right_copy = condition.right_expr->copy();
-        if (!right_copy) {
-          LOG_WARN("Failed to copy right SubQueryExpr");
-          delete filter_unit;
-          return RC::INTERNAL;
-        }
-      } else {
-        right_copy = condition.right_expr->copy();
-        if (!right_copy) {
-          LOG_WARN("Failed to copy right expression");
-          delete filter_unit;
-          return RC::INTERNAL;
-        }
+      right_copy = condition.right_expr->copy();
+      if (!right_copy) {
+        LOG_WARN("Failed to copy right expression");
+        delete filter_unit;
+        return RC::INTERNAL;
       }
 
       filter_unit->set_left_expr(std::move(left_copy));
