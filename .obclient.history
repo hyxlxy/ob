@@ -1920,8 +1920,6 @@ INSERT INTO csq_2 VALUES (5, 3, 12.6);
 INSERT INTO csq_3 VALUES (3, 6, 16.5);
 ### 2025-09-28 16:03:21.499
 INSERT INTO csq_3 VALUES (5, 5, 14.6);
-### 2025-09-28 16:03:21.501
-CREATE TABLE ssq_1(id int, name varchar(20));
 ### 2025-09-28 16:03:21.523
 INSERT INTO ssq_1 VALUES (1, 'Alice');
 ### 2025-09-28 16:03:21.526
@@ -1984,8 +1982,6 @@ DROP TABLE IF EXISTS t1, t2; CREATE TABLE t1(id int, val int); INSERT INTO t1 VA
 DROP TABLE IF EXISTS test1, test2; CREATE TABLE test1(id int, val int); INSERT INTO test1 VALUES (1, 10); INSERT INTO test1 VALUES (2, 20); INSERT INTO test1 VALUES (3, 30); CREATE TABLE test2(id int, val int); INSERT INTO test2 VALUES (1, 5); INSERT INTO test2 VALUES (2, 15); SELECT * FROM test1 WHERE val > (SELECT MAX(val) FROM test2); DROP TABLE test1; DROP TABLE test2;
 ### 2025-09-29 10:23:52.314
 SELECT 1;
-### 2025-09-29 10:24:41.854
-CREATE TABLE csq_1(id int, col1 int, feat1 float);
 ### 2025-09-29 10:24:53.633
 INSERT INTO csq_1 VALUES (1, 4, 11.2);
 ### 2025-09-29 10:25:00.815
@@ -1998,3 +1994,7 @@ CREATE TABLE csq_3(id int, col3 int, feat3 float);
 INSERT INTO csq_3 VALUES (1, 2, 11.0);
 ### 2025-09-29 10:25:00.891
 SELECT * FROM csq_1 WHERE col1 > (SELECT MAX(csq_2.col2) FROM csq_2 WHERE csq_2.feat2 >= (SELECT MIN(csq_3.feat3) FROM csq_3));
+### 2025-09-29 10:43:37.512
+CREATE TABLE csq_1(id int, col1 int, feat1 float);
+### 2025-09-29 10:44:03.962
+CREATE TABLE ssq_1(id int, name varchar(20));

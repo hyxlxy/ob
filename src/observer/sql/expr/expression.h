@@ -706,6 +706,7 @@ class SubQueryExpr : public Expression
 {
 public:
   explicit SubQueryExpr(SelectSqlNode &select_node);
+  explicit SubQueryExpr(std::unique_ptr<SelectSqlNode> select_node);
   virtual ~SubQueryExpr();
 
   RC   open(Trx *trx, const Tuple &tuple);
@@ -746,6 +747,7 @@ public:
 
 private:
   SelectSqlNode                    &sql_node_;
+  std::unique_ptr<SelectSqlNode>   owned_sql_node_;  // 拥有SelectSqlNode的所有权
   mutable std::unique_ptr<SelectStmt>       select_stmt_;
   mutable std::unique_ptr<LogicalOperator>  logical_oper_;
   mutable std::unique_ptr<PhysicalOperator> physical_oper_;

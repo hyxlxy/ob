@@ -1886,6 +1886,9 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
 
 SubQueryExpr::SubQueryExpr(SelectSqlNode &select_node) : sql_node_(select_node) {}
 
+SubQueryExpr::SubQueryExpr(std::unique_ptr<SelectSqlNode> select_node) 
+  : sql_node_(*select_node), owned_sql_node_(std::move(select_node)) {}
+
 SubQueryExpr::~SubQueryExpr() = default;
 
 RC SubQueryExpr::generate_select_stmt(Db *db, const std::unordered_map<std::string, BaseTable *> &tables) const
