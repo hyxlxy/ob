@@ -38,6 +38,13 @@ public:
     }
   }
 
+  // Add outer query context for correlated subqueries
+  void add_outer_context(const BinderContext *outer_context) {
+    if (outer_context != nullptr) {
+      outer_contexts_.push_back(outer_context);
+    }
+  }
+
   Table *find_table(const char *table_name) const;
 
   const vector<Table *> &query_tables() const { return query_tables_; }
@@ -45,6 +52,7 @@ public:
 private:
   vector<Table *>                query_tables_;
   std::unordered_map<string, Table *> name_to_table_;
+  vector<const BinderContext *>  outer_contexts_;  // 外层查询上下文
 };
 
 /**
@@ -54,7 +62,8 @@ private:
 class ExpressionBinder
 {
 public:
-  ExpressionBinder(BinderContext &context) : context_(context) {}
+  ExpressionBinder(BinderContext &context, const BinderContext *outer_context = nullptr) 
+    : context_(context), outer_context_(outer_context) {}
   virtual ~ExpressionBinder() = default;
 
   RC bind_expression(unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions);
@@ -81,4 +90,5 @@ private:
 
 private:
   BinderContext &context_;
+  const BinderContext *outer_context_;
 };

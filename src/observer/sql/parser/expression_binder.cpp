@@ -17,6 +17,8 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/ranges.h"
 #include "sql/parser/expression_binder.h"
 #include "sql/expr/expression_iterator.h"
+#include "observer/session/session.h"
+#include "storage/db/db.h"
 
 using namespace common;
 
@@ -31,10 +33,19 @@ Table *BinderContext::find_table(const char *table_name) const
   // Fallback: search by real table names in query tables
   auto pred = [table_name](Table *table) { return 0 == strcasecmp(table_name, table->name()); };
   auto iter = ranges::find_if(query_tables_, pred);
-  if (iter == query_tables_.end()) {
-    return nullptr;
+  if (iter != query_tables_.end()) {
+    return *iter;
   }
-  return *iter;
+  
+  // Search in outer contexts for correlated subqueries
+  for (const BinderContext *outer_context : outer_contexts_) {
+    Table *table = outer_context->find_table(table_name);
+    if (table != nullptr) {
+      return table;
+    }
+  }
+  
+  return nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -191,7 +202,41 @@ RC ExpressionBinder::bind_unbound_field_expression(
       LOG_INFO("no such table in from list: %s", table_name);
       // 检查是否可能是关联子查询中的外层表引用
       LOG_WARN("Table '%s' not found in current context. This might be a correlated subquery reference.", table_name);
-      return RC::SCHEMA_TABLE_NOT_EXIST;
+      
+      // 尝试在外层上下文中查找表
+      if (outer_context_ != nullptr) {
+        table = outer_context_->find_table(table_name);
+        if (table != nullptr) {
+          LOG_INFO("Found table '%s' in outer context", table_name);
+        } else {
+          LOG_WARN("Table '%s' not found in outer context either", table_name);
+          return RC::SCHEMA_TABLE_NOT_EXIST;
+        }
+      } else {
+        // 如果没有外层上下文，尝试从当前会话中获取数据库并查找表
+        // 这是相关子查询的临时解决方案
+        Session *session = Session::current_session();
+        if (session != nullptr) {
+          Db *db = session->get_current_db();
+          if (db != nullptr) {
+            // 尝试从数据库中查找表
+            Table *found_table = db->find_table(table_name);
+            if (found_table != nullptr) {
+              LOG_INFO("Found table '%s' in database for correlated subquery", table_name);
+              table = found_table;
+            } else {
+              LOG_WARN("Table '%s' not found in database either", table_name);
+              return RC::SCHEMA_TABLE_NOT_EXIST;
+            }
+          } else {
+            LOG_WARN("No current database available");
+            return RC::SCHEMA_TABLE_NOT_EXIST;
+          }
+        } else {
+          LOG_WARN("No current session available");
+          return RC::SCHEMA_TABLE_NOT_EXIST;
+        }
+      }
     }
   }
 

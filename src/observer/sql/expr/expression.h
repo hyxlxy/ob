@@ -33,6 +33,7 @@ class Trx;
 class LogicalOperator;
 class PhysicalOperator;
 class BaseTable;
+class BinderContext;
 
 /**
  * @brief LIKE操作符的模式匹配函数
@@ -238,6 +239,10 @@ public:
   Field &field() { return field_; }
 
   const Field &field() const { return field_; }
+  
+  // 支持相关子查询的静态方法
+  static void set_current_parent_tuple(const Tuple *parent_tuple) { current_parent_tuple_ = parent_tuple; }
+  static const Tuple *get_current_parent_tuple() { return current_parent_tuple_; }
 
   const char *table_name() const { return field_.table_name(); }
   const char *field_name() const { return field_.field_name(); }
@@ -248,6 +253,9 @@ public:
 
 private:
   Field field_;
+  
+  // 支持相关子查询的静态成员变量
+  static const Tuple *current_parent_tuple_;
 };
 
 /**
@@ -724,7 +732,10 @@ public:
 
   std::unique_ptr<Expression> deep_copy() const;
 
-  RC generate_select_stmt(Db *db, const std::unordered_map<std::string, BaseTable *> &tables) const;
+  RC generate_select_stmt(Db *db, const std::unordered_map<std::string, BaseTable *> &tables, const BinderContext *outer_context = nullptr) const;
+  
+  // 设置外层上下文用于相关子查询
+  void set_outer_context(const BinderContext *outer_context) { outer_context_ = outer_context; }
 
   RC generate_logical_oper() const;
   RC generate_physical_oper() const;
@@ -757,4 +768,7 @@ private:
   
   // 缓存标量子查询的结果，避免重复执行
   mutable Value cached_value_;
+  
+  // 外层查询上下文，用于相关子查询
+  const BinderContext *outer_context_;
 };

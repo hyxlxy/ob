@@ -31,7 +31,7 @@ SelectStmt::~SelectStmt()
   }
 }
 
-RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
+RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const BinderContext *outer_context)
 {
   if (nullptr == db) {
     LOG_WARN("invalid argument. db is null");
@@ -39,6 +39,11 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   }
 
   BinderContext binder_context;
+  
+  // Add outer context for correlated subqueries
+  if (outer_context != nullptr) {
+    binder_context.add_outer_context(outer_context);
+  }
 
   // collect tables in `from` statement
   vector<Table *>                tables;
@@ -102,7 +107,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 
   // collect query fields in `select` statement
   vector<unique_ptr<Expression>> bound_expressions;
-  ExpressionBinder expression_binder(binder_context);
+  ExpressionBinder expression_binder(binder_context, outer_context);
   
   for (unique_ptr<Expression> &expression : select_sql.expressions) {
     RC rc = expression_binder.bind_expression(expression, bound_expressions);

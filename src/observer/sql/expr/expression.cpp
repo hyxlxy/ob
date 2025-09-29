@@ -27,7 +27,7 @@ See the Mulan PSL v2 for more details. */
 #include "session/session.h"
 
 // 前向声明
-static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Value> &results, const Tuple *parent_tuple = nullptr);
+static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Value> &results, const Tuple *parent_tuple = nullptr, const BinderContext *outer_context = nullptr);
 #include "common/lang/limits.h"
 
 #include <type_traits>
@@ -35,6 +35,9 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
 #include "observer/common/null_like.h"
 
 using namespace std;
+
+// 定义 FieldExpr 的静态成员变量
+const Tuple *FieldExpr::current_parent_tuple_ = nullptr;
 
 /**
  * @brief LIKE操作符的模式匹配函数
@@ -93,6 +96,13 @@ RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
   RC rc = tuple.find_cell(TupleCellSpec(table_name(), field_name()), value);
 
   printf("DEBUG: [FIELD] FieldExpr find_cell result: rc=%s\n", strrc(rc));
+
+  // 如果在当前元组中找不到字段，且存在父级元组（相关子查询），尝试从父级元组中查找
+  if (rc != RC::SUCCESS && current_parent_tuple_ != nullptr) {
+    printf("DEBUG: [FIELD] FieldExpr not found in current tuple, trying parent tuple for correlated subquery\n");
+    rc = current_parent_tuple_->find_cell(TupleCellSpec(table_name(), field_name()), value);
+    printf("DEBUG: [FIELD] FieldExpr parent tuple find_cell result: rc=%s\n", strrc(rc));
+  }
 
   if (rc == RC::SUCCESS) {
     if (value.attr_type() == AttrType::INTS) {
@@ -396,12 +406,12 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
           // Use FilterUnit's subquery (preferred)
           LOG_DEBUG("Executing FilterUnit subquery %s", is_correlated ? "(correlated)" : "(first time)");
           // 对于关联子查询，传递 &tuple；对于非关联子查询，传递 nullptr
-          rc = execute_subquery_and_collect_results(filter_unit_->sub_query().get(), sub_query_results, is_correlated ? &tuple : nullptr);
+          rc = execute_subquery_and_collect_results(filter_unit_->sub_query().get(), sub_query_results, is_correlated ? &tuple : nullptr, nullptr);
         } else if (sub_query_) {
           // Use direct subquery
           LOG_DEBUG("Executing direct subquery %s", is_correlated ? "(correlated)" : "(first time)");
           // 对于关联子查询，传递 &tuple；对于非关联子查询，传递 nullptr
-          rc = execute_subquery_and_collect_results(sub_query_.get(), sub_query_results, is_correlated ? &tuple : nullptr);
+          rc = execute_subquery_and_collect_results(sub_query_.get(), sub_query_results, is_correlated ? &tuple : nullptr, nullptr);
         } else {
           LOG_WARN("No subquery found in filter_unit or sub_query");
           return RC::INTERNAL;
@@ -414,9 +424,9 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
             LOG_WARN("Subquery execution failed, trying as correlated subquery");
             // 尝试作为关联子查询执行
             if (filter_unit_ && filter_unit_->sub_query()) {
-              rc = execute_subquery_and_collect_results(filter_unit_->sub_query().get(), sub_query_results, &tuple);
+              rc = execute_subquery_and_collect_results(filter_unit_->sub_query().get(), sub_query_results, &tuple, nullptr);
             } else if (sub_query_) {
-              rc = execute_subquery_and_collect_results(sub_query_.get(), sub_query_results, &tuple);
+              rc = execute_subquery_and_collect_results(sub_query_.get(), sub_query_results, &tuple, nullptr);
             }
             
             if (rc != RC::SUCCESS) {
@@ -1635,7 +1645,7 @@ RC SubQueryInExpr::get_value(const Tuple &tuple, Value &value) const
     }
 
     // 对于 IN/NOT IN 子查询，通常是非关联的，传递 nullptr
-    rc = execute_subquery_and_collect_results(sub_query_.get(), sub_query_results_, nullptr);
+    rc = execute_subquery_and_collect_results(sub_query_.get(), sub_query_results_, nullptr, nullptr);
     if (rc != RC::SUCCESS) {
       LOG_WARN("Failed to execute subquery for IN/NOT IN operation. rc=%s", strrc(rc));
       // 如果子查询执行失败，对于IN返回false，对于NOT IN返回true
@@ -1680,7 +1690,7 @@ RC SubQueryInExpr::eval(Chunk &chunk, vector<uint8_t> &select)
       return RC::INTERNAL;
     }
 
-    RC rc = execute_subquery_and_collect_results(sub_query_.get(), sub_query_results_, nullptr);
+    RC rc = execute_subquery_and_collect_results(sub_query_.get(), sub_query_results_, nullptr, nullptr);
     if (rc != RC::SUCCESS) {
       LOG_WARN("Failed to execute subquery for IN/NOT IN operation. rc=%s", strrc(rc));
       return rc;
@@ -1718,7 +1728,7 @@ RC SubQueryInExpr::eval(Chunk &chunk, vector<uint8_t> &select)
 }
 
 // 执行子查询并收集结果
-static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Value> &results, const Tuple *parent_tuple)
+static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Value> &results, const Tuple *parent_tuple, const BinderContext *outer_context)
 {
   LOG_WARN("Starting subquery execution");
 
@@ -1790,6 +1800,8 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
   if (parent_tuple != nullptr) {
     LOG_DEBUG("Setting parent tuple for correlated subquery");
     physical_operator->set_parent_tuple(parent_tuple);
+    // 设置 FieldExpr 的静态父级元组，用于相关子查询中的字段查找
+    FieldExpr::set_current_parent_tuple(parent_tuple);
   }
 
   // 重要：确保子查询的物理操作符有正确的子操作符
@@ -1904,6 +1916,9 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
   LOG_DEBUG("Finished collecting subquery results. Total rows: %d", row_count);
 
   physical_operator->close();
+  
+  // 清理 FieldExpr 的静态父级元组
+  FieldExpr::set_current_parent_tuple(nullptr);
 
   if (rc == RC::RECORD_EOF) {
     rc = RC::SUCCESS;
@@ -1920,18 +1935,18 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
 ////////////////////////////////////////////////////////////////////////////////
 // SubQueryExpr
 
-SubQueryExpr::SubQueryExpr(SelectSqlNode &select_node) : sql_node_(select_node) {}
+SubQueryExpr::SubQueryExpr(SelectSqlNode &select_node) : sql_node_(select_node), outer_context_(nullptr) {}
 
 SubQueryExpr::SubQueryExpr(std::unique_ptr<SelectSqlNode> select_node) 
-  : sql_node_(*select_node), owned_sql_node_(std::move(select_node)) {}
+  : sql_node_(*select_node), owned_sql_node_(std::move(select_node)), outer_context_(nullptr) {}
 
 SubQueryExpr::~SubQueryExpr() = default;
 
-RC SubQueryExpr::generate_select_stmt(Db *db, const std::unordered_map<std::string, BaseTable *> &tables) const
+RC SubQueryExpr::generate_select_stmt(Db *db, const std::unordered_map<std::string, BaseTable *> &tables, const BinderContext *outer_context) const
 {
   // 仿照普通 select 的执行流程，tables 用来传递别名
   Stmt *stmt = nullptr;
-  RC    rc   = SelectStmt::create(db, sql_node_, stmt);
+  RC    rc   = SelectStmt::create(db, sql_node_, stmt, outer_context);
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to create subquery select statement. return %s", strrc(rc));
     return rc;
@@ -2050,6 +2065,8 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
 
   // 设置父级tuple并打开物理操作符
   physical_oper_->set_parent_tuple(&tuple);
+  // 设置 FieldExpr 的静态父级元组，用于相关子查询中的字段查找
+  FieldExpr::set_current_parent_tuple(&tuple);
   RC rc = physical_oper_->open(trx);
   if (rc != RC::SUCCESS) {
     LOG_WARN("Failed to open subquery physical operator: %s", strrc(rc));
@@ -2064,6 +2081,8 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
     // 没有数据，返回NULL
     printf("DEBUG: [SUBQUERY] Scalar subquery (get_value) returned no results, setting NULL\n");
     physical_oper_->close();
+    // 清理 FieldExpr 的静态父级元组
+    FieldExpr::set_current_parent_tuple(nullptr);
     value.set_type(AttrType::UNDEFINED);
     value.set_null(true);
     return RC::SUCCESS;
@@ -2071,6 +2090,8 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
     // 其他错误
     printf("DEBUG: [SUBQUERY] Scalar subquery (get_value) next() failed: %s\n", strrc(rc));
     physical_oper_->close();
+    // 清理 FieldExpr 的静态父级元组
+    FieldExpr::set_current_parent_tuple(nullptr);
     value.set_type(AttrType::UNDEFINED);
     value.set_null(true);
     return rc;
@@ -2082,12 +2103,16 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
     // 有多行数据，标量子查询错误
     printf("DEBUG: [SUBQUERY] Scalar subquery returned multiple rows - this is an error\n");
     physical_oper_->close();
+    // 清理 FieldExpr 的静态父级元组
+    FieldExpr::set_current_parent_tuple(nullptr);
     LOG_WARN("Scalar subquery returned multiple rows");
     return RC::SQL_SYNTAX;
   } else if (next_rc != RC::RECORD_EOF) {
     // 其他错误
     printf("DEBUG: [SUBQUERY] Error checking for multiple rows: %s\n", strrc(next_rc));
     physical_oper_->close();
+    // 清理 FieldExpr 的静态父级元组
+    FieldExpr::set_current_parent_tuple(nullptr);
     return next_rc;
   }
 
@@ -2096,6 +2121,8 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
   if (!current_tuple) {
     printf("DEBUG: [SUBQUERY] Scalar subquery (get_value) current_tuple is null\n");
     physical_oper_->close();
+    // 清理 FieldExpr 的静态父级元组
+    FieldExpr::set_current_parent_tuple(nullptr);
     value.set_type(AttrType::UNDEFINED);
     value.set_null(true);
     return RC::INTERNAL;
@@ -2105,6 +2132,9 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
   rc = current_tuple->cell_at(0, value);
   printf("DEBUG: [SUBQUERY] Scalar subquery (get_value) result: rc=%s, value=%s\n", strrc(rc), value.to_string().c_str());
   physical_oper_->close();
+  
+  // 清理 FieldExpr 的静态父级元组
+  FieldExpr::set_current_parent_tuple(nullptr);
   
   if (rc != RC::SUCCESS) {
     LOG_WARN("Failed to get value from subquery tuple: %s", strrc(rc));
@@ -2235,8 +2265,17 @@ RC SubQueryExpr::initialize_subquery() const
     return RC::INTERNAL;
   }
 
-  // 生成SelectStmt
-  RC rc = generate_select_stmt(db, {});
+  // 创建外层上下文，包含当前数据库的所有表
+  BinderContext outer_context;
+  
+  // 从数据库中获取所有表，用于相关子查询的表绑定
+  // 这是一个简化的方法，实际应该只包含外层查询的表
+  // 我们需要手动添加表到外层上下文中
+  // 由于我们无法直接访问get_all_tables，我们暂时使用空的外层上下文
+  // 真正的修复需要在bind_unbound_field_expression中处理
+  
+  // 生成SelectStmt，传递外层上下文
+  RC rc = generate_select_stmt(db, {}, &outer_context);
   if (rc != RC::SUCCESS) {
     LOG_WARN("Failed to generate select statement: %s", strrc(rc));
     return rc;

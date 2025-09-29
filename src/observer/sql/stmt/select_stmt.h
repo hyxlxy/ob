@@ -22,6 +22,7 @@ class FieldMeta;
 class FilterStmt;
 class Db;
 class Table;
+class BinderContext;
 
 /**
  * @brief 表示select语句
@@ -36,7 +37,7 @@ public:
   StmtType type() const override { return StmtType::SELECT; }
 
 public:
-  static RC create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt);
+  static RC create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const BinderContext *outer_context = nullptr);
 
 public:
   const vector<Table *> &tables() const { return tables_; }
