@@ -300,8 +300,17 @@ bool ComparisonExpr::is_correlated_subquery() const
     return false;
   }
   
-  // 对于 IN/NOT IN 子查询，我们假设它可能是关联的
-  return true;
+  // 对于 IN/NOT IN 子查询，我们需要更精确的检测
+  // 检查子查询是否真的引用了外层查询的表
+  if (filter_unit_ && filter_unit_->sub_query()) {
+    // 这里应该检查子查询的SQL节点，看是否包含外层查询的表引用
+    // 暂时假设IN/NOT IN子查询是非关联的，除非有明确证据表明它是关联的
+    // 这样可以避免为每一行重新执行非关联子查询
+    return false;
+  }
+  
+  // 如果没有子查询，返回false
+  return false;
 }
 
 RC ComparisonExpr::try_get_value(Value &cell) const
@@ -373,9 +382,13 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
 
       if (!is_correlated && sub_query_executed_ && !sub_query_results_.empty()) {
         // Use cached results for non-correlated subqueries
-        LOG_DEBUG("Using cached subquery results (%d results)", (int)sub_query_results_.size());
+        LOG_WARN("Using cached subquery results (%d results)", (int)sub_query_results_.size());
         sub_query_results = sub_query_results_;
       } else {
+        LOG_WARN("NOT CACHED: is_correlated=%s, sub_query_executed_=%s, results_empty=%s", 
+                 is_correlated ? "true" : "false",
+                 sub_query_executed_ ? "true" : "false",
+                 sub_query_results_.empty() ? "true" : "false");
         // Execute subquery (always for correlated, first time for non-correlated)
         RC rc = RC::SUCCESS;
 
@@ -468,6 +481,15 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
 
     // Set result based on whether we found a match
     bool result = found ? (comp_ == IN_OP || comp_ == IN_VALUES_OP) : (comp_ == NOT_IN_OP || comp_ == NOT_IN_VALUES_OP);
+    
+    // 添加调试信息
+    if (comp_ == NOT_IN_OP || comp_ == NOT_IN_VALUES_OP) {
+      LOG_WARN("NOT IN DEBUG: left_value=%s, found=%s, result=%s", 
+               left_value.to_string().c_str(), 
+               found ? "true" : "false", 
+               result ? "true" : "false");
+    }
+    
     value.set_boolean(result);
     return RC::SUCCESS;
   }

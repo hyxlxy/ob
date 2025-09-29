@@ -1,9 +1,3 @@
-### 2025-09-11 16:46:30.894
-INSERT INTO EXP_TABLE VALUES (1, 1, 1, 1.0, 1.5);
-### 2025-09-11 16:46:35.249
-INSERT INTO EXP_TABLE VALUES (2, 2, -2, 5.5, 1.0);
-### 2025-09-11 16:46:39.288
-INSERT INTO EXP_TABLE VALUES (3, 3, 4, 5.0, 4.0);
 ### 2025-09-11 16:46:46.598
 SELECT * FROM EXP_TABLE WHERE -0 < COL1-COL2;
 ### 2025-09-11 16:52:52.980
@@ -1994,7 +1988,13 @@ CREATE TABLE csq_3(id int, col3 int, feat3 float);
 INSERT INTO csq_3 VALUES (1, 2, 11.0);
 ### 2025-09-29 10:25:00.891
 SELECT * FROM csq_1 WHERE col1 > (SELECT MAX(csq_2.col2) FROM csq_2 WHERE csq_2.feat2 >= (SELECT MIN(csq_3.feat3) FROM csq_3));
-### 2025-09-29 10:43:37.512
-CREATE TABLE csq_1(id int, col1 int, feat1 float);
 ### 2025-09-29 10:44:03.962
 CREATE TABLE ssq_1(id int, name varchar(20));
+### 2025-09-29 11:08:25.183
+CREATE TABLE csq_1(id int, col1 int, feat1 float);
+### 2025-09-29 11:09:55.959
+SELECT csq_3.id FROM csq_3;
+### 2025-09-29 11:22:52.913
+SELECT csq_2.col2 FROM csq_2 WHERE csq_2.id NOT IN (SELECT csq_3.id FROM csq_3);
+### 2025-09-29 11:23:51.206
+SELECT * FROM csq_1 WHERE col1 NOT IN (SELECT csq_2.col2 FROM csq_2 WHERE csq_2.id NOT IN (SELECT csq_3.id FROM csq_3));
