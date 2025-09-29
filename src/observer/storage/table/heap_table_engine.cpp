@@ -141,6 +141,8 @@ RC HeapTableEngine::get_record_scanner(RecordScanner *&scanner, Trx *trx, ReadWr
   RC rc = scanner->open_scan();
   if (rc != RC::SUCCESS) {
     LOG_ERROR("failed to open scanner. rc=%s", strrc(rc));
+    delete scanner;
+    scanner = nullptr;
   }
   return rc;
 }

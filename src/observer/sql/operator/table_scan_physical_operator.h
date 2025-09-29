@@ -31,7 +31,12 @@ class TableScanPhysicalOperator : public PhysicalOperator
 public:
   TableScanPhysicalOperator(Table *table, ReadWriteMode mode) : table_(table), mode_(mode) {}
 
-  virtual ~TableScanPhysicalOperator() = default;
+  virtual ~TableScanPhysicalOperator() {
+    if (record_scanner_) {
+      delete record_scanner_;
+      record_scanner_ = nullptr;
+    }
+  }
 
   string param() const override;
 

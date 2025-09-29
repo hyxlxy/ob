@@ -22,6 +22,32 @@ INSERT INTO csq_3 VALUES (11, 9, 19.0);
 
 SELECT * FROM csq_1 WHERE (SELECT MAX(csq_2.feat2) FROM csq_2) > feat1 OR (SELECT MIN(csq_3.col3) FROM csq_3) < col1;
 
+CREATE TABLE ssq_1(id int, col1 int);
+INSERT INTO ssq_1 VALUES (1, 10);
+INSERT INTO ssq_1 VALUES (2, 20);
+
+CREATE TABLE ssq_2(id int, col2 int);
+INSERT INTO ssq_2 VALUES (1, 5);
+INSERT INTO ssq_2 VALUES (2, 15);
+
+SELECT * FROM ssq_1 WHERE col1 = (SELECT ssq_2.col2 FROM ssq_2);
+
+CREATE TABLE test_correlated(id int, val int);
+INSERT INTO test_correlated VALUES (1, 10);
+INSERT INTO test_correlated VALUES (2, 20);
+
+CREATE TABLE test_ref(id int, val int);
+INSERT INTO test_ref VALUES (1, 5);
+INSERT INTO test_ref VALUES (2, 15);
+
+SELECT * FROM test_correlated WHERE val <> (SELECT MIN(test_ref.val) FROM test_ref WHERE test_ref.val > test_correlated.val);
+
+SELECT * FROM ssq_1 WHERE id IN (1, 2);
+
 DROP TABLE csq_1;
 DROP TABLE csq_2;
 DROP TABLE csq_3;
+DROP TABLE ssq_1;
+DROP TABLE ssq_2;
+DROP TABLE test_correlated;
+DROP TABLE test_ref;
