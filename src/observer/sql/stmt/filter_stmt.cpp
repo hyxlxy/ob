@@ -26,6 +26,11 @@ FilterStmt::~FilterStmt()
     delete unit;
   }
   filter_units_.clear();
+  
+  if (condition_tree_) {
+    delete condition_tree_;
+    condition_tree_ = nullptr;
+  }
 }
 
 RC FilterStmt::create(Db *db, Table *default_table, unordered_map<string, Table *> *tables,
@@ -35,20 +40,137 @@ RC FilterStmt::create(Db *db, Table *default_table, unordered_map<string, Table 
   stmt  = nullptr;
 
   FilterStmt *tmp_stmt = new FilterStmt();
+  
+  // 创建条件树
+  printf("DEBUG: [FILTER_STMT] About to create condition tree\n");
+  rc = create_condition_tree(db, default_table, tables, conditions, condition_num, tmp_stmt->condition_tree_);
+  if (rc != RC::SUCCESS) {
+    printf("DEBUG: [FILTER_STMT] create_condition_tree failed with rc=%s\n", strrc(rc));
+    delete tmp_stmt;
+    LOG_WARN("failed to create condition tree. condition_num=%d", condition_num);
+    return rc;
+  }
+  printf("DEBUG: [FILTER_STMT] create_condition_tree succeeded\n");
+
+  // 保持向后兼容：创建传统的filter_units_
+  // 注意：即使create_filter_unit失败，我们也不删除条件树，因为条件树已经创建成功
   for (int i = 0; i < condition_num; i++) {
     FilterUnit *filter_unit = nullptr;
-
-    rc = create_filter_unit(db, default_table, tables, conditions[i], filter_unit);
-    if (rc != RC::SUCCESS) {
-      delete tmp_stmt;
-      LOG_WARN("failed to create filter unit. condition index=%d", i);
-      return rc;
+    RC filter_unit_rc = create_filter_unit(db, default_table, tables, conditions[i], filter_unit);
+    if (filter_unit_rc != RC::SUCCESS) {
+      LOG_WARN("failed to create filter unit. condition index=%d, rc=%s", i, strrc(filter_unit_rc));
+      // 不删除tmp_stmt，因为条件树已经创建成功
+      // 继续处理其他条件
+      continue;
     }
     tmp_stmt->filter_units_.push_back(filter_unit);
   }
 
   stmt = tmp_stmt;
   return rc;
+}
+
+RC FilterStmt::create_condition_tree(Db *db, Table *default_table, unordered_map<string, Table *> *tables,
+    const ConditionSqlNode *conditions, int condition_num, FilterConditionNode *&tree)
+{
+  if (condition_num == 0) {
+    tree = nullptr;
+    return RC::SUCCESS;
+  }
+
+  printf("DEBUG: [FILTER_STMT] Creating condition tree with %d conditions\n", condition_num);
+  for (int i = 0; i < condition_num; i++) {
+    printf("DEBUG: [FILTER_STMT] Condition %d: conjunction_op = %d\n", i, conditions[i].conjunction_op);
+  }
+
+  if (condition_num == 1) {
+    // 单个条件
+    tree = new FilterConditionNode(FilterConditionNode::CONDITION);
+    RC rc = create_filter_unit(db, default_table, tables, conditions[0], tree->filter_unit);
+    if (rc != RC::SUCCESS) {
+      delete tree;
+      tree = nullptr;
+      return rc;
+    }
+    return RC::SUCCESS;
+  }
+
+  // 多个条件：需要根据conjunction_op来分组
+  // 首先检查是否有OR条件
+  bool has_or = false;
+  for (int i = 0; i < condition_num; i++) {
+    if (conditions[i].conjunction_op == OR_OP) {
+      has_or = true;
+      break;
+    }
+  }
+
+  if (has_or) {
+    // 有OR条件：创建OR组
+    tree = new FilterConditionNode(FilterConditionNode::OR_GROUP);
+    
+    // 将条件按OR分组
+    vector<vector<ConditionSqlNode*>> or_groups;
+    vector<ConditionSqlNode*> current_group;
+    
+    for (int i = 0; i < condition_num; i++) {
+      current_group.push_back(const_cast<ConditionSqlNode*>(&conditions[i]));
+      
+      // 如果下一个条件是OR，或者这是最后一个条件
+      if (i == condition_num - 1 || conditions[i + 1].conjunction_op == OR_OP) {
+        or_groups.push_back(current_group);
+        current_group.clear();
+      }
+    }
+    
+    // 为每个OR组创建子节点
+    for (const auto &group : or_groups) {
+      if (group.size() == 1) {
+        // 单个条件，直接创建CONDITION节点
+        FilterConditionNode *child_tree = new FilterConditionNode(FilterConditionNode::CONDITION);
+        RC rc = create_filter_unit(db, default_table, tables, *group[0], child_tree->filter_unit);
+        if (rc != RC::SUCCESS) {
+          delete child_tree;
+          delete tree;
+          tree = nullptr;
+          return rc;
+        }
+        tree->children.push_back(child_tree);
+      } else {
+        // 多个条件，递归创建AND组（因为一个OR组内部是AND关系）
+        FilterConditionNode *child_tree = new FilterConditionNode(FilterConditionNode::AND_GROUP);
+        for (ConditionSqlNode* condition : group) {
+          FilterConditionNode *and_child = new FilterConditionNode(FilterConditionNode::CONDITION);
+          RC rc = create_filter_unit(db, default_table, tables, *condition, and_child->filter_unit);
+          if (rc != RC::SUCCESS) {
+            delete and_child;
+            delete child_tree;
+            delete tree;
+            tree = nullptr;
+            return rc;
+          }
+          child_tree->children.push_back(and_child);
+        }
+        tree->children.push_back(child_tree);
+      }
+    }
+  } else {
+    // 没有OR条件：创建AND组
+    tree = new FilterConditionNode(FilterConditionNode::AND_GROUP);
+    
+    for (int i = 0; i < condition_num; i++) {
+      FilterConditionNode *child_tree = nullptr;
+      RC rc = create_condition_tree(db, default_table, tables, &conditions[i], 1, child_tree);
+      if (rc != RC::SUCCESS) {
+        delete tree;
+        tree = nullptr;
+        return rc;
+      }
+      tree->children.push_back(child_tree);
+    }
+  }
+
+  return RC::SUCCESS;
 }
 
 RC get_table_and_field(Db *db, Table *default_table, unordered_map<string, Table *> *tables,
@@ -164,9 +286,11 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<st
       delete filter_unit;
       return RC::INVALID_ARGUMENT;
     }
+    printf("DEBUG: [FILTER_STMT] About to create SelectStmt for subquery\n");
     rc = SelectStmt::create(db, condition.sub_query->selection, sub_query_stmt);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to create sub-query statement. rc=%s", strrc(rc));
+      printf("DEBUG: [FILTER_STMT] SelectStmt::create failed for subquery, rc=%s\n", strrc(rc));
       delete filter_unit;
       // 如果是字段不存在错误，可能是关联子查询，返回更友好的错误
       if (rc == RC::SCHEMA_TABLE_NOT_EXIST || rc == RC::SCHEMA_FIELD_MISSING || rc == RC::SCHEMA_FIELD_NOT_EXIST) {

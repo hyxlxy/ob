@@ -735,21 +735,35 @@ RC ConjunctionExpr::get_value(const Tuple &tuple, Value &value) const
     return rc;
   }
 
+  printf("DEBUG: [CONJUNCTION] Starting %s evaluation with %zu children\n", 
+         conjunction_type_ == Type::AND ? "AND" : "OR", children_.size());
+  fflush(stdout);
+
   Value tmp_value;
-  for (const unique_ptr<Expression> &expr : children_) {
+  for (size_t i = 0; i < children_.size(); ++i) {
+    const unique_ptr<Expression> &expr = children_[i];
+    printf("DEBUG: [CONJUNCTION] Evaluating child %zu (type: %d)\n", i, static_cast<int>(expr->type()));
+    
     rc = expr->get_value(tuple, tmp_value);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to get value by child expression. rc=%s", strrc(rc));
       return rc;
     }
     bool bool_value = tmp_value.get_boolean();
+    printf("DEBUG: [CONJUNCTION] Child %zu result: %s\n", i, bool_value ? "true" : "false");
+    fflush(stdout);
+    
     if ((conjunction_type_ == Type::AND && !bool_value) || (conjunction_type_ == Type::OR && bool_value)) {
+      printf("DEBUG: [CONJUNCTION] Short-circuit: returning %s\n", bool_value ? "true" : "false");
+      fflush(stdout);
       value.set_boolean(bool_value);
       return rc;
     }
   }
 
   bool default_value = (conjunction_type_ == Type::AND);
+  printf("DEBUG: [CONJUNCTION] No short-circuit: returning default %s\n", default_value ? "true" : "false");
+  fflush(stdout);
   value.set_boolean(default_value);
   return rc;
 }
@@ -2009,12 +2023,13 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
 
   // 对于非关联子查询，检查是否已经缓存了结果
   if (cached_value_.attr_type() != AttrType::UNDEFINED) {
-    printf("DEBUG: [SUBQUERY] Using cached value: %s\n", cached_value_.to_string().c_str());
+    printf("DEBUG: [SUBQUERY] Using cached value: %s (subquery instance: %p)\n", cached_value_.to_string().c_str(), this);
     value = cached_value_;
     return RC::SUCCESS;
   }
 
-  printf("DEBUG: [SUBQUERY] Executing scalar subquery for the first time\n");
+  printf("DEBUG: [SUBQUERY] Executing scalar subquery for the first time (instance: %p)\n", this);
+  fflush(stdout);
 
   // 获取当前会话和事务
   Session *session = Session::current_session();
@@ -2061,6 +2076,21 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
     return rc;
   }
 
+  // 检查是否有多行数据（标量子查询只能返回0行或1行）
+  RC next_rc = physical_oper_->next();
+  if (next_rc == RC::SUCCESS) {
+    // 有多行数据，标量子查询错误
+    printf("DEBUG: [SUBQUERY] Scalar subquery returned multiple rows - this is an error\n");
+    physical_oper_->close();
+    LOG_WARN("Scalar subquery returned multiple rows");
+    return RC::SQL_SYNTAX;
+  } else if (next_rc != RC::RECORD_EOF) {
+    // 其他错误
+    printf("DEBUG: [SUBQUERY] Error checking for multiple rows: %s\n", strrc(next_rc));
+    physical_oper_->close();
+    return next_rc;
+  }
+
   // 获取当前tuple的值
   Tuple *current_tuple = physical_oper_->current_tuple();
   if (!current_tuple) {
@@ -2093,7 +2123,7 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
 
   // 缓存结果，避免重复执行非关联子查询
   cached_value_ = value;
-  printf("DEBUG: [SUBQUERY] Cached scalar subquery result: %s\n", value.to_string().c_str());
+  printf("DEBUG: [SUBQUERY] Cached scalar subquery result: %s (instance: %p)\n", value.to_string().c_str(), this);
 
   return RC::SUCCESS;
 }

@@ -4317,3 +4317,329 @@ Finish dump configuration
 [2025-09-29 11:23:56.705640 pid:911184 tid:7d271737e6c0 ctx:0 ERROR: operator()@one_thread_per_connection_thread_handler.cpp:98] >> handle error. rc = IOERR_CLOSE
 [2025-09-29 11:23:56.705698 pid:911184 tid:7d271737e6c0 ctx:0 INFO: operator()@one_thread_per_connection_thread_handler.cpp:103] >> worker thread stop. communicator = 0x50b000001d20
 [2025-09-29 11:23:56.705908 pid:911184 tid:7d271737e6c0 ctx:0 INFO: close_connection@one_thread_per_connection_thread_handler.cpp:154] >> close connection. communicator = 0x50b000001d20
+[2025-09-29 14:27:59.525819 pid:911184 tid:7d271737e6c0 ctx:0 INFO: quit_thread_func@main.cpp:156] >> Receive signal: 15
+[2025-09-29 14:27:59.525802 pid:911184 tid:7d271e1637c0 ctx:0 WARN: serve@server.cpp:271] >> [listen socket] poll error. fd = 21, ret = -1, error=Interrupted system call
+[2025-09-29 14:27:59.528847 pid:911184 tid:7d271737e6c0 ctx:0 INFO: shutdown@server.cpp:299] >> NetServer shutting down
+[2025-09-29 14:27:59.529191 pid:911184 tid:7d271e1637c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:170] >> begin to await stop one thread per connection thread handler
+[2025-09-29 14:27:59.529698 pid:911184 tid:7d271e1637c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:174] >> end to await stop one thread per connection thread handler
+[2025-09-29 14:27:59.529800 pid:911184 tid:7d271e1637c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:170] >> begin to await stop one thread per connection thread handler
+[2025-09-29 14:27:59.529881 pid:911184 tid:7d271e1637c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:174] >> end to await stop one thread per connection thread handler
+[2025-09-29 14:27:59.530013 pid:911184 tid:7d271e1637c0 ctx:0 INFO: serve@server.cpp:293] >> NetServer quit
+[2025-09-29 14:27:59.530118 pid:911184 tid:7d271e1637c0 ctx:0 INFO: main@main.cpp:203] >> Server stopped
+[2025-09-29 14:27:59.537745 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=exp_table2
+[2025-09-29 14:27:59.538285 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:exp_table2.
+[2025-09-29 14:27:59.539104 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=test
+[2025-09-29 14:27:59.539168 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:test.
+[2025-09-29 14:27:59.539555 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=text_table
+[2025-09-29 14:27:59.539617 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:text_table.
+[2025-09-29 14:27:59.540359 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=ssq_1
+[2025-09-29 14:27:59.540421 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:ssq_1.
+[2025-09-29 14:27:59.541077 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=csq_1
+[2025-09-29 14:27:59.541141 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:csq_1.
+[2025-09-29 14:27:59.541556 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=big_order_t2
+[2025-09-29 14:27:59.541592 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:big_order_t2.
+[2025-09-29 14:27:59.541973 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=exp_table
+[2025-09-29 14:27:59.542007 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:exp_table.
+[2025-09-29 14:27:59.542330 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=csq_2
+[2025-09-29 14:27:59.542382 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:csq_2.
+[2025-09-29 14:27:59.542657 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=t2
+[2025-09-29 14:27:59.542709 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:t2.
+[2025-09-29 14:27:59.549853 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=big_order_t3
+[2025-09-29 14:27:59.549932 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:big_order_t3.
+[2025-09-29 14:27:59.550157 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=ssq_2
+[2025-09-29 14:27:59.550196 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:ssq_2.
+[2025-09-29 14:27:59.550423 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=big_order_t1
+[2025-09-29 14:27:59.550459 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:big_order_t1.
+[2025-09-29 14:27:59.550664 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=csq_3
+[2025-09-29 14:27:59.550700 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:csq_3.
+[2025-09-29 14:27:59.552242 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@db.cpp:412] >> double write buffer flush pages ret=SUCCESS
+[2025-09-29 14:27:59.553416 pid:911184 tid:7d271e1637c0 ctx:0 INFO: flush_meta@db.cpp:545] >> Successfully write db meta file. db=sys, file=miniob/db/sys/sys.db.tmp, check_point_lsn=0
+[2025-09-29 14:27:59.553689 pid:911184 tid:7d271e1637c0 ctx:0 INFO: sync@db.cpp:431] >> Successfully sync db. db=sys
+[2025-09-29 14:27:59.555048 pid:911184 tid:7d271e1637c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/exp_table2.data, page count=0
+[2025-09-29 14:27:59.555195 pid:911184 tid:7d271e1637c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 18:miniob/db/sys/exp_table2.data.
+[2025-09-29 14:27:59.555340 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:27:59.555422 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: exp_table2
+[2025-09-29 14:27:59.555890 pid:911184 tid:7d271e1637c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/test.data, page count=0
+[2025-09-29 14:27:59.555964 pid:911184 tid:7d271e1637c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 17:miniob/db/sys/test.data.
+[2025-09-29 14:27:59.556019 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:27:59.556099 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: test
+[2025-09-29 14:27:59.556186 pid:911184 tid:7d271e1637c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/text_table.data, page count=0
+[2025-09-29 14:27:59.556241 pid:911184 tid:7d271e1637c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 15:miniob/db/sys/text_table.data.
+[2025-09-29 14:27:59.556293 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:27:59.556335 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: text_table
+[2025-09-29 14:27:59.556437 pid:911184 tid:7d271e1637c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/ssq_1.data, page count=0
+[2025-09-29 14:27:59.556515 pid:911184 tid:7d271e1637c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 14:miniob/db/sys/ssq_1.data.
+[2025-09-29 14:27:59.556566 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:27:59.556615 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: ssq_1
+[2025-09-29 14:27:59.556750 pid:911184 tid:7d271e1637c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/csq_1.data, page count=0
+[2025-09-29 14:27:59.556819 pid:911184 tid:7d271e1637c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 16:miniob/db/sys/csq_1.data.
+[2025-09-29 14:27:59.556890 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:27:59.556945 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: csq_1
+[2025-09-29 14:27:59.557071 pid:911184 tid:7d271e1637c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/big_order_t2.data, page count=0
+[2025-09-29 14:27:59.557145 pid:911184 tid:7d271e1637c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 12:miniob/db/sys/big_order_t2.data.
+[2025-09-29 14:27:59.557220 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:27:59.557280 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: big_order_t2
+[2025-09-29 14:27:59.557400 pid:911184 tid:7d271e1637c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/exp_table.data, page count=0
+[2025-09-29 14:27:59.557500 pid:911184 tid:7d271e1637c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 13:miniob/db/sys/exp_table.data.
+[2025-09-29 14:27:59.557562 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:27:59.557613 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: exp_table
+[2025-09-29 14:27:59.557724 pid:911184 tid:7d271e1637c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/csq_2.data, page count=0
+[2025-09-29 14:27:59.557780 pid:911184 tid:7d271e1637c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 11:miniob/db/sys/csq_2.data.
+[2025-09-29 14:27:59.557837 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:27:59.557882 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: csq_2
+[2025-09-29 14:27:59.557960 pid:911184 tid:7d271e1637c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/t2.data, page count=0
+[2025-09-29 14:27:59.558016 pid:911184 tid:7d271e1637c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 20:miniob/db/sys/t2.data.
+[2025-09-29 14:27:59.558068 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:27:59.558131 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: t2
+[2025-09-29 14:27:59.558250 pid:911184 tid:7d271e1637c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/big_order_t3.data, page count=0
+[2025-09-29 14:27:59.558327 pid:911184 tid:7d271e1637c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 10:miniob/db/sys/big_order_t3.data.
+[2025-09-29 14:27:59.558392 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:27:59.558445 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: big_order_t3
+[2025-09-29 14:27:59.558603 pid:911184 tid:7d271e1637c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/ssq_2.data, page count=0
+[2025-09-29 14:27:59.558673 pid:911184 tid:7d271e1637c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 9:miniob/db/sys/ssq_2.data.
+[2025-09-29 14:27:59.558738 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:27:59.558797 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: ssq_2
+[2025-09-29 14:27:59.558919 pid:911184 tid:7d271e1637c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/big_order_t1.data, page count=0
+[2025-09-29 14:27:59.558988 pid:911184 tid:7d271e1637c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 19:miniob/db/sys/big_order_t1.data.
+[2025-09-29 14:27:59.559122 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:27:59.559293 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: big_order_t1
+[2025-09-29 14:27:59.559519 pid:911184 tid:7d271e1637c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/csq_3.data, page count=0
+[2025-09-29 14:27:59.559622 pid:911184 tid:7d271e1637c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 8:miniob/db/sys/csq_3.data.
+[2025-09-29 14:27:59.559739 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:27:59.559797 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: csq_3
+[2025-09-29 14:27:59.565865 pid:911184 tid:7d27197ff6c0 ctx:0 INFO: thread_func@thread_pool_executor.cpp:176] >> [ObLsmBackground] thread exit
+[2025-09-29 14:27:59.761867 pid:911184 tid:7d271e1637c0 ctx:0 INFO: ~Db@db.cpp:50] >> Db has been closed: sys
+[2025-09-29 14:27:59.765751 pid:911184 tid:7d271e1637c0 ctx:0 INFO: cleanup@mem_pool.h:223] >> Successfully do cleanup, this->name:BufPool.
+[2025-09-29 14:27:59.766375 pid:911184 tid:7d271e1637c0 ctx:0 INFO: cleanup_util@init.cpp:230] >> Shutdown Cleanly!
+[2025-09-29 14:28:01.565443 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@init.cpp:201] >> Output configuration 
+Begin dump configuration
+[]
+
+Finish dump configuration 
+
+[2025-09-29 14:28:01.569084 pid:926605 tid:70eda57707c0 ctx:0 WARN: create_db@default_handler.cpp:91] >> Db already exists: sys
+[2025-09-29 14:28:01.570532 pid:926605 tid:70eda0dff6c0 ctx:0 INFO: thread_func@thread_pool_executor.cpp:118] >> [ObLsmBackground] thread started
+[2025-09-29 14:28:01.572187 pid:926605 tid:70eda57707c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:128, item_num_per_pool:128, this->name:BufPool.
+[2025-09-29 14:28:01.573666 pid:926605 tid:70eda57707c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:256, item_num_per_pool:128, this->name:BufPool.
+[2025-09-29 14:28:01.574956 pid:926605 tid:70eda57707c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:384, item_num_per_pool:128, this->name:BufPool.
+[2025-09-29 14:28:01.576173 pid:926605 tid:70eda57707c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:512, item_num_per_pool:128, this->name:BufPool.
+[2025-09-29 14:28:01.577272 pid:926605 tid:70eda57707c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:640, item_num_per_pool:128, this->name:BufPool.
+[2025-09-29 14:28:01.578795 pid:926605 tid:70eda57707c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:768, item_num_per_pool:128, this->name:BufPool.
+[2025-09-29 14:28:01.580161 pid:926605 tid:70eda57707c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:896, item_num_per_pool:128, this->name:BufPool.
+[2025-09-29 14:28:01.581492 pid:926605 tid:70eda57707c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1024, item_num_per_pool:128, this->name:BufPool.
+[2025-09-29 14:28:01.582619 pid:926605 tid:70eda57707c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1152, item_num_per_pool:128, this->name:BufPool.
+[2025-09-29 14:28:01.583965 pid:926605 tid:70eda57707c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1280, item_num_per_pool:128, this->name:BufPool.
+[2025-09-29 14:28:01.585149 pid:926605 tid:70eda57707c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1408, item_num_per_pool:128, this->name:BufPool.
+[2025-09-29 14:28:01.586476 pid:926605 tid:70eda57707c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1536, item_num_per_pool:128, this->name:BufPool.
+[2025-09-29 14:28:01.587637 pid:926605 tid:70eda57707c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1664, item_num_per_pool:128, this->name:BufPool.
+[2025-09-29 14:28:01.588765 pid:926605 tid:70eda57707c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1792, item_num_per_pool:128, this->name:BufPool.
+[2025-09-29 14:28:01.589996 pid:926605 tid:70eda57707c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1920, item_num_per_pool:128, this->name:BufPool.
+[2025-09-29 14:28:01.591247 pid:926605 tid:70eda57707c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2048, item_num_per_pool:128, this->name:BufPool.
+[2025-09-29 14:28:01.592639 pid:926605 tid:70eda57707c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2176, item_num_per_pool:128, this->name:BufPool.
+[2025-09-29 14:28:01.594066 pid:926605 tid:70eda57707c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2304, item_num_per_pool:128, this->name:BufPool.
+[2025-09-29 14:28:01.595286 pid:926605 tid:70eda57707c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2432, item_num_per_pool:128, this->name:BufPool.
+[2025-09-29 14:28:01.596339 pid:926605 tid:70eda57707c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2560, item_num_per_pool:128, this->name:BufPool.
+[2025-09-29 14:28:01.596544 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@mem_pool.h:197] >> Extend one pool, this->size:2560, item_num_per_pool:128, this->name:BufPool.
+[2025-09-29 14:28:01.596716 pid:926605 tid:70eda57707c0 ctx:0 INFO: BufferPoolManager@disk_buffer_pool.cpp:775] >> buffer pool manager init with memory size 20971520, page num: 2560, pool num: 20
+[2025-09-29 14:28:01.597434 pid:926605 tid:70eda57707c0 ctx:0 INFO: load_pages@double_write_buffer.cpp:287] >> double write buffer load pages done. page num=7
+[2025-09-29 14:28:01.597877 pid:926605 tid:70eda57707c0 ctx:0 INFO: init_meta@db.cpp:500] >> Successfully read db meta file. db=sys, file=miniob/db/sys/sys.db, check_point_lsn=0
+[2025-09-29 14:28:01.600866 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=id
+[2025-09-29 14:28:01.601261 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=col3
+[2025-09-29 14:28:01.601462 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=feat3
+[2025-09-29 14:28:01.601896 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/csq_3.data.
+[2025-09-29 14:28:01.602228 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/csq_3.data. file_desc=8, hdr_frame=0x70eda436c808, file header=pageCount:2, allocatedCount:2
+[2025-09-29 14:28:01.602794 pid:926605 tid:70eda57707c0 ctx:0 INFO: init_free_pages@record_manager.cpp:640] >> record file handler init free pages done. free page num=1, rc=SUCCESS
+[2025-09-29 14:28:01.603021 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@record_manager.cpp:599] >> open record file handle done. rc=SUCCESS
+[2025-09-29 14:28:01.603233 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_all_tables@db.cpp:380] >> Open table: csq_3, file: csq_3.table
+[2025-09-29 14:28:01.603975 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=id
+[2025-09-29 14:28:01.604242 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=col2
+[2025-09-29 14:28:01.604389 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=name
+[2025-09-29 14:28:01.604773 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/ssq_2.data.
+[2025-09-29 14:28:01.605070 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/ssq_2.data. file_desc=9, hdr_frame=0x70eda4370928, file header=pageCount:2, allocatedCount:2
+[2025-09-29 14:28:01.605427 pid:926605 tid:70eda57707c0 ctx:0 INFO: init_free_pages@record_manager.cpp:640] >> record file handler init free pages done. free page num=1, rc=SUCCESS
+[2025-09-29 14:28:01.605662 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@record_manager.cpp:599] >> open record file handle done. rc=SUCCESS
+[2025-09-29 14:28:01.605853 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_all_tables@db.cpp:380] >> Open table: ssq_2, file: ssq_2.table
+[2025-09-29 14:28:01.606776 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=id
+[2025-09-29 14:28:01.607168 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=col5
+[2025-09-29 14:28:01.607381 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=col6
+[2025-09-29 14:28:01.607757 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/big_order_t3.data.
+[2025-09-29 14:28:01.608056 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/big_order_t3.data. file_desc=10, hdr_frame=0x70eda4374a48, file header=pageCount:2, allocatedCount:2
+[2025-09-29 14:28:01.608417 pid:926605 tid:70eda57707c0 ctx:0 INFO: init_free_pages@record_manager.cpp:640] >> record file handler init free pages done. free page num=1, rc=SUCCESS
+[2025-09-29 14:28:01.608615 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@record_manager.cpp:599] >> open record file handle done. rc=SUCCESS
+[2025-09-29 14:28:01.608795 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_all_tables@db.cpp:380] >> Open table: big_order_t3, file: big_order_t3.table
+[2025-09-29 14:28:01.609589 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=id
+[2025-09-29 14:28:01.609914 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=col2
+[2025-09-29 14:28:01.610105 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=feat2
+[2025-09-29 14:28:01.610437 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/csq_2.data.
+[2025-09-29 14:28:01.610598 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/csq_2.data. file_desc=11, hdr_frame=0x70eda4378b68, file header=pageCount:2, allocatedCount:2
+[2025-09-29 14:28:01.610802 pid:926605 tid:70eda57707c0 ctx:0 INFO: init_free_pages@record_manager.cpp:640] >> record file handler init free pages done. free page num=1, rc=SUCCESS
+[2025-09-29 14:28:01.610843 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@record_manager.cpp:599] >> open record file handle done. rc=SUCCESS
+[2025-09-29 14:28:01.610892 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_all_tables@db.cpp:380] >> Open table: csq_2, file: csq_2.table
+[2025-09-29 14:28:01.613706 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=id
+[2025-09-29 14:28:01.613862 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=col3
+[2025-09-29 14:28:01.613904 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=col4
+[2025-09-29 14:28:01.614099 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/big_order_t2.data.
+[2025-09-29 14:28:01.614242 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/big_order_t2.data. file_desc=12, hdr_frame=0x70eda437cc88, file header=pageCount:2, allocatedCount:2
+[2025-09-29 14:28:01.614456 pid:926605 tid:70eda57707c0 ctx:0 INFO: init_free_pages@record_manager.cpp:640] >> record file handler init free pages done. free page num=1, rc=SUCCESS
+[2025-09-29 14:28:01.614527 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@record_manager.cpp:599] >> open record file handle done. rc=SUCCESS
+[2025-09-29 14:28:01.614578 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_all_tables@db.cpp:380] >> Open table: big_order_t2, file: big_order_t2.table
+[2025-09-29 14:28:01.615547 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=id
+[2025-09-29 14:28:01.615852 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=col1
+[2025-09-29 14:28:01.616035 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=col2
+[2025-09-29 14:28:01.616202 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=col3
+[2025-09-29 14:28:01.616357 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=col4
+[2025-09-29 14:28:01.616704 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/exp_table.data.
+[2025-09-29 14:28:01.617052 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/exp_table.data. file_desc=13, hdr_frame=0x70eda4380da8, file header=pageCount:2, allocatedCount:2
+[2025-09-29 14:28:01.617414 pid:926605 tid:70eda57707c0 ctx:0 INFO: init_free_pages@record_manager.cpp:640] >> record file handler init free pages done. free page num=1, rc=SUCCESS
+[2025-09-29 14:28:01.617650 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@record_manager.cpp:599] >> open record file handle done. rc=SUCCESS
+[2025-09-29 14:28:01.617862 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_all_tables@db.cpp:380] >> Open table: exp_table, file: exp_table.table
+[2025-09-29 14:28:01.619614 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=id
+[2025-09-29 14:28:01.620023 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=name
+[2025-09-29 14:28:01.620370 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/ssq_1.data.
+[2025-09-29 14:28:01.620681 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/ssq_1.data. file_desc=14, hdr_frame=0x70eda4384ec8, file header=pageCount:2, allocatedCount:2
+[2025-09-29 14:28:01.621043 pid:926605 tid:70eda57707c0 ctx:0 INFO: init_free_pages@record_manager.cpp:640] >> record file handler init free pages done. free page num=1, rc=SUCCESS
+[2025-09-29 14:28:01.621224 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@record_manager.cpp:599] >> open record file handle done. rc=SUCCESS
+[2025-09-29 14:28:01.621409 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_all_tables@db.cpp:380] >> Open table: ssq_1, file: ssq_1.table
+[2025-09-29 14:28:01.622140 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=id
+[2025-09-29 14:28:01.622419 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=info
+[2025-09-29 14:28:01.622772 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/text_table.data.
+[2025-09-29 14:28:01.623061 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/text_table.data. file_desc=15, hdr_frame=0x70eda4388fe8, file header=pageCount:1, allocatedCount:1
+[2025-09-29 14:28:01.623363 pid:926605 tid:70eda57707c0 ctx:0 INFO: init_free_pages@record_manager.cpp:640] >> record file handler init free pages done. free page num=0, rc=SUCCESS
+[2025-09-29 14:28:01.623563 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@record_manager.cpp:599] >> open record file handle done. rc=SUCCESS
+[2025-09-29 14:28:01.623767 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_all_tables@db.cpp:380] >> Open table: text_table, file: text_table.table
+[2025-09-29 14:28:01.627397 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=id
+[2025-09-29 14:28:01.627559 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=col1
+[2025-09-29 14:28:01.627603 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=feat1
+[2025-09-29 14:28:01.627782 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/csq_1.data.
+[2025-09-29 14:28:01.627894 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/csq_1.data. file_desc=16, hdr_frame=0x70eda438b078, file header=pageCount:2, allocatedCount:2
+[2025-09-29 14:28:01.628043 pid:926605 tid:70eda57707c0 ctx:0 INFO: init_free_pages@record_manager.cpp:640] >> record file handler init free pages done. free page num=1, rc=SUCCESS
+[2025-09-29 14:28:01.628080 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@record_manager.cpp:599] >> open record file handle done. rc=SUCCESS
+[2025-09-29 14:28:01.628127 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_all_tables@db.cpp:380] >> Open table: csq_1, file: csq_1.table
+[2025-09-29 14:28:01.629728 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=id
+[2025-09-29 14:28:01.630062 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/test.data.
+[2025-09-29 14:28:01.630212 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/test.data. file_desc=17, hdr_frame=0x70eda438f198, file header=pageCount:1, allocatedCount:1
+[2025-09-29 14:28:01.630329 pid:926605 tid:70eda57707c0 ctx:0 INFO: init_free_pages@record_manager.cpp:640] >> record file handler init free pages done. free page num=0, rc=SUCCESS
+[2025-09-29 14:28:01.630376 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@record_manager.cpp:599] >> open record file handle done. rc=SUCCESS
+[2025-09-29 14:28:01.630450 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_all_tables@db.cpp:380] >> Open table: test, file: test.table
+[2025-09-29 14:28:01.631533 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=id
+[2025-09-29 14:28:01.631807 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=col1
+[2025-09-29 14:28:01.631994 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/exp_table2.data.
+[2025-09-29 14:28:01.632120 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/exp_table2.data. file_desc=18, hdr_frame=0x70eda4391228, file header=pageCount:2, allocatedCount:2
+[2025-09-29 14:28:01.632301 pid:926605 tid:70eda57707c0 ctx:0 INFO: init_free_pages@record_manager.cpp:640] >> record file handler init free pages done. free page num=1, rc=SUCCESS
+[2025-09-29 14:28:01.632347 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@record_manager.cpp:599] >> open record file handle done. rc=SUCCESS
+[2025-09-29 14:28:01.632422 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_all_tables@db.cpp:380] >> Open table: exp_table2, file: exp_table2.table
+[2025-09-29 14:28:01.633170 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=id
+[2025-09-29 14:28:01.633299 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=col1
+[2025-09-29 14:28:01.633348 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=col2
+[2025-09-29 14:28:01.633588 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/big_order_t1.data.
+[2025-09-29 14:28:01.633720 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/big_order_t1.data. file_desc=19, hdr_frame=0x70eda4395348, file header=pageCount:2, allocatedCount:2
+[2025-09-29 14:28:01.633907 pid:926605 tid:70eda57707c0 ctx:0 INFO: init_free_pages@record_manager.cpp:640] >> record file handler init free pages done. free page num=1, rc=SUCCESS
+[2025-09-29 14:28:01.633982 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@record_manager.cpp:599] >> open record file handle done. rc=SUCCESS
+[2025-09-29 14:28:01.634066 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_all_tables@db.cpp:380] >> Open table: big_order_t1, file: big_order_t1.table
+[2025-09-29 14:28:01.634758 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=id
+[2025-09-29 14:28:01.634884 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=val
+[2025-09-29 14:28:01.635080 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/t2.data.
+[2025-09-29 14:28:01.635223 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/t2.data. file_desc=20, hdr_frame=0x70eda4399468, file header=pageCount:1, allocatedCount:1
+[2025-09-29 14:28:01.635335 pid:926605 tid:70eda57707c0 ctx:0 INFO: init_free_pages@record_manager.cpp:640] >> record file handler init free pages done. free page num=0, rc=SUCCESS
+[2025-09-29 14:28:01.635608 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@record_manager.cpp:599] >> open record file handle done. rc=SUCCESS
+[2025-09-29 14:28:01.635681 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_all_tables@db.cpp:380] >> Open table: t2, file: t2.table
+[2025-09-29 14:28:01.635716 pid:926605 tid:70eda57707c0 ctx:0 INFO: open_all_tables@db.cpp:383] >> All table have been opened. num=13
+[2025-09-29 14:28:01.638956 pid:926605 tid:70eda57707c0 ctx:0 INFO: recover@db.cpp:464] >> Successfully recover db. db=sys checkpoint_lsn=0
+[2025-09-29 14:28:01.639283 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@default_handler.cpp:67] >> Default handler init with miniob success
+[2025-09-29 14:28:01.639345 pid:926605 tid:70eda57707c0 ctx:0 INFO: init@init.cpp:216] >> Successfully init utility
+[2025-09-29 14:28:01.639572 pid:926605 tid:70eda57707c0 ctx:0 INFO: start_tcp_server@server.cpp:192] >> Listen on port 6789
+[2025-09-29 14:28:01.639624 pid:926605 tid:70eda57707c0 ctx:0 INFO: start_tcp_server@server.cpp:195] >> Observer start success
+[2025-09-29 14:28:47.658173 pid:926605 tid:70eda57707c0 ctx:0 WARN: serve@server.cpp:271] >> [listen socket] poll error. fd = 21, ret = -1, error=Interrupted system call
+[2025-09-29 14:28:47.658448 pid:926605 tid:70eda57707c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:170] >> begin to await stop one thread per connection thread handler
+[2025-09-29 14:28:47.658600 pid:926605 tid:70eda57707c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:174] >> end to await stop one thread per connection thread handler
+[2025-09-29 14:28:47.658590 pid:926605 tid:70ed9e97e6c0 ctx:0 INFO: quit_thread_func@main.cpp:156] >> Receive signal: 1
+[2025-09-29 14:28:47.658697 pid:926605 tid:70eda57707c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:170] >> begin to await stop one thread per connection thread handler
+[2025-09-29 14:28:47.658748 pid:926605 tid:70ed9e97e6c0 ctx:0 INFO: shutdown@server.cpp:299] >> NetServer shutting down
+[2025-09-29 14:28:47.658813 pid:926605 tid:70eda57707c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:174] >> end to await stop one thread per connection thread handler
+[2025-09-29 14:28:47.658969 pid:926605 tid:70eda57707c0 ctx:0 INFO: serve@server.cpp:293] >> NetServer quit
+[2025-09-29 14:28:47.659121 pid:926605 tid:70eda57707c0 ctx:0 INFO: main@main.cpp:203] >> Server stopped
+[2025-09-29 14:28:47.660010 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=exp_table2
+[2025-09-29 14:28:47.660130 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:exp_table2.
+[2025-09-29 14:28:47.660497 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=test
+[2025-09-29 14:28:47.660576 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:test.
+[2025-09-29 14:28:47.660934 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=text_table
+[2025-09-29 14:28:47.661007 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:text_table.
+[2025-09-29 14:28:47.661583 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=ssq_1
+[2025-09-29 14:28:47.661686 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:ssq_1.
+[2025-09-29 14:28:47.662198 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=csq_1
+[2025-09-29 14:28:47.662275 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:csq_1.
+[2025-09-29 14:28:47.662761 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=big_order_t2
+[2025-09-29 14:28:47.662874 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:big_order_t2.
+[2025-09-29 14:28:47.663389 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=exp_table
+[2025-09-29 14:28:47.663503 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:exp_table.
+[2025-09-29 14:28:47.664074 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=csq_2
+[2025-09-29 14:28:47.664156 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:csq_2.
+[2025-09-29 14:28:47.664448 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=t2
+[2025-09-29 14:28:47.664558 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:t2.
+[2025-09-29 14:28:47.671207 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=big_order_t3
+[2025-09-29 14:28:47.671311 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:big_order_t3.
+[2025-09-29 14:28:47.671717 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=ssq_2
+[2025-09-29 14:28:47.671794 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:ssq_2.
+[2025-09-29 14:28:47.672165 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=big_order_t1
+[2025-09-29 14:28:47.672235 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:big_order_t1.
+[2025-09-29 14:28:47.672598 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@heap_table_engine.cpp:414] >> Sync table over. table=csq_3
+[2025-09-29 14:28:47.672664 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:csq_3.
+[2025-09-29 14:28:47.674258 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@db.cpp:412] >> double write buffer flush pages ret=SUCCESS
+[2025-09-29 14:28:47.674786 pid:926605 tid:70eda57707c0 ctx:0 INFO: flush_meta@db.cpp:545] >> Successfully write db meta file. db=sys, file=miniob/db/sys/sys.db.tmp, check_point_lsn=0
+[2025-09-29 14:28:47.674923 pid:926605 tid:70eda57707c0 ctx:0 INFO: sync@db.cpp:431] >> Successfully sync db. db=sys
+[2025-09-29 14:28:47.675170 pid:926605 tid:70eda57707c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/exp_table2.data, page count=0
+[2025-09-29 14:28:47.675268 pid:926605 tid:70eda57707c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 18:miniob/db/sys/exp_table2.data.
+[2025-09-29 14:28:47.675412 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:28:47.675495 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: exp_table2
+[2025-09-29 14:28:47.675641 pid:926605 tid:70eda57707c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/test.data, page count=0
+[2025-09-29 14:28:47.675717 pid:926605 tid:70eda57707c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 17:miniob/db/sys/test.data.
+[2025-09-29 14:28:47.675805 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:28:47.675873 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: test
+[2025-09-29 14:28:47.676011 pid:926605 tid:70eda57707c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/text_table.data, page count=0
+[2025-09-29 14:28:47.676088 pid:926605 tid:70eda57707c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 15:miniob/db/sys/text_table.data.
+[2025-09-29 14:28:47.676197 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:28:47.676264 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: text_table
+[2025-09-29 14:28:47.676411 pid:926605 tid:70eda57707c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/ssq_1.data, page count=0
+[2025-09-29 14:28:47.676501 pid:926605 tid:70eda57707c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 14:miniob/db/sys/ssq_1.data.
+[2025-09-29 14:28:47.676592 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:28:47.676659 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: ssq_1
+[2025-09-29 14:28:47.676809 pid:926605 tid:70eda57707c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/csq_1.data, page count=0
+[2025-09-29 14:28:47.676882 pid:926605 tid:70eda57707c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 16:miniob/db/sys/csq_1.data.
+[2025-09-29 14:28:47.676963 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:28:47.677030 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: csq_1
+[2025-09-29 14:28:47.677176 pid:926605 tid:70eda57707c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/big_order_t2.data, page count=0
+[2025-09-29 14:28:47.677256 pid:926605 tid:70eda57707c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 12:miniob/db/sys/big_order_t2.data.
+[2025-09-29 14:28:47.677324 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:28:47.677389 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: big_order_t2
+[2025-09-29 14:28:47.677529 pid:926605 tid:70eda57707c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/exp_table.data, page count=0
+[2025-09-29 14:28:47.677601 pid:926605 tid:70eda57707c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 13:miniob/db/sys/exp_table.data.
+[2025-09-29 14:28:47.677671 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:28:47.677728 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: exp_table
+[2025-09-29 14:28:47.677856 pid:926605 tid:70eda57707c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/csq_2.data, page count=0
+[2025-09-29 14:28:47.677929 pid:926605 tid:70eda57707c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 11:miniob/db/sys/csq_2.data.
+[2025-09-29 14:28:47.677998 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:28:47.678054 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: csq_2
+[2025-09-29 14:28:47.678174 pid:926605 tid:70eda57707c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/t2.data, page count=0
+[2025-09-29 14:28:47.678243 pid:926605 tid:70eda57707c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 20:miniob/db/sys/t2.data.
+[2025-09-29 14:28:47.678316 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:28:47.678369 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: t2
+[2025-09-29 14:28:47.678518 pid:926605 tid:70eda57707c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/big_order_t3.data, page count=0
+[2025-09-29 14:28:47.678594 pid:926605 tid:70eda57707c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 10:miniob/db/sys/big_order_t3.data.
+[2025-09-29 14:28:47.678659 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:28:47.678711 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: big_order_t3
+[2025-09-29 14:28:47.678832 pid:926605 tid:70eda57707c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/ssq_2.data, page count=0
+[2025-09-29 14:28:47.678900 pid:926605 tid:70eda57707c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 9:miniob/db/sys/ssq_2.data.
+[2025-09-29 14:28:47.678962 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:28:47.679024 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: ssq_2
+[2025-09-29 14:28:47.679148 pid:926605 tid:70eda57707c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/big_order_t1.data, page count=0
+[2025-09-29 14:28:47.679216 pid:926605 tid:70eda57707c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 19:miniob/db/sys/big_order_t1.data.
+[2025-09-29 14:28:47.679306 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:28:47.679360 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: big_order_t1
+[2025-09-29 14:28:47.679513 pid:926605 tid:70eda57707c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/csq_3.data, page count=0
+[2025-09-29 14:28:47.679587 pid:926605 tid:70eda57707c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 8:miniob/db/sys/csq_3.data.
+[2025-09-29 14:28:47.679651 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-09-29 14:28:47.679707 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: csq_3
+[2025-09-29 14:28:47.683183 pid:926605 tid:70eda0dff6c0 ctx:0 INFO: thread_func@thread_pool_executor.cpp:176] >> [ObLsmBackground] thread exit
+[2025-09-29 14:28:47.880132 pid:926605 tid:70eda57707c0 ctx:0 INFO: ~Db@db.cpp:50] >> Db has been closed: sys
+[2025-09-29 14:28:47.892599 pid:926605 tid:70eda57707c0 ctx:0 INFO: cleanup@mem_pool.h:223] >> Successfully do cleanup, this->name:BufPool.
+[2025-09-29 14:28:47.892779 pid:926605 tid:70eda57707c0 ctx:0 INFO: cleanup_util@init.cpp:230] >> Shutdown Cleanly!

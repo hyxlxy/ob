@@ -249,8 +249,24 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
   RC                                  rc = RC::SUCCESS;
   vector<unique_ptr<Expression>> cmp_exprs;
   bool always_false = false;  // 常量折叠：若任一比较恒为假（AND 语义），整体恒假
-  const vector<FilterUnit *>    &filter_units = filter_stmt->filter_units();
-  for (const FilterUnit *filter_unit : filter_units) {
+  
+  // 优先使用条件树，如果不存在则使用传统的filter_units
+  FilterConditionNode *condition_tree = filter_stmt->get_condition_tree();
+  if (condition_tree != nullptr) {
+    printf("DEBUG: [LOGICAL_PLAN] Using condition tree instead of filter_units\n");
+    unique_ptr<Expression> tree_expr;
+    rc = create_expression_from_condition_tree(condition_tree, tree_expr);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("Failed to create expression from condition tree");
+      return rc;
+    }
+    if (tree_expr) {
+      cmp_exprs.emplace_back(std::move(tree_expr));
+    }
+  } else {
+    printf("DEBUG: [LOGICAL_PLAN] Using traditional filter_units\n");
+    const vector<FilterUnit *>    &filter_units = filter_stmt->filter_units();
+    for (const FilterUnit *filter_unit : filter_units) {
     // 处理IN_VALUES_OP和NOT_IN_VALUES_OP，创建InExpr
     if (filter_unit->comp() == IN_VALUES_OP || filter_unit->comp() == NOT_IN_VALUES_OP) {
       const FilterObj &filter_obj_left = filter_unit->left();
@@ -457,6 +473,7 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
     ComparisonExpr *cmp_expr = new ComparisonExpr(filter_unit->comp(), std::move(left), std::move(right));
     cmp_exprs.emplace_back(cmp_expr);
   }
+  } // 结束传统filter_units处理的else分支
 
   unique_ptr<PredicateLogicalOperator> predicate_oper;
   if (always_false) {
@@ -690,6 +707,144 @@ bool LogicalPlanGenerator::involves_tables(Expression *expr, LogicalOperator *le
   return false;
 }
 
+RC LogicalPlanGenerator::create_expression_from_condition_tree(FilterConditionNode *node, unique_ptr<Expression> &expr)
+{
+  if (node == nullptr) {
+    expr = nullptr;
+    return RC::SUCCESS;
+  }
+  
+  printf("DEBUG: [LOGICAL_PLAN] Creating expression from condition tree node type: %d\n", static_cast<int>(node->type));
+  
+  switch (node->type) {
+    case FilterConditionNode::CONDITION: {
+      // 单个条件：从FilterUnit创建ComparisonExpr
+      if (node->filter_unit == nullptr) {
+        LOG_WARN("FilterUnit is null in CONDITION node");
+        return RC::INTERNAL;
+      }
+      
+      FilterUnit *filter_unit = node->filter_unit;
+      
+      // 处理IN_VALUES_OP和NOT_IN_VALUES_OP
+      if (filter_unit->comp() == IN_VALUES_OP || filter_unit->comp() == NOT_IN_VALUES_OP) {
+        const FilterObj &filter_obj_left = filter_unit->left();
+        unique_ptr<Expression> left;
+        if (filter_obj_left.is_attr()) {
+          left = make_unique<FieldExpr>(filter_obj_left.field);
+        } else if (filter_obj_left.is_value()) {
+          left = make_unique<ValueExpr>(filter_obj_left.value);
+        } else if (filter_obj_left.is_expr()) {
+          left = filter_obj_left.expr->copy();
+        }
+        
+        if (left) {
+          bool is_not_in = (filter_unit->comp() == NOT_IN_VALUES_OP);
+          expr = make_unique<InExpr>(std::move(left), filter_unit->right_values(), is_not_in);
+        }
+        return RC::SUCCESS;
+      }
+      
+      // 处理IN_OP和NOT_IN_OP（子查询形式）
+      if (filter_unit->comp() == IN_OP || filter_unit->comp() == NOT_IN_OP) {
+        if (filter_unit->sub_query()) {
+          const FilterObj &filter_obj_left = filter_unit->left();
+          unique_ptr<Expression> left;
+          if (filter_obj_left.is_attr()) {
+            left = make_unique<FieldExpr>(filter_obj_left.field);
+          } else if (filter_obj_left.is_value()) {
+            left = make_unique<ValueExpr>(filter_obj_left.value);
+          } else if (filter_obj_left.is_expr()) {
+            left = filter_obj_left.expr->copy();
+          }
+          
+          if (left) {
+            expr = make_unique<ComparisonExpr>(filter_unit->comp(), std::move(left), const_cast<FilterUnit*>(filter_unit));
+          }
+          return RC::SUCCESS;
+        }
+      }
+      
+      // 普通比较操作
+      const FilterObj &filter_obj_left  = filter_unit->left();
+      const FilterObj &filter_obj_right = filter_unit->right();
 
+      unique_ptr<Expression> left;
+      if (filter_obj_left.is_attr()) {
+        left = make_unique<FieldExpr>(filter_obj_left.field);
+      } else if (filter_obj_left.is_value()) {
+        left = make_unique<ValueExpr>(filter_obj_left.value);
+      } else if (filter_obj_left.is_expr()) {
+        left = filter_obj_left.expr->copy();
+      }
+
+      unique_ptr<Expression> right;
+      if (filter_obj_right.is_attr()) {
+        right = make_unique<FieldExpr>(filter_obj_right.field);
+      } else if (filter_obj_right.is_value()) {
+        right = make_unique<ValueExpr>(filter_obj_right.value);
+      } else if (filter_obj_right.is_expr()) {
+        right = filter_obj_right.expr->copy();
+      }
+
+      expr = make_unique<ComparisonExpr>(filter_unit->comp(), std::move(left), std::move(right));
+      return RC::SUCCESS;
+    }
+    
+    case FilterConditionNode::AND_GROUP: {
+      // AND组：创建ConjunctionExpr with Type::AND
+      vector<unique_ptr<Expression>> children;
+      for (FilterConditionNode *child : node->children) {
+        unique_ptr<Expression> child_expr;
+        RC rc = create_expression_from_condition_tree(child, child_expr);
+        if (rc != RC::SUCCESS) {
+          return rc;
+        }
+        if (child_expr) {
+          children.emplace_back(std::move(child_expr));
+        }
+      }
+      
+      if (children.empty()) {
+        expr = nullptr;
+      } else if (children.size() == 1) {
+        expr = std::move(children[0]);
+      } else {
+        expr = make_unique<ConjunctionExpr>(ConjunctionExpr::Type::AND, children);
+      }
+      return RC::SUCCESS;
+    }
+    
+    case FilterConditionNode::OR_GROUP: {
+      // OR组：创建ConjunctionExpr with Type::OR
+      printf("DEBUG: [LOGICAL_PLAN] Creating OR group with %zu children\n", node->children.size());
+      vector<unique_ptr<Expression>> children;
+      for (FilterConditionNode *child : node->children) {
+        unique_ptr<Expression> child_expr;
+        RC rc = create_expression_from_condition_tree(child, child_expr);
+        if (rc != RC::SUCCESS) {
+          return rc;
+        }
+        if (child_expr) {
+          children.emplace_back(std::move(child_expr));
+        }
+      }
+      
+      if (children.empty()) {
+        expr = nullptr;
+      } else if (children.size() == 1) {
+        expr = std::move(children[0]);
+      } else {
+        printf("DEBUG: [LOGICAL_PLAN] Creating ConjunctionExpr with OR type and %zu children\n", children.size());
+        expr = make_unique<ConjunctionExpr>(ConjunctionExpr::Type::OR, children);
+      }
+      return RC::SUCCESS;
+    }
+    
+    default:
+      LOG_WARN("Unknown FilterConditionNode type: %d", static_cast<int>(node->type));
+      return RC::INTERNAL;
+  }
+}
 
 

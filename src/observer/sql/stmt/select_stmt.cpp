@@ -156,6 +156,8 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       all_conditions.push_back(std::move(condition));
     }
   }
+  
+  printf("DEBUG: [SELECT_STMT] Creating SelectStmt with %zu conditions\n", all_conditions.size());
 
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;

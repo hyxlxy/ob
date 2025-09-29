@@ -105,6 +105,28 @@ private:
 };
 
 /**
+ * @brief 表示一个过滤条件节点
+ */
+struct FilterConditionNode
+{
+  enum Type {
+    CONDITION,    ///< 单个条件
+    AND_GROUP,    ///< AND组
+    OR_GROUP      ///< OR组
+  };
+
+  Type type;
+  FilterUnit *filter_unit;                    ///< 单个条件（当type == CONDITION时）
+  vector<FilterConditionNode*> children;      ///< 子条件（当type == AND_GROUP或OR_GROUP时）
+
+  FilterConditionNode(Type t) : type(t), filter_unit(nullptr) {}
+  ~FilterConditionNode() {
+    if (filter_unit) delete filter_unit;
+    for (auto child : children) delete child;
+  }
+};
+
+/**
  * @brief Filter/谓词/过滤语句
  * @ingroup Statement
  */
@@ -116,6 +138,7 @@ public:
 
 public:
   const vector<FilterUnit *> &filter_units() const { return filter_units_; }
+  FilterConditionNode* get_condition_tree() const { return condition_tree_; }
 
 public:
   static RC create(Db *db, Table *default_table, unordered_map<string, Table *> *tables,
@@ -124,6 +147,11 @@ public:
   static RC create_filter_unit(Db *db, Table *default_table, unordered_map<string, Table *> *tables,
       const ConditionSqlNode &condition, FilterUnit *&filter_unit);
 
+  // 新增：创建条件树
+  static RC create_condition_tree(Db *db, Table *default_table, unordered_map<string, Table *> *tables,
+      const ConditionSqlNode *conditions, int condition_num, FilterConditionNode *&tree);
+
 private:
-  vector<FilterUnit *> filter_units_;  // 默认当前都是AND关系
+  vector<FilterUnit *> filter_units_;  // 默认当前都是AND关系（保持向后兼容）
+  FilterConditionNode *condition_tree_;  // 新增：条件树结构
 };

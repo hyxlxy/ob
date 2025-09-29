@@ -23,6 +23,7 @@ See the Mulan PSL v2 for more details. */
 class Stmt;
 class CalcStmt;
 class SelectStmt;
+struct FilterConditionNode;
 class FilterStmt;
 class InsertStmt;
 class DeleteStmt;
@@ -57,6 +58,9 @@ private:
   // JOIN条件处理辅助函数
   bool is_join_condition(Expression *expr, const vector<Table *> &tables);
   bool involves_tables(Expression *expr, LogicalOperator *left_oper, LogicalOperator *right_oper);
+  
+  // 条件树处理方法
+  RC create_expression_from_condition_tree(FilterConditionNode *node, unique_ptr<Expression> &expr);
 
   // HAVING子句聚合表达式收集辅助函数
   void collect_having_aggregates(Expression *expr, vector<Expression *> &aggregate_expressions);

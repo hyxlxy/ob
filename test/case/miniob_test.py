@@ -276,7 +276,7 @@ class MiniObServer:
   用来控制miniob的服务器程序。负责程序的启停和环境的初始化和清理工作
   '''
 
-  def __init__(self, base_dir: str, data_dir: str, config_file: str, server_port: int, server_socket: str, clean_data_dir: bool):
+  def __init__(self, base_dir: str, data_dir: str, config_file: str, server_port: int, server_socket: str, clean_data_dir: bool, server_debug: bool = False):
     self.__check_base_dir(base_dir)
     self.__check_data_dir(data_dir, clean_data_dir)
 
@@ -289,6 +289,7 @@ class MiniObServer:
     self.__config = config_file
     self.__server_port = server_port
     self.__server_socket = server_socket.strip()
+    self.__server_debug = server_debug
 
     self.__process = None
 
@@ -358,7 +359,10 @@ class MiniObServer:
       observer_command.append('-p')
       observer_command.append(str(self.__server_port))
 
-    process = subprocess.Popen(observer_command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=self.__data_dir)
+    process = subprocess.Popen(observer_command, 
+                              stdout=None if self.__server_debug else subprocess.DEVNULL, 
+                              stderr=None if self.__server_debug else subprocess.DEVNULL, 
+                              cwd=self.__data_dir)
     return_code = process.poll()
     if return_code != None:
       _logger.error("Failed to start observer, exit with code %d", return_code)
@@ -838,6 +842,7 @@ class TestSuite:
     self.__need_start_server = True
     self.__test_names = None # 如果指定测试哪些Case，就不再遍历所有的cases
     self.__miniob_server = None
+    self.__server_debug = False # 是否输出服务器调试信息
     # MySQL对比相关
     self.__mysql_compare = False
     self.__mysql_connector = None
@@ -875,6 +880,9 @@ class TestSuite:
 
   def set_use_unix_socket(self, use_unix_socket: bool):
     self.__use_unix_socket = use_unix_socket
+
+  def set_server_debug(self, server_debug: bool):
+    self.__server_debug = server_debug
 
   def donot_need_start_server(self):
     self.__need_start_server = False
@@ -1040,7 +1048,7 @@ class TestSuite:
         unix_socket = self.__get_unix_socket_address()
 
       miniob_server = MiniObServer(self.__db_server_base_dir, self.__db_data_dir,
-                                   self.__db_config, self.__server_port, unix_socket, clean_data_dir)
+                                   self.__db_config, self.__server_port, unix_socket, clean_data_dir, self.__server_debug)
       miniob_server.init_server()
       result = miniob_server.start_server()
       if result is False:
@@ -1102,6 +1110,9 @@ def __init_options():
   # 是否启动调试模式。调试模式不会清理服务器的数据目录
   options_parser.add_argument('-d', '--debug', action='store_true', dest='debug', default=False,
                               help='enable debug mode')
+  # 是否输出服务器调试信息到控制台
+  options_parser.add_argument('--server-debug', action='store_true', dest='server_debug', default=False,
+                              help='output server debug information to console')
 
   options_parser.add_argument('--compile-make-args', action='store', dest='compile_make_args', default='',
                               help='compile args used by make')
@@ -1157,6 +1168,7 @@ def __init_test_suite(options) -> TestSuite:
 
   test_suite.set_server_port(options.server_port)
   test_suite.set_use_unix_socket(not options.not_use_unix_socket)
+  test_suite.set_server_debug(options.server_debug)
   test_suite.set_db_server_base_dir(__get_build_path(options.work_dir))
   test_suite.set_db_data_dir(options.work_dir + '/data')
   test_suite.set_db_config(os.path.abspath(options.project_dir + '/etc/observer.ini'))

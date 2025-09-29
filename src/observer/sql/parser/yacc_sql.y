@@ -114,6 +114,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         FROM
         WHERE
         AND
+        OR
         JOIN
         INNER
         ON
@@ -1088,6 +1089,12 @@ where:
     }
     | WHERE condition_list {
       $$ = $2;
+      printf("DEBUG: [YACC] WHERE condition_list: %zu conditions\n", $2 ? $2->size() : 0);
+      if ($2) {
+        for (size_t i = 0; i < $2->size(); i++) {
+          printf("DEBUG: [YACC] Condition %zu: conjunction_op = %d\n", i, (*$2)[i].conjunction_op);
+        }
+      }
     }
     ;
 condition_list:
@@ -1102,6 +1109,15 @@ condition_list:
     }
     | condition AND condition_list {
       $$ = $3;
+      $1->conjunction_op = AND_OP;  // 设置AND连接符
+      printf("DEBUG: [YACC] Setting AND_OP for condition\n");
+      $$->emplace_back(std::move(*$1));
+      delete $1;
+    }
+    | condition OR condition_list {
+      $$ = $3;
+      $1->conjunction_op = OR_OP;    // 设置OR连接符
+      printf("DEBUG: [YACC] Setting OR_OP for condition\n");
       $$->emplace_back(std::move(*$1));
       delete $1;
     }
@@ -1113,6 +1129,7 @@ condition:
       $$->left_expr.reset($1);
       $$->right_expr.reset($3);
       $$->comp = $2;
+      $$->conjunction_op = AND_OP;  // 默认初始化为AND_OP
     }
     | expression IN LBRACE expression_list RBRACE
     {

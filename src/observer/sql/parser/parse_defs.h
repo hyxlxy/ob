@@ -66,6 +66,16 @@ enum CompOp
 };
 
 /**
+ * @brief 描述逻辑连接运算符
+ * @ingroup SQLParser
+ */
+enum ConjunctionOp
+{
+  AND_OP,       ///< "AND"
+  OR_OP         ///< "OR"
+};
+
+/**
  * @brief 描述排序方向
  * @ingroup SQLParser
  */
@@ -115,6 +125,9 @@ struct ConditionSqlNode
 
   // 新增：支持IN操作的值列表
   std::vector<Value> right_values;  ///< values for IN/NOT IN operations
+
+  // 新增：支持逻辑连接符
+  ConjunctionOp  conjunction_op;    ///< AND or OR operator
 
   // 添加移动构造函数和移动赋值操作符
   ConditionSqlNode() = default;
