@@ -80,54 +80,73 @@ RC CreateTableExecutor::execute_create_table_as_select(Session *session, CreateT
 
   LOG_INFO("Physical plan created successfully");
 
-  // Step 2: Open the physical operator to get the result schema
-  rc = physical_operator->open(nullptr);
+  // Step 2: Get Trx and open the physical operator
+  Trx *trx = session->current_trx();
+  if (trx == nullptr) {
+    LOG_ERROR("failed to get current transaction for CREATE TABLE AS SELECT");
+    return RC::INTERNAL;
+  }
+
+  rc = physical_operator->open(trx);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to open physical operator for CREATE TABLE AS SELECT. rc=%s", strrc(rc));
     return rc;
   }
 
   // Step 3: Derive table schema from SELECT result
-  vector<AttrInfoSqlNode> attr_infos;
-
-  // Execute the first row to determine schema
-  rc = physical_operator->next();
+  // Get tuple schema first
+  TupleSchema tuple_schema;
+  rc = physical_operator->tuple_schema(tuple_schema);
   if (rc != RC::SUCCESS) {
-    LOG_ERROR("No data available to determine schema for CREATE TABLE AS SELECT. rc=%s", strrc(rc));
+    LOG_ERROR("Failed to get tuple schema from physical operator. rc=%s", strrc(rc));
+    physical_operator->close();
+    return rc;
+  }
+
+  int cell_count = tuple_schema.cell_num();
+  LOG_INFO("Schema derivation: found %d columns from tuple schema", cell_count);
+
+  // Execute first row to get actual data types
+  rc = physical_operator->next();
+  if (rc != RC::SUCCESS && rc != RC::RECORD_EOF) {
+    LOG_ERROR("Failed to fetch first row for schema derivation. rc=%s", strrc(rc));
     physical_operator->close();
     return RC::INTERNAL;
   }
 
-  // Get the first tuple to determine schema
-  Tuple *first_tuple = physical_operator->current_tuple();
-  if (first_tuple == nullptr) {
-    LOG_ERROR("Current tuple is null for schema derivation");
-    physical_operator->close();
-    return RC::INTERNAL;
-  }
-
-  int cell_count = first_tuple->cell_num();
-  LOG_INFO("Schema derivation: found %d columns", cell_count);
-
+  // Get the first tuple to determine actual data types
+  Tuple *first_tuple = (rc == RC::SUCCESS) ? physical_operator->current_tuple() : nullptr;
+  
+  vector<AttrInfoSqlNode> attr_infos;
   for (int i = 0; i < cell_count; i++) {
     AttrInfoSqlNode attr_info;
 
-    // Generate column name
-    attr_info.name = "col" + std::to_string(i + 1);
-
-    // Get type information from the first tuple
-    Value cell_value;
-    RC rc = first_tuple->cell_at(i, cell_value);
-    if (rc != RC::SUCCESS) {
-      LOG_ERROR("Failed to get cell value for schema derivation. rc=%s", strrc(rc));
-      physical_operator->close();
-      return rc;
+    // Use column name from tuple schema
+    const TupleCellSpec &cell_spec = tuple_schema.cell_at(i);
+    attr_info.name = cell_spec.alias();
+    if (attr_info.name.empty()) {
+      // Fallback to generic name if no alias
+      attr_info.name = "col" + std::to_string(i + 1);
     }
 
-    // Determine type and length based on the cell value
-    attr_info.type = cell_value.attr_type();
+    // Get type information from the first tuple if available
+    if (first_tuple != nullptr) {
+      Value cell_value;
+      RC rc_cell = first_tuple->cell_at(i, cell_value);
+      if (rc_cell == RC::SUCCESS) {
+        attr_info.type = cell_value.attr_type();
+      } else {
+        // Default to INT if we can't determine type
+        attr_info.type = AttrType::INTS;
+      }
+    } else {
+      // If no data, default to INT
+      attr_info.type = AttrType::INTS;
+    }
+
     attr_info.nullable = true;
 
+    // Set length based on type
     switch (attr_info.type) {
       case AttrType::INTS:
         attr_info.length = 4;
@@ -136,10 +155,14 @@ RC CreateTableExecutor::execute_create_table_as_select(Session *session, CreateT
         attr_info.length = 4;
         break;
       case AttrType::CHARS:
-        attr_info.length = cell_value.length() > 0 ? cell_value.length() : 4;
+        // Use a reasonable default for CHARS
+        attr_info.length = 255;
         break;
       case AttrType::DATES:
         attr_info.length = 4;
+        break;
+      case AttrType::TEXTS:
+        attr_info.length = 65535;
         break;
       default:
         attr_info.type = AttrType::INTS;
@@ -173,7 +196,7 @@ RC CreateTableExecutor::execute_create_table_as_select(Session *session, CreateT
   // Reset the physical operator to start from the beginning
   // We need to close and reopen to get all data, not just continue from where we left off
   physical_operator->close();
-  rc = physical_operator->open(nullptr);
+  rc = physical_operator->open(trx);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to reopen physical operator for data insertion. rc=%s", strrc(rc));
     return rc;

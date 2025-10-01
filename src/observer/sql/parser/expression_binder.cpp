@@ -257,12 +257,26 @@ RC ExpressionBinder::bind_unbound_field_expression(
     FieldExpr *field_expr = new FieldExpr(field);
     const char *alias_name = expr->name();
 
-    // Prefer explicit alias if present (and not a qualified token like "tbl.col").
-    // Otherwise, default to bare field name to match baseline header format.
-    bool has_explicit_alias = (alias_name != nullptr && alias_name[0] != '\0' && strchr(alias_name, '.') == nullptr);
-    if (has_explicit_alias) {
-      field_expr->set_name(alias_name);
+    // Set field name according to the following rules:
+    // 1. If there's an explicit alias (user provided alias), use it
+    // 2. If the name contains a dot (like "t1.id"), keep it as-is (this is table alias + field)
+    // 3. Otherwise, use just the field name
+    if (alias_name != nullptr && alias_name[0] != '\0') {
+      // Check if this is a qualified name (table.field or alias.field)
+      bool is_qualified = (strchr(alias_name, '.') != nullptr);
+      
+      // If it's qualified, keep the full name (e.g., "t1.id")
+      // If it's not qualified but not empty, it's either an explicit alias or a bare field reference
+      if (is_qualified) {
+        // For qualified names, check if we should use the alias
+        // If table_name in the query matches an alias, keep the qualified name
+        field_expr->set_name(alias_name);
+      } else {
+        // For unqualified names, use them as-is (could be explicit alias or bare field)
+        field_expr->set_name(alias_name);
+      }
     } else {
+      // No name set, default to field name
       field_expr->set_name(field_name);
     }
     bound_expressions.emplace_back(field_expr);
