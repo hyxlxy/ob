@@ -5,13 +5,16 @@ CREATE TABLE csq_2(id int, col2 int, feat2 float);
 CREATE TABLE csq_3(id int, col3 int, feat3 float);
 CREATE TABLE csq_4(id int, col4 int, feat4 float);
 
-INSERT INTO csq_1 VALUES (89, 98, 42.22);
-INSERT INTO csq_1 VALUES (17, 30, 23.87);
-INSERT INTO csq_1 VALUES (45, 67, 15.33);
+
+INSERT INTO csq_1 VALUES (1, 10, 5.5);
+INSERT INTO csq_1 VALUES (2, 20, 15.5);
+INSERT INTO csq_1 VALUES (3, 30, 25.5);
+INSERT INTO csq_1 VALUES (4, 40, 35.5);
 
 INSERT INTO csq_2 VALUES (1, 10, 5.5);
 INSERT INTO csq_2 VALUES (2, 20, 15.5);
 INSERT INTO csq_2 VALUES (3, 30, 25.5);
+INSERT INTO csq_2 VALUES (4, 40, 35.5);
 
 INSERT INTO csq_3 VALUES (1, 100, 50.5);
 INSERT INTO csq_3 VALUES (2, 200, 60.5);
@@ -23,10 +26,14 @@ INSERT INTO ssq_1 VALUES (44, 'C');
 INSERT INTO ssq_1 VALUES (6, 'D');
 
 
+
 SELECT * FROM csq_1 WHERE id IN (SELECT csq_2.id FROM csq_2 WHERE csq_2.id NOT IN (SELECT csq_3.id FROM csq_3));
 
 
 SELECT * FROM ssq_1 WHERE id IN (13,65,13,44,6);
+
+
+SELECT * FROM csq_1 WHERE id IN (SELECT csq_3.id FROM csq_3);
 
 DROP TABLE csq_1;
 DROP TABLE csq_2;

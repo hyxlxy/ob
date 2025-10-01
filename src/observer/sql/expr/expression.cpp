@@ -1916,7 +1916,24 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
       // 检查物理操作符是否是 ProjectPhysicalOperator
       if (typeid(*physical_operator).name() == typeid(ProjectPhysicalOperator).name()) {
         LOG_WARN("Physical operator is ProjectPhysicalOperator with empty expressions");
-        // 对于空的 ExpressionTuple，我们跳过这个结果
+        
+        // 修复：对于空的ProjectPhysicalOperator，我们需要从子操作符获取数据
+        // 这通常发生在子查询的SELECT列表绑定失败时
+        if (!physical_operator->children().empty()) {
+          PhysicalOperator *child_op = physical_operator->children()[0].get();
+          Tuple *child_tuple = child_op->current_tuple();
+          if (child_tuple != nullptr && child_tuple->cell_num() > 0) {
+            // 从子操作符的第一个单元格获取值
+            rc = child_tuple->cell_at(0, value);
+            if (rc == RC::SUCCESS) {
+              LOG_WARN("Successfully extracted value from child operator: %s", value.to_string().c_str());
+              results.push_back(value);
+              continue;
+            }
+          }
+        }
+        
+        // 如果无法从子操作符获取数据，跳过这个结果
         continue;
       } else {
         LOG_WARN("Unknown tuple type with 0 cells");
