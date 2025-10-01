@@ -187,6 +187,10 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
   const char *table_name = unbound_field_expr->table_name();
   const char *field_name = unbound_field_expr->field_name();
+  
+  printf("DEBUG: [BINDER] Binding UnboundFieldExpr: table='%s', field='%s'\n",
+         table_name ? table_name : "NULL",
+         field_name ? field_name : "NULL");
 
   Table *table = nullptr;
   if (is_blank(table_name)) {

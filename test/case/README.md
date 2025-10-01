@@ -5,6 +5,7 @@ miniob自动化功能测试
 ```bash
 python3 miniob_test.py
 ```
+python3 sql_gui.py
 
 运行指定测试用例
 ```bash

@@ -93,6 +93,13 @@ RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
          table_name() ? table_name() : "NULL",
          field_name() ? field_name() : "NULL");
 
+  // 检查Field对象是否有效
+  if (!field_.table() || !field_.meta()) {
+    printf("ERROR: [FIELD] FieldExpr has invalid Field object: table=%p, field=%p\n", 
+           field_.table(), field_.meta());
+    return RC::INTERNAL;
+  }
+
   RC rc = tuple.find_cell(TupleCellSpec(table_name(), field_name()), value);
 
   printf("DEBUG: [FIELD] FieldExpr find_cell result: rc=%s\n", strrc(rc));
@@ -520,7 +527,7 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
       // Handle empty list case
       if (rc == RC::RECORD_EOF && !found) {
         // Empty list or no match found
-        bool result = (comp_ == NOT_IN_OP); // NOT IN returns true, IN returns false
+        bool result = (comp_ == NOT_IN_OP || comp_ == NOT_IN_VALUES_OP); // NOT IN returns true, IN returns false
         value.set_boolean(result);
         return RC::SUCCESS;
       } else if (rc != RC::SUCCESS && rc != RC::RECORD_EOF) {
@@ -1523,9 +1530,13 @@ unique_ptr<Expression> InExpr::copy() const
 
 RC InExpr::get_value(const Tuple &tuple, Value &value) const
 {
+  printf("DEBUG: [IN] InExpr::get_value() called, left_ type=%d\n", static_cast<int>(left_->type()));
+  
   Value left_value;
   RC rc = left_->get_value(tuple, left_value);
   if (rc != RC::SUCCESS) {
+    printf("ERROR: [IN] failed to get value of left expression in IN. rc=%s, left_type=%d\n", 
+           strrc(rc), static_cast<int>(left_->type()));
     LOG_WARN("failed to get value of left expression in IN. rc=%s", strrc(rc));
     return rc;
   }

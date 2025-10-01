@@ -1,38 +1,35 @@
-DROP TABLE IF EXISTS csq_1, csq_2;
+DROP TABLE IF EXISTS csq_1, csq_2, csq_3, csq_4;
 
-CREATE TABLE csq_1(id int, feat1 float, name varchar(20));
-INSERT INTO csq_1 VALUES (1, 10.0, 'A');
-INSERT INTO csq_1 VALUES (2, 20.0, 'B');
-INSERT INTO csq_1 VALUES (3, 30.0, 'C');
-INSERT INTO csq_1 VALUES (4, 15.0, 'D');
-INSERT INTO csq_1 VALUES (5, 25.0, 'E');
+CREATE TABLE csq_1(id int, col1 int, feat1 float);
+CREATE TABLE csq_2(id int, col2 int, feat2 float);
+CREATE TABLE csq_3(id int, col3 int, feat3 float);
+CREATE TABLE csq_4(id int, col4 int, feat4 float);
 
-CREATE TABLE csq_2(id int, feat2 float, category varchar(20));
-INSERT INTO csq_2 VALUES (1, 5.0, 'X');
-INSERT INTO csq_2 VALUES (2, 15.0, 'Y');
-INSERT INTO csq_2 VALUES (3, 25.0, 'Z');
-INSERT INTO csq_2 VALUES (4, 12.0, 'X');
-INSERT INTO csq_2 VALUES (5, 18.0, 'Y');
+INSERT INTO csq_1 VALUES (89, 98, 42.22);
+INSERT INTO csq_1 VALUES (17, 30, 23.87);
+INSERT INTO csq_1 VALUES (45, 67, 15.33);
 
-SELECT * FROM csq_1 WHERE feat1 > (SELECT MIN(csq_2.feat2) FROM csq_2 WHERE csq_2.feat2 > csq_1.feat1);
+INSERT INTO csq_2 VALUES (1, 10, 5.5);
+INSERT INTO csq_2 VALUES (2, 20, 15.5);
+INSERT INTO csq_2 VALUES (3, 30, 25.5);
 
-SELECT * FROM csq_1 WHERE feat1 <> (SELECT MIN(csq_2.feat2) FROM csq_2 WHERE csq_2.feat2 > csq_1.feat1);
+INSERT INTO csq_3 VALUES (1, 100, 50.5);
+INSERT INTO csq_3 VALUES (2, 200, 60.5);
 
-SELECT * FROM csq_1 WHERE id IN (SELECT id FROM csq_2 WHERE feat2 > csq_1.feat1);
+CREATE TABLE ssq_1(id int, name varchar(20));
+INSERT INTO ssq_1 VALUES (13, 'A');
+INSERT INTO ssq_1 VALUES (65, 'B');
+INSERT INTO ssq_1 VALUES (44, 'C');
+INSERT INTO ssq_1 VALUES (6, 'D');
 
-SELECT * FROM csq_1 WHERE id NOT IN (SELECT id FROM csq_2 WHERE feat2 < csq_1.feat1);
 
-SELECT * FROM csq_1 WHERE EXISTS (SELECT 1 FROM csq_2 WHERE csq_2.feat2 > csq_1.feat1);
+SELECT * FROM csq_1 WHERE id IN (SELECT csq_2.id FROM csq_2 WHERE csq_2.id NOT IN (SELECT csq_3.id FROM csq_3));
 
-SELECT * FROM csq_1 WHERE NOT EXISTS (SELECT 1 FROM csq_2 WHERE csq_2.feat2 < csq_1.feat1);
 
-SELECT * FROM csq_1 WHERE feat1 > (SELECT AVG(feat2) FROM csq_2 WHERE feat2 > csq_1.feat1);
-
-SELECT * FROM csq_1 WHERE feat1 = (SELECT feat2 FROM csq_2 WHERE feat2 > 10);
-
-SELECT * FROM csq_1 WHERE feat1 = (SELECT feat2 FROM csq_2 WHERE feat2 > 100);
-
-SELECT * FROM csq_1 WHERE feat1 = (SELECT feat2 FROM csq_2 WHERE feat2 > 100);
+SELECT * FROM ssq_1 WHERE id IN (13,65,13,44,6);
 
 DROP TABLE csq_1;
 DROP TABLE csq_2;
+DROP TABLE csq_3;
+DROP TABLE csq_4;
+DROP TABLE ssq_1;

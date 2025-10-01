@@ -355,7 +355,7 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
     } else if (filter_obj_right.is_value()) {
       right = make_unique<ValueExpr>(filter_obj_right.value);
     } else if (filter_obj_right.is_expr()) {
-      right = filter_obj_right.expr->copy();
+        right = filter_obj_right.expr->copy();
     }
 
     // Bind expressions to actual table fields if context is available
@@ -739,6 +739,17 @@ RC LogicalPlanGenerator::create_expression_from_condition_tree(FilterConditionNo
         }
         
         if (left) {
+          // Bind expression to actual table fields if context is available
+          if (binder_ctx_initialized_) {
+            ExpressionBinder binder(binder_context_);
+            vector<unique_ptr<Expression>> bound_left;
+            RC brc = binder.bind_expression(left, bound_left);
+            if (OB_FAIL(brc)) return brc;
+            if (bound_left.size() == 1) {
+              left = std::move(bound_left[0]);
+            }
+          }
+          
           bool is_not_in = (filter_unit->comp() == NOT_IN_VALUES_OP);
           expr = make_unique<InExpr>(std::move(left), filter_unit->right_values(), is_not_in);
         }
