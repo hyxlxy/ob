@@ -247,7 +247,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
   } else {
     const FieldMeta *field_meta = table->table_meta().field(field_name);
     if (nullptr == field_meta) {
-      LOG_INFO("no such field in table: %s.%s", table_name, field_name);
+      LOG_INFO("no such field in table: %s.%s", table->name(), field_name);
       return RC::SCHEMA_FIELD_MISSING;
     }
 
@@ -339,56 +339,36 @@ RC ExpressionBinder::bind_comparison_expression(
   unique_ptr<Expression>        &left_expr  = comparison_expr->left();
   unique_ptr<Expression>        &right_expr = comparison_expr->right();
 
-  printf("DEBUG: [BINDER] About to bind left expression, type=%d, ptr=%p\n",
-         static_cast<int>(left_expr->type()), left_expr.get());
   RC rc = bind_expression(left_expr, child_bound_expressions);
   if (rc != RC::SUCCESS) {
-    printf("ERROR: [BINDER] Failed to bind left expression, rc=%d\n", static_cast<int>(rc));
     return rc;
   }
 
-  printf("DEBUG: [BINDER] Left expression bound, child_bound_expressions.size()=%d\n",
-         (int)child_bound_expressions.size());
   if (child_bound_expressions.size() != 1) {
     LOG_WARN("invalid left children number of comparison expression: %d", child_bound_expressions.size());
     return RC::INVALID_ARGUMENT;
   }
 
   unique_ptr<Expression> &left = child_bound_expressions[0];
-  printf("DEBUG: [BINDER] Left bound expression: ptr=%p, type=%d\n",
-         left.get(), static_cast<int>(left->type()));
   if (left.get() != left_expr.get()) {
-    printf("DEBUG: [BINDER] Replacing left_expr with bound expression\n");
     left_expr.reset(left.release());
   }
-  printf("DEBUG: [BINDER] Final left_expr: ptr=%p, type=%d\n",
-         left_expr.get(), static_cast<int>(left_expr->type()));
 
   child_bound_expressions.clear();
-  printf("DEBUG: [BINDER] About to bind right expression, type=%d, ptr=%p\n",
-         static_cast<int>(right_expr->type()), right_expr.get());
   rc = bind_expression(right_expr, child_bound_expressions);
   if (rc != RC::SUCCESS) {
-    printf("ERROR: [BINDER] Failed to bind right expression, rc=%d\n", static_cast<int>(rc));
     return rc;
   }
 
-  printf("DEBUG: [BINDER] Right expression bound, child_bound_expressions.size()=%d\n",
-         (int)child_bound_expressions.size());
   if (child_bound_expressions.size() != 1) {
     LOG_WARN("invalid right children number of comparison expression: %d", child_bound_expressions.size());
     return RC::INVALID_ARGUMENT;
   }
 
   unique_ptr<Expression> &right = child_bound_expressions[0];
-  printf("DEBUG: [BINDER] Right bound expression: ptr=%p, type=%d\n",
-         right.get(), static_cast<int>(right->type()));
   if (right.get() != right_expr.get()) {
-    printf("DEBUG: [BINDER] Replacing right_expr with bound expression\n");
     right_expr.reset(right.release());
   }
-  printf("DEBUG: [BINDER] Final right_expr: ptr=%p, type=%d\n",
-         right_expr.get(), static_cast<int>(right_expr->type()));
 
   bound_expressions.emplace_back(std::move(expr));
   return RC::SUCCESS;
