@@ -47,6 +47,7 @@ private:
   bool             inited_ = false;
   Table           *table_  = nullptr;
   BplusTreeHandler index_handler_;
+  vector<FieldMeta> field_metas_;  // 多字段索引支持
 };
 
 /**

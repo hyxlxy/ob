@@ -1,12 +1,14 @@
-/* Copyright (c) 2021 OceanBase and/or its affiliates. All rights reserved.
-miniob is licensed under Mulan PSL v2.
-You can use this software according to the terms and conditions of the Mulan PSL v2.
-You may obtain a copy of Mulan PSL v2 at:
-         http://license.coscl.org.cn/MulanPSL2
-THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
-EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
-MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
-See the Mulan PSL v2 for more details. */
+/***************************************************************
+ *                                                             *
+ * @Author      : Koschei                                      *
+ * @Email       : nitianzero@gmail.com                         *
+ * @Date        : 2024/10/13                                     *
+ * @Description : Brief description of the file's purpose      *
+ *                                                             *
+ * Copyright (c) 2024 Koschei                                  *
+ * All rights reserved.                                        *
+ *                                                             *
+ ***************************************************************/
 
 #pragma once
 
@@ -23,8 +25,8 @@ See the Mulan PSL v2 for more details. */
 class ViewScanPhysicalOperator : public PhysicalOperator
 {
 public:
-  ViewScanPhysicalOperator(View *view, std::string alias) : view_(view) {
-    // tuple_.set_table_alias(alias); // 该方法不存在，暂时注释
+  ViewScanPhysicalOperator(View *view, std::string alias) : view_(view) { 
+    // RowTuple不支持set_table_alias，暂时跳过
   }
 
   ~ViewScanPhysicalOperator() override = default;
@@ -50,10 +52,10 @@ private:
   RC next_record();
 
 private:
-  View                                        *view_ = nullptr;
-  Trx                                         *trx_  = nullptr;
-  std::vector<std::unique_ptr<Expression>>     predicates_;
-  RowTuple                                     tuple_;
-  std::unique_ptr<PhysicalOperator>            child_operator_;
-  bool                                         opened_ = false;
+  View                                    *view_        = nullptr;
+  Trx                                     *trx_         = nullptr;
+  std::unique_ptr<PhysicalOperator>        select_expr_ = nullptr;
+  Record                                   current_record_;
+  RowTuple                                 tuple_;
+  std::vector<std::unique_ptr<Expression>> predicates_;  // TODO chang predicate to table tuple filter
 };

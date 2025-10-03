@@ -86,14 +86,15 @@ Tuple *NestedLoopJoinPhysicalOperator::current_tuple() { return &joined_tuple_; 
 
 RC NestedLoopJoinPhysicalOperator::left_next()
 {
-  RC rc = RC::SUCCESS;
-  rc    = left_->next();
+  RC rc = left_->next();
   if (rc != RC::SUCCESS) {
     return rc;
   }
 
   left_tuple_ = left_->current_tuple();
-  joined_tuple_.set_left(left_tuple_);
+  if (left_tuple_) {
+    joined_tuple_.set_left(left_tuple_);
+  }
   return rc;
 }
 
@@ -128,6 +129,8 @@ RC NestedLoopJoinPhysicalOperator::right_next()
   }
 
   right_tuple_ = right_->current_tuple();
-  joined_tuple_.set_right(right_tuple_);
+  if (right_tuple_) {
+    joined_tuple_.set_right(right_tuple_);
+  }
   return rc;
 }

@@ -47,34 +47,34 @@ RC BplusTreeIndex::create(Table *table, const char *file_name, const IndexMeta &
 RC BplusTreeIndex::create(Table *table, const char *file_name, const IndexMeta &index_meta, const vector<FieldMeta> &field_metas)
 {
   if (inited_) {
-    LOG_WARN("Failed to create multi-field index due to the index has been created before. file_name:%s, index:%s",
-        file_name, index_meta.name());
     return RC::RECORD_OPENNED;
   }
 
-  // For multi-field index, we use the first field for now (simplified implementation)
   if (field_metas.empty()) {
-    LOG_WARN("Failed to create multi-field index due to empty field_metas. file_name:%s, index:%s",
-        file_name, index_meta.name());
     return RC::INVALID_ARGUMENT;
   }
 
-  // Use the first field for the B+ tree structure (simplified approach)
-  const FieldMeta &first_field = field_metas[0];
-  Index::init(index_meta, first_field);
+  // 保存所有字段
+  field_metas_ = field_metas;
+  
+  // 计算组合键长度
+  int total_len = 0;
+  for (const FieldMeta &fm : field_metas) {
+    total_len += fm.len();
+  }
 
+  // 使用第一个字段初始化
+  Index::init(index_meta, field_metas[0]);
+  
   BufferPoolManager &bpm = table->db()->buffer_pool_manager();
-  RC rc = index_handler_.create(table->db()->log_handler(), bpm, file_name, first_field.type(), first_field.len());
-  if (RC::SUCCESS != rc) {
-    LOG_WARN("Failed to create multi-field index_handler, file_name:%s, index:%s, rc:%s",
-        file_name, index_meta.name(), strrc(rc));
+  // 使用组合键长度
+  RC rc = index_handler_.create(table->db()->log_handler(), bpm, file_name, field_metas[0].type(), total_len);
+  if (rc != RC::SUCCESS) {
     return rc;
   }
 
   inited_ = true;
   table_  = table;
-  LOG_INFO("Successfully create multi-field index, file_name:%s, index:%s, fields:%zu",
-    file_name, index_meta.name(), field_metas.size());
   return RC::SUCCESS;
 }
 

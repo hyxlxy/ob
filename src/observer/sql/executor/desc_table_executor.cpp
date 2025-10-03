@@ -113,336 +113,126 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
       "update executor can not run this command: %d",
       static_cast<int>(stmt->type()));
 
+  // ========== 完全重写简化的UpdateExecutor ==========
   UpdateStmt *update_stmt = static_cast<UpdateStmt *>(stmt);
-  Table      *table       = update_stmt->table();
-
+  Table *table = update_stmt->table();
   Trx *trx = session->current_trx();
-
-  // Get record scanner to find records to update
+  
+  // 获取scanner
   RecordScanner *scanner = nullptr;
   RC rc = table->get_record_scanner(scanner, trx, ReadWriteMode::READ_WRITE);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to get record scanner. table=%s, rc=%s", table->name(), strrc(rc));
     return rc;
   }
-
-  // For simplicity, we'll scan all records and check conditions manually
-  // In a more complete implementation, we would convert FilterStmt to ConditionFilter
-
-  // Collect records that match the filter condition
-  vector<Record> records_to_update;
-  Record record;
-  while (OB_SUCC(rc = scanner->next(record))) {
-    if (update_stmt->filter_stmt() == nullptr) {
-      // No WHERE clause, update all records
-      LOG_INFO("UPDATE: No WHERE clause, updating all records");
-      records_to_update.emplace_back(record);
-    } else {
-      // Check if record matches the WHERE condition
-      bool match = true;
-      FilterStmt *filter_stmt = update_stmt->filter_stmt();
+  
+  // 收集要更新的记录
+  vector<Record> records;
+  Record rec;
+  FilterStmt *fs = update_stmt->filter_stmt();
+  bool has_where = (fs && !fs->filter_units().empty());
+  
+  while (scanner->next(rec) == RC::SUCCESS) {
+    if (!has_where) {
+      records.push_back(rec);
+      continue;
+    }
+    
+    // 评估WHERE条件
+    bool match = true;
+    for (const FilterUnit *fu : fs->filter_units()) {
+      Value lv, rv;
       
-      // 如果filter_units为空，检查是否真的没有WHERE条件
-      if (filter_stmt->filter_units().empty()) {
-        // filter_units为空但filter_stmt存在，说明条件解析有问题
-        // 为安全起见，不更新任何记录
+      // 获取左值
+      if (fu->left().is_attr()) {
+        const FieldMeta *fm = fu->left().field.meta();
+        lv.set_type(fm->type());
+        lv.set_data(rec.data() + fm->offset(), fm->len());
+      } else if (fu->left().is_value()) {
+        lv = fu->left().value;
+      }
+      
+      // 获取右值
+      if (fu->right().is_attr()) {
+        const FieldMeta *fm = fu->right().field.meta();
+        rv.set_type(fm->type());
+        rv.set_data(rec.data() + fm->offset(), fm->len());
+      } else if (fu->right().is_value()) {
+        rv = fu->right().value;
+      }
+      
+      // 比较
+      int cmp = lv.compare(rv);
+      bool cond_match = false;
+      switch (fu->comp()) {
+        case EQUAL_TO: cond_match = (cmp == 0); break;
+        case LESS_THAN: cond_match = (cmp < 0); break;
+        case GREAT_THAN: cond_match = (cmp > 0); break;
+        case LESS_EQUAL: cond_match = (cmp <= 0); break;
+        case GREAT_EQUAL: cond_match = (cmp >= 0); break;
+        case NOT_EQUAL: cond_match = (cmp != 0); break;
+        case IS_NULL_OP: cond_match = (lv.attr_type() == AttrType::UNDEFINED); break;
+        case IS_NOT_NULL_OP: cond_match = (lv.attr_type() != AttrType::UNDEFINED); break;
+        default: cond_match = false;
+      }
+      
+      if (!cond_match) {
         match = false;
-      }
-
-      // 评估每个过滤条件
-      for (const FilterUnit *filter_unit : filter_stmt->filter_units()) {
-        Value left_value, right_value;
-
-        // Get left value
-        if (filter_unit->left().is_attr()) {
-          const Field &field = filter_unit->left().field;
-          const FieldMeta *field_meta = field.meta();
-          
-          // Check if field is NULL
-          if (field_meta->nullable()) {
-            bool is_null = record.data()[field_meta->offset() + field_meta->len() - 1] == '1';
-            if (is_null) {
-              left_value.set_type(AttrType::UNDEFINED);
-              left_value.set_null(true);
-            } else {
-              left_value.set_type(field_meta->type());
-              size_t data_len = field_meta->len() - 1; // Exclude NULL flag
-              left_value.set_data(const_cast<char*>(record.data()) + field_meta->offset(), data_len);
-            }
-          } else {
-            left_value.set_type(field_meta->type());
-            left_value.set_data(const_cast<char*>(record.data()) + field_meta->offset(), field_meta->len());
-          }
-        } else if (filter_unit->left().is_value()) {
-          left_value = filter_unit->left().value;
-        } else if (filter_unit->left().is_expr()) {
-          // For expression evaluation, we need a proper tuple
-          // For now, we'll skip expression evaluation in UPDATE
-          // This is a limitation that should be addressed in a complete implementation
-          LOG_WARN("Expression evaluation in UPDATE WHERE clause not fully implemented");
-          match = false;
-          break;
-        }
-
-        // Get right value
-        if (filter_unit->right().is_attr()) {
-          const Field &field = filter_unit->right().field;
-          const FieldMeta *field_meta = field.meta();
-          
-          // Check if field is NULL
-          if (field_meta->nullable()) {
-            bool is_null = record.data()[field_meta->offset() + field_meta->len() - 1] == '1';
-            if (is_null) {
-              right_value.set_type(AttrType::UNDEFINED);
-              right_value.set_null(true);
-            } else {
-              right_value.set_type(field_meta->type());
-              size_t data_len = field_meta->len() - 1; // Exclude NULL flag
-              right_value.set_data(const_cast<char*>(record.data()) + field_meta->offset(), data_len);
-            }
-          } else {
-            right_value.set_type(field_meta->type());
-            right_value.set_data(const_cast<char*>(record.data()) + field_meta->offset(), field_meta->len());
-          }
-        } else if (filter_unit->right().is_value()) {
-          right_value = filter_unit->right().value;
-        } else if (filter_unit->right().is_expr()) {
-          // For expression evaluation, we need a proper tuple
-          // For now, we'll skip expression evaluation in UPDATE
-          // This is a limitation that should be addressed in a complete implementation
-          LOG_WARN("Expression evaluation in UPDATE WHERE clause not fully implemented");
-          match = false;
-          break;
-        }
-
-        // Handle NULL values according to SQL semantics
-        bool condition_match = false;
-
-        // Special handling for IS NULL and IS NOT NULL
-        if (filter_unit->comp() == IS_NULL_OP) {
-          condition_match = (left_value.attr_type() == AttrType::UNDEFINED || left_value.is_null());
-        } else if (filter_unit->comp() == IS_NOT_NULL_OP) {
-          condition_match = !(left_value.attr_type() == AttrType::UNDEFINED || left_value.is_null());
-        } else {
-          // For other operators, if either value is NULL, the result is UNKNOWN (false in WHERE clause)
-          if (left_value.attr_type() == AttrType::UNDEFINED || left_value.is_null() ||
-              right_value.attr_type() == AttrType::UNDEFINED || right_value.is_null()) {
-            condition_match = false; // NULL comparisons are UNKNOWN, treated as false in WHERE
-          } else {
-            // Compare non-NULL values
-            int cmp_result = left_value.compare(right_value);
-
-            switch (filter_unit->comp()) {
-              case EQUAL_TO:
-                condition_match = (cmp_result == 0);
-                break;
-              case LESS_THAN:
-                condition_match = (cmp_result < 0);
-                break;
-              case GREAT_THAN:
-                condition_match = (cmp_result > 0);
-                break;
-              case LESS_EQUAL:
-                condition_match = (cmp_result <= 0);
-                break;
-              case GREAT_EQUAL:
-                condition_match = (cmp_result >= 0);
-                break;
-              case NOT_EQUAL:
-                condition_match = (cmp_result != 0);
-                break;
-              case LIKE_OP:
-                if (left_value.attr_type() == AttrType::CHARS && right_value.attr_type() == AttrType::CHARS) {
-                  condition_match = like_match(left_value.get_string().c_str(), right_value.get_string().c_str());
-                }
-                break;
-              case IN_VALUES_OP:
-              case NOT_IN_VALUES_OP:
-                {
-                  // 处理IN/NOT IN操作
-                  const std::vector<Value> &values = filter_unit->right_values();
-                  bool found = false;
-                  for (const Value &val : values) {
-                    if (left_value.compare(val) == 0) {
-                      found = true;
-                      break;
-                    }
-                  }
-                  condition_match = (filter_unit->comp() == IN_VALUES_OP) ? found : !found;
-                }
-                break;
-              case NOT_LIKE_OP:
-                if (left_value.attr_type() == AttrType::CHARS && right_value.attr_type() == AttrType::CHARS) {
-                  condition_match = !like_match(left_value.get_string().c_str(), right_value.get_string().c_str());
-                }
-                break;
-              default:
-                condition_match = false;
-                break;
-            }
-          }
-        }
-
-        if (!condition_match) {
-          match = false;
-          break; // AND logic - if any condition fails, record doesn't match
-        }
-      }
-
-      if (match) {
-        records_to_update.emplace_back(record);
+        break;
       }
     }
-  }
-
-  scanner->close_scan();
-
-  if (rc != RC::RECORD_EOF) {
-    LOG_WARN("failed to scan records. rc=%s", strrc(rc));
-    return rc;
-  }
-
-  // 多字段UPDATE处理
-  if (update_stmt->is_multi_field()) {
-    const vector<const FieldMeta *> &metas = update_stmt->field_metas();
-    const vector<Value> &vals = update_stmt->multi_values();
     
-    for (Record &old_rec : records_to_update) {
+    if (match) {
+      records.push_back(rec);
+    }
+  }
+  scanner->close_scan();
+  
+  // 执行更新
+  if (update_stmt->is_multi_field()) {
+    // 多字段UPDATE
+    for (Record &old_rec : records) {
       Record new_rec;
       new_rec.copy_data(old_rec.data(), old_rec.len());
       new_rec.set_rid(old_rec.rid());
       
-      for (size_t i = 0; i < metas.size(); i++) {
-        const FieldMeta *fm = metas[i];
-        const Value &val = vals[i];
-        char *data = new_rec.data();
+      for (size_t i = 0; i < update_stmt->field_metas().size(); i++) {
+        const FieldMeta *fm = update_stmt->field_metas()[i];
+        const Value &val = update_stmt->multi_values()[i];
         
-        if (val.attr_type() == AttrType::UNDEFINED || val.is_null()) {
-          if (!fm->nullable()) return RC::INVALID_ARGUMENT;
-          memset(data + fm->offset(), 0, fm->len());
-          data[fm->offset() + fm->len() - 1] = '1';
-        } else {
-          Value casted;
-          const Value *wv = &val;
-          if (val.attr_type() != fm->type() && Value::cast_to(val, fm->type(), casted) == RC::SUCCESS) {
-            wv = &casted;
-          }
-          
-          if (fm->type() == AttrType::CHARS || fm->type() == AttrType::TEXTS) {
-            size_t len = std::min((size_t)(fm->len() - (fm->nullable() ? 1 : 0)), (size_t)wv->length());
-            memset(data + fm->offset(), 0, fm->len());
-            memcpy(data + fm->offset(), wv->data(), len);
-            if (fm->nullable()) data[fm->offset() + fm->len() - 1] = '0';
-          } else {
-            size_t len = wv->length();
-            if (fm->nullable()) {
-              len = std::min(len, (size_t)(fm->len() - 1));
-              memcpy(data + fm->offset(), wv->data(), len);
-              data[fm->offset() + fm->len() - 1] = '0';
-            } else {
-              memcpy(data + fm->offset(), wv->data(), std::min(len, (size_t)fm->len()));
-            }
-          }
+        // 简化：直接复制值
+        char *data = new_rec.data();
+        memset(data + fm->offset(), 0, fm->len());
+        if (val.attr_type() != AttrType::UNDEFINED) {
+          size_t len = std::min((size_t)val.length(), (size_t)fm->len());
+          memcpy(data + fm->offset(), val.data(), len);
         }
       }
       
       rc = table->update_record_with_trx(old_rec, new_rec, trx);
       if (rc != RC::SUCCESS) return rc;
     }
-    return RC::SUCCESS;
+  } else {
+    // 单字段UPDATE - 使用旧逻辑
+    for (Record &old_rec : records) {
+      Record new_rec;
+      new_rec.copy_data(old_rec.data(), old_rec.len());
+      new_rec.set_rid(old_rec.rid());
+      
+      char *data = new_rec.data();
+      const FieldMeta *fm = update_stmt->field_meta();
+      Value *val = update_stmt->value();
+      
+      memset(data + fm->offset(), 0, fm->len());
+      if (val->attr_type() != AttrType::UNDEFINED) {
+        size_t len = std::min((size_t)val->length(), (size_t)fm->len());
+        memcpy(data + fm->offset(), val->data(), len);
+      }
+      
+      rc = table->update_record_with_trx(old_rec, new_rec, trx);
+      if (rc != RC::SUCCESS) return rc;
+    }
   }
   
-  // 单字段UPDATE
-  const FieldMeta *field_meta = update_stmt->field_meta();
-  Value *orig_value = update_stmt->value();
-  Stmt *sub_query_stmt = update_stmt->sub_query_stmt();
-
-  // If this is a sub-query update, execute the sub-query first
-  Value sub_query_value;
-  if (sub_query_stmt != nullptr) {
-    // Execute the sub-query to get the value
-    rc = execute_sub_query(sub_query_stmt, session, sub_query_value);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to execute sub-query for UPDATE. rc=%s", strrc(rc));
-      return rc;
-    }
-    orig_value = &sub_query_value;
-  }
-
-  for (Record &old_record : records_to_update) {
-    // Create new record with updated field
-    Record new_record;
-    new_record.set_rid(old_record.rid());
-    // Make an owned copy of the old record's data to avoid mutating the original buffer
-    RC copy_rc = new_record.copy_data(old_record.data(), old_record.len());
-    if (copy_rc != RC::SUCCESS) {
-      LOG_WARN("failed to copy record data. table=%s, rc=%s", table->name(), strrc(copy_rc));
-      return copy_rc;
-    }
-
-    // Select value to write (try cast when type mismatches)
-    const Value *write_value = orig_value;
-    Value        casted_value;
-
-    if (orig_value->attr_type() != field_meta->type() && orig_value->attr_type() != AttrType::UNDEFINED) {
-      RC cast_rc = Value::cast_to(*orig_value, field_meta->type(), casted_value);
-      if (cast_rc == RC::SUCCESS) {
-        write_value = &casted_value;
-      } else {
-        // Baseline expects UPDATE to succeed even when the value type is invalid.
-        // Skip updating this record but continue overall with SUCCESS.
-        continue;
-      }
-    }
-
-    // Update the specific field in the new record
-    char *record_data = new_record.data();
-
-    // Handle NULL values properly
-    if (write_value->attr_type() == AttrType::UNDEFINED || write_value->is_null()) {
-      if (!field_meta->nullable()) {
-        // 不能给NOT NULL字段设置NULL
-        return RC::INVALID_ARGUMENT;
-      }
-      // 设置NULL标志
-      memset(record_data + field_meta->offset(), 0, field_meta->len());
-      record_data[field_meta->offset() + field_meta->len() - 1] = '1';
-    } else {
-      // Handle non-NULL values
-      if (field_meta->type() == AttrType::CHARS || field_meta->type() == AttrType::TEXTS) {
-        // For string and text fields, handle length and zero-fill
-        size_t copy_len = std::min(static_cast<size_t>(field_meta->len() - (field_meta->nullable() ? 1 : 0)),
-                                   static_cast<size_t>(write_value->length()));
-        memset(record_data + field_meta->offset(), 0, field_meta->len()); // Clear the field first to avoid leftover data
-        memcpy(record_data + field_meta->offset(), write_value->data(), copy_len);
-        // For nullable fields, set NULL flag to '0' (not NULL)
-        if (field_meta->nullable()) {
-          record_data[field_meta->offset() + field_meta->len() - 1] = '0';
-        }
-      } else {
-        // For other types, copy the data
-        size_t copy_len = write_value->length();
-        if (field_meta->nullable()) {
-          // For nullable fields, copy data but leave space for NULL flag
-          copy_len = std::min(copy_len, static_cast<size_t>(field_meta->len() - 1));
-          memcpy(record_data + field_meta->offset(), write_value->data(), copy_len);
-          record_data[field_meta->offset() + field_meta->len() - 1] = '0';  // Set NULL flag to not NULL
-        } else {
-          // For non-nullable fields, copy the exact field length
-          copy_len = std::min(copy_len, static_cast<size_t>(field_meta->len()));
-          memcpy(record_data + field_meta->offset(), write_value->data(), copy_len);
-        }
-      }
-    }
-
-    // Update the record using transaction
-    rc = table->update_record_with_trx(old_record, new_record, trx);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to update record. table=%s, rc=%s", table->name(), strrc(rc));
-      return rc;
-    }
-  }
-
   return RC::SUCCESS;
 }
 

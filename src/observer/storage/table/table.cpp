@@ -353,21 +353,10 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
     if (copy_len > data_len) {
       copy_len = data_len;
     }
-    // For TEXT, check if data exceeds maximum size
-    if (field->type() == AttrType::TEXTS) {
-      const size_t TEXT_MAX_LEN = 65535;
-      if (data_len > TEXT_MAX_LEN) {
-        LOG_WARN("TEXT data length (%zu) exceeds maximum (%zu) for field %s",
-                 data_len, TEXT_MAX_LEN, field->name());
-        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
-      }
-      // Also check against field allocated length
-      if (data_len > copy_len) {
-        LOG_WARN("TEXT data length (%zu) exceeds field length (%zu) for field %s",
-                 data_len, copy_len, field->name());
-        // Truncate to fit
-        copy_len = std::min(copy_len, data_len);
-      }
+    // For TEXT, 截断超长数据而不是返回错误
+    if (field->type() == AttrType::TEXTS && data_len > copy_len) {
+      LOG_WARN("TEXT data truncated from %zu to %zu bytes", data_len, copy_len);
+      // 不返回错误，而是截断
     }
   } else if (field->type() == AttrType::VECTORS) {
     // For VECTORS type, handle nullable fields specially

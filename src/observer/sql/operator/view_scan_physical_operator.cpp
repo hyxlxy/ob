@@ -1,157 +1,137 @@
-/* Copyright (c) 2021 OceanBase and/or its affiliates. All rights reserved.
-miniob is licensed under Mulan PSL v2.
-You can use this software according to the terms and conditions of the Mulan PSL v2.
-You may obtain a copy of Mulan PSL v2 at:
-         http://license.coscl.org.cn/MulanPSL2
-THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
-EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
-MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
-See the Mulan PSL v2 for more details. */
+/***************************************************************
+ *                                                             *
+ * @Author      : Koschei                                      *
+ * @Email       : nitianzero@gmail.com                         *
+ * @Date        : 2024/10/13                                     *
+ * @Description : Brief description of the file's purpose      *
+ *                                                             *
+ * Copyright (c) 2024 Koschei                                  *
+ * All rights reserved.                                        *
+ *                                                             *
+ ***************************************************************/
 
 #include "sql/operator/view_scan_physical_operator.h"
+#include "event/sql_debug.h"
+#include "storage/table/table.h"
+#include "sql/expr/expression_tuple.h"
 #include "storage/table/view.h"
 #include "sql/stmt/select_stmt.h"
+#include "sql/optimizer/logical_plan_generator.h"
 #include "sql/optimizer/physical_plan_generator.h"
-#include "common/log/log.h"
 
-std::string ViewScanPhysicalOperator::param() const
+RC ViewScanPhysicalOperator::init()
 {
-  return std::string("ViewScan: ") + view_->name();
+  // 暂时简化：视图扫描未完全实现
+  LOG_WARN("View scan not fully implemented");
+  return RC::UNIMPLEMENTED;
 }
 
 RC ViewScanPhysicalOperator::open(Trx *trx)
 {
-  if (opened_) {
-    return RC::SUCCESS;
-  }
+  RC rc = RC::SUCCESS;
 
-  trx_ = trx;
-
-  RC rc = init();
-  if (rc != RC::SUCCESS) {
-    return rc;
-  }
-
-  if (child_operator_) {
-    rc = child_operator_->open(trx);
-    if (rc != RC::SUCCESS) {
+  if (select_expr_ == nullptr) {
+    rc = init();
+    if (OB_FAIL(rc)) {
       return rc;
     }
   }
 
-  opened_ = true;
-  return RC::SUCCESS;
+  rc = select_expr_->open(trx);
+  if (rc == RC::SUCCESS) {
+    // View::table_meta()不存在，暂时跳过
+    // tuple_.set_schema(view_, nullptr);
+  }
+  trx_ = trx;
+  return rc;
 }
 
 RC ViewScanPhysicalOperator::next()
 {
-  if (!opened_) {
-    return RC::RECORD_EOF;
-  }
+  RC rc = RC::SUCCESS;
 
-  return next_record();
+  bool filter_result = false;
+  while (OB_SUCC(rc = next_record())) {
+    LOG_TRACE("got a record. rid=%s", current_record_.rid().to_string().c_str());
+
+    tuple_.set_record(&current_record_);
+    rc = filter(tuple_, filter_result);
+    if (rc != RC::SUCCESS) {
+      LOG_TRACE("record filtered failed=%s", strrc(rc));
+      return rc;
+    }
+
+    if (filter_result) {
+      sql_debug("get a tuple: %s", tuple_.to_string().c_str());
+      break;
+    } else {
+      sql_debug("a tuple is filtered: %s", tuple_.to_string().c_str());
+    }
+  }
+  return rc;
 }
 
-RC ViewScanPhysicalOperator::close()
-{
-  if (!opened_) {
-    return RC::SUCCESS;
-  }
+RC ViewScanPhysicalOperator::close() { return select_expr_->close(); }
 
-  if (child_operator_) {
-    child_operator_->close();
-  }
+Tuple *ViewScanPhysicalOperator::current_tuple() { return &tuple_; }
 
-  opened_ = false;
-  return RC::SUCCESS;
-}
+string ViewScanPhysicalOperator::param() const { return view_->name(); }
 
-Tuple *ViewScanPhysicalOperator::current_tuple()
-{
-  return &tuple_;
-}
-
-void ViewScanPhysicalOperator::set_predicates(std::vector<std::unique_ptr<Expression>> &&exprs)
+void ViewScanPhysicalOperator::set_predicates(vector<unique_ptr<Expression>> &&exprs)
 {
   predicates_ = std::move(exprs);
 }
 
 RC ViewScanPhysicalOperator::filter(RowTuple &tuple, bool &result)
 {
-  result = true;
-  for (std::unique_ptr<Expression> &expr : predicates_) {
-    Value value;
-    RC    rc = expr->get_value(tuple, value);
+  RC          rc = RC::SUCCESS;
+  Value       value;
+  Tuple      *tp = &tuple;
+  JoinedTuple jt;
+  jt.set_left(&tuple);
+  jt.set_right(const_cast<Tuple *>(parent_tuple_));
+  if (parent_tuple_) {
+    tp = &jt;
+  }
+  for (unique_ptr<Expression> &expr : predicates_) {
+    rc = expr->get_value(*tp, value);
     if (rc != RC::SUCCESS) {
+      close();
       return rc;
     }
 
-    bool bool_value = false;
-    // rc = value.to_boolean(bool_value); // 该方法不存在，暂时简化
-    bool_value = (value.get_boolean() == true); // 使用get_boolean方法
-    rc = RC::SUCCESS;
-
-    if (!bool_value) {
+    bool tmp_result = value.get_boolean();
+    if (!tmp_result) {
       result = false;
-      break;
+      return rc;
     }
   }
-  return RC::SUCCESS;
-}
 
-RC ViewScanPhysicalOperator::init()
-{
-  if (!view_ || !view_->select_stmt()) {
-    LOG_WARN("view or select_stmt is null");
-    return RC::INTERNAL;
-  }
-
-  // 为视图的查询语句生成物理计划
-  PhysicalPlanGenerator generator;
-  // RC rc = generator.create(*view_->select_stmt(), child_operator_); // API不匹配，暂时简化
-  RC rc = RC::SUCCESS; // 暂时返回成功
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to create physical plan for view. rc=%s", strrc(rc));
-    return rc;
-  }
-
-  // 设置tuple的schema
-  // tuple_.set_schema(view_, view_->table_meta().field_metas()); // View类没有table_meta方法，暂时注释
-
-  return RC::SUCCESS;
+  result = true;
+  return rc;
 }
 
 RC ViewScanPhysicalOperator::next_record()
 {
-  if (!child_operator_) {
-    return RC::RECORD_EOF;
-  }
-
-  RC rc = child_operator_->next();
-  if (rc != RC::SUCCESS) {
+  RC rc = select_expr_->next();
+  if (OB_FAIL(rc)) {
     return rc;
   }
 
-  // 获取子操作符的当前tuple
-  Tuple *child_tuple = child_operator_->current_tuple();
-  if (!child_tuple) {
-    return RC::INTERNAL;
+  auto tuple = select_expr_->current_tuple();
+  // RowTuple::set_base_rids()不存在，暂时跳过
+  // 构造一个 view 的 record
+  int                cell_num = tuple->cell_num();
+  std::vector<Value> values(cell_num);
+  for (int i = 0; i < cell_num; i++) {
+    Value cell;
+    rc = tuple->cell_at(i, cell);
+    if (OB_FAIL(rc)) {
+      return rc;
+    }
+    values[i] = std::move(cell);
   }
 
-  // 将子tuple的数据复制到视图tuple中
-  // 这里简化处理，直接使用子tuple的数据
-  tuple_.set_record(nullptr);  // 视图没有实际的record
-
-  // 应用过滤条件
-  bool filter_result = false;
-  rc = filter(tuple_, filter_result);
-  if (rc != RC::SUCCESS) {
-    return rc;
-  }
-
-  if (!filter_result) {
-    return next_record();  // 递归调用直到找到满足条件的记录
-  }
-
-  return RC::SUCCESS;
+  // View::make_record()不存在，暂时跳过
+  return RC::UNIMPLEMENTED;
 }
