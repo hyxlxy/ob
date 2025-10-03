@@ -117,14 +117,14 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
   UpdateStmt *update_stmt = static_cast<UpdateStmt *>(stmt);
   Table *table = update_stmt->table();
   Trx *trx = session->current_trx();
-  
+
   // 获取scanner
   RecordScanner *scanner = nullptr;
   RC rc = table->get_record_scanner(scanner, trx, ReadWriteMode::READ_WRITE);
   if (rc != RC::SUCCESS) {
     return rc;
   }
-  
+
   // 收集要更新的记录
   vector<Record> records;
   Record rec;
@@ -138,7 +138,7 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
     }
     
     // 评估WHERE条件
-    bool match = true;
+      bool match = true;
     for (const FilterUnit *fu : fs->filter_units()) {
       Value lv, rv;
       
@@ -208,7 +208,7 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
     }
   }
   scanner->close_scan();
-  
+
   // 执行更新
   if (update_stmt->is_multi_field()) {
     // 多字段UPDATE
@@ -279,7 +279,7 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
       if (rc != RC::SUCCESS) return rc;
     }
   }
-  
+
   return RC::SUCCESS;
 }
 

@@ -224,11 +224,12 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
   const TupleSchema &schema   = sql_result->tuple_schema();
   const int          cell_num = schema.cell_num();
 
+  bool first_cell = true;
   for (int i = 0; i < cell_num; i++) {
     const TupleCellSpec &spec  = schema.cell_at(i);
     const char          *alias = spec.alias();
-    if (nullptr != alias || alias[0] != 0) {
-      if (0 != i) {
+    if (nullptr != alias && alias[0] != 0) {
+      if (!first_cell) {
         const char *delim = " | ";
 
         rc = writer_->writen(delim, strlen(delim));
@@ -246,6 +247,7 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
         sql_result->close();
         return rc;
       }
+      first_cell = false;
     }
   }
 

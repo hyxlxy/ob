@@ -808,6 +808,12 @@ update_kv_list:
       $$ = $1;
       delete $5;
     }
+    | ID EQ LBRACE sub_query RBRACE
+    {
+      // 单字段子查询UPDATE - 回退到旧语法处理
+      // 这里暂时不支持，让解析器尝试其他规则
+      YYERROR;
+    }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
     SELECT projection_list FROM rel_list join_list where group_by having order_by
@@ -1077,6 +1083,11 @@ rel_attr:
       $$ = new RelAttrSqlNode;
       $$->relation_name  = $1;
       $$->attribute_name = $3;
+    }
+    | ID DOT '*' {
+      $$ = new RelAttrSqlNode;
+      $$->relation_name  = $1;
+      $$->attribute_name = (char*)"*";
     }
     ;
 

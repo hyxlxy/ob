@@ -49,13 +49,14 @@ Table *BinderContext::find_table(const char *table_name) const
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-static void wildcard_fields(Table *table, vector<unique_ptr<Expression>> &expressions)
+static void wildcard_fields(Table *table, const char *table_name_or_alias, vector<unique_ptr<Expression>> &expressions)
 {
   const TableMeta &table_meta = table->table_meta();
   const int        field_num  = table_meta.field_num();
   for (int i = table_meta.sys_field_num(); i < field_num; i++) {
     Field      field(table, table_meta.field(i));
     FieldExpr *field_expr = new FieldExpr(field);
+    // Set field name without table prefix (MySQL behavior for wildcard expansion)
     field_expr->set_name(field.field_name());
     expressions.emplace_back(field_expr);
   }
@@ -153,24 +154,24 @@ RC ExpressionBinder::bind_star_expression(
 
   auto star_expr = static_cast<StarExpr *>(expr.get());
 
-  vector<Table *> tables_to_wildcard;
-
   const char *table_name = star_expr->table_name();
   if (!is_blank(table_name) && 0 != strcmp(table_name, "*")) {
+    // Specific table specified (e.g., "t2.*")
     Table *table = context_.find_table(table_name);
     if (nullptr == table) {
       LOG_INFO("no such table in from list: %s", table_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
-    tables_to_wildcard.push_back(table);
+    // Use the name as specified by user (could be alias like "t2")
+    wildcard_fields(table, table_name, bound_expressions);
   } else {
+    // Expand all tables (SELECT *)
     const vector<Table *> &all_tables = context_.query_tables();
-    tables_to_wildcard.insert(tables_to_wildcard.end(), all_tables.begin(), all_tables.end());
-  }
-
-  for (Table *table : tables_to_wildcard) {
-    wildcard_fields(table, bound_expressions);
+    for (Table *table : all_tables) {
+      // Use actual table name for wildcard expansion
+      wildcard_fields(table, table->name(), bound_expressions);
+    }
   }
 
   return RC::SUCCESS;
@@ -187,10 +188,6 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
   const char *table_name = unbound_field_expr->table_name();
   const char *field_name = unbound_field_expr->field_name();
-  
-  printf("DEBUG: [BINDER] Binding UnboundFieldExpr: table='%s', field='%s'\n",
-         table_name ? table_name : "NULL",
-         field_name ? field_name : "NULL");
 
   Table *table = nullptr;
   if (is_blank(table_name)) {
@@ -245,7 +242,8 @@ RC ExpressionBinder::bind_unbound_field_expression(
   }
 
   if (0 == strcmp(field_name, "*")) {
-    wildcard_fields(table, bound_expressions);
+    // Use table_name (which could be an alias) for wildcard expansion
+    wildcard_fields(table, table_name, bound_expressions);
   } else {
     const FieldMeta *field_meta = table->table_meta().field(field_name);
     if (nullptr == field_meta) {
@@ -258,21 +256,18 @@ RC ExpressionBinder::bind_unbound_field_expression(
     const char *alias_name = expr->name();
 
     // Set field name according to the following rules:
-    // 1. If there's an explicit alias (user provided alias), use it
-    // 2. If the name contains a dot (like "t1.id"), keep it as-is (this is table alias + field)
-    // 3. Otherwise, use just the field name
+    // 1. If there's an explicit alias (user provided via AS), use it
+    // 2. If no alias, use just the field name (not table.field)
     if (alias_name != nullptr && alias_name[0] != '\0') {
       // Check if this is a qualified name (table.field or alias.field)
       bool is_qualified = (strchr(alias_name, '.') != nullptr);
       
-      // If it's qualified, keep the full name (e.g., "t1.id")
-      // If it's not qualified but not empty, it's either an explicit alias or a bare field reference
       if (is_qualified) {
-        // For qualified names, check if we should use the alias
-        // If table_name in the query matches an alias, keep the qualified name
-        field_expr->set_name(alias_name);
+        // Qualified name without explicit AS alias: use only the field name
+        // (e.g., "SELECT t1.id" displays as "id", not "t1.id")
+        field_expr->set_name(field_name);
       } else {
-        // For unqualified names, use them as-is (could be explicit alias or bare field)
+        // Unqualified name: this is an explicit alias or bare field reference
         field_expr->set_name(alias_name);
       }
     } else {
