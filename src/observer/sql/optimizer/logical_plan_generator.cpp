@@ -215,7 +215,6 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
   // Bind projection expressions
   vector<unique_ptr<Expression>> proj_exprs = std::move(select_stmt->query_expressions());
-  LOG_WARN("LOGICAL_PLAN: Creating ProjectLogicalOperator, initial proj_exprs.size()=%zu", proj_exprs.size());
   
   if (binder_ctx_initialized_) {
     ExpressionBinder binder(binder_context_);
@@ -223,10 +222,8 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
       vector<unique_ptr<Expression>> bound;
       RC brc = binder.bind_expression(expr, bound);
       if (OB_FAIL(brc)) {
-        LOG_WARN("LOGICAL_PLAN: Failed to bind projection expression, rc=%s", strrc(brc));
         return brc;
       }
-      LOG_WARN("LOGICAL_PLAN: Bound expression, bound.size()=%zu", bound.size());
       if (!bound.empty()) {
         // For SELECT list, star may expand to multiple expressions.
         // Replace current expr with the first, and append the rest.
@@ -243,7 +240,6 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     }
   }
 
-  LOG_WARN("LOGICAL_PLAN: Final proj_exprs.size()=%zu before creating ProjectLogicalOperator", proj_exprs.size());
   auto project_oper = make_unique<ProjectLogicalOperator>(std::move(proj_exprs));
   if (*last_oper) {
     project_oper->add_child(std::move(*last_oper));

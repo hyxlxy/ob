@@ -142,29 +142,14 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
       bool match = true;
       FilterStmt *filter_stmt = update_stmt->filter_stmt();
       
-      LOG_INFO("UPDATE: Checking WHERE condition, filter_units count: %zu", filter_stmt->filter_units().size());
-      
-      // If filter_units is empty but condition_tree exists, we need to use a different approach
-      // For now, if filter_units is empty, skip filtering (treat as no WHERE clause)
+      // 如果filter_units为空，检查是否真的没有WHERE条件
       if (filter_stmt->filter_units().empty()) {
-        LOG_WARN("UPDATE: filter_units is empty but filter_stmt exists, this is a bug. Using condition_tree or treating as no WHERE.");
-        // TODO: Use condition_tree to evaluate conditions
-        // For now, we'll check if there's a condition tree
-        if (filter_stmt->get_condition_tree() == nullptr) {
-          // No conditions at all, update all records
-          records_to_update.emplace_back(record);
-          continue;
-        } else {
-          // Has condition_tree but no filter_units
-          // This means conditions couldn't be converted to filter_units (probably due to expressions)
-          // We need to use a proper tuple-based evaluation
-          // For now, skip this record to avoid incorrect updates
-          LOG_WARN("UPDATE: Has condition_tree but empty filter_units - expressions not supported in UPDATE WHERE yet");
-          match = false;
-        }
+        // filter_units为空但filter_stmt存在，说明条件解析有问题
+        // 为安全起见，不更新任何记录
+        match = false;
       }
 
-      // Evaluate each filter condition
+      // 评估每个过滤条件
       for (const FilterUnit *filter_unit : filter_stmt->filter_units()) {
         Value left_value, right_value;
 
@@ -317,88 +302,13 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
     return rc;
   }
 
-  // Check if this is multi-field update
+  // 只支持单字段UPDATE（多字段UPDATE暂不支持）
   if (update_stmt->is_multi_field()) {
-    // Multi-field update
-    const vector<const FieldMeta *> &field_metas = update_stmt->field_metas();
-    const vector<Value> &values = update_stmt->multi_values();
-    
-    if (field_metas.size() != values.size()) {
-      LOG_WARN("field count mismatch in multi-field update");
-      return RC::INVALID_ARGUMENT;
-    }
-    
-    for (Record &old_record : records_to_update) {
-      // Create new record
-      Record new_record;
-      RC copy_rc = new_record.copy_data(old_record.data(), old_record.len());
-      if (copy_rc != RC::SUCCESS) {
-        LOG_WARN("failed to copy record data. table=%s, rc=%s", table->name(), strrc(copy_rc));
-        return copy_rc;
-      }
-      new_record.set_rid(old_record.rid());
-      
-      // Update all fields
-      for (size_t i = 0; i < field_metas.size(); i++) {
-        const FieldMeta *field_meta = field_metas[i];
-        const Value &value = values[i];
-        
-        char *record_data = new_record.data();
-        
-        // Handle NULL values
-        if (value.attr_type() == AttrType::UNDEFINED || value.is_null()) {
-          if (field_meta->nullable()) {
-            memset(record_data + field_meta->offset(), 0, field_meta->len());
-            record_data[field_meta->offset() + field_meta->len() - 1] = '1';
-          } else {
-            LOG_WARN("Cannot set NULL to NOT NULL field %s", field_meta->name());
-            return RC::INVALID_ARGUMENT;
-          }
-        } else {
-          // Handle non-NULL values
-          Value casted_value;
-          const Value *write_value = &value;
-          if (value.attr_type() != field_meta->type()) {
-            RC cast_rc = Value::cast_to(value, field_meta->type(), casted_value);
-            if (cast_rc == RC::SUCCESS) {
-              write_value = &casted_value;
-            }
-          }
-          
-          if (field_meta->type() == AttrType::CHARS || field_meta->type() == AttrType::TEXTS) {
-            size_t copy_len = std::min(static_cast<size_t>(field_meta->len() - (field_meta->nullable() ? 1 : 0)),
-                                       static_cast<size_t>(write_value->length()));
-            memset(record_data + field_meta->offset(), 0, field_meta->len());
-            memcpy(record_data + field_meta->offset(), write_value->data(), copy_len);
-            if (field_meta->nullable()) {
-              record_data[field_meta->offset() + field_meta->len() - 1] = '0';
-            }
-          } else {
-            size_t copy_len = write_value->length();
-            if (field_meta->nullable()) {
-              copy_len = std::min(copy_len, static_cast<size_t>(field_meta->len() - 1));
-              memcpy(record_data + field_meta->offset(), write_value->data(), copy_len);
-              record_data[field_meta->offset() + field_meta->len() - 1] = '0';
-            } else {
-              copy_len = std::min(copy_len, static_cast<size_t>(field_meta->len()));
-              memcpy(record_data + field_meta->offset(), write_value->data(), copy_len);
-            }
-          }
-        }
-      }
-      
-      // Update the record
-      rc = table->update_record_with_trx(old_record, new_record, trx);
-      if (rc != RC::SUCCESS) {
-        LOG_WARN("failed to update record. table=%s, rc=%s", table->name(), strrc(rc));
-        return rc;
-      }
-    }
-    
-    return RC::SUCCESS;
+    LOG_WARN("Multi-field UPDATE not yet supported");
+    return RC::UNIMPLEMENTED;
   }
   
-  // Single-field update (original logic)
+  // Single-field update
   const FieldMeta *field_meta = update_stmt->field_meta();
   Value *orig_value = update_stmt->value();
   Stmt *sub_query_stmt = update_stmt->sub_query_stmt();
@@ -446,18 +356,13 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
 
     // Handle NULL values properly
     if (write_value->attr_type() == AttrType::UNDEFINED || write_value->is_null()) {
-      LOG_INFO("UPDATE: Setting field %s to NULL (nullable=%d)", field_meta->name(), field_meta->nullable());
-      
-      if (field_meta->nullable()) {
-        // For nullable fields, set the field data to zeros and set NULL flag in last byte
-        memset(record_data + field_meta->offset(), 0, field_meta->len());
-        record_data[field_meta->offset() + field_meta->len() - 1] = '1';  // Set NULL flag
-        LOG_INFO("UPDATE: NULL flag set at offset %d", field_meta->offset() + field_meta->len() - 1);
-      } else {
-        // For non-nullable fields, cannot set NULL - this is an error
-        LOG_WARN("UPDATE: Cannot set NULL to NOT NULL field %s", field_meta->name());
-        return RC::INVALID_ARGUMENT;  // Return error instead of continuing
+      if (!field_meta->nullable()) {
+        // 不能给NOT NULL字段设置NULL
+        return RC::INVALID_ARGUMENT;
       }
+      // 设置NULL标志
+      memset(record_data + field_meta->offset(), 0, field_meta->len());
+      record_data[field_meta->offset() + field_meta->len() - 1] = '1';
     } else {
       // Handle non-NULL values
       if (field_meta->type() == AttrType::CHARS || field_meta->type() == AttrType::TEXTS) {

@@ -239,6 +239,12 @@ RC CreateTableExecutor::execute_create_table_as_select(Session *session, CreateT
     if (attr_info.name.empty()) {
       // Fallback to generic name if no alias
       attr_info.name = "col" + std::to_string(i + 1);
+    } else {
+      // 如果alias包含'.'（如"t1.id"），只取字段名部分
+      size_t dot_pos = attr_info.name.find('.');
+      if (dot_pos != string::npos) {
+        attr_info.name = attr_info.name.substr(dot_pos + 1);
+      }
     }
 
     // Get type information from the first tuple if available

@@ -500,19 +500,12 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
 
 
       // Check if left_value is in sub_query_results
-      LOG_WARN("IN subquery: Checking left_value=%s against %zu sub_query_results", 
-               left_value.to_string().c_str(), sub_query_results.size());
       for (const Value &sub_value : sub_query_results) {
-        int cmp_result = left_value.compare(sub_value);
-        LOG_WARN("  Comparing left=%s with sub=%s, result=%d", 
-                 left_value.to_string().c_str(), sub_value.to_string().c_str(), cmp_result);
-        if (cmp_result == 0) {
+        if (left_value.compare(sub_value) == 0) {
           found = true;
-          LOG_WARN("  MATCH FOUND!");
           break;
         }
       }
-      LOG_WARN("IN subquery: found=%s", found ? "true" : "false");
     }
     // Handle list case (existing logic)
     else if (right_) {
@@ -1784,225 +1777,68 @@ RC SubQueryInExpr::eval(Chunk &chunk, vector<uint8_t> &select)
   return RC::SUCCESS;
 }
 
-// 执行子查询并收集结果
+// 执行子查询并收集结果 - 完全重写简化版本
 static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Value> &results, const Tuple *parent_tuple, const BinderContext *outer_context)
 {
-  LOG_WARN("Starting subquery execution");
-
   if (!sub_query) {
-    LOG_WARN("sub_query is null");
     return RC::INVALID_ARGUMENT;
   }
 
-  LOG_WARN("sub_query is valid, creating logical plan");
-
-  // 创建逻辑计划
+  // 创建逻辑和物理计划
   LogicalPlanGenerator logical_plan_generator;
   unique_ptr<LogicalOperator> logical_operator;
   RC rc = logical_plan_generator.create(sub_query, logical_operator);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to create logical plan for sub-query. rc=%s", strrc(rc));
-    // 对于子查询规划失败，直接返回错误
-    // 不再进行关联子查询检测，因为这可能误判
     return rc;
   }
 
-  LOG_WARN("Successfully created logical plan, creating physical plan");
-
-  // 创建物理计划
-  PhysicalPlanGenerator physical_plan_generator;
-  unique_ptr<PhysicalOperator> physical_operator;
   Session *session = Session::current_session();
-  rc = physical_plan_generator.create(*logical_operator, physical_operator, session);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to create physical plan for sub-query. rc=%s", strrc(rc));
-    // 对于物理计划生成失败，直接返回错误
-    return rc;
-  }
-
-  LOG_WARN("Successfully created physical plan");
-
-  // 调试：检查物理计划的类型
-  LOG_WARN("Physical operator type: %s", typeid(*physical_operator).name());
-  if (physical_operator->children().size() > 0) {
-    LOG_WARN("Physical operator has %d children", (int)physical_operator->children().size());
-    LOG_WARN("First child type: %s", typeid(*physical_operator->children()[0]).name());
-  } else {
-    LOG_WARN("Physical operator has no children");
-  }
-
-  // 执行子查询
-  // 获取当前 Session 和 Trx
-  LOG_WARN("Getting current session and transaction");
-  Trx *trx = nullptr;
-  if (session != nullptr) {
-    LOG_DEBUG("Session found, getting transaction");
-    trx = session->current_trx();
-  } else {
-    LOG_WARN("No current session found");
-  }
-  if (trx == nullptr) {
-    LOG_WARN("failed to get current transaction for sub-query execution");
+  if (!session) {
     return RC::INTERNAL;
   }
 
-  LOG_DEBUG("Opening physical operator");
-  rc = physical_operator->open(trx);
+  PhysicalPlanGenerator physical_plan_generator;
+  unique_ptr<PhysicalOperator> physical_operator;
+  rc = physical_plan_generator.create(*logical_operator, physical_operator, session);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to open sub-query physical operator. rc=%s", strrc(rc));
     return rc;
   }
 
-  // 设置父级 tuple 上下文以支持关联子查询
-  if (parent_tuple != nullptr) {
-    LOG_DEBUG("Setting parent tuple for correlated subquery");
+  // 打开物理操作符
+  Trx *trx = session->current_trx();
+  if (!trx) {
+    return RC::INTERNAL;
+  }
+
+  rc = physical_operator->open(trx);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+
+  // 设置父级tuple支持关联子查询
+  if (parent_tuple) {
     physical_operator->set_parent_tuple(parent_tuple);
-    // 设置 FieldExpr 的静态父级元组，用于相关子查询中的字段查找
     FieldExpr::set_current_parent_tuple(parent_tuple);
   }
 
-  // 重要：确保子查询的物理操作符有正确的子操作符
-  // 子查询需要从表中读取数据，所以应该有 TableScanPhysicalOperator 作为子操作符
-  LOG_DEBUG("Checking physical operator children for subquery");
-  if (physical_operator->children().empty()) {
-    LOG_WARN("Subquery physical operator has no children - this may cause ExpressionTuple to fail");
-    // 对于没有子操作符的情况，我们尝试直接执行，但可能失败
-  } else {
-    LOG_DEBUG("Subquery physical operator has %d children", (int)physical_operator->children().size());
-    for (size_t i = 0; i < physical_operator->children().size(); i++) {
-      LOG_DEBUG("Child %d type: %s", (int)i, typeid(*physical_operator->children()[i]).name());
-    }
-  }
-
-  // 关键修复：确保 ExpressionTuple 有正确的 child_tuple
-  // 对于 ProjectPhysicalOperator，我们需要确保它能正确设置 ExpressionTuple 的 child_tuple
-  LOG_DEBUG("Ensuring ExpressionTuple has proper child_tuple setup");
-  
-  // 关键修复：直接处理 ExpressionTuple 的问题
-  // 我们需要确保在收集结果时正确处理 ExpressionTuple
-  LOG_DEBUG("Subquery physical operator setup complete");
-
-  LOG_DEBUG("Physical operator opened successfully");
-
-  // 收集所有结果
-  LOG_DEBUG("Starting to collect subquery results");
-
-  // 首先检查 tuple schema
-  TupleSchema schema;
-  rc = physical_operator->tuple_schema(schema);
-  if (rc == RC::SUCCESS) {
-    LOG_DEBUG("Physical operator tuple schema has %d cells", schema.cell_num());
-    for (int i = 0; i < schema.cell_num(); i++) {
-      LOG_DEBUG("Cell %d: %s", i, schema.cell_at(i).alias());
-    }
-  } else {
-    LOG_WARN("Failed to get tuple schema from physical operator. rc=%s", strrc(rc));
-  }
-
-  int row_count = 0;
-  while (RC::SUCCESS == (rc = physical_operator->next())) {
-    row_count++;
-    LOG_DEBUG("Processing row %d", row_count);
-
+  // 收集结果 - 简化版本
+  while ((rc = physical_operator->next()) == RC::SUCCESS) {
     Tuple *tuple = physical_operator->current_tuple();
-    if (tuple == nullptr) {
-      LOG_WARN("sub-query returned null tuple at row %d", row_count);
+    if (!tuple) {
       continue;
     }
 
-    LOG_WARN("Got tuple at row %d, type: %s", row_count, typeid(*tuple).name());
-    LOG_WARN("Tuple cell_num: %d", tuple->cell_num());
-
-    // 处理不同类型的元组
     Value value;
-
-    if (tuple->cell_num() == 0) {
-      // ExpressionTuple为空，说明ProjectPhysicalOperator的expressions为空
-      // 这是一个bug，但我们尝试从child operator获取数据作为临时解决方案
-      LOG_WARN("WARNING: Tuple has 0 cells - ProjectPhysicalOperator has no expressions");
-      
-      // 从child operator获取数据
-      // 注意：这里需要知道应该获取哪一列
-      // 对于"SELECT col2 FROM t"，我们应该获取col2列，但目前无法确定
-      // 临时方案：假设子查询只SELECT一列，获取最后一列（通常是用户指定的列）
-      if (!physical_operator->children().empty()) {
-        PhysicalOperator *child_op = physical_operator->children()[0].get();
-        Tuple *child_tuple = child_op->current_tuple();
-        if (child_tuple != nullptr && child_tuple->cell_num() > 0) {
-          // 获取最后一列（对于SELECT col2，最后一列通常是col2）
-          int col_index = child_tuple->cell_num() - 1;
-          rc = child_tuple->cell_at(col_index, value);
-          if (rc == RC::SUCCESS) {
-            LOG_WARN("Extracted value from child operator column %d: %s", col_index, value.to_string().c_str());
-            results.push_back(value);
-            continue;
-          }
-        }
-      }
-      
-      // 如果无法获取数据，跳过这一行
-      LOG_WARN("Failed to extract value, skipping row %d", row_count);
-      continue;
-    } else {
-      // 正常情况：从元组单元格获取值
-      rc = tuple->cell_at(0, value);
-      if (rc != RC::SUCCESS) {
-        LOG_WARN("failed to get value from sub-query result at row %d. rc=%s", row_count, strrc(rc));
-        LOG_WARN("Tuple type: %s", typeid(*tuple).name());
-
-        // 尝试调试 ExpressionTuple 的内容
-        if (typeid(*tuple).name() == typeid(ExpressionTuple<unique_ptr<Expression>>).name()) {
-          LOG_WARN("This is an ExpressionTuple, but cell_at failed");
-          
-          // 对于 ExpressionTuple，尝试使用不同的索引来获取值
-          // 有时候 cell_at(0) 失败，但其他索引可能成功
-          bool found_value = false;
-          for (int i = 0; i < tuple->cell_num(); i++) {
-            RC cell_rc = tuple->cell_at(i, value);
-            if (cell_rc == RC::SUCCESS) {
-              LOG_DEBUG("Successfully got value from ExpressionTuple at index %d: %s", i, value.to_string().c_str());
-              results.push_back(value);
-              found_value = true;
-              break;
-            }
-          }
-          
-          if (found_value) {
-            continue;
-          }
-          
-          LOG_WARN("ExpressionTuple cell_at failed for all indices, skipping this result");
-          continue;
-        }
-
-        break;
-      }
+    // 尝试从tuple获取第一列
+    if (tuple->cell_at(0, value) == RC::SUCCESS) {
+      results.push_back(value);
     }
-
-    LOG_DEBUG("sub-query returned value at row %d: %s", row_count, value.to_string().c_str());
-    results.push_back(value);
-  }
-
-  LOG_WARN("Finished collecting subquery results. Total rows: %d, results.size(): %zu", row_count, results.size());
-  for (size_t i = 0; i < results.size(); i++) {
-    LOG_WARN("  Result[%zu]: %s (type=%d)", i, results[i].to_string().c_str(), static_cast<int>(results[i].attr_type()));
   }
 
   physical_operator->close();
-  
-  // 清理 FieldExpr 的静态父级元组
   FieldExpr::set_current_parent_tuple(nullptr);
 
-  if (rc == RC::RECORD_EOF) {
-    rc = RC::SUCCESS;
-  }
-
-  // 确保至少有一些结果被收集，即使子查询返回空结果
-  if (results.empty() && row_count == 0) {
-    LOG_DEBUG("Subquery returned no results");
-  }
-
-  return rc;
+  return (rc == RC::RECORD_EOF) ? RC::SUCCESS : rc;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2109,15 +1945,11 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
     }
   }
 
-  // 对于非关联子查询，检查是否已经缓存了结果
+  // 使用缓存结果
   if (cached_value_.attr_type() != AttrType::UNDEFINED) {
-    printf("DEBUG: [SUBQUERY] Using cached value: %s (subquery instance: %p)\n", cached_value_.to_string().c_str(), this);
     value = cached_value_;
     return RC::SUCCESS;
   }
-
-  printf("DEBUG: [SUBQUERY] Executing scalar subquery for the first time (instance: %p)\n", this);
-  fflush(stdout);
 
   // 获取当前会话和事务
   Session *session = Session::current_session();
@@ -2151,29 +1983,21 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
   // 获取第一行数据
   rc = physical_oper_->next();
   if (rc == RC::RECORD_EOF) {
-    // 没有数据，返回NULL
-    printf("DEBUG: [SUBQUERY] Scalar subquery (get_value) returned no results, setting NULL\n");
+    // 无数据返回NULL
     physical_oper_->close();
-    // 清理 FieldExpr 的静态父级元组
     FieldExpr::set_current_parent_tuple(nullptr);
     value.set_type(AttrType::UNDEFINED);
     value.set_null(true);
     return RC::SUCCESS;
   } else if (rc != RC::SUCCESS) {
-    // 其他错误
-    printf("DEBUG: [SUBQUERY] Scalar subquery (get_value) next() failed: %s\n", strrc(rc));
     physical_oper_->close();
-    // 清理 FieldExpr 的静态父级元组
     FieldExpr::set_current_parent_tuple(nullptr);
-    value.set_type(AttrType::UNDEFINED);
-    value.set_null(true);
     return rc;
   }
 
   // 获取当前tuple的值（先获取第一行的值）
   Tuple *current_tuple = physical_oper_->current_tuple();
   if (!current_tuple) {
-    printf("DEBUG: [SUBQUERY] Scalar subquery (get_value) current_tuple is null\n");
     physical_oper_->close();
     // 清理 FieldExpr 的静态父级元组
     FieldExpr::set_current_parent_tuple(nullptr);
@@ -2193,35 +2017,27 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
     return RC::SUCCESS;
   }
 
-  // 检查是否有多行数据（标量子查询只能返回0行或1行）
+  // 检查是否有多行数据（标量子查询只能返回0-1行）
   RC next_rc = physical_oper_->next();
   if (next_rc == RC::SUCCESS) {
-    // 有多行数据，标量子查询错误
-    printf("DEBUG: [SUBQUERY] ERROR: Scalar subquery returned multiple rows\n");
+    // 多行数据，返回错误
     physical_oper_->close();
     FieldExpr::set_current_parent_tuple(nullptr);
-    LOG_WARN("Scalar subquery returned multiple rows");
-    return RC::INTERNAL;  // Return error - this should cause query to fail
+    return RC::INTERNAL;
   } else if (next_rc != RC::RECORD_EOF) {
     // 其他错误
-    printf("DEBUG: [SUBQUERY] Error checking for multiple rows: %s\n", strrc(next_rc));
     physical_oper_->close();
     // 清理 FieldExpr 的静态父级元组
     FieldExpr::set_current_parent_tuple(nullptr);
     return next_rc;
   }
   
-  // Close the physical operator
-  printf("DEBUG: [SUBQUERY] Scalar subquery (get_value) result: rc=%s, value=%s\n", strrc(rc), value.to_string().c_str());
+  // 关闭并清理
   physical_oper_->close();
-  
-  // 清理 FieldExpr 的静态父级元组
   FieldExpr::set_current_parent_tuple(nullptr);
 
-  // 缓存结果，避免重复执行非关联子查询
+  // 缓存结果
   cached_value_ = value;
-  printf("DEBUG: [SUBQUERY] Cached scalar subquery result: %s (instance: %p)\n", value.to_string().c_str(), this);
-
   return RC::SUCCESS;
 }
 
