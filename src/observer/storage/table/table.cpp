@@ -393,7 +393,11 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
 RC Table::get_record_scanner(RecordScanner *&scanner, Trx *trx, ReadWriteMode mode)
 {
   if (is_view()) {
-    LOG_WARN("Cannot get record scanner from view: %s", name());
+    // 视图应该通过其SELECT语句查询，而不是直接扫描记录
+    // 这里返回一个空scanner作为临时方案，防止崩溃
+    // TODO: 正确的实现应该在SelectStmt阶段展开视图
+    LOG_WARN("get_record_scanner called on view %s, which should not happen. Returning empty scanner.", name());
+    scanner = nullptr;  // 返回nullptr表示不支持
     return RC::UNIMPLEMENTED;
   }
   return engine_->get_record_scanner(scanner, trx, mode);
