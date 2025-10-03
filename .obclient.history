@@ -1,5 +1,3 @@
-### 2025-09-11 16:46:46.598
-SELECT * FROM EXP_TABLE WHERE -0 < COL1-COL2;
 ### 2025-09-11 16:52:52.980
 insert into exp_table VALUES (1, 1, 1, 1.0, 1.5);
 ### 2025-09-11 16:52:57.335
@@ -1998,3 +1996,5 @@ SELECT csq_3.id FROM csq_3;
 SELECT csq_2.col2 FROM csq_2 WHERE csq_2.id NOT IN (SELECT csq_3.id FROM csq_3);
 ### 2025-09-29 11:23:51.206
 SELECT * FROM csq_1 WHERE col1 NOT IN (SELECT csq_2.col2 FROM csq_2 WHERE csq_2.id NOT IN (SELECT csq_3.id FROM csq_3));
+### 2025-10-03 14:25:26.787
+CREATE TABLE alias_t1(id int, col1 int); INSERT INTO alias_t1 VALUES (1, 10); INSERT INTO alias_t1 VALUES (2, 20); CREATE TABLE alias_t2(id int, col2 int); INSERT INTO alias_t2 VALUES (1, 100); INSERT INTO alias_t2 VALUES (3, 300); SELECT * FROM alias_t1 t1, alias_t2 t2 WHERE t1.id = t2.id;

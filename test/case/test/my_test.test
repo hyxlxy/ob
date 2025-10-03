@@ -1,0 +1,67 @@
+DROP TABLE IF EXISTS null_test;
+CREATE TABLE null_test(id int, num int null, name char(10) null);
+INSERT INTO null_test VALUES (1, 1, 'N1');
+INSERT INTO null_test VALUES (2, null, 'N2');
+INSERT INTO null_test VALUES (3, 3, 'N3');
+UPDATE null_test SET name=null WHERE num is null;
+SELECT * FROM null_test;
+
+DROP TABLE IF EXISTS text_test;
+CREATE TABLE text_test(id int, info text);
+INSERT INTO text_test VALUES (1, 'original text 1');
+INSERT INTO text_test VALUES (2, 'original text 2 very long');
+INSERT INTO text_test VALUES (3, 'original text 3');
+UPDATE text_test SET info='new short' WHERE id=2;
+SELECT * FROM text_test;
+
+DROP TABLE IF EXISTS update_test;
+CREATE TABLE update_test(id int, name char(10), score int);
+INSERT INTO update_test VALUES (1, 'AAA', 10);
+INSERT INTO update_test VALUES (2, 'BBB', 20);
+INSERT INTO update_test VALUES (3, 'CCC', 30);
+INSERT INTO update_test VALUES (6, 'FFF', 60);
+INSERT INTO update_test VALUES (6, 'FFF2', 61);
+UPDATE update_test SET name='UPDATED' WHERE id=6;
+SELECT * FROM update_test;
+
+DROP TABLE IF EXISTS alias_t1;
+DROP TABLE IF EXISTS alias_t2;
+CREATE TABLE alias_t1(id int, col1 int);
+CREATE TABLE alias_t2(id int, col2 int);
+INSERT INTO alias_t1 VALUES (1, 10);
+INSERT INTO alias_t1 VALUES (2, 20);
+INSERT INTO alias_t2 VALUES (1, 100);
+INSERT INTO alias_t2 VALUES (3, 300);
+SELECT * FROM alias_t1 t1, alias_t2 t2 WHERE t1.id = t2.id;
+
+DROP TABLE IF EXISTS source_table;
+DROP TABLE IF EXISTS target_table;
+CREATE TABLE source_table(id int, age int, name char(10));
+INSERT INTO source_table VALUES (1, 20, 'Alice');
+INSERT INTO source_table VALUES (2, 25, 'Bob');
+INSERT INTO source_table VALUES (3, 30, 'Charlie');
+CREATE TABLE target_table(id int, age int) SELECT id, age FROM source_table;
+SELECT * FROM target_table;
+SELECT COUNT(*) FROM target_table;
+
+DROP TABLE IF EXISTS sub_t1;
+DROP TABLE IF EXISTS sub_t2;
+CREATE TABLE sub_t1(id int, col1 int);
+CREATE TABLE sub_t2(id int, col2 int);
+INSERT INTO sub_t1 VALUES (1, 10);
+INSERT INTO sub_t1 VALUES (2, 20);
+INSERT INTO sub_t1 VALUES (3, 30);
+INSERT INTO sub_t2 VALUES (1, 100);
+INSERT INTO sub_t2 VALUES (2, 20);
+SELECT * FROM sub_t1 WHERE col1 IN (SELECT col2 FROM sub_t2);
+SELECT * FROM sub_t1 WHERE id = (SELECT id FROM sub_t2 WHERE id=1);
+
+DROP TABLE null_test;
+DROP TABLE text_test;
+DROP TABLE update_test;
+DROP TABLE alias_t1;
+DROP TABLE alias_t2;
+DROP TABLE source_table;
+DROP TABLE target_table;
+DROP TABLE sub_t1;
+DROP TABLE sub_t2;

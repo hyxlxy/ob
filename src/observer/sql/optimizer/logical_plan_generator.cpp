@@ -96,12 +96,16 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 {
   unique_ptr<LogicalOperator> *last_oper = nullptr;
 
-  // Initialize binder context with tables for this SELECT
+  // Initialize binder context with tables and aliases for this SELECT
   binder_context_ = BinderContext();
   binder_ctx_initialized_ = true;
   const vector<Table *> &tables = select_stmt->tables();
-  for (Table *table : tables) {
-    binder_context_.add_table(table);
+  const vector<string> &aliases = select_stmt->table_aliases();
+  for (size_t i = 0; i < tables.size(); i++) {
+    binder_context_.add_table(tables[i]);
+    if (i < aliases.size() && !aliases[i].empty()) {
+      binder_context_.add_table_with_name(tables[i], aliases[i].c_str());
+    }
   }
 
   unique_ptr<LogicalOperator> table_oper(nullptr);
@@ -211,14 +215,18 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
   // Bind projection expressions
   vector<unique_ptr<Expression>> proj_exprs = std::move(select_stmt->query_expressions());
+  LOG_WARN("LOGICAL_PLAN: Creating ProjectLogicalOperator, initial proj_exprs.size()=%zu", proj_exprs.size());
+  
   if (binder_ctx_initialized_) {
     ExpressionBinder binder(binder_context_);
     for (auto &expr : proj_exprs) {
       vector<unique_ptr<Expression>> bound;
       RC brc = binder.bind_expression(expr, bound);
       if (OB_FAIL(brc)) {
+        LOG_WARN("LOGICAL_PLAN: Failed to bind projection expression, rc=%s", strrc(brc));
         return brc;
       }
+      LOG_WARN("LOGICAL_PLAN: Bound expression, bound.size()=%zu", bound.size());
       if (!bound.empty()) {
         // For SELECT list, star may expand to multiple expressions.
         // Replace current expr with the first, and append the rest.
@@ -235,6 +243,7 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     }
   }
 
+  LOG_WARN("LOGICAL_PLAN: Final proj_exprs.size()=%zu before creating ProjectLogicalOperator", proj_exprs.size());
   auto project_oper = make_unique<ProjectLogicalOperator>(std::move(proj_exprs));
   if (*last_oper) {
     project_oper->add_child(std::move(*last_oper));

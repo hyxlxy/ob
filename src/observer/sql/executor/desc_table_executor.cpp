@@ -149,8 +149,22 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
         if (filter_unit->left().is_attr()) {
           const Field &field = filter_unit->left().field;
           const FieldMeta *field_meta = field.meta();
-          left_value.set_type(field_meta->type());
-          left_value.set_data(const_cast<char*>(record.data()) + field_meta->offset(), field_meta->len());
+          
+          // Check if field is NULL
+          if (field_meta->nullable()) {
+            bool is_null = record.data()[field_meta->offset() + field_meta->len() - 1] == '1';
+            if (is_null) {
+              left_value.set_type(AttrType::UNDEFINED);
+              left_value.set_null(true);
+            } else {
+              left_value.set_type(field_meta->type());
+              size_t data_len = field_meta->len() - 1; // Exclude NULL flag
+              left_value.set_data(const_cast<char*>(record.data()) + field_meta->offset(), data_len);
+            }
+          } else {
+            left_value.set_type(field_meta->type());
+            left_value.set_data(const_cast<char*>(record.data()) + field_meta->offset(), field_meta->len());
+          }
         } else if (filter_unit->left().is_value()) {
           left_value = filter_unit->left().value;
         } else if (filter_unit->left().is_expr()) {
@@ -166,8 +180,22 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
         if (filter_unit->right().is_attr()) {
           const Field &field = filter_unit->right().field;
           const FieldMeta *field_meta = field.meta();
-          right_value.set_type(field_meta->type());
-          right_value.set_data(const_cast<char*>(record.data()) + field_meta->offset(), field_meta->len());
+          
+          // Check if field is NULL
+          if (field_meta->nullable()) {
+            bool is_null = record.data()[field_meta->offset() + field_meta->len() - 1] == '1';
+            if (is_null) {
+              right_value.set_type(AttrType::UNDEFINED);
+              right_value.set_null(true);
+            } else {
+              right_value.set_type(field_meta->type());
+              size_t data_len = field_meta->len() - 1; // Exclude NULL flag
+              right_value.set_data(const_cast<char*>(record.data()) + field_meta->offset(), data_len);
+            }
+          } else {
+            right_value.set_type(field_meta->type());
+            right_value.set_data(const_cast<char*>(record.data()) + field_meta->offset(), field_meta->len());
+          }
         } else if (filter_unit->right().is_value()) {
           right_value = filter_unit->right().value;
         } else if (filter_unit->right().is_expr()) {

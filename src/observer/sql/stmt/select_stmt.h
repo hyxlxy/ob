@@ -41,6 +41,7 @@ public:
 
 public:
   const vector<Table *> &tables() const { return tables_; }
+  const vector<string> &table_aliases() const { return table_aliases_; }
   FilterStmt            *filter_stmt() const { return filter_stmt_; }
   const vector<ConditionSqlNode> &raw_conditions() const { return raw_conditions_; }
 
@@ -53,6 +54,7 @@ public:
 private:
   vector<unique_ptr<Expression>> query_expressions_;
   vector<Table *>                tables_;
+  vector<string>                 table_aliases_;  // 与tables_一一对应的别名，空字符串表示无别名
   FilterStmt                    *filter_stmt_ = nullptr;
   vector<ConditionSqlNode>       raw_conditions_;  // 存储原始条件，用于处理 SubQueryExpr
   vector<unique_ptr<Expression>> group_by_;

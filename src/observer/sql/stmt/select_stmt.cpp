@@ -109,8 +109,14 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
   vector<unique_ptr<Expression>> bound_expressions;
   ExpressionBinder expression_binder(binder_context, outer_context);
   
+  printf("======= SELECT_STMT::CREATE: select_sql.expressions.size() = %zu =======\n", select_sql.expressions.size());
+  
   for (unique_ptr<Expression> &expression : select_sql.expressions) {
+    printf("Before bind: bound_expressions.size() = %zu, expression type = %d\n", 
+           bound_expressions.size(), static_cast<int>(expression->type()));
     RC rc = expression_binder.bind_expression(expression, bound_expressions);
+    printf("After bind: rc = %s, bound_expressions.size() = %zu\n", 
+           strrc(rc), bound_expressions.size());
     if (OB_FAIL(rc)) {
       LOG_INFO("bind expression failed. rc=%s", strrc(rc));
       // 如果是字段不存在错误，可能是关联子查询，返回更友好的错误
@@ -121,6 +127,8 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
       return rc;
     }
   }
+  
+  printf("======= SELECT_STMT::CREATE: Final bound_expressions.size() = %zu =======\n", bound_expressions.size());
 
   vector<unique_ptr<Expression>> group_by_expressions;
   for (unique_ptr<Expression> &expression : select_sql.group_by) {
@@ -214,6 +222,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
   SelectStmt *select_stmt = new SelectStmt();
 
   select_stmt->tables_.swap(tables);
+  select_stmt->table_aliases_ = select_sql.relation_aliases;  // 保存表别名
   select_stmt->query_expressions_.swap(bound_expressions);
   select_stmt->filter_stmt_ = filter_stmt;
   select_stmt->raw_conditions_ = std::move(all_conditions);  // 移动原始条件
