@@ -302,13 +302,57 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
     return rc;
   }
 
-  // 只支持单字段UPDATE（多字段UPDATE暂不支持）
+  // 多字段UPDATE处理
   if (update_stmt->is_multi_field()) {
-    LOG_WARN("Multi-field UPDATE not yet supported");
-    return RC::UNIMPLEMENTED;
+    const vector<const FieldMeta *> &metas = update_stmt->field_metas();
+    const vector<Value> &vals = update_stmt->multi_values();
+    
+    for (Record &old_rec : records_to_update) {
+      Record new_rec;
+      new_rec.copy_data(old_rec.data(), old_rec.len());
+      new_rec.set_rid(old_rec.rid());
+      
+      for (size_t i = 0; i < metas.size(); i++) {
+        const FieldMeta *fm = metas[i];
+        const Value &val = vals[i];
+        char *data = new_rec.data();
+        
+        if (val.attr_type() == AttrType::UNDEFINED || val.is_null()) {
+          if (!fm->nullable()) return RC::INVALID_ARGUMENT;
+          memset(data + fm->offset(), 0, fm->len());
+          data[fm->offset() + fm->len() - 1] = '1';
+        } else {
+          Value casted;
+          const Value *wv = &val;
+          if (val.attr_type() != fm->type() && Value::cast_to(val, fm->type(), casted) == RC::SUCCESS) {
+            wv = &casted;
+          }
+          
+          if (fm->type() == AttrType::CHARS || fm->type() == AttrType::TEXTS) {
+            size_t len = std::min((size_t)(fm->len() - (fm->nullable() ? 1 : 0)), (size_t)wv->length());
+            memset(data + fm->offset(), 0, fm->len());
+            memcpy(data + fm->offset(), wv->data(), len);
+            if (fm->nullable()) data[fm->offset() + fm->len() - 1] = '0';
+          } else {
+            size_t len = wv->length();
+            if (fm->nullable()) {
+              len = std::min(len, (size_t)(fm->len() - 1));
+              memcpy(data + fm->offset(), wv->data(), len);
+              data[fm->offset() + fm->len() - 1] = '0';
+            } else {
+              memcpy(data + fm->offset(), wv->data(), std::min(len, (size_t)fm->len()));
+            }
+          }
+        }
+      }
+      
+      rc = table->update_record_with_trx(old_rec, new_rec, trx);
+      if (rc != RC::SUCCESS) return rc;
+    }
+    return RC::SUCCESS;
   }
   
-  // Single-field update
+  // 单字段UPDATE
   const FieldMeta *field_meta = update_stmt->field_meta();
   Value *orig_value = update_stmt->value();
   Stmt *sub_query_stmt = update_stmt->sub_query_stmt();

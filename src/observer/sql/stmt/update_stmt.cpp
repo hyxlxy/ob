@@ -77,13 +77,23 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
     return rc;
   }
 
-  // 暂不支持多字段UPDATE
+  // 检查是否为多字段UPDATE
   if (!update.attribute_names.empty()) {
-    delete filter_stmt;
-    return RC::UNIMPLEMENTED;
+    // 多字段UPDATE
+    vector<const FieldMeta *> field_metas;
+    for (const string &attr_name : update.attribute_names) {
+      const FieldMeta *fm = table->table_meta().field(attr_name.c_str());
+      if (!fm) {
+        delete filter_stmt;
+        return RC::SCHEMA_FIELD_NOT_EXIST;
+      }
+      field_metas.push_back(fm);
+    }
+    stmt = new UpdateStmt(table, field_metas, update.values, filter_stmt);
+    return RC::SUCCESS;
   }
 
-  // Single-field update
+  // 单字段UPDATE
   const FieldMeta *field_meta = table->table_meta().field(update.attribute_name.c_str());
   if (nullptr == field_meta) {
     LOG_WARN("no such field in table. db=%s, table=%s, field=%s",
