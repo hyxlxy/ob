@@ -332,10 +332,11 @@ bool ComparisonExpr::is_correlated_subquery() const
   // 对于 IN/NOT IN 子查询，我们需要更精确的检测
   // 检查子查询是否真的引用了外层查询的表
   if (filter_unit_ && filter_unit_->sub_query()) {
-    // 这里应该检查子查询的SQL节点，看是否包含外层查询的表引用
-    // 由于我们无法在解析阶段准确判断，我们采用保守的方法：
-    // 假设IN/NOT IN子查询是关联的，以确保正确性
-    return true; // 保守地假设IN/NOT IN子查询是关联的
+    // Bug修复：默认情况下IN/NOT IN子查询应该是非关联的
+    // 只有当子查询中真的引用了外层表时，才是关联子查询
+    // 由于检测外层表引用比较复杂，我们先假设是非关联的
+    // 如果执行时出现字段找不到等错误，ComparisonExpr::get_value()会尝试作为关联子查询重新执行
+    return false; // 默认假设IN/NOT IN子查询是非关联的
   }
   
   // 如果没有子查询，返回false
@@ -438,13 +439,9 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
 
       if (!is_correlated && sub_query_executed_ && !sub_query_results_.empty()) {
         // Use cached results for non-correlated subqueries
-        LOG_WARN("Using cached subquery results (%d results)", (int)sub_query_results_.size());
+        LOG_DEBUG("Using cached subquery results (%d results)", (int)sub_query_results_.size());
         sub_query_results = sub_query_results_;
       } else {
-        LOG_WARN("NOT CACHED: is_correlated=%s, sub_query_executed_=%s, results_empty=%s", 
-                 is_correlated ? "true" : "false",
-                 sub_query_executed_ ? "true" : "false",
-                 sub_query_results_.empty() ? "true" : "false");
         // Execute subquery (always for correlated, first time for non-correlated)
         RC rc = RC::SUCCESS;
 
@@ -1530,13 +1527,9 @@ unique_ptr<Expression> InExpr::copy() const
 
 RC InExpr::get_value(const Tuple &tuple, Value &value) const
 {
-  printf("DEBUG: [IN] InExpr::get_value() called, left_ type=%d\n", static_cast<int>(left_->type()));
-  
   Value left_value;
   RC rc = left_->get_value(tuple, left_value);
   if (rc != RC::SUCCESS) {
-    printf("ERROR: [IN] failed to get value of left expression in IN. rc=%s, left_type=%d\n", 
-           strrc(rc), static_cast<int>(left_->type()));
     LOG_WARN("failed to get value of left expression in IN. rc=%s", strrc(rc));
     return rc;
   }
@@ -1821,7 +1814,7 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
     FieldExpr::set_current_parent_tuple(parent_tuple);
   }
 
-  // 收集结果 - 改进版本
+  // 收集结果
   while ((rc = physical_operator->next()) == RC::SUCCESS) {
     Tuple *tuple = physical_operator->current_tuple();
     if (!tuple) {
@@ -1837,8 +1830,9 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
         PhysicalOperator *child = physical_operator->children()[0].get();
         Tuple *child_tuple = child->current_tuple();
         if (child_tuple && child_tuple->cell_num() > 0) {
-          // 获取最后一列（用户指定的列）
-          cell_rc = child_tuple->cell_at(child_tuple->cell_num() - 1, value);
+          // Bug修复：应该获取第0列（投影的第一列），而不是最后一列
+          // 原代码：cell_rc = child_tuple->cell_at(child_tuple->cell_num() - 1, value);
+          cell_rc = child_tuple->cell_at(0, value);
         }
       }
     }

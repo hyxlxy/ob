@@ -54,16 +54,6 @@ RC PredicatePhysicalOperator::next()
       break;
     }
 
-    // 添加调试信息：检查 tuple 的内容
-    printf("DEBUG: [PREDICATE] Tuple has %d cells\n", tuple->cell_num());
-    for (int i = 0; i < tuple->cell_num(); i++) {
-      Value cell_value;
-      RC cell_rc = tuple->cell_at(i, cell_value);
-      if (cell_rc == RC::SUCCESS) {
-        printf("DEBUG: [PREDICATE] Cell[%d]: %s\n", i, cell_value.to_string().c_str());
-      }
-    }
-
     Value value;
     rc = expression_->get_value(*tuple, value);
     if (rc != RC::SUCCESS) {
@@ -71,19 +61,9 @@ RC PredicatePhysicalOperator::next()
                static_cast<int>(expression_->type()), strrc(rc));
       return rc;
     }
-    LOG_DEBUG("PredicatePhysicalOperator::next() get_value SUCCESS: expr_type=%d value_type=%d",
-              static_cast<int>(expression_->type()), static_cast<int>(value.attr_type()));
-
-    // 添加详细的调试信息
-    printf("DEBUG: [PREDICATE] Expression evaluation result: value_type=%d, value=%s, boolean=%s\n",
-           static_cast<int>(value.attr_type()), value.to_string().c_str(),
-           value.get_boolean() ? "true" : "false");
 
     if (value.get_boolean()) {
-      printf("DEBUG: [PREDICATE] Tuple PASSED the predicate\n");
       return rc;
-    } else {
-      printf("DEBUG: [PREDICATE] Tuple FAILED the predicate, continuing to next tuple\n");
     }
   }
   return rc;
