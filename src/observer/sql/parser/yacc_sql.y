@@ -169,6 +169,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   vector<RelationWithAliasSqlNode> *         relation_with_alias_list;
   RelationWithAliasSqlNode *                 relation_with_alias;
   JoinSqlNode *                              join_item;
+  vector<pair<string, Value>> *              update_kv_list;
 }
 
 %token <number> NUMBER
@@ -189,6 +190,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <rel_attr>            rel_attr
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
+%type <update_kv_list>      update_kv_list
 %type <value_list>          insert_value_list
 %type <condition_list>      where
 %type <condition_list>      condition_list
@@ -773,30 +775,38 @@ delete_stmt:    /*  delete 语句的语法解析树*/
     }
     ;
 update_stmt:      /*  update 语句的语法解析树*/
-    UPDATE ID SET ID EQ value where
+    UPDATE ID SET update_kv_list where
     {
       $$ = new ParsedSqlNode(SCF_UPDATE);
       $$->update.relation_name = $2;
-      $$->update.attribute_name = $4;
-      $$->update.value = *$6;
-      $$->update.is_sub_query = false;
-      if ($7 != nullptr) {
-        $$->update.conditions.swap(*$7);
-        delete $7;
+      
+      if ($4 && !$4->empty()) {
+        for (auto &kv : *$4) {
+          $$->update.attribute_names.push_back(kv.first);
+          $$->update.values.push_back(kv.second);
+        }
+        delete $4;
       }
-      delete $6;
+      
+      if ($5 != nullptr) {
+        $$->update.conditions.swap(*$5);
+        delete $5;
+      }
     }
-    | UPDATE ID SET ID EQ LBRACE sub_query RBRACE where
+    ;
+
+update_kv_list:
+    ID EQ value
     {
-      $$ = new ParsedSqlNode(SCF_UPDATE);
-      $$->update.relation_name = $2;
-      $$->update.attribute_name = $4;
-      $$->update.sub_query.reset($7);
-      $$->update.is_sub_query = true;
-      if ($9 != nullptr) {
-        $$->update.conditions.swap(*$9);
-        delete $9;
-      }
+      $$ = new vector<pair<string, Value>>();
+      $$->push_back({$1, *$3});
+      delete $3;
+    }
+    | update_kv_list COMMA ID EQ value
+    {
+      $1->push_back({$3, *$5});
+      $$ = $1;
+      delete $5;
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/

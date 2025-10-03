@@ -169,7 +169,7 @@ union YYSTYPE
   vector<RelationWithAliasSqlNode> *         relation_with_alias_list;
   RelationWithAliasSqlNode *                 relation_with_alias;
   JoinSqlNode *                              join_item;
-  vector<pair<string, Value>> *              update_set_list;
+  vector<pair<string, Value>> *              update_kv_list;
 
 #line 175 "yacc_sql.tab.h"
 
