@@ -1821,7 +1821,7 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
     FieldExpr::set_current_parent_tuple(parent_tuple);
   }
 
-  // 收集结果 - 简化版本
+  // 收集结果 - 改进版本
   while ((rc = physical_operator->next()) == RC::SUCCESS) {
     Tuple *tuple = physical_operator->current_tuple();
     if (!tuple) {
@@ -1829,8 +1829,21 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
     }
 
     Value value;
-    // 尝试从tuple获取第一列
-    if (tuple->cell_at(0, value) == RC::SUCCESS) {
+    RC cell_rc = tuple->cell_at(0, value);
+    
+    // 如果cell_at失败且tuple->cell_num()==0，尝试从child获取
+    if (cell_rc != RC::SUCCESS && tuple->cell_num() == 0) {
+      if (!physical_operator->children().empty()) {
+        PhysicalOperator *child = physical_operator->children()[0].get();
+        Tuple *child_tuple = child->current_tuple();
+        if (child_tuple && child_tuple->cell_num() > 0) {
+          // 获取最后一列（用户指定的列）
+          cell_rc = child_tuple->cell_at(child_tuple->cell_num() - 1, value);
+        }
+      }
+    }
+    
+    if (cell_rc == RC::SUCCESS) {
       results.push_back(value);
     }
   }

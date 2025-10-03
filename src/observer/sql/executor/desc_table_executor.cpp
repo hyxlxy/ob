@@ -142,37 +142,59 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
     for (const FilterUnit *fu : fs->filter_units()) {
       Value lv, rv;
       
-      // 获取左值
+      // 获取左值（检查NULL标志）
       if (fu->left().is_attr()) {
         const FieldMeta *fm = fu->left().field.meta();
-        lv.set_type(fm->type());
-        lv.set_data(rec.data() + fm->offset(), fm->len());
+        if (fm->nullable() && rec.data()[fm->offset() + fm->len() - 1] == '1') {
+          lv.set_type(AttrType::UNDEFINED);
+          lv.set_null(true);
+        } else {
+          lv.set_type(fm->type());
+          size_t len = fm->nullable() ? fm->len() - 1 : fm->len();
+          lv.set_data(rec.data() + fm->offset(), len);
+        }
       } else if (fu->left().is_value()) {
         lv = fu->left().value;
       }
       
-      // 获取右值
+      // 获取右值（检查NULL标志）
       if (fu->right().is_attr()) {
         const FieldMeta *fm = fu->right().field.meta();
-        rv.set_type(fm->type());
-        rv.set_data(rec.data() + fm->offset(), fm->len());
+        if (fm->nullable() && rec.data()[fm->offset() + fm->len() - 1] == '1') {
+          rv.set_type(AttrType::UNDEFINED);
+          rv.set_null(true);
+        } else {
+          rv.set_type(fm->type());
+          size_t len = fm->nullable() ? fm->len() - 1 : fm->len();
+          rv.set_data(rec.data() + fm->offset(), len);
+        }
       } else if (fu->right().is_value()) {
         rv = fu->right().value;
       }
       
-      // 比较
-      int cmp = lv.compare(rv);
+      // 比较（处理NULL）
       bool cond_match = false;
-      switch (fu->comp()) {
-        case EQUAL_TO: cond_match = (cmp == 0); break;
-        case LESS_THAN: cond_match = (cmp < 0); break;
-        case GREAT_THAN: cond_match = (cmp > 0); break;
-        case LESS_EQUAL: cond_match = (cmp <= 0); break;
-        case GREAT_EQUAL: cond_match = (cmp >= 0); break;
-        case NOT_EQUAL: cond_match = (cmp != 0); break;
-        case IS_NULL_OP: cond_match = (lv.attr_type() == AttrType::UNDEFINED); break;
-        case IS_NOT_NULL_OP: cond_match = (lv.attr_type() != AttrType::UNDEFINED); break;
-        default: cond_match = false;
+      if (fu->comp() == IS_NULL_OP) {
+        cond_match = (lv.attr_type() == AttrType::UNDEFINED || lv.is_null());
+      } else if (fu->comp() == IS_NOT_NULL_OP) {
+        cond_match = !(lv.attr_type() == AttrType::UNDEFINED || lv.is_null());
+      } else {
+        // 其他比较：NULL参与返回false
+        if (lv.attr_type() == AttrType::UNDEFINED || lv.is_null() ||
+            rv.attr_type() == AttrType::UNDEFINED || rv.is_null()) {
+          cond_match = false;
+        } else {
+          int cmp = lv.compare(rv);
+          switch (fu->comp()) {
+            case EQUAL_TO: cond_match = (cmp == 0); break;
+            case LESS_THAN: cond_match = (cmp < 0); break;
+            case GREAT_THAN: cond_match = (cmp > 0); break;
+            case LESS_EQUAL: cond_match = (cmp <= 0); break;
+            case GREAT_EQUAL: cond_match = (cmp >= 0); break;
+            case NOT_EQUAL: cond_match = (cmp != 0); break;
+            default: cond_match = false;
+          }
+        }
       }
       
       if (!cond_match) {
@@ -220,27 +242,36 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
       if (rc != RC::SUCCESS) return rc;
     }
   } else {
-    // 单字段UPDATE - 使用旧逻辑
+    // 单字段UPDATE
+    const FieldMeta *fm = update_stmt->field_meta();
+    Value *val = update_stmt->value();
+    
+    // 如果是子查询UPDATE，先执行子查询
+    Value sub_val;
+    if (update_stmt->is_sub_query()) {
+      rc = execute_sub_query(update_stmt->sub_query_stmt(), session, sub_val);
+      if (rc != RC::SUCCESS) return rc;
+      val = &sub_val;
+    }
+    
     for (Record &old_rec : records) {
       Record new_rec;
       new_rec.copy_data(old_rec.data(), old_rec.len());
       new_rec.set_rid(old_rec.rid());
       
       char *data = new_rec.data();
-      const FieldMeta *fm = update_stmt->field_meta();
-      Value *val = update_stmt->value();
       
       // 处理NULL值
       if (val->attr_type() == AttrType::UNDEFINED || val->is_null()) {
         if (!fm->nullable()) return RC::INVALID_ARGUMENT;
         memset(data + fm->offset(), 0, fm->len());
-        data[fm->offset() + fm->len() - 1] = '1';  // NULL标志
+        data[fm->offset() + fm->len() - 1] = '1';
       } else {
         memset(data + fm->offset(), 0, fm->len());
         size_t len = std::min((size_t)val->length(), (size_t)(fm->len() - (fm->nullable() ? 1 : 0)));
         memcpy(data + fm->offset(), val->data(), len);
         if (fm->nullable()) {
-          data[fm->offset() + fm->len() - 1] = '0';  // 非NULL标志
+          data[fm->offset() + fm->len() - 1] = '0';
         }
       }
       
