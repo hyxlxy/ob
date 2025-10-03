@@ -198,13 +198,21 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
       for (size_t i = 0; i < update_stmt->field_metas().size(); i++) {
         const FieldMeta *fm = update_stmt->field_metas()[i];
         const Value &val = update_stmt->multi_values()[i];
-        
-        // 简化：直接复制值
         char *data = new_rec.data();
-        memset(data + fm->offset(), 0, fm->len());
-        if (val.attr_type() != AttrType::UNDEFINED) {
-          size_t len = std::min((size_t)val.length(), (size_t)fm->len());
+        
+        // 处理NULL值
+        if (val.attr_type() == AttrType::UNDEFINED || val.is_null()) {
+          if (!fm->nullable()) return RC::INVALID_ARGUMENT;
+          memset(data + fm->offset(), 0, fm->len());
+          data[fm->offset() + fm->len() - 1] = '1';  // 设置NULL标志
+        } else {
+          // 非NULL值
+          memset(data + fm->offset(), 0, fm->len());
+          size_t len = std::min((size_t)val.length(), (size_t)(fm->len() - (fm->nullable() ? 1 : 0)));
           memcpy(data + fm->offset(), val.data(), len);
+          if (fm->nullable()) {
+            data[fm->offset() + fm->len() - 1] = '0';  // 设置非NULL标志
+          }
         }
       }
       
@@ -222,10 +230,18 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
       const FieldMeta *fm = update_stmt->field_meta();
       Value *val = update_stmt->value();
       
-      memset(data + fm->offset(), 0, fm->len());
-      if (val->attr_type() != AttrType::UNDEFINED) {
-        size_t len = std::min((size_t)val->length(), (size_t)fm->len());
+      // 处理NULL值
+      if (val->attr_type() == AttrType::UNDEFINED || val->is_null()) {
+        if (!fm->nullable()) return RC::INVALID_ARGUMENT;
+        memset(data + fm->offset(), 0, fm->len());
+        data[fm->offset() + fm->len() - 1] = '1';  // NULL标志
+      } else {
+        memset(data + fm->offset(), 0, fm->len());
+        size_t len = std::min((size_t)val->length(), (size_t)(fm->len() - (fm->nullable() ? 1 : 0)));
         memcpy(data + fm->offset(), val->data(), len);
+        if (fm->nullable()) {
+          data[fm->offset() + fm->len() - 1] = '0';  // 非NULL标志
+        }
       }
       
       rc = table->update_record_with_trx(old_rec, new_rec, trx);
