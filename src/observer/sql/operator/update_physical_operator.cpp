@@ -36,14 +36,16 @@ static RC set_field_value_to_record(Record *record, const FieldMeta &field_meta,
   // Handle NULL values
   if (value.attr_type() == AttrType::UNDEFINED) {
     if (field_meta.nullable()) {
-      // For nullable fields, set the field data to zeros and set NULL flag in last byte
+      // For nullable fields, clear the field and set NULL flag in last byte
+      // First clear the entire field
       memset(record_data + field_meta.offset(), 0, field_meta.len());
+      // Then set NULL flag at the last byte
       record_data[field_meta.offset() + field_meta.len() - 1] = '1';  // Set NULL flag
     } else {
       LOG_WARN("Cannot set NULL to NOT NULL field: %s", field_meta.name());
       return RC::INVALID_ARGUMENT;
     }
-    return RC::SUCCESS;
+    return RC::SUCCESS;  // Return here! Don't continue to copy data
   }
 
   // Check type compatibility and convert if necessary
@@ -61,26 +63,18 @@ static RC set_field_value_to_record(Record *record, const FieldMeta &field_meta,
   size_t       copy_len = field_meta.len();
   const size_t data_len = actual_value.length();
 
-  if (field_meta.type() == AttrType::CHARS) {
-    // For CHARS type, handle nullable fields specially
+  if (field_meta.type() == AttrType::CHARS || field_meta.type() == AttrType::TEXTS) {
+    // For CHARS and TEXT types, we need to clear the entire field first to avoid leftover data
+    // Clear the entire field space
+    memset(record_data + field_meta.offset(), 0, field_meta.len());
+    
+    // Calculate how much data we can write
     if (field_meta.nullable()) {
       copy_len = field_meta.len() - 1;  // Reserve last byte for NULL flag
     }
     if (copy_len > data_len) {
       copy_len = data_len;
     }
-    // Clear the field first
-    memset(record_data + field_meta.offset(), 0, field_meta.len());
-  } else if (field_meta.type() == AttrType::TEXTS) {
-    // For TEXT type, similar to CHARS
-    if (field_meta.nullable()) {
-      copy_len = field_meta.len() - 1;
-    }
-    if (copy_len > data_len) {
-      copy_len = data_len;
-    }
-    // Clear the field first
-    memset(record_data + field_meta.offset(), 0, field_meta.len());
   } else if (field_meta.type() == AttrType::VECTORS) {
     // For VECTORS type, handle nullable fields specially
     if (field_meta.nullable()) {

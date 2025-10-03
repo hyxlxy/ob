@@ -327,11 +327,11 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
       }
     } else {
       // Handle non-NULL values
-      if (field_meta->type() == AttrType::CHARS) {
-        // For string fields, handle length and zero-fill
+      if (field_meta->type() == AttrType::CHARS || field_meta->type() == AttrType::TEXTS) {
+        // For string and text fields, handle length and zero-fill
         size_t copy_len = std::min(static_cast<size_t>(field_meta->len() - (field_meta->nullable() ? 1 : 0)),
                                    static_cast<size_t>(write_value->length()));
-        memset(record_data + field_meta->offset(), 0, field_meta->len()); // Clear the field first
+        memset(record_data + field_meta->offset(), 0, field_meta->len()); // Clear the field first to avoid leftover data
         memcpy(record_data + field_meta->offset(), write_value->data(), copy_len);
         // For nullable fields, set NULL flag to '0' (not NULL)
         if (field_meta->nullable()) {
