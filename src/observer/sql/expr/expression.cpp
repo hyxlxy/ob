@@ -2173,10 +2173,8 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
     // 清理 FieldExpr 的静态父级元组
     FieldExpr::set_current_parent_tuple(nullptr);
     LOG_WARN("Scalar subquery returned multiple rows");
-    // 设置一个特殊值表示错误，而不是返回错误码
-    value.set_type(AttrType::UNDEFINED);
-    value.set_null(true);
-    return RC::SUCCESS; // 返回SUCCESS，但value是NULL表示错误
+    // 标量子查询返回多行是错误，应该返回错误码
+    return RC::INTERNAL;  // Return error instead of SUCCESS
   } else if (next_rc != RC::RECORD_EOF) {
     // 其他错误
     printf("DEBUG: [SUBQUERY] Error checking for multiple rows: %s\n", strrc(next_rc));

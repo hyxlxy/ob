@@ -38,13 +38,125 @@ RC CreateTableExecutor::execute(SQLStageEvent *sql_event)
   const char *table_name = create_table_stmt->table_name().c_str();
 
   if (create_table_stmt->is_as_select()) {
-    // Handle CREATE TABLE AS SELECT
-    return execute_create_table_as_select(session, create_table_stmt);
+    // Handle CREATE TABLE AS SELECT or CREATE TABLE (...) SELECT
+    // Check if attr_infos is provided (CREATE TABLE (columns) SELECT form)
+    if (!create_table_stmt->attr_infos().empty()) {
+      // First create the table with the provided schema
+      RC rc = session->get_current_db()->create_table(table_name, create_table_stmt->attr_infos(), 
+                                                       create_table_stmt->primary_keys(), 
+                                                       create_table_stmt->storage_format());
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to create table for CREATE TABLE (...) SELECT. rc=%s", strrc(rc));
+        return rc;
+      }
+      
+      // Then insert data from SELECT
+      return execute_insert_from_select(session, create_table_stmt);
+    } else {
+      // CREATE TABLE AS SELECT (infer schema from SELECT)
+      return execute_create_table_as_select(session, create_table_stmt);
+    }
   } else {
     // Handle regular CREATE TABLE
     RC rc = session->get_current_db()->create_table(table_name, create_table_stmt->attr_infos(), create_table_stmt->primary_keys(), create_table_stmt->storage_format());
     return rc;
   }
+}
+
+RC CreateTableExecutor::execute_insert_from_select(Session *session, CreateTableStmt *create_table_stmt)
+{
+  const char *table_name = create_table_stmt->table_name().c_str();
+  SelectStmt *select_stmt = create_table_stmt->select_stmt();
+
+  LOG_INFO("Starting INSERT FROM SELECT for table: %s", table_name);
+
+  if (select_stmt == nullptr) {
+    LOG_ERROR("SelectStmt is null for INSERT FROM SELECT");
+    return RC::INTERNAL;
+  }
+
+  // Get the target table
+  Table *table = session->get_current_db()->find_table(table_name);
+  if (table == nullptr) {
+    LOG_WARN("failed to find table %s for INSERT FROM SELECT", table_name);
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+
+  // Execute the SELECT statement
+  LogicalPlanGenerator logical_plan_generator;
+  std::unique_ptr<LogicalOperator> logical_operator;
+  RC rc = logical_plan_generator.create(select_stmt, logical_operator);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("failed to create logical plan for INSERT FROM SELECT. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  PhysicalPlanGenerator physical_plan_generator;
+  std::unique_ptr<PhysicalOperator> physical_operator;
+  rc = physical_plan_generator.create(*logical_operator, physical_operator, session);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("failed to create physical plan for INSERT FROM SELECT. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  Trx *trx = session->current_trx();
+  if (trx == nullptr) {
+    LOG_ERROR("failed to get current transaction for INSERT FROM SELECT");
+    return RC::INTERNAL;
+  }
+
+  rc = physical_operator->open(trx);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to open physical operator for INSERT FROM SELECT. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  // Insert each row from the SELECT result
+  while ((rc = physical_operator->next()) == RC::SUCCESS) {
+    Tuple *tuple = physical_operator->current_tuple();
+    if (tuple == nullptr) {
+      LOG_WARN("failed to get current tuple from SELECT result");
+      rc = RC::INTERNAL;
+      break;
+    }
+
+    // Convert tuple to record and insert
+    vector<Value> values;
+    for (int i = 0; i < tuple->cell_num(); i++) {
+      Value value;
+      rc = tuple->cell_at(i, value);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to get cell value from tuple. rc=%s", strrc(rc));
+        break;
+      }
+      values.push_back(value);
+    }
+
+    if (rc != RC::SUCCESS) {
+      break;
+    }
+
+    Record record;
+    rc = table->make_record(static_cast<int>(values.size()), values.data(), record);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to make record for INSERT FROM SELECT. rc=%s", strrc(rc));
+      break;
+    }
+
+    rc = table->insert_record(record);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to insert record for INSERT FROM SELECT. rc=%s", strrc(rc));
+      break;
+    }
+  }
+
+  physical_operator->close();
+
+  if (rc == RC::RECORD_EOF) {
+    rc = RC::SUCCESS; // End of data is expected
+  }
+
+  return rc;
 }
 
 RC CreateTableExecutor::execute_create_table_as_select(Session *session, CreateTableStmt *create_table_stmt)

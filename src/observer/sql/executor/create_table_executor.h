@@ -34,4 +34,5 @@ public:
 
 private:
   RC execute_create_table_as_select(Session *session, CreateTableStmt *create_table_stmt);
+  RC execute_insert_from_select(Session *session, CreateTableStmt *create_table_stmt);
 };

@@ -344,13 +344,30 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
   size_t       copy_len = field->len();
   const size_t data_len = value.length();
 
-  if (field->type() == AttrType::CHARS) {
-    // For CHARS type, handle nullable fields specially
+  if (field->type() == AttrType::CHARS || field->type() == AttrType::TEXTS) {
+    // For CHARS and TEXTS type, handle nullable fields specially
     if (field->nullable()) {
       copy_len = field->len() - 1;  // Reserve last byte for NULL flag
     }
+    // Ensure we don't overflow the field
     if (copy_len > data_len) {
       copy_len = data_len;
+    }
+    // For TEXT, check if data exceeds maximum size
+    if (field->type() == AttrType::TEXTS) {
+      const size_t TEXT_MAX_LEN = 65535;
+      if (data_len > TEXT_MAX_LEN) {
+        LOG_WARN("TEXT data length (%zu) exceeds maximum (%zu) for field %s",
+                 data_len, TEXT_MAX_LEN, field->name());
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+      }
+      // Also check against field allocated length
+      if (data_len > copy_len) {
+        LOG_WARN("TEXT data length (%zu) exceeds field length (%zu) for field %s",
+                 data_len, copy_len, field->name());
+        // Truncate to fit
+        copy_len = std::min(copy_len, data_len);
+      }
     }
   } else if (field->type() == AttrType::VECTORS) {
     // For VECTORS type, handle nullable fields specially
@@ -375,7 +392,7 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
 
   // For nullable fields, set NULL flag to '0' (not NULL)
   if (field->nullable()) {
-    if (field->type() == AttrType::CHARS || field->type() == AttrType::VECTORS) {
+    if (field->type() == AttrType::CHARS || field->type() == AttrType::TEXTS || field->type() == AttrType::VECTORS) {
       // For variable-length types, NULL flag is at the end
       record_data[field->offset() + field->len() - 1] = '0';
     } else {

@@ -314,16 +314,17 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
 
     // Handle NULL values properly
     if (write_value->attr_type() == AttrType::UNDEFINED || write_value->is_null()) {
-
+      LOG_INFO("UPDATE: Setting field %s to NULL (nullable=%d)", field_meta->name(), field_meta->nullable());
+      
       if (field_meta->nullable()) {
         // For nullable fields, set the field data to zeros and set NULL flag in last byte
         memset(record_data + field_meta->offset(), 0, field_meta->len());
         record_data[field_meta->offset() + field_meta->len() - 1] = '1';  // Set NULL flag
-
+        LOG_INFO("UPDATE: NULL flag set at offset %d", field_meta->offset() + field_meta->len() - 1);
       } else {
         // For non-nullable fields, set the field data to all zeros
         memset(record_data + field_meta->offset(), 0, field_meta->len());
-
+        LOG_WARN("UPDATE: Trying to set NULL to non-nullable field %s", field_meta->name());
       }
     } else {
       // Handle non-NULL values

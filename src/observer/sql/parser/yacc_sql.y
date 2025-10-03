@@ -425,6 +425,30 @@ create_table_stmt:    /*create table 语句的语法解析树*/
       create_table.as_select = std::make_unique<SelectSqlNode>(std::move($5->selection));
       delete $5;
     }
+    | CREATE TABLE ID LBRACE attr_def attr_def_list primary_key RBRACE select_stmt
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_TABLE);
+      CreateTableSqlNode &create_table = $$->create_table;
+      create_table.relation_name = $3;
+      
+      vector<AttrInfoSqlNode> *src_attrs = $6;
+      if (src_attrs != nullptr) {
+        create_table.attr_infos.swap(*src_attrs);
+        delete src_attrs;
+      }
+      create_table.attr_infos.emplace_back(*$5);
+      reverse(create_table.attr_infos.begin(), create_table.attr_infos.end());
+      delete $5;
+      
+      if ($7 != nullptr) {
+        create_table.primary_keys.swap(*$7);
+        delete $7;
+      }
+      
+      // Store the SELECT statement for data insertion
+      create_table.as_select = std::make_unique<SelectSqlNode>(std::move($9->selection));
+      delete $9;
+    }
     ;
 
 create_view_stmt:
