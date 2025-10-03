@@ -243,8 +243,13 @@ struct DeleteSqlNode
 struct UpdateSqlNode
 {
   string                   relation_name;   ///< Relation to update
-  string                   attribute_name;  ///< 更新的字段，仅支持一个字段
-  Value                    value;           ///< 更新的值，仅支持一个字段
+  string                   attribute_name;  ///< 更新的字段（单字段模式）
+  Value                    value;           ///< 更新的值（单字段模式）
+  
+  // 多字段UPDATE支持
+  vector<string>           attribute_names; ///< 更新的字段列表（多字段模式）
+  vector<Value>            values;          ///< 更新的值列表（多字段模式）
+  
   vector<ConditionSqlNode> conditions;
   bool                     is_sub_query = false;  ///< 是否使用子查询更新
   std::unique_ptr<ParsedSqlNode> sub_query;       ///< 子查询节点

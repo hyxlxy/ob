@@ -1,0 +1,11 @@
+DROP TABLE IF EXISTS update_test;
+CREATE TABLE update_test(id int, name char(10), col1 int, col2 int);
+INSERT INTO update_test VALUES (1, 'A', 3, 4);
+INSERT INTO update_test VALUES (1, 'B', 6, 7);
+INSERT INTO update_test VALUES (2, 'C', 9, 5);
+INSERT INTO update_test VALUES (8, 'D', 2, 2);
+INSERT INTO update_test VALUES (8, 'E', 6, 8);
+UPDATE update_test SET name='UPDATED', col2=5 WHERE id=8;
+SELECT * FROM update_test;
+DROP TABLE update_test;
+

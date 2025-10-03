@@ -2194,13 +2194,14 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
   }
 
   // 检查是否有多行数据（标量子查询只能返回0行或1行）
-  // 注意：在MySQL中，如果标量子查询返回多行，语句会失败
-  // 但为了避免崩溃，我们这里取第一行的值，并记录警告
   RC next_rc = physical_oper_->next();
   if (next_rc == RC::SUCCESS) {
-    // 有多行数据，标量子查询应该报错，但为了兼容性我们取第一个值
-    printf("DEBUG: [SUBQUERY] WARNING: Scalar subquery returned multiple rows, using first row\n");
-    LOG_WARN("Scalar subquery returned multiple rows, using first row value");
+    // 有多行数据，标量子查询错误
+    printf("DEBUG: [SUBQUERY] ERROR: Scalar subquery returned multiple rows\n");
+    physical_oper_->close();
+    FieldExpr::set_current_parent_tuple(nullptr);
+    LOG_WARN("Scalar subquery returned multiple rows");
+    return RC::INTERNAL;  // Return error - this should cause query to fail
   } else if (next_rc != RC::RECORD_EOF) {
     // 其他错误
     printf("DEBUG: [SUBQUERY] Error checking for multiple rows: %s\n", strrc(next_rc));

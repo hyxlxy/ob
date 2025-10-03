@@ -30,6 +30,10 @@ UpdateStmt::UpdateStmt(Table *table, const FieldMeta *field_meta, Stmt *sub_quer
     : table_(table), field_meta_(field_meta), filter_stmt_(filter_stmt), sub_query_stmt_(sub_query_stmt)
 {}
 
+UpdateStmt::UpdateStmt(Table *table, const vector<const FieldMeta *> &field_metas, const vector<Value> &values, FilterStmt *filter_stmt)
+    : table_(table), filter_stmt_(filter_stmt), field_metas_(field_metas), multi_values_(values)
+{}
+
 UpdateStmt::~UpdateStmt()
 {
   if (nullptr != filter_stmt_) {
@@ -61,24 +65,51 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  // check whether the field exists
-  const FieldMeta *field_meta = table->table_meta().field(update.attribute_name.c_str());
-  if (nullptr == field_meta) {
-    LOG_WARN("no such field in table. db=%s, table=%s, field=%s",
-             db->name(), table_name, update.attribute_name.c_str());
-    return RC::SCHEMA_FIELD_NOT_EXIST;
-  }
-
   // create filter statement for WHERE clause
   FilterStmt *filter_stmt = nullptr;
   unordered_map<string, Table *> table_map;
   table_map.insert(pair<string, Table *>(string(table_name), table));
 
+  LOG_INFO("UPDATE: Creating FilterStmt with %zu conditions", update.conditions.size());
   RC rc = FilterStmt::create(db, table, &table_map,
                              update.conditions.data(), static_cast<int>(update.conditions.size()), filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create filter statement. rc=%d:%s", rc, strrc(rc));
     return rc;
+  }
+  
+  if (filter_stmt) {
+    LOG_INFO("UPDATE: FilterStmt created, filter_units count: %zu", filter_stmt->filter_units().size());
+  } else {
+    LOG_INFO("UPDATE: FilterStmt is nullptr");
+  }
+
+  // Check if this is multi-field update
+  if (!update.attribute_names.empty()) {
+    // Multi-field update
+    vector<const FieldMeta *> field_metas;
+    for (const string &attr_name : update.attribute_names) {
+      const FieldMeta *field_meta = table->table_meta().field(attr_name.c_str());
+      if (nullptr == field_meta) {
+        LOG_WARN("no such field in table. db=%s, table=%s, field=%s",
+                 db->name(), table_name, attr_name.c_str());
+        delete filter_stmt;
+        return RC::SCHEMA_FIELD_NOT_EXIST;
+      }
+      field_metas.push_back(field_meta);
+    }
+    
+    stmt = new UpdateStmt(table, field_metas, update.values, filter_stmt);
+    return RC::SUCCESS;
+  }
+
+  // Single-field update (original logic)
+  const FieldMeta *field_meta = table->table_meta().field(update.attribute_name.c_str());
+  if (nullptr == field_meta) {
+    LOG_WARN("no such field in table. db=%s, table=%s, field=%s",
+             db->name(), table_name, update.attribute_name.c_str());
+    delete filter_stmt;
+    return RC::SCHEMA_FIELD_NOT_EXIST;
   }
 
   // Check if this is a sub-query update

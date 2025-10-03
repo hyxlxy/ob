@@ -798,7 +798,6 @@ update_stmt:      /*  update 语句的语法解析树*/
         delete $9;
       }
     }
-
     ;
 select_stmt:        /*  select 语句的语法解析树*/
     SELECT projection_list FROM rel_list join_list where group_by having order_by
