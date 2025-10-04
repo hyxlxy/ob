@@ -1,31 +1,21 @@
+
 CREATE TABLE ssq_1(id int, col1 int, feat1 float);
 CREATE TABLE ssq_2(id int, col2 int, feat2 float);
 CREATE TABLE ssq_3(id int, col3 int, feat3 float);
 CREATE TABLE ssq_4(id int, col4 char(20));
-INSERT INTO ssq_1 VALUES (40, 82, 64.38);
-INSERT INTO ssq_1 VALUES (41, 75, 58.21);
-INSERT INTO ssq_1 VALUES (42, 90, 61.55);
-INSERT INTO ssq_2 VALUES (40, 68, 30.5);
-INSERT INTO ssq_2 VALUES (42, 68, 35.7);
-INSERT INTO ssq_2 VALUES (43, 69, 40.2);
-INSERT INTO ssq_3 VALUES (1, 10, 20.0);
-INSERT INTO ssq_3 VALUES (2, 20, 30.0);
-INSERT INTO ssq_4 VALUES (1, 'test1');
-INSERT INTO ssq_4 VALUES (2, 'test2');
-SELECT * FROM ssq_1 WHERE (select ssq_2.id from ssq_2 where col2 = 68) = id;
-CREATE TABLE csq_1(id int, col1 int, feat1 float);
-CREATE TABLE csq_2(id int, col2 int, feat2 float);
-CREATE TABLE csq_3(id int, col3 int, feat3 float);
-CREATE TABLE csq_4(id int, col4 int, feat4 float);
-INSERT INTO csq_1 VALUES (87, 36, 50.16);
-INSERT INTO csq_1 VALUES (88, 45, 55.32);
-INSERT INTO csq_1 VALUES (89, 50, 60.78);
-INSERT INTO csq_2 VALUES (1, 45, 60.0);
-INSERT INTO csq_2 VALUES (2, 50, 70.0);
-INSERT INTO csq_2 VALUES (3, 48, 55.0);
-INSERT INTO csq_3 VALUES (1, 20, 50.0);
-INSERT INTO csq_3 VALUES (2, 30, 60.0);
-INSERT INTO csq_3 VALUES (3, 40, 45.0);
-INSERT INTO csq_4 VALUES (1, 100, 80.0);
-INSERT INTO csq_4 VALUES (2, 200, 90.0);
-SELECT * FROM csq_1 WHERE (select max(csq_2.col2) from csq_2 where csq_2.feat2 > (select min(csq_3.feat3) from csq_3)) = col1;
+
+
+INSERT INTO ssq_1 VALUES (81, 22, 62.94);
+INSERT INTO ssq_1 VALUES (82, 33, 55.72);
+INSERT INTO ssq_1 VALUES (83, 44, 48.31);
+
+
+INSERT INTO ssq_2 VALUES (81, 68, 29.45); 
+INSERT INTO ssq_2 VALUES (90, 69, 41.22); 
+
+
+INSERT INTO ssq_3 VALUES (1, 10, 15.89);
+INSERT INTO ssq_4 VALUES (1, 'sample_data');
+
+
+SELECT * FROM ssq_1 WHERE (SELECT ssq_2.id FROM ssq_2 WHERE col2 = 68) = id;
