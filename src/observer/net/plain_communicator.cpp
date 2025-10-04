@@ -102,8 +102,9 @@ RC PlainCommunicator::write_state(SessionEvent *event, bool &need_disconnect)
     const char *result = RC::SUCCESS == sql_result->return_code() ? "SUCCESS" : "FAILURE";
     snprintf(buf, buf_size, "%s\n", result);
   } else {
-    // 对于语法错误，直接返回FAILURE而不是SQL_SYNTAX > Failed to parse sql
-    if (sql_result->return_code() == RC::SQL_SYNTAX) {
+    // 对于语法错误和标量子查询多行错误，直接返回FAILURE而不显示内部错误码
+    if (sql_result->return_code() == RC::SQL_SYNTAX || 
+        sql_result->return_code() == RC::SCALAR_SUBQUERY_MULTIPLE_ROWS) {
       snprintf(buf, buf_size, "FAILURE\n");
     } else {
       snprintf(buf, buf_size, "%s > %s\n", strrc(sql_result->return_code()), state_string.c_str());
@@ -199,7 +200,7 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
       // 网络错误，需要断开连接
       return write_state(event, need_disconnect);
     } else {
-      // SQL语义错误，返回FAILURE但不断开连接
+      // SQL语义错误（包括SCALAR_SUBQUERY_MULTIPLE_ROWS），返回FAILURE但不断开连接
       need_disconnect = false;
       return write_state(event, need_disconnect);
     }
@@ -210,7 +211,7 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
     sql_result->close();
     sql_result->set_return_code(rc);
     // 错误码分类: 区分网络/系统错误和 SQL 语义错误
-    // 只有真正的网络错误才断开连接，SQL 语义错误只返回 FAILURE
+    // 只有真正的网络错误才断开连接，SQL 语义错误（包括SCALAR_SUBQUERY_MULTIPLE_ROWS）返回FAILURE但不断开连接
     if (rc == RC::IOERR_READ || rc == RC::IOERR_WRITE || rc == RC::IOERR_CLOSE || rc == RC::IOERR_TOO_LONG) {
       // 网络错误，需要断开连接
       return write_state(event, need_disconnect);

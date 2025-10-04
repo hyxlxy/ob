@@ -16,6 +16,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "common/types.h"
 #include "common/lang/string.h"
+#include "common/sys/rc.h"
 
 class Trx;
 class Db;
@@ -95,6 +96,11 @@ public:
 
   void set_used_chunk_mode(bool used_chunk_mode) { used_chunk_mode_ = used_chunk_mode; }
 
+  // SQL错误记录（用于延迟错误处理）
+  void set_sql_error(RC rc) { sql_error_ = rc; }
+  RC get_sql_error() const { return sql_error_; }
+  void clear_sql_error() { sql_error_ = RC::SUCCESS; }
+
   /**
    * @brief 将指定会话设置到线程变量中
    *
@@ -123,4 +129,7 @@ private:
   bool used_chunk_mode_ = false;
 
   ExecutionMode execution_mode_ = ExecutionMode::TUPLE_ITERATOR;
+  
+  // SQL执行过程中的延迟错误（如标量子查询返回多行）
+  RC sql_error_ = RC::SUCCESS;
 };

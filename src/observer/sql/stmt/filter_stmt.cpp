@@ -387,16 +387,25 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<st
     }
 
     if (!handled_simple) {
-      // 使用表达式比较：复制表达式并由 FilterUnit 持有，避免悬垂指针
-      // SubQueryExpr 的 copy() 方法已经修复，现在可以正常复制
+      // 使用表达式比较：尝试复制表达式并由 FilterUnit 持有
+      // 注意：SubQueryExpr无法被安全复制（会返回nullptr）
+      // 对于SubQueryExpr，我们需要特殊处理：创建ComparisonExpr来包装它
 
       unique_ptr<Expression> left_copy;
       unique_ptr<Expression> right_copy;
 
       // 处理左表达式
+      if (condition.left_expr->type() == ExprType::SUBQUERY) {
+        // SubQueryExpr不能被复制，所以我们需要创建一个ComparisonExpr来包装整个比较操作
+        // 但这需要右表达式也可用，所以我们先标记这种情况
+        LOG_WARN("Left expression is SubQueryExpr, need special handling");
+        delete filter_unit;
+        return RC::UNSUPPORTED;  // 返回不支持的操作
+      }
+      
       left_copy = condition.left_expr->copy();
       if (!left_copy) {
-        LOG_WARN("Failed to copy left expression");
+        LOG_WARN("Failed to copy left expression (type=%d)", static_cast<int>(condition.left_expr->type()));
         delete filter_unit;
         return RC::INTERNAL;
       }
@@ -404,7 +413,7 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<st
       // 处理右表达式
       right_copy = condition.right_expr->copy();
       if (!right_copy) {
-        LOG_WARN("Failed to copy right expression");
+        LOG_WARN("Failed to copy right expression (type=%d)", static_cast<int>(condition.right_expr->type()));
         delete filter_unit;
         return RC::INTERNAL;
       }

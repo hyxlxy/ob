@@ -123,6 +123,7 @@ RC RecordPageHandler::init(DiskBufferPool &buffer_pool, LogHandler &log_handler,
     frame_->write_latch();
   }
   disk_buffer_pool_ = &buffer_pool;
+  is_frame_latched_ = true;  // 标记frame已经被latch
 
   rw_mode_     = mode;
   page_header_ = (PageHeader *)(data);

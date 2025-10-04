@@ -34,6 +34,12 @@ RC SqlTaskHandler::handle_event(Communicator *communicator)
 
   SQLStageEvent sql_event(event, event->query());
 
+  // 清除上一次的SQL错误状态
+  Session *session = event->session();
+  if (session) {
+    session->clear_sql_error();
+  }
+
   rc = handle_sql(&sql_event);
   if (OB_FAIL(rc)) {
     LOG_TRACE("failed to handle sql. rc=%s", strrc(rc));
@@ -42,16 +48,19 @@ RC SqlTaskHandler::handle_event(Communicator *communicator)
 
   bool need_disconnect = false;
 
-  rc = communicator->write_result(event, need_disconnect);
-  LOG_INFO("write result return %s", strrc(rc));
+  RC write_rc = communicator->write_result(event, need_disconnect);
+  LOG_INFO("write result return %s", strrc(write_rc));
   event->session()->set_current_request(nullptr);
   Session::set_current_session(nullptr);
 
   delete event;
 
   if (need_disconnect) {
+    LOG_WARN("Connection will be closed due to error");
     return RC::INTERNAL;
   }
+  
+  // SQL语义错误（如UNIMPLEMENTED）不应导致连接关闭，返回SUCCESS让连接继续服务
   return RC::SUCCESS;
 }
 

@@ -562,6 +562,8 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
     printf("DEBUG: ComparisonExpr: Subquery result: rc=%s, value=%s\n", strrc(rc), right_value.to_string().c_str());
   }
   if (rc != RC::SUCCESS) {
+    // 直接返回错误，SubQueryExpr::get_value() 已经处理了多行检查
+    // TableScanPhysicalOperator会在返回错误前释放Frame lock
     printf("ERROR: ComparisonExpr: failed to get value of right expression: right_type=%d rc=%s\n",
              static_cast<int>(right_->type()), strrc(rc));
     return rc;
@@ -1975,38 +1977,79 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
     return RC::INTERNAL;
   }
 
-  // 设置父级tuple并打开物理操作符
+  // 检查physical_oper_是否有效
+  if (!physical_oper_) {
+    LOG_ERROR("Physical operator is null in SubQueryExpr::get_value()");
+    value.set_type(AttrType::UNDEFINED);
+    value.set_null(true);
+    return RC::INTERNAL;
+  }
+
+  // 设置父级tuple并打开物理操作符（如果还没打开）
   physical_oper_->set_parent_tuple(&tuple);
   // 设置 FieldExpr 的静态父级元组，用于相关子查询中的字段查找
   FieldExpr::set_current_parent_tuple(&tuple);
-  RC rc = physical_oper_->open(trx);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("Failed to open subquery physical operator: %s", strrc(rc));
-    value.set_type(AttrType::UNDEFINED);
-    value.set_null(true);
-    return rc;
+  
+  // 只有在未打开时才打开
+  RC rc = RC::SUCCESS;
+  if (!is_opened_) {
+    rc = physical_oper_->open(trx);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("Failed to open subquery physical operator: %s", strrc(rc));
+      FieldExpr::set_current_parent_tuple(nullptr);
+      value.set_type(AttrType::UNDEFINED);
+      value.set_null(true);
+      return rc;
+    }
+    is_opened_ = true;
   }
 
   // 获取第一行数据
   rc = physical_oper_->next();
   if (rc == RC::RECORD_EOF) {
     // 无数据返回NULL
-    physical_oper_->close();
+    if (is_opened_) {
+      physical_oper_->close();
+      is_opened_ = false;
+    }
     FieldExpr::set_current_parent_tuple(nullptr);
     value.set_type(AttrType::UNDEFINED);
     value.set_null(true);
     return RC::SUCCESS;
   } else if (rc != RC::SUCCESS) {
-    physical_oper_->close();
+    LOG_WARN("Failed to get first row from subquery: %s", strrc(rc));
+    if (is_opened_) {
+      physical_oper_->close();
+      is_opened_ = false;
+    }
     FieldExpr::set_current_parent_tuple(nullptr);
+    value.set_type(AttrType::UNDEFINED);
+    value.set_null(true);
     return rc;
   }
 
   // 获取当前tuple的值（先获取第一行的值）
   Tuple *current_tuple = physical_oper_->current_tuple();
   if (!current_tuple) {
-    physical_oper_->close();
+    LOG_WARN("Current tuple is null in subquery");
+    if (is_opened_) {
+      physical_oper_->close();
+      is_opened_ = false;
+    }
     // 清理 FieldExpr 的静态父级元组
+    FieldExpr::set_current_parent_tuple(nullptr);
+    value.set_type(AttrType::UNDEFINED);
+    value.set_null(true);
+    return RC::SUCCESS;
+  }
+
+  // 检查tuple是否有至少一个cell
+  if (current_tuple->cell_num() == 0) {
+    LOG_WARN("Subquery tuple has no cells");
+    if (is_opened_) {
+      physical_oper_->close();
+      is_opened_ = false;
+    }
     FieldExpr::set_current_parent_tuple(nullptr);
     value.set_type(AttrType::UNDEFINED);
     value.set_null(true);
@@ -2017,7 +2060,10 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
   rc = current_tuple->cell_at(0, value);
   if (rc != RC::SUCCESS) {
     LOG_WARN("Failed to get value from subquery tuple: %s", strrc(rc));
-    physical_oper_->close();
+    if (is_opened_) {
+      physical_oper_->close();
+      is_opened_ = false;
+    }
     FieldExpr::set_current_parent_tuple(nullptr);
     value.set_type(AttrType::UNDEFINED);
     value.set_null(true);
@@ -2027,20 +2073,44 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
   // 检查是否有多行数据（标量子查询只能返回0-1行）
   RC next_rc = physical_oper_->next();
   if (next_rc == RC::SUCCESS) {
-    // 多行数据，返回错误
-    physical_oper_->close();
+    // 标量子查询返回了多行数据，这是语义错误
+    // 重要：必须先consume所有行才能正确清理资源（特别是Frame锁）
+    int row_count = 2; // 已经有第一行和第二行了
+    while (physical_oper_->next() == RC::SUCCESS) {
+      row_count++;
+      if (row_count > 100) break; // 避免计数太多导致性能问题
+    }
+    
+    // 现在所有行都已经被读取完毕，可以安全地close
+    if (is_opened_) {
+      physical_oper_->close();
+      is_opened_ = false;
+    }
     FieldExpr::set_current_parent_tuple(nullptr);
-    return RC::INTERNAL;
+    
+    LOG_ERROR("SQL semantic error: Scalar subquery returned %d rows, expected at most 1. "
+              "Suggestion: Use 'IN (subquery)' instead of '= (subquery)' for multi-row subqueries.",
+              row_count);
+    
+    // 返回专门的错误码，表示标量子查询返回多行
+    // 这个错误码会被特殊处理，确保不会导致Frame锁问题
+    return RC::SCALAR_SUBQUERY_MULTIPLE_ROWS;
   } else if (next_rc != RC::RECORD_EOF) {
     // 其他错误
-    physical_oper_->close();
+    if (is_opened_) {
+      physical_oper_->close();
+      is_opened_ = false;
+    }
     // 清理 FieldExpr 的静态父级元组
     FieldExpr::set_current_parent_tuple(nullptr);
     return next_rc;
   }
   
-  // 关闭并清理
-  physical_oper_->close();
+  // 正常情况：只有一行数据，关闭并清理
+  if (is_opened_) {
+    physical_oper_->close();
+    is_opened_ = false;
+  }
   FieldExpr::set_current_parent_tuple(nullptr);
 
   // 缓存结果
@@ -2048,7 +2118,14 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
   return RC::SUCCESS;
 }
 
-RC SubQueryExpr::close() { return physical_oper_->close(); }
+RC SubQueryExpr::close() { 
+  if (is_opened_ && physical_oper_) {
+    RC rc = physical_oper_->close();
+    is_opened_ = false;
+    return rc;
+  }
+  return RC::SUCCESS;
+}
 
 RC SubQueryExpr::try_get_value(Value &value) const 
 { 
@@ -2082,7 +2159,15 @@ RC SubQueryExpr::try_get_value(Value &value) const
   }
 
   // 对于非关联子查询，传递nullptr作为父级tuple
+  // 注意：try_get_value可能在优化阶段调用，使用独立的open/close周期
   physical_oper_->set_parent_tuple(nullptr);
+  
+  // 确保先关闭之前可能打开的状态
+  if (is_opened_) {
+    physical_oper_->close();
+    is_opened_ = false;
+  }
+  
   RC rc = physical_oper_->open(trx);
   if (rc != RC::SUCCESS) {
     LOG_WARN("Failed to open subquery physical operator in try_get_value: %s", strrc(rc));
@@ -2090,18 +2175,25 @@ RC SubQueryExpr::try_get_value(Value &value) const
     value.set_null(true);
     return rc;
   }
+  is_opened_ = true;
 
   // 获取第一行数据
   rc = physical_oper_->next();
   if (rc == RC::RECORD_EOF) {
     // 没有数据，返回NULL
-    physical_oper_->close();
+    if (is_opened_) {
+      physical_oper_->close();
+      is_opened_ = false;
+    }
     value.set_type(AttrType::UNDEFINED);
     value.set_null(true);
     return RC::SUCCESS;
   } else if (rc != RC::SUCCESS) {
     // 其他错误
-    physical_oper_->close();
+    if (is_opened_) {
+      physical_oper_->close();
+      is_opened_ = false;
+    }
     value.set_type(AttrType::UNDEFINED);
     value.set_null(true);
     return rc;
@@ -2110,7 +2202,10 @@ RC SubQueryExpr::try_get_value(Value &value) const
   // 获取当前tuple的值
   Tuple *current_tuple = physical_oper_->current_tuple();
   if (!current_tuple) {
-    physical_oper_->close();
+    if (is_opened_) {
+      physical_oper_->close();
+      is_opened_ = false;
+    }
     value.set_type(AttrType::UNDEFINED);
     value.set_null(true);
     return RC::INTERNAL;
@@ -2121,7 +2216,10 @@ RC SubQueryExpr::try_get_value(Value &value) const
   
   if (rc != RC::SUCCESS) {
     LOG_WARN("Failed to get value from subquery tuple in try_get_value: %s", strrc(rc));
-    physical_oper_->close();
+    if (is_opened_) {
+      physical_oper_->close();
+      is_opened_ = false;
+    }
     value.set_type(AttrType::UNDEFINED);
     value.set_null(true);
     return rc;
@@ -2130,23 +2228,45 @@ RC SubQueryExpr::try_get_value(Value &value) const
   // 检查是否有多行数据（标量子查询只能返回0-1行）
   RC next_rc = physical_oper_->next();
   if (next_rc == RC::SUCCESS) {
-    // 标量子查询返回了多行数据，这是错误的
-    LOG_WARN("Scalar subquery returned more than one row in try_get_value");
-    physical_oper_->close();
+    // 标量子查询返回了多行数据，这是语义错误
+    // 必须先consume所有行才能正确清理资源
+    int row_count = 2; // 已经有第一行和第二行了
+    while (physical_oper_->next() == RC::SUCCESS) {
+      row_count++;
+      if (row_count > 100) break; // 避免计数太多导致性能问题
+    }
+    
+    if (is_opened_) {
+      physical_oper_->close();
+      is_opened_ = false;
+    }
+    
+    LOG_ERROR("SQL semantic error: Scalar subquery returned %d rows in try_get_value, expected at most 1. "
+              "Suggestion: Use 'IN (subquery)' instead of '= (subquery)' for multi-row subqueries.",
+              row_count);
+    
     value.set_type(AttrType::UNDEFINED);
     value.set_null(true);
-    return RC::INTERNAL;
+    
+    // 返回专门的错误码
+    return RC::SCALAR_SUBQUERY_MULTIPLE_ROWS;
   } else if (next_rc != RC::RECORD_EOF) {
     // 其他错误
     LOG_WARN("Error checking for multiple rows in try_get_value: %s", strrc(next_rc));
-    physical_oper_->close();
+    if (is_opened_) {
+      physical_oper_->close();
+      is_opened_ = false;
+    }
     value.set_type(AttrType::UNDEFINED);
     value.set_null(true);
     return next_rc;
   }
 
   // 正常情况：只有一行数据，关闭physical operator
-  physical_oper_->close();
+  if (is_opened_) {
+    physical_oper_->close();
+    is_opened_ = false;
+  }
 
   return RC::SUCCESS;
 }

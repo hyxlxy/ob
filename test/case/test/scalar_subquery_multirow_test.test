@@ -1,0 +1,40 @@
+-- 标量子查询多行检查测试
+-- 测试标量子查询返回多行时的错误处理
+
+CREATE TABLE test_table1(id INT, value INT);
+CREATE TABLE test_table2(id INT, name CHARS(10));
+
+INSERT INTO test_table1 VALUES (1, 100);
+INSERT INTO test_table1 VALUES (2, 200);
+INSERT INTO test_table1 VALUES (3, 300);
+
+INSERT INTO test_table2 VALUES (1, 'Alice');
+INSERT INTO test_table2 VALUES (2, 'Bob');
+INSERT INTO test_table2 VALUES (3, 'Charlie');
+
+-- 测试1: 正常情况 - 子查询返回0行（应该返回NULL）
+SELECT * FROM test_table1 WHERE id = (SELECT id FROM test_table2 WHERE id = 999);
+
+-- 测试2: 正常情况 - 子查询返回1行（应该正常工作）
+SELECT * FROM test_table1 WHERE id = (SELECT id FROM test_table2 WHERE id = 2);
+
+-- 测试3: 错误情况 - 子查询返回多行（应该报错：SCALAR_SUBQUERY_MULTIPLE_ROWS）
+-- 这是关键测试，应该捕获到标量子查询返回多行的错误
+SELECT * FROM test_table1 WHERE id = (SELECT id FROM test_table2);
+
+-- 测试4: 正常情况 - 使用聚合函数确保只返回一行
+SELECT * FROM test_table1 WHERE value = (SELECT MAX(id) * 100 FROM test_table2);
+
+-- 测试5: 正常情况 - IN操作允许多行
+SELECT * FROM test_table1 WHERE id IN (SELECT id FROM test_table2);
+
+-- 测试6: 错误情况 - SELECT列表中的标量子查询返回多行（应该报错）
+SELECT id, (SELECT name FROM test_table2) as subquery_result FROM test_table1;
+
+-- 测试7: 正常情况 - SELECT列表中的标量子查询返回1行
+SELECT id, (SELECT name FROM test_table2 WHERE id = 1) as subquery_result FROM test_table1;
+
+-- 清理
+DROP TABLE test_table1;
+DROP TABLE test_table2;
+

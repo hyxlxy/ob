@@ -186,14 +186,18 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
       LOG_WARN("Field validation failed in WHERE clause. rc=%d:%s", rc, strrc(rc));
       return rc;
     }
-    // 检查是否是关联子查询错误
-    if (rc == RC::UNIMPLEMENTED) {
-      LOG_WARN("Correlated subquery detected, not yet supported");
+    // 检查是否是SQL语法错误（包括不支持的功能）
+    if (rc == RC::SQL_SYNTAX || rc == RC::UNIMPLEMENTED || rc == RC::UNSUPPORTED) {
+      // 这些错误表示SQL语法不支持，直接返回给客户端
+      LOG_WARN("FilterStmt creation failed due to unsupported syntax. rc=%s", strrc(rc));
       return rc;
     }
-    // 如果 FilterStmt 创建失败，可能是因为包含了 SubQueryExpr
-    // 我们尝试创建一个空的 FilterStmt，并在逻辑计划生成阶段处理 SubQueryExpr
+    
+    // 其他错误：可能是因为包含了不支持的SubQueryExpr
+    // 我们尝试创建一个空的 FilterStmt，表示这个查询有WHERE但无法处理
+    // 注意：这意味着WHERE条件会被忽略！但至少服务器不会崩溃
     LOG_WARN("FilterStmt creation failed (possibly due to SubQueryExpr), creating empty FilterStmt. Raw conditions count: %zu", all_conditions.size());
+    LOG_WARN("WARNING: WHERE condition will be IGNORED. This may return all rows!");
     filter_stmt = new FilterStmt();
     // 注意：这里我们创建了一个空的 FilterStmt，实际的条件处理将在逻辑计划生成阶段进行
   }

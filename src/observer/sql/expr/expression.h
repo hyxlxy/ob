@@ -750,9 +750,9 @@ public:
   // 兼容性方法
   unique_ptr<Expression> copy() const override
   {
-    // 对于子查询，我们创建一个新的SubQueryExpr实例
-    // 使用相同的SelectSqlNode引用，因为它是const的
-    // 这是一个浅拷贝，但应该足够用于子查询的执行
+    // 创建一个新的SubQueryExpr，共享相同的SelectSqlNode引用
+    // 这是安全的，因为SelectSqlNode由ParsedSqlNode拥有，生命周期贯穿整个SQL执行
+    // 注意：多个SubQueryExpr实例会共享同一个SelectSqlNode，但它们各自维护自己的状态
     return std::make_unique<SubQueryExpr>(sql_node_);
   }
 
@@ -768,6 +768,7 @@ private:
   
   // 缓存标量子查询的结果，避免重复执行
   mutable Value cached_value_;
+  mutable bool is_opened_ = false;  // 标记physical_oper_是否已打开
   
   // 外层查询上下文，用于相关子查询
   const BinderContext *outer_context_;

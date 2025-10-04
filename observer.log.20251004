@@ -1,0 +1,289 @@
+[2025-10-04 14:35:11.131427 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: init@init.cpp:201] >> Output configuration 
+Begin dump configuration
+[]
+
+[DB]
+BUFFER_POOL_SIZE=1024
+DATA_DIR=./miniob
+DB_NAME=miniob
+LOG_DIR=./miniob/log
+PAGE_SIZE=4096
+
+[LOG]
+LOG_CONSOLE_LEVEL=4
+LOG_FILE_LEVEL=4
+LOG_FILE_NAME=observer.log
+
+[SERVER]
+BIND_ADDRESS=127.0.0.1
+CONNECTION_THREAD_NUM=4
+MAX_CONNECTION_NUM=8192
+PORT=6789
+
+Finish dump configuration 
+
+[2025-10-04 14:35:11.132500 pid:72199 tid:765b9a4f77c0 ctx:0 WARN: create_db@default_handler.cpp:91] >> Db already exists: sys
+[2025-10-04 14:35:11.135403 pid:72199 tid:765b95bff6c0 ctx:0 INFO: thread_func@thread_pool_executor.cpp:118] >> [ObLsmBackground] thread started
+[2025-10-04 14:35:11.137208 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:128, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 14:35:11.138191 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:256, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 14:35:11.139095 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:384, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 14:35:11.140091 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:512, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 14:35:11.141052 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:640, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 14:35:11.141968 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:768, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 14:35:11.142838 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:896, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 14:35:11.143822 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1024, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 14:35:11.145248 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1152, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 14:35:11.146421 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1280, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 14:35:11.147546 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1408, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 14:35:11.148661 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1536, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 14:35:11.149678 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1664, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 14:35:11.150735 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1792, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 14:35:11.151860 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1920, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 14:35:11.152983 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2048, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 14:35:11.154204 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2176, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 14:35:11.155342 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2304, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 14:35:11.156505 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2432, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 14:35:11.157709 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2560, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 14:35:11.157981 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: init@mem_pool.h:197] >> Extend one pool, this->size:2560, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 14:35:11.158240 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: BufferPoolManager@disk_buffer_pool.cpp:775] >> buffer pool manager init with memory size 20971520, page num: 2560, pool num: 20
+[2025-10-04 14:35:11.160675 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: load_pages@double_write_buffer.cpp:287] >> double write buffer load pages done. page num=6
+[2025-10-04 14:35:11.161606 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: init_meta@db.cpp:500] >> Successfully read db meta file. db=sys, file=miniob/db/sys/sys.db, check_point_lsn=0
+[2025-10-04 14:35:11.164211 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=id
+[2025-10-04 14:35:11.164444 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=col2
+[2025-10-04 14:35:11.164625 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=feat2
+[2025-10-04 14:35:11.165056 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/ssq_2.data.
+[2025-10-04 14:35:11.165475 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b9916e828, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x118c0f 0xbdf1f 0xdbb08 0xc2efd 0xe464d 0x4f8706 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.166088 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b9916e828, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x1195f6 0xbdf1f 0xdbb08 0xc2efd 0xe464d 0x4f8706 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.166305 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: alloc@disk_buffer_pool.cpp:142] >> allocate a new frame. frame=frame id:buffer_pool_id:2,page_num:0, dirty=0, pin=1, lsn=-4702111234474983746, this=0x765b9916c808
+[2025-10-04 14:35:11.166545 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: allocate_frame@disk_buffer_pool.cpp:712] >> allocate frame 0x765b9916c808, page num 0, frame=frame id:buffer_pool_id:2,page_num:0, dirty=0, pin=1, lsn=-4702111234474983746, this=0x765b9916c808
+[2025-10-04 14:35:11.166816 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/ssq_2.data. file_desc=8, hdr_frame=0x765b9916c808, file header=pageCount:2, allocatedCount:2
+[2025-10-04 14:35:11.167046 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: open_file@disk_buffer_pool.cpp:865] >> insert buffer pool into fd buffer pools. fd=8, bp=0x50e000000c80, lbt=0x4d1e0 0x6e0d3e 0xe595f 0x4f8706 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.167318 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b991708b8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x118c0f 0xbdf1f 0xdbb08 0xc7202 0x1b0f07 0x1cc04e 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.167508 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b991708b8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x1195f6 0xbdf1f 0xdbb08 0xc7202 0x1b0f07 0x1cc04e 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.167719 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: alloc@disk_buffer_pool.cpp:142] >> allocate a new frame. frame=frame id:buffer_pool_id:2,page_num:1, dirty=0, pin=1, lsn=0, this=0x765b9916e898
+[2025-10-04 14:35:11.167917 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: allocate_frame@disk_buffer_pool.cpp:712] >> allocate frame 0x765b9916e898, page num 1, frame=frame id:buffer_pool_id:2,page_num:1, dirty=0, pin=1, lsn=0, this=0x765b9916e898
+[2025-10-04 14:35:11.168165 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b991708b8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x10ed5e 0x10ea4f 0x1b16e5 0x1cc04e 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.168366 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b991708b8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x11102e 0x10ea4f 0x1b16e5 0x1cc04e 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.168555 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b991708b8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x11108b 0x10ea4f 0x1b16e5 0x1cc04e 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.168752 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b991708b8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x111ac5 0x10ea4f 0x1b16e5 0x1cc04e 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.168964 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b991708b8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x1157c0 0x1154a5 0x1b941f 0x1cc84d 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.169152 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b991708b8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x117d3e 0x1154a5 0x1b941f 0x1cc84d 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.169364 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b991708b8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x11ae4c 0xce84c 0x1b94bb 0x1cc84d 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.169549 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b991708b8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x11dabd 0xce84c 0x1b94bb 0x1cc84d 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.169734 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: init_free_pages@record_manager.cpp:640] >> record file handler init free pages done. free page num=1, rc=SUCCESS
+[2025-10-04 14:35:11.169908 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: init@record_manager.cpp:599] >> open record file handle done. rc=SUCCESS
+[2025-10-04 14:35:11.170092 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: open_all_tables@db.cpp:380] >> Open table: ssq_2, file: ssq_2.table
+[2025-10-04 14:35:11.171286 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=id
+[2025-10-04 14:35:11.171519 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=name
+[2025-10-04 14:35:11.171945 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/t1.data.
+[2025-10-04 14:35:11.172424 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b99172948, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x118c0f 0xbdf1f 0xdbb08 0xc2efd 0xe464d 0x4f8706 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.172653 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b99172948, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x1195f6 0xbdf1f 0xdbb08 0xc2efd 0xe464d 0x4f8706 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.172856 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: alloc@disk_buffer_pool.cpp:142] >> allocate a new frame. frame=frame id:buffer_pool_id:3,page_num:0, dirty=0, pin=1, lsn=0, this=0x765b99170928
+[2025-10-04 14:35:11.173058 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: allocate_frame@disk_buffer_pool.cpp:712] >> allocate frame 0x765b99170928, page num 0, frame=frame id:buffer_pool_id:3,page_num:0, dirty=0, pin=1, lsn=0, this=0x765b99170928
+[2025-10-04 14:35:11.173340 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/t1.data. file_desc=9, hdr_frame=0x765b99170928, file header=pageCount:2, allocatedCount:2
+[2025-10-04 14:35:11.173539 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: open_file@disk_buffer_pool.cpp:865] >> insert buffer pool into fd buffer pools. fd=9, bp=0x50e000000f20, lbt=0x4d1e0 0x6e0d3e 0xe595f 0x4f8706 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.173783 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b991749d8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x118c0f 0xbdf1f 0xdbb08 0xc7202 0x1b0f07 0x1cc04e 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.173987 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b991749d8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x1195f6 0xbdf1f 0xdbb08 0xc7202 0x1b0f07 0x1cc04e 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.174188 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: alloc@disk_buffer_pool.cpp:142] >> allocate a new frame. frame=frame id:buffer_pool_id:3,page_num:1, dirty=0, pin=1, lsn=0, this=0x765b991729b8
+[2025-10-04 14:35:11.174395 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: allocate_frame@disk_buffer_pool.cpp:712] >> allocate frame 0x765b991729b8, page num 1, frame=frame id:buffer_pool_id:3,page_num:1, dirty=0, pin=1, lsn=0, this=0x765b991729b8
+[2025-10-04 14:35:11.174646 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b991749d8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x10ed5e 0x10ea4f 0x1b16e5 0x1cc04e 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.174863 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b991749d8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x11102e 0x10ea4f 0x1b16e5 0x1cc04e 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.175070 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b991749d8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x11108b 0x10ea4f 0x1b16e5 0x1cc04e 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.175269 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b991749d8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x111ac5 0x10ea4f 0x1b16e5 0x1cc04e 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.175507 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b991749d8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x1157c0 0x1154a5 0x1b941f 0x1cc84d 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.175780 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b991749d8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x117d3e 0x1154a5 0x1b941f 0x1cc84d 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.176078 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b991749d8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x11ae4c 0xce84c 0x1b94bb 0x1cc84d 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.176372 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b991749d8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x11dabd 0xce84c 0x1b94bb 0x1cc84d 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.176751 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: init_free_pages@record_manager.cpp:640] >> record file handler init free pages done. free page num=1, rc=SUCCESS
+[2025-10-04 14:35:11.176964 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: init@record_manager.cpp:599] >> open record file handle done. rc=SUCCESS
+[2025-10-04 14:35:11.177208 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: open_all_tables@db.cpp:380] >> Open table: t1, file: t1.table
+[2025-10-04 14:35:11.178174 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=id
+[2025-10-04 14:35:11.178452 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=col1
+[2025-10-04 14:35:11.178744 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: init@field_meta.cpp:59] >> Init a field with name=feat1
+[2025-10-04 14:35:11.179259 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/ssq_1.data.
+[2025-10-04 14:35:11.179619 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b99176a68, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x118c0f 0xbdf1f 0xdbb08 0xc2efd 0xe464d 0x4f8706 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.179993 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b99176a68, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x1195f6 0xbdf1f 0xdbb08 0xc2efd 0xe464d 0x4f8706 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.180228 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: alloc@disk_buffer_pool.cpp:142] >> allocate a new frame. frame=frame id:buffer_pool_id:1,page_num:0, dirty=0, pin=1, lsn=0, this=0x765b99174a48
+[2025-10-04 14:35:11.180483 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: allocate_frame@disk_buffer_pool.cpp:712] >> allocate frame 0x765b99174a48, page num 0, frame=frame id:buffer_pool_id:1,page_num:0, dirty=0, pin=1, lsn=0, this=0x765b99174a48
+[2025-10-04 14:35:11.180866 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/ssq_1.data. file_desc=10, hdr_frame=0x765b99174a48, file header=pageCount:2, allocatedCount:2
+[2025-10-04 14:35:11.181093 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: open_file@disk_buffer_pool.cpp:865] >> insert buffer pool into fd buffer pools. fd=10, bp=0x50e0000011c0, lbt=0x4d1e0 0x6e0d3e 0xe595f 0x4f8706 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.181373 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b99178af8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x118c0f 0xbdf1f 0xdbb08 0xc7202 0x1b0f07 0x1cc04e 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.181583 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b99178af8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x1195f6 0xbdf1f 0xdbb08 0xc7202 0x1b0f07 0x1cc04e 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.181796 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: alloc@disk_buffer_pool.cpp:142] >> allocate a new frame. frame=frame id:buffer_pool_id:1,page_num:1, dirty=0, pin=1, lsn=0, this=0x765b99176ad8
+[2025-10-04 14:35:11.181995 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: allocate_frame@disk_buffer_pool.cpp:712] >> allocate frame 0x765b99176ad8, page num 1, frame=frame id:buffer_pool_id:1,page_num:1, dirty=0, pin=1, lsn=0, this=0x765b99176ad8
+[2025-10-04 14:35:11.182256 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b99178af8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x10ed5e 0x10ea4f 0x1b16e5 0x1cc04e 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.182491 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b99178af8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x11102e 0x10ea4f 0x1b16e5 0x1cc04e 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.182689 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b99178af8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x11108b 0x10ea4f 0x1b16e5 0x1cc04e 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.182898 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b99178af8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x111ac5 0x10ea4f 0x1b16e5 0x1cc04e 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.183121 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b99178af8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x1157c0 0x1154a5 0x1b941f 0x1cc84d 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.183367 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b99178af8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x117d3e 0x1154a5 0x1b941f 0x1cc84d 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.183575 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b99178af8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x11ae4c 0xce84c 0x1b94bb 0x1cc84d 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.183775 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b99178af8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x11dabd 0xce84c 0x1b94bb 0x1cc84d 0x1cb413 0x4f904c 0x4f9cf0 0x1ed6f9 0x13a352 0x128191 0x15a781 0x1567bb 0x14e14 0x1623d 0xced7 0x21ca 0x228b 0x9d45
+[2025-10-04 14:35:11.183971 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: init_free_pages@record_manager.cpp:640] >> record file handler init free pages done. free page num=1, rc=SUCCESS
+[2025-10-04 14:35:11.184155 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: init@record_manager.cpp:599] >> open record file handle done. rc=SUCCESS
+[2025-10-04 14:35:11.184376 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: open_all_tables@db.cpp:380] >> Open table: ssq_1, file: ssq_1.table
+[2025-10-04 14:35:11.184564 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: open_all_tables@db.cpp:383] >> All table have been opened. num=3
+[2025-10-04 14:35:11.188911 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: recover@db.cpp:464] >> Successfully recover db. db=sys checkpoint_lsn=0
+[2025-10-04 14:35:11.189194 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: init@default_handler.cpp:67] >> Default handler init with miniob success
+[2025-10-04 14:35:11.189397 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: init@init.cpp:216] >> Successfully init utility
+[2025-10-04 14:35:11.189923 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: start_tcp_server@server.cpp:192] >> Listen on port 6789
+[2025-10-04 14:35:11.190117 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: start_tcp_server@server.cpp:195] >> Observer start success
+[2025-10-04 14:35:13.092544 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: accept@server.cpp:127] >> Accepted connection from 127.0.0.1:10884
+
+[2025-10-04 14:35:13.096525 pid:72199 tid:765b933ff6c0 ctx:0 INFO: operator()@one_thread_per_connection_thread_handler.cpp:70] >> worker thread start. communicator = 0x50b0000012d0
+[2025-10-04 14:36:38.713194 pid:72199 tid:765b933ff6c0 ctx:0 INFO: read_event@plain_communicator.cpp:82] >> The peer has been closed 127.0.0.1:10884
+[2025-10-04 14:36:38.713737 pid:72199 tid:765b933ff6c0 ctx:0 ERROR: operator()@one_thread_per_connection_thread_handler.cpp:98] >> handle error. rc = IOERR_CLOSE
+[2025-10-04 14:36:38.714035 pid:72199 tid:765b933ff6c0 ctx:0 INFO: operator()@one_thread_per_connection_thread_handler.cpp:103] >> worker thread stop. communicator = 0x50b0000012d0
+[2025-10-04 14:36:38.714022 pid:72199 tid:765b920f56c0 ctx:0 INFO: quit_thread_func@main.cpp:156] >> Receive signal: 2
+[2025-10-04 14:36:38.714447 pid:72199 tid:765b920f56c0 ctx:0 INFO: shutdown@server.cpp:299] >> NetServer shutting down
+[2025-10-04 14:36:38.714780 pid:72199 tid:765b933ff6c0 ctx:0 INFO: close_connection@one_thread_per_connection_thread_handler.cpp:154] >> close connection. communicator = 0x50b0000012d0
+[2025-10-04 14:36:39.194176 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:170] >> begin to await stop one thread per connection thread handler
+[2025-10-04 14:36:39.194829 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:174] >> end to await stop one thread per connection thread handler
+[2025-10-04 14:36:39.195348 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:170] >> begin to await stop one thread per connection thread handler
+[2025-10-04 14:36:39.195777 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:174] >> end to await stop one thread per connection thread handler
+[2025-10-04 14:36:39.196214 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: serve@server.cpp:293] >> NetServer quit
+[2025-10-04 14:36:39.196658 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: main@main.cpp:203] >> Server stopped
+[2025-10-04 14:36:39.197194 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b99178af8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x118c0f 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd4349 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.197770 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b99178af8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x1195f6 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd4349 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.198262 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b99176a68, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x118c0f 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd4349 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.198768 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b99176a68, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x1195f6 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd4349 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.209418 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: flush_page_internal@disk_buffer_pool.cpp:564] >> Flush block. file desc=10, frame=frame id:buffer_pool_id:1,page_num:1, dirty=0, pin=1, lsn=0, this=0x765b99176ad8
+[2025-10-04 14:36:39.210108 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b99178af8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x11ae4c 0xd4437 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.211081 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b99178af8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x11dabd 0xd4437 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.212513 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: flush_page_internal@disk_buffer_pool.cpp:564] >> Flush block. file desc=10, frame=frame id:buffer_pool_id:1,page_num:0, dirty=0, pin=2, lsn=0, this=0x765b99174a48
+[2025-10-04 14:36:39.213187 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b99176a68, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x11ae4c 0xd4437 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.214010 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b99176a68, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x11dabd 0xd4437 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.214647 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: sync@heap_table_engine.cpp:416] >> Sync table over. table=ssq_1
+[2025-10-04 14:36:39.215129 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:ssq_1.
+[2025-10-04 14:36:39.215639 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b991749d8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x118c0f 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd4349 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.216104 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b991749d8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x1195f6 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd4349 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.216590 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b99172948, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x118c0f 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd4349 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.217008 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b99172948, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x1195f6 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd4349 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.218130 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: flush_page_internal@disk_buffer_pool.cpp:564] >> Flush block. file desc=9, frame=frame id:buffer_pool_id:3,page_num:1, dirty=0, pin=1, lsn=0, this=0x765b991729b8
+[2025-10-04 14:36:39.218625 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b991749d8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x11ae4c 0xd4437 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.219050 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b991749d8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x11dabd 0xd4437 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.220125 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: flush_page_internal@disk_buffer_pool.cpp:564] >> Flush block. file desc=9, frame=frame id:buffer_pool_id:3,page_num:0, dirty=0, pin=2, lsn=0, this=0x765b99170928
+[2025-10-04 14:36:39.220558 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b99172948, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x11ae4c 0xd4437 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.220985 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b99172948, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x11dabd 0xd4437 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.221486 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: sync@heap_table_engine.cpp:416] >> Sync table over. table=t1
+[2025-10-04 14:36:39.221879 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:t1.
+[2025-10-04 14:36:39.222280 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b991708b8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x118c0f 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd4349 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.222754 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b991708b8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x1195f6 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd4349 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.223209 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b9916e828, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x118c0f 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd4349 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.223666 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b9916e828, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x1195f6 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd4349 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.224772 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: flush_page_internal@disk_buffer_pool.cpp:564] >> Flush block. file desc=8, frame=frame id:buffer_pool_id:2,page_num:1, dirty=0, pin=1, lsn=0, this=0x765b9916e898
+[2025-10-04 14:36:39.225061 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b991708b8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x11ae4c 0xd4437 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.225344 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b991708b8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x11dabd 0xd4437 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.226088 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: flush_page_internal@disk_buffer_pool.cpp:564] >> Flush block. file desc=8, frame=frame id:buffer_pool_id:2,page_num:0, dirty=0, pin=2, lsn=0, this=0x765b9916c808
+[2025-10-04 14:36:39.226452 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b9916e828, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x11ae4c 0xd4437 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.226778 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b9916e828, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x11dabd 0xd4437 0x4f77b9 0x1f4c63 0x13d094 0x15c3b5 0x157b97 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.227124 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: sync@heap_table_engine.cpp:416] >> Sync table over. table=ssq_2
+[2025-10-04 14:36:39.227421 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: sync@db.cpp:407] >> Successfully sync table db:sys, table:ssq_2.
+[2025-10-04 14:36:39.238741 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: sync@db.cpp:412] >> double write buffer flush pages ret=SUCCESS
+[2025-10-04 14:36:39.239281 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: flush_meta@db.cpp:545] >> Successfully write db meta file. db=sys, file=miniob/db/sys/sys.db.tmp, check_point_lsn=0
+[2025-10-04 14:36:39.239489 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: sync@db.cpp:431] >> Successfully sync db. db=sys
+[2025-10-04 14:36:39.239694 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b99176a68, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x11ae4c 0xc4e5f 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.239901 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b99176a68, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x11dabd 0xc4e5f 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.240097 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b99178af8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x118c0f 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd0996 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.240281 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b99178af8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x1195f6 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd0996 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.240494 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b99176a68, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x118c0f 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd0996 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.240679 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b99176a68, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x1195f6 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd0996 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.240874 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: purge_frame@disk_buffer_pool.cpp:490] >> Successfully purge frame =0x765b99176ad8, page 1 frame_id=buffer_pool_id:1,page_num:1
+[2025-10-04 14:36:39.241073 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b99178af8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x11ae4c 0xbffe0 0xbec13 0xd0458 0xd0a51 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.241257 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b99178af8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x11dabd 0xbffe0 0xbec13 0xd0458 0xd0a51 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.241476 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: purge_frame@disk_buffer_pool.cpp:490] >> Successfully purge frame =0x765b99174a48, page 0 frame_id=buffer_pool_id:1,page_num:0
+[2025-10-04 14:36:39.241656 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b99176a68, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x11ae4c 0xbffe0 0xbec13 0xd0458 0xd0a51 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.241844 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b99176a68, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x11dabd 0xbffe0 0xbec13 0xd0458 0xd0a51 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.242039 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/ssq_1.data, page count=0
+[2025-10-04 14:36:39.242249 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 10:miniob/db/sys/ssq_1.data.
+[2025-10-04 14:36:39.242446 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-10-04 14:36:39.242636 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: ssq_1
+[2025-10-04 14:36:39.242834 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b99172948, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x11ae4c 0xc4e5f 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.243060 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b99172948, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x11dabd 0xc4e5f 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.243278 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b991749d8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x118c0f 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd0996 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.243514 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b991749d8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x1195f6 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd0996 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.243976 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b99172948, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x118c0f 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd0996 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.244362 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b99172948, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x1195f6 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd0996 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.244758 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: purge_frame@disk_buffer_pool.cpp:490] >> Successfully purge frame =0x765b991729b8, page 1 frame_id=buffer_pool_id:3,page_num:1
+[2025-10-04 14:36:39.245125 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b991749d8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x11ae4c 0xbffe0 0xbec13 0xd0458 0xd0a51 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.245538 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b991749d8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x11dabd 0xbffe0 0xbec13 0xd0458 0xd0a51 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.245982 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: purge_frame@disk_buffer_pool.cpp:490] >> Successfully purge frame =0x765b99170928, page 0 frame_id=buffer_pool_id:3,page_num:0
+[2025-10-04 14:36:39.246446 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b99172948, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x11ae4c 0xbffe0 0xbec13 0xd0458 0xd0a51 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.246805 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b99172948, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x11dabd 0xbffe0 0xbec13 0xd0458 0xd0a51 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.247149 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/t1.data, page count=0
+[2025-10-04 14:36:39.247525 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 9:miniob/db/sys/t1.data.
+[2025-10-04 14:36:39.247853 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-10-04 14:36:39.248113 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: t1
+[2025-10-04 14:36:39.248419 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b9916e828, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x11ae4c 0xc4e5f 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.248767 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b9916e828, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x11dabd 0xc4e5f 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.249132 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b991708b8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x118c0f 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd0996 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.249518 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b991708b8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x1195f6 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd0996 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.249883 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b9916e828, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x118c0f 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd0996 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.250224 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b9916e828, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x1195f6 0xc0202 0xe9335 0xe8e94 0xe8950 0xf404b 0xee982 0xc0417 0xd0996 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.250587 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: purge_frame@disk_buffer_pool.cpp:490] >> Successfully purge frame =0x765b9916e898, page 1 frame_id=buffer_pool_id:2,page_num:1
+[2025-10-04 14:36:39.250883 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b991708b8, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x11ae4c 0xbffe0 0xbec13 0xd0458 0xd0a51 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.251181 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b991708b8, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x11dabd 0xbffe0 0xbec13 0xd0458 0xd0a51 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.251501 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: purge_frame@disk_buffer_pool.cpp:490] >> Successfully purge frame =0x765b9916c808, page 0 frame_id=buffer_pool_id:2,page_num:0
+[2025-10-04 14:36:39.251925 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: lock@mutex.cpp:266] >> debug lock 0x765b9916e828, lbt=0x4d1e0 0x6e0d3e 0x6c05a5 0x11e657 0x11ae4c 0xbffe0 0xbec13 0xd0458 0xd0a51 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.252378 pid:72199 tid:765b9a4f77c0 ctx:0 DEBUG: unlock@mutex.cpp:273] >> debug unlock 0x765b9916e828, lbt=0x4d1e0 0x6e0d3e 0x6c0e37 0x11e69a 0x11dabd 0xbffe0 0xbec13 0xd0458 0xd0a51 0xc4e6e 0x4dd600 0x4de088 0x1f5f0d 0x1f5443 0x1e01c0 0x121eea 0x157c7b 0x155403 0x155486 0x156a5 0x17557 0x17dd1 0xd6ca 0x21ca 0x228b 0x9d45
+[2025-10-04 14:36:39.252746 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/ssq_2.data, page count=0
+[2025-10-04 14:36:39.253048 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 8:miniob/db/sys/ssq_2.data.
+[2025-10-04 14:36:39.253325 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
+[2025-10-04 14:36:39.253570 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:37] >> Table has been closed: ssq_2
+[2025-10-04 14:36:39.254138 pid:72199 tid:765b95bff6c0 ctx:0 INFO: thread_func@thread_pool_executor.cpp:176] >> [ObLsmBackground] thread exit
+[2025-10-04 14:36:39.454459 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: ~Db@db.cpp:50] >> Db has been closed: sys
+[2025-10-04 14:36:39.468481 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: cleanup@mem_pool.h:223] >> Successfully do cleanup, this->name:BufPool.
+[2025-10-04 14:36:39.469223 pid:72199 tid:765b9a4f77c0 ctx:0 INFO: cleanup_util@init.cpp:230] >> Shutdown Cleanly!
+[2025-10-04 15:29:32.909095 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: init@init.cpp:201] >> Output configuration 
+Begin dump configuration
+[]
+
+[DB]
+BUFFER_POOL_SIZE=1024
+DATA_DIR=./miniob
+DB_NAME=miniob
+LOG_DIR=./miniob/log
+PAGE_SIZE=4096
+
+[LOG]
+LOG_CONSOLE_LEVEL=4
+LOG_FILE_LEVEL=4
+LOG_FILE_NAME=observer.log
+
+[SERVER]
+BIND_ADDRESS=127.0.0.1
+CONNECTION_THREAD_NUM=4
+MAX_CONNECTION_NUM=8192
+PORT=6789
+
+Finish dump configuration 
+
+[2025-10-04 15:29:32.910196 pid:103067 tid:7ba903dff6c0 ctx:0 INFO: thread_func@thread_pool_executor.cpp:118] >> [ObLsmBackground] thread started
+[2025-10-04 15:29:32.911425 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:128, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 15:29:32.911959 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:256, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 15:29:32.912477 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:384, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 15:29:32.913108 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:512, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 15:29:32.913652 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:640, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 15:29:32.914153 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:768, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 15:29:32.914715 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:896, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 15:29:32.915313 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1024, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 15:29:32.916089 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1152, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 15:29:32.916710 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1280, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 15:29:32.917216 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1408, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 15:29:32.917776 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1536, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 15:29:32.918333 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1664, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 15:29:32.918849 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1792, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 15:29:32.919391 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1920, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 15:29:32.919942 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2048, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 15:29:32.920496 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2176, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 15:29:32.921021 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2304, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 15:29:32.921564 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2432, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 15:29:32.922323 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2560, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 15:29:32.922351 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: init@mem_pool.h:197] >> Extend one pool, this->size:2560, item_num_per_pool:128, this->name:BufPool.
+[2025-10-04 15:29:32.922369 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: BufferPoolManager@disk_buffer_pool.cpp:775] >> buffer pool manager init with memory size 20971520, page num: 2560, pool num: 20
+[2025-10-04 15:29:32.922531 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: load_pages@double_write_buffer.cpp:287] >> double write buffer load pages done. page num=0
+[2025-10-04 15:29:32.922645 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: init_meta@db.cpp:473] >> Db meta file not exist. db=sys, file=miniob/db/sys/sys.db
+[2025-10-04 15:29:32.923018 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: open_all_tables@db.cpp:383] >> All table have been opened. num=0
+[2025-10-04 15:29:32.925488 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: recover@db.cpp:464] >> Successfully recover db. db=sys checkpoint_lsn=0
+[2025-10-04 15:29:32.925606 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: init@default_handler.cpp:67] >> Default handler init with miniob success
+[2025-10-04 15:29:32.925626 pid:103067 tid:7ba907fcf7c0 ctx:0 INFO: init@init.cpp:216] >> Successfully init utility

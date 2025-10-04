@@ -57,6 +57,12 @@ RC TableScanPhysicalOperator::next()
     rc = filter(tuple_, filter_result);
     if (rc != RC::SUCCESS) {
       LOG_TRACE("record filtered failed=%s", strrc(rc));
+      // 在返回错误前，先关闭scanner以释放Frame lock等资源
+      if (record_scanner_ != nullptr) {
+        record_scanner_->close_scan();
+        delete record_scanner_;
+        record_scanner_ = nullptr;
+      }
       return rc;
     }
 
