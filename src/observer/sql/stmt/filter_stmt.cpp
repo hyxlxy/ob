@@ -88,6 +88,8 @@ RC FilterStmt::create_condition_tree(Db *db, Table *default_table, unordered_map
     tree = new FilterConditionNode(FilterConditionNode::CONDITION);
     RC rc = create_filter_unit(db, default_table, tables, conditions[0], tree->filter_unit);
     if (rc != RC::SUCCESS) {
+      // 防止 create_filter_unit 失败时留下悬挂指针被析构再次释放
+      tree->filter_unit = nullptr;
       delete tree;
       tree = nullptr;
       return rc;
@@ -130,6 +132,7 @@ RC FilterStmt::create_condition_tree(Db *db, Table *default_table, unordered_map
         FilterConditionNode *child_tree = new FilterConditionNode(FilterConditionNode::CONDITION);
         RC rc = create_filter_unit(db, default_table, tables, *group[0], child_tree->filter_unit);
         if (rc != RC::SUCCESS) {
+          child_tree->filter_unit = nullptr;
           delete child_tree;
           delete tree;
           tree = nullptr;
@@ -143,6 +146,7 @@ RC FilterStmt::create_condition_tree(Db *db, Table *default_table, unordered_map
           FilterConditionNode *and_child = new FilterConditionNode(FilterConditionNode::CONDITION);
           RC rc = create_filter_unit(db, default_table, tables, *condition, and_child->filter_unit);
           if (rc != RC::SUCCESS) {
+            and_child->filter_unit = nullptr;
             delete and_child;
             delete child_tree;
             delete tree;

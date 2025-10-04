@@ -119,6 +119,15 @@ RC PlainCommunicator::write_state(SessionEvent *event, bool &need_disconnect)
     return RC::IOERR_WRITE;
   }
 
+  // 补写消息分隔符，保证客户端能读到完整响应
+  RC rc2 = writer_->writen(send_message_delimiter_.data(), send_message_delimiter_.size());
+  if (OB_FAIL(rc2)) {
+    LOG_ERROR("Failed to send delimiter to client. ret=%s, error=%s", strrc(rc2), strerror(errno));
+    need_disconnect = true;
+    delete[] buf;
+    return rc2;
+  }
+
   need_disconnect = false;
   delete[] buf;
 
@@ -181,8 +190,6 @@ RC PlainCommunicator::write_result(SessionEvent *event, bool &need_disconnect)
     }
   }
   writer_->flush();  // TODO handle error
-  // 避免上层误判为需要断开连接，统一保持连接
-  need_disconnect = false;
   return rc;
 }
 
@@ -190,7 +197,8 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
 {
   RC rc = RC::SUCCESS;
 
-  need_disconnect = true;
+  // 默认保持连接不断开，由具体错误分支决定是否断开
+  need_disconnect = false;
 
   SqlResult *sql_result = event->sql_result();
 

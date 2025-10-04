@@ -5,6 +5,7 @@ import json
 import sys
 import logging
 import subprocess
+import threading
 import socket
 import select
 import time
@@ -359,10 +360,22 @@ class MiniObServer:
       observer_command.append('-p')
       observer_command.append(str(self.__server_port))
 
-    process = subprocess.Popen(observer_command, 
-                              stdout=None if self.__server_debug else subprocess.DEVNULL, 
-                              stderr=None if self.__server_debug else subprocess.DEVNULL, 
-                              cwd=self.__data_dir)
+    # 将 observer 的 stdout/stderr 打印回测试日志，避免丢失关键信息
+    process = subprocess.Popen(observer_command,
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT,
+                              cwd=self.__data_dir,
+                              bufsize=1,
+                              universal_newlines=True)
+    # 异步采集 observer 输出，集成到测试日志
+    def _drain_observer_output(proc):
+      try:
+        for line in proc.stdout:
+          _logger.info("[observer] %s", line.rstrip())
+      except Exception as e:
+        _logger.error("drain observer output error: %s", e)
+
+    threading.Thread(target=_drain_observer_output, args=(process,), daemon=True).start()
     return_code = process.poll()
     if return_code != None:
       _logger.error("Failed to start observer, exit with code %d", return_code)
@@ -1218,16 +1231,32 @@ def __run_shell_command(command_args):
   _logger.info("running command: '%s'", ' '.join(command_args))
 
   outputs = []
-  command_process = subprocess.Popen(command_args, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-  while True:
-    line = command_process.stderr.readline()
-    line_str = line.decode(GlobalConfig.default_encoding)
-    if isinstance(line_str, str):
-      outputs.append(line_str.strip())
+  # 采集被执行命令的 stdout/stderr，集成到测试日志
+  command_process = subprocess.Popen(
+    command_args,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.STDOUT,
+    universal_newlines=True,
+    bufsize=1
+  )
 
-    return_code = command_process.poll()
-    if return_code is not None:
-      return return_code, outputs
+  try:
+    for line in iter(command_process.stdout.readline, ''):
+      if not line:
+        break
+      line_str = line.rstrip('\n')
+      outputs.append(line_str)
+      _logger.info("[cmd] %s", line_str)
+  finally:
+    if command_process.stdout:
+      try:
+        command_process.stdout.close()
+      except Exception:
+        pass
+
+  return_code = command_process.wait()
+  return return_code, outputs
+
 
 def run_cmake(work_dir: str, build_path: str, cmake_args: str):
   cmake_command = ["cmake", "-B", build_path, "--log-level=WARNING"]
