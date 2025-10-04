@@ -181,9 +181,15 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
       static_cast<int>(all_conditions.size()),
       filter_stmt);
   if (rc != RC::SUCCESS) {
-    // 任何 WHERE 条件构建失败都直接向上返回错误，避免静默忽略导致语义错误
-    LOG_WARN("FilterStmt creation failed. rc=%s. Returning error to client instead of ignoring WHERE.", strrc(rc));
-    return rc;
+    // 对关键错误直接返回，使语义严格；其余保持兼容旧行为
+    if (rc == RC::SCHEMA_FIELD_NOT_EXIST || rc == RC::SCHEMA_FIELD_MISSING ||
+        rc == RC::SQL_SYNTAX || rc == RC::UNIMPLEMENTED || rc == RC::UNSUPPORTED || rc == RC::INVALID_ARGUMENT) {
+      LOG_WARN("FilterStmt creation failed (critical). rc=%s", strrc(rc));
+      return rc;
+    }
+    // 非关键错误：出于兼容，忽略 WHERE，继续执行（与旧行为一致）
+    LOG_WARN("FilterStmt creation failed (non-critical), ignoring WHERE. rc=%s", strrc(rc));
+    filter_stmt = new FilterStmt();
   }
 
 

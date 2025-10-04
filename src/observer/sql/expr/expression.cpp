@@ -481,6 +481,7 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
             }
             // 关联子查询执行成功，继续处理结果
           } else {
+            // 非特定错误：向上返回以暴露真实问题
             return rc;
           }
         }
@@ -1780,21 +1781,20 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
   }
 
   // 创建逻辑和物理计划
-  LogicalPlanGenerator logical_plan_generator;
-  unique_ptr<LogicalOperator> logical_operator;
-  RC rc = logical_plan_generator.create(sub_query, logical_operator);
-  if (rc != RC::SUCCESS) {
-    return rc;
-  }
-
-  // 兜底语义校验：用于 IN/NOT IN 的子查询必须返回1列
-  // 通过尝试将 Stmt 动态转换为 SelectStmt
+  // 兜底语义校验（计划生成之前执行，避免列被移动走导致 size 变为 0）
   if (sub_query && sub_query->type() == StmtType::SELECT) {
     auto *sel = dynamic_cast<SelectStmt *>(sub_query);
     if (sel && sel->query_expressions().size() != 1) {
       LOG_WARN("IN/NOT IN subquery must return exactly one column at execution. got=%zu", sel->query_expressions().size());
       return RC::INVALID_ARGUMENT; // 将在上层转化为 FAILURE
     }
+  }
+
+  LogicalPlanGenerator logical_plan_generator;
+  unique_ptr<LogicalOperator> logical_operator;
+  RC rc = logical_plan_generator.create(sub_query, logical_operator);
+  if (rc != RC::SUCCESS) {
+    return rc;
   }
 
   Session *session = Session::current_session();
