@@ -1787,6 +1787,16 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
     return rc;
   }
 
+  // 兜底语义校验：用于 IN/NOT IN 的子查询必须返回1列
+  // 通过尝试将 Stmt 动态转换为 SelectStmt
+  if (sub_query && sub_query->type() == StmtType::SELECT) {
+    auto *sel = dynamic_cast<SelectStmt *>(sub_query);
+    if (sel && sel->query_expressions().size() != 1) {
+      LOG_WARN("IN/NOT IN subquery must return exactly one column at execution. got=%zu", sel->query_expressions().size());
+      return RC::INVALID_ARGUMENT; // 将在上层转化为 FAILURE
+    }
+  }
+
   Session *session = Session::current_session();
   if (!session) {
     return RC::INTERNAL;

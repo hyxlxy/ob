@@ -304,6 +304,23 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<st
       return rc;
     }
 
+    // 语义校验：IN/NOT IN 的子查询必须且只能返回1列
+    if (sub_query_stmt != nullptr) {
+      auto *sel = dynamic_cast<SelectStmt *>(sub_query_stmt);
+      if (sel == nullptr) {
+        LOG_WARN("sub-query is not a SelectStmt for IN/NOT IN");
+        delete filter_unit;
+        delete sub_query_stmt;
+        return RC::INVALID_ARGUMENT;
+      }
+      if (sel->query_expressions().size() != 1) {
+        LOG_WARN("IN/NOT IN subquery must return exactly one column. got=%zu", sel->query_expressions().size());
+        delete filter_unit;
+        delete sub_query_stmt;
+        return RC::INVALID_ARGUMENT; // 将在客户端显示为 FAILURE
+      }
+    }
+
     filter_unit->set_comp(comp);
     filter_unit->set_sub_query(std::unique_ptr<Stmt>(sub_query_stmt));
     return RC::SUCCESS;
