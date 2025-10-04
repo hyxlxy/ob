@@ -2118,14 +2118,35 @@ RC SubQueryExpr::try_get_value(Value &value) const
 
   // 从tuple获取第一个cell的值
   rc = current_tuple->cell_at(0, value);
-  physical_oper_->close();
   
   if (rc != RC::SUCCESS) {
     LOG_WARN("Failed to get value from subquery tuple in try_get_value: %s", strrc(rc));
+    physical_oper_->close();
     value.set_type(AttrType::UNDEFINED);
     value.set_null(true);
     return rc;
   }
+
+  // 检查是否有多行数据（标量子查询只能返回0-1行）
+  RC next_rc = physical_oper_->next();
+  if (next_rc == RC::SUCCESS) {
+    // 标量子查询返回了多行数据，这是错误的
+    LOG_WARN("Scalar subquery returned more than one row in try_get_value");
+    physical_oper_->close();
+    value.set_type(AttrType::UNDEFINED);
+    value.set_null(true);
+    return RC::INTERNAL;
+  } else if (next_rc != RC::RECORD_EOF) {
+    // 其他错误
+    LOG_WARN("Error checking for multiple rows in try_get_value: %s", strrc(next_rc));
+    physical_oper_->close();
+    value.set_type(AttrType::UNDEFINED);
+    value.set_null(true);
+    return next_rc;
+  }
+
+  // 正常情况：只有一行数据，关闭physical operator
+  physical_oper_->close();
 
   return RC::SUCCESS;
 }
