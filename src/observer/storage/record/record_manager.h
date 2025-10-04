@@ -262,7 +262,7 @@ protected:
   PageHeader   *page_header_ = nullptr;                    ///< 当前页面上页面头
   char         *bitmap_      = nullptr;  ///< 当前页面上record分配状态信息bitmap内存起始位置
   StorageFormat storage_format_;
-  bool is_frame_latched_ = false;  ///< 标记frame是否已经被latch了，防止重复unlock
+  bool is_frame_latched_ = false;  ///< 标记frame是否已经被latch，防止重复unlatch导致崩溃
 
 protected:
   friend class RecordPageIterator;

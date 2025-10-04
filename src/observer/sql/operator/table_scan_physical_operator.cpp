@@ -58,10 +58,12 @@ RC TableScanPhysicalOperator::next()
     if (rc != RC::SUCCESS) {
       LOG_TRACE("record filtered failed=%s", strrc(rc));
       // 在返回错误前，先关闭scanner以释放Frame lock等资源
+      // 注意：不delete，让close()来负责，避免重复释放
       if (record_scanner_ != nullptr) {
-        record_scanner_->close_scan();
-        delete record_scanner_;
-        record_scanner_ = nullptr;
+        RC close_rc = record_scanner_->close_scan();
+        if (close_rc != RC::SUCCESS) {
+          LOG_WARN("Failed to close record scanner in error path: %s", strrc(close_rc));
+        }
       }
       return rc;
     }

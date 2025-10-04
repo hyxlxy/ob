@@ -420,10 +420,6 @@ select * from ssq_1;
 select * from ssq_1 where col1 in (select ssq_2.col2 from ssq_2);
 ### 2025-09-15 10:44:35.539
 select * from ssq_1 where id in (select ssq_2.id from ssq_2);
-### 2025-09-15 10:45:13.230
-CREATE TABLE ssq_1(id int, col1 int, feat1 float);
-### 2025-09-15 10:45:13.235
-CREATE TABLE ssq_2(id int, col2 int, feat2 float);
 ### 2025-09-15 10:45:13.235
 INSERT INTO ssq_1 VALUES (1, 4, 11.2);
 ### 2025-09-15 10:45:13.236
@@ -700,8 +696,6 @@ SELECT * FROM ssq_1 WHERE col1 > 50;
 SELECT * FROM ssq_1 WHERE col1 = (SELECT ssq_2.col2 FROM ssq_2 LIMIT 1);
 ### 2025-09-19 17:06:00.536
 SELECT * FROM ssq_1;
-### 2025-09-19 17:06:48.378
-SELECT * FROM ssq_1 WHERE col1 = (SELECT ssq_2.col2 FROM ssq_2);
 ### 2025-09-19 17:07:33.146
 SELECT * FROM ssq_2;
 ### 2025-09-19 17:16:56.433
@@ -762,3 +756,19 @@ CREATE VIEW test_view AS SELECT id, name FROM test_order WHERE score > 80;
 DROP VIEW test_view;
 ### 2025-10-03 15:48:33.684
 UPDATE t1 SET name='UPD', score=99 WHERE id=8;
+### 2025-10-04 20:20:53.702
+CREATE TABLE ssq_1(id int, col1 int, feat1 float);
+### 2025-10-04 20:21:29.876
+CREATE TABLE ssq_2(id int, col2 int, feat2 float);
+### 2025-10-04 20:21:36.314
+INSERT INTO ssq_1 VALUES (42, 90, 50.93);
+### 2025-10-04 20:21:50.085
+INSERT INTO ssq_1 VALUES (43, 80, 45.21);
+### 2025-10-04 20:21:50.097
+INSERT INTO ssq_2 VALUES (5, 90, 33.45);
+### 2025-10-04 20:21:50.097
+INSERT INTO ssq_2 VALUES (6, 80, 29.78);
+### 2025-10-04 20:21:50.098
+INSERT INTO ssq_2 VALUES (7, 70, 22.15);
+### 2025-10-04 20:27:15.797
+SELECT * FROM ssq_1 WHERE col1 = (SELECT ssq_2.col2 FROM ssq_2);

@@ -260,7 +260,8 @@ RC RecordPageHandler::init_empty_page(DiskBufferPool &buffer_pool, LogHandler &l
 
 RC RecordPageHandler::cleanup()
 {
-  if (disk_buffer_pool_ != nullptr) {
+  if (disk_buffer_pool_ != nullptr && frame_ != nullptr && is_frame_latched_) {
+    // 只有在frame被latch的情况下才unlatch，防止重复unlatch导致崩溃
     if (rw_mode_ == ReadWriteMode::READ_ONLY) {
       frame_->read_unlatch();
     } else {
@@ -268,6 +269,8 @@ RC RecordPageHandler::cleanup()
     }
     disk_buffer_pool_->unpin_page(frame_);
     disk_buffer_pool_ = nullptr;
+    frame_ = nullptr;
+    is_frame_latched_ = false;  // 重置标志
   }
 
   return RC::SUCCESS;

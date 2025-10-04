@@ -181,6 +181,8 @@ RC PlainCommunicator::write_result(SessionEvent *event, bool &need_disconnect)
     }
   }
   writer_->flush();  // TODO handle error
+  // 避免上层误判为需要断开连接，统一保持连接
+  need_disconnect = false;
   return rc;
 }
 
@@ -222,6 +224,57 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
     }
   }
 
+  // 先执行数据，在执行过程中可能会设置错误码
+  rc = RC::SUCCESS;
+  if (event->session()->get_execution_mode() == ExecutionMode::CHUNK_ITERATOR
+      && event->session()->used_chunk_mode()) {
+    rc = write_chunk_result(sql_result);
+  } else {
+    rc = write_tuple_result(sql_result);
+  }
+
+  if (OB_FAIL(rc)) {
+    return rc;
+  }
+
+  // 执行完数据后，检查是否有错误（包括SCALAR_SUBQUERY_MULTIPLE_ROWS）
+  if (RC::SUCCESS != sql_result->return_code()) {
+    // 如果有错误，直接返回FAILURE，不输出表头
+    need_disconnect = false;
+    return write_state(event, need_disconnect);
+  }
+
+  // 表头现在在write_tuple_result函数中输出
+  const TupleSchema &schema   = sql_result->tuple_schema();
+  const int          cell_num = schema.cell_num();
+
+  if (cell_num == 0) {
+    // 除了select之外，其它的消息通常不会通过operator来返回结果，表头和行数据都是空的
+    // 这里针对这种情况做特殊处理，当表头和行数据都是空的时候，就返回处理的结果
+    // 可能是insert/delete等操作，不直接返回给客户端数据，这里把处理结果返回给客户端
+    RC rc_close = sql_result->close();
+    if (rc == RC::SUCCESS) {
+      rc = rc_close;
+    }
+    sql_result->set_return_code(rc);
+    return write_state(event, need_disconnect);
+  } else {
+    need_disconnect = false;
+  }
+
+  RC rc_close = sql_result->close();
+  if (OB_SUCC(rc)) {
+    rc = rc_close;
+  }
+
+  return rc;
+}
+
+RC PlainCommunicator::write_tuple_result(SqlResult *sql_result)
+{
+  RC rc = RC::SUCCESS;
+  
+  // 先输出表头
   const TupleSchema &schema   = sql_result->tuple_schema();
   const int          cell_num = schema.cell_num();
 
@@ -262,44 +315,13 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
       return rc;
     }
   }
-
-  rc = RC::SUCCESS;
-  if (event->session()->get_execution_mode() == ExecutionMode::CHUNK_ITERATOR
-      && event->session()->used_chunk_mode()) {
-    rc = write_chunk_result(sql_result);
-  } else {
-    rc = write_tuple_result(sql_result);
+  
+  // 检查是否有错误（包括SCALAR_SUBQUERY_MULTIPLE_ROWS）
+  if (RC::SUCCESS != sql_result->return_code()) {
+    // 如果有错误，直接返回，不输出数据行
+    return RC::SUCCESS;
   }
-
-  if (OB_FAIL(rc)) {
-    return rc;
-  }
-
-  if (cell_num == 0) {
-    // 除了select之外，其它的消息通常不会通过operator来返回结果，表头和行数据都是空的
-    // 这里针对这种情况做特殊处理，当表头和行数据都是空的时候，就返回处理的结果
-    // 可能是insert/delete等操作，不直接返回给客户端数据，这里把处理结果返回给客户端
-    RC rc_close = sql_result->close();
-    if (rc == RC::SUCCESS) {
-      rc = rc_close;
-    }
-    sql_result->set_return_code(rc);
-    return write_state(event, need_disconnect);
-  } else {
-    need_disconnect = false;
-  }
-
-  RC rc_close = sql_result->close();
-  if (OB_SUCC(rc)) {
-    rc = rc_close;
-  }
-
-  return rc;
-}
-
-RC PlainCommunicator::write_tuple_result(SqlResult *sql_result)
-{
-  RC rc = RC::SUCCESS;
+  
   Tuple *tuple = nullptr;
   while (RC::SUCCESS == (rc = sql_result->next_tuple(tuple))) {
     assert(tuple != nullptr);
@@ -347,6 +369,12 @@ RC PlainCommunicator::write_tuple_result(SqlResult *sql_result)
 
   if (rc == RC::RECORD_EOF) {
     rc = RC::SUCCESS;
+  } else if (rc != RC::SUCCESS) {
+    // 如果next_tuple返回错误（例如SCALAR_SUBQUERY_MULTIPLE_ROWS），需要设置到sql_result中
+    // 这样write_result_internal才能正确处理错误
+    LOG_WARN("next_tuple returned error: rc=%s", strrc(rc));
+    sql_result->set_return_code(rc);
+    rc = RC::SUCCESS; // 返回SUCCESS，让write_result_internal通过sql_result->return_code()检查错误
   }
   return rc;
 }

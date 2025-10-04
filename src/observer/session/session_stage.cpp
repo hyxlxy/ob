@@ -47,7 +47,7 @@ void SessionStage::handle_request(SessionEvent *sev)
   Communicator *communicator    = sev->get_communicator();
   bool          need_disconnect = false;
   RC            rc              = communicator->write_result(sev, need_disconnect);
-  LOG_INFO("write result return %s", strrc(rc));
+  LOG_TRACE("write result return %s", strrc(rc));
   if (need_disconnect) {
     // do nothing
   }

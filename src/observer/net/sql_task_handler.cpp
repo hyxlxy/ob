@@ -49,7 +49,7 @@ RC SqlTaskHandler::handle_event(Communicator *communicator)
   bool need_disconnect = false;
 
   RC write_rc = communicator->write_result(event, need_disconnect);
-  LOG_INFO("write result return %s", strrc(write_rc));
+  LOG_TRACE("write result return %s", strrc(write_rc));
   event->session()->set_current_request(nullptr);
   Session::set_current_session(nullptr);
 
