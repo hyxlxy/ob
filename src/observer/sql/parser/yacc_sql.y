@@ -67,6 +67,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 //标识tokens
 %token  SEMICOLON
         BY
+        LIMIT
+        WITH
         CREATE
         DROP
         GROUP
@@ -82,6 +84,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         TABLE
         TABLES
         INDEX
+        /* allow 'CREATE VECTOR INDEX' */
+        /* reuse VECTOR_T token for keyword VECTOR before INDEX */
         IF
         EXISTS
         CALC
@@ -216,6 +220,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <float_list>          number_list
 %type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
+%type <number>              limit_clause
 %type <sql_node>            insert_stmt
 %type <sql_node>            update_stmt
 %type <sql_node>            delete_stmt
@@ -226,6 +231,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <sql_node>            show_index_stmt
 %type <sql_node>            desc_table_stmt
 %type <sql_node>            create_index_stmt
+/* remove duplicate %type limit_clause declaration */
+%type <number>              option_list
+%type <number>              option_item
 %type <sql_node>            drop_index_stmt
 %type <sql_node>            sync_stmt
 %type <sql_node>            begin_stmt
@@ -383,6 +391,30 @@ create_index_stmt:    /*create index 语句的语法解析树*/
         delete $8;
       }
       create_index.is_unique = true;
+    }
+    | CREATE VECTOR_T INDEX ID ON ID LBRACE attr_list RBRACE /* ignore optional WITH clause below */
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
+      CreateIndexSqlNode &create_index = $$->create_index;
+      create_index.index_name = $4;
+      create_index.relation_name = $6;
+      if ($8 != nullptr) {
+        create_index.attribute_names.swap(*$8);
+        delete $8;
+      }
+      create_index.is_unique = false;
+    }
+    | CREATE VECTOR_T INDEX ID ON ID LBRACE attr_list RBRACE WITH LBRACE /* swallow options */ option_list RBRACE
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
+      CreateIndexSqlNode &create_index = $$->create_index;
+      create_index.index_name = $4;
+      create_index.relation_name = $6;
+      if ($8 != nullptr) {
+        create_index.attribute_names.swap(*$8);
+        delete $8;
+      }
+      create_index.is_unique = false;
     }
     ;
 
@@ -816,7 +848,7 @@ update_kv_list:
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT projection_list FROM rel_list join_list where group_by having order_by
+    SELECT projection_list FROM rel_list join_list where group_by having order_by limit_clause
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -855,8 +887,10 @@ select_stmt:        /*  select 语句的语法解析树*/
         $$->selection.order_by.swap(*$9);
         delete $9;
       }
+      // store optional LIMIT for later plan generation
+      $$->selection.limit_count = $10;
     }
-    | SELECT projection_list WHERE condition_list order_by
+    | SELECT projection_list WHERE condition_list order_by limit_clause
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -873,8 +907,9 @@ select_stmt:        /*  select 语句的语法解析树*/
         $$->selection.order_by.swap(*$5);
         delete $5;
       }
+      $$->selection.limit_count = $6;
     }
-    | SELECT projection_list order_by
+    | SELECT projection_list order_by limit_clause
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -886,6 +921,7 @@ select_stmt:        /*  select 语句的语法解析树*/
         $$->selection.order_by.swap(*$3);
         delete $3;
       }
+      $$->selection.limit_count = $4;
     }
     ;
 calc_stmt:
@@ -1422,6 +1458,24 @@ order_by_item:
       $$->expression = unique_ptr<Expression>($1);
       $$->direction = DESC_ORDER;
     }
+    ;
+
+limit_clause:
+    /* empty */ { $$ = 0; }
+    | LIMIT number { $$ = $2; }
+    ;
+
+/* A very loose option list: accept sequences like KEY=VALUE separated by comma, ignoring contents */
+option_list:
+    /* empty */ { $$ = 0; }
+    | option_item { $$ = 0; }
+    | option_list COMMA option_item { $$ = 0; }
+    ;
+
+option_item:
+    ID EQ ID { $$ = 0; }
+    | ID EQ NUMBER { $$ = 0; }
+    | ID EQ FLOAT_LITERAL { $$ = 0; }
     ;
 
 count_expr:

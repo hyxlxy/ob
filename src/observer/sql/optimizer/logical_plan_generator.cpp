@@ -213,6 +213,14 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     last_oper = &sort_oper;
   }
 
+  // LIMIT: 如果解析阶段提供了 limit_count，则叠加 LIMIT 算子（在 ORDER BY 之后）
+  unique_ptr<LogicalOperator> limit_oper;
+  if (select_stmt->limit_count() > 0 && *last_oper) {
+    limit_oper = make_unique<LimitLogicalOperator>(select_stmt->limit_count());
+    limit_oper->add_child(std::move(*last_oper));
+    last_oper = &limit_oper;
+  }
+
   // Bind projection expressions
   vector<unique_ptr<Expression>> proj_exprs = std::move(select_stmt->query_expressions());
   

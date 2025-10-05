@@ -224,6 +224,9 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
   select_stmt->having_expr_ = std::move(having_expr);
   select_stmt->order_by_expressions_.swap(order_by_expressions);
   select_stmt->order_by_directions_.swap(order_by_directions);
+  // 传递 LIMIT（如果解析阶段设置了）
+  // 注意：当前 parse_defs.h 在 SelectSqlNode 中新增了 limit_count 字段
+  select_stmt->limit_count_ = select_sql.limit_count;
   stmt                      = select_stmt;
   return RC::SUCCESS;
 }

@@ -50,6 +50,7 @@ public:
   Expression                     *having_expr() const { return having_expr_.get(); }
   vector<unique_ptr<Expression>> &order_by_expressions() { return order_by_expressions_; }
   vector<OrderDirection>         &order_by_directions() { return order_by_directions_; }
+  int                             limit_count() const { return limit_count_; }
 
 private:
   vector<unique_ptr<Expression>> query_expressions_;
@@ -61,4 +62,5 @@ private:
   unique_ptr<Expression>         having_expr_;
   vector<unique_ptr<Expression>> order_by_expressions_;
   vector<OrderDirection>         order_by_directions_;
+  int                            limit_count_ = 0;
 };

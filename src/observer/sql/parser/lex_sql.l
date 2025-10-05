@@ -135,6 +135,8 @@ HAVING                                  RETURN_TOKEN(HAVING);
 ORDER                                   RETURN_TOKEN(ORDER);
 ASC                                     RETURN_TOKEN(ASC);
 AS                                     RETURN_TOKEN(AS);
+WITH                                   RETURN_TOKEN(WITH);
+LIMIT                                  RETURN_TOKEN(LIMIT);
 COUNT                                   RETURN_TOKEN(COUNT);
 SUM                                     RETURN_TOKEN(SUM);
 MAX                                     RETURN_TOKEN(MAX);

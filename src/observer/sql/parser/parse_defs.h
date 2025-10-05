@@ -204,6 +204,7 @@ struct SelectSqlNode
   vector<unique_ptr<Expression>> group_by;      ///< group by clause
   unique_ptr<Expression>         having_expr;   ///< having clause (expression)
   vector<OrderBySqlNode>         order_by;      ///< order by clause
+  int                            limit_count = 0; ///< LIMIT 子句（0表示未指定）
 };
 
 /**
