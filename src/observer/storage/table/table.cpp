@@ -369,6 +369,22 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
                data_len, copy_len, field->name());
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
+    // 当模式为显式 VECTOR(n) 时，字段长度(扣除可空标志位)应为 sizeof(int)+n*sizeof(float)
+    // 强制校验实际维度与定义维度完全一致，防止插入短向量到高维列
+    int expected_data_len = static_cast<int>(copy_len);
+    if (expected_data_len > static_cast<int>(sizeof(int))) {  // 仅当定义了具体维度时进行严格校验
+      int expected_dim = (expected_data_len - static_cast<int>(sizeof(int))) / static_cast<int>(sizeof(float));
+      if (value.data() == nullptr || data_len < sizeof(int)) {
+        LOG_WARN("Invalid vector payload for field %s", field->name());
+        return RC::INVALID_ARGUMENT;
+      }
+      int actual_dim = *(const int *)(value.data());
+      int actual_data_len = static_cast<int>(sizeof(int) + actual_dim * sizeof(float));
+      if (actual_data_len != expected_data_len) {
+        LOG_WARN("Vector dimension mismatch for field %s: expected %d, got %d", field->name(), expected_dim, actual_dim);
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+      }
+    }
     // 对于向量类型，使用实际数据长度
     copy_len = data_len;
   } else {
