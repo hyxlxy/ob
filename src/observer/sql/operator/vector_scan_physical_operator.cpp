@@ -24,7 +24,8 @@ VectorScanPhysicalOperator::VectorScanPhysicalOperator(Table *table, std::string
 
 std::string VectorScanPhysicalOperator::param() const
 {
-  return std::string("VectorScan: ") + table_->name() + " on " + index_->index_meta().name();
+  // expected format: INDEX_NAME ON TABLE_NAME
+  return std::string(index_->index_meta().name()) + " ON " + std::string(table_->name());
 }
 
 RC VectorScanPhysicalOperator::open(Trx *trx)

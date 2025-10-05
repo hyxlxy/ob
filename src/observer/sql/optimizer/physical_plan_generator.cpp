@@ -224,14 +224,11 @@ RC PhysicalPlanGenerator::create_plan(LimitLogicalOperator &logical_oper, unique
                     }
 
                     if (!base_vector.empty()) {
-                      // Build VECTOR_INDEX_SCAN under LIMIT
+                      // Build a top-level VECTOR_INDEX_SCAN only. The operator enforces top-N internally.
                       auto vector_scan = std::make_unique<VectorScanPhysicalOperator>(
                           table, std::string(), index, base_vector, static_cast<size_t>(logical_oper.limit_count()),
                           ReadWriteMode::READ_ONLY);
-
-                      auto limit_oper = make_unique<LimitPhysicalOperator>(logical_oper.limit_count());
-                      limit_oper->add_child(std::move(vector_scan));
-                      oper = std::move(limit_oper);
+                      oper = std::move(vector_scan);
                       return RC::SUCCESS;
                     }
                   }

@@ -23,6 +23,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/optimizer/logical_plan_generator.h"
 #include "sql/optimizer/physical_plan_generator.h"
 #include "sql/operator/physical_operator.h"
+#include "common/type/vector_type.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 
@@ -41,6 +42,7 @@ RC CreateTableExecutor::execute(SQLStageEvent *sql_event)
     // Handle CREATE TABLE AS SELECT or CREATE TABLE (...) SELECT
     // Check if attr_infos is provided (CREATE TABLE (columns) SELECT form)
     if (!create_table_stmt->attr_infos().empty()) {
+      // 允许创建高维 VECTOR 列（如 2049），维度上限仅在插入/使用时校验
       // First create the table with the provided schema
       RC rc = session->get_current_db()->create_table(table_name, create_table_stmt->attr_infos(), 
                                                        create_table_stmt->primary_keys(), 
@@ -60,6 +62,7 @@ RC CreateTableExecutor::execute(SQLStageEvent *sql_event)
     }
   } else {
     // Handle regular CREATE TABLE
+    // 允许创建高维 VECTOR 列（如 2049），维度上限仅在插入/使用时校验
     RC rc = session->get_current_db()->create_table(table_name, create_table_stmt->attr_infos(), create_table_stmt->primary_keys(), create_table_stmt->storage_format());
     return rc;
   }
