@@ -54,6 +54,7 @@ private:
   ReadWriteMode                                mode_;
   
   RecordFileHandler                           *record_handler_ = nullptr;
+  Record                                       current_record_;
   RowTuple                                     tuple_;
   std::vector<std::unique_ptr<Expression>>     predicates_;
   

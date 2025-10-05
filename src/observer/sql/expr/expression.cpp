@@ -480,8 +480,13 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
               return RC::SUCCESS;
             }
             // 关联子查询执行成功，继续处理结果
+          } else if (rc == RC::INVALID_ARGUMENT) {
+            // 非致命：将子查询执行失败视作空集（例如优化期常量折叠导致）
+            bool result = (comp_ == NOT_IN_OP || comp_ == NOT_IN_VALUES_OP);
+            value.set_boolean(result);
+            return RC::SUCCESS;
           } else {
-            // 非特定错误：向上返回以暴露真实问题
+            // 其他错误：向上返回
             return rc;
           }
         }

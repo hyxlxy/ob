@@ -356,7 +356,7 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<st
       if (lt == ExprType::UNBOUND_FIELD) {
         auto *ufe = dynamic_cast<UnboundFieldExpr *>(condition.left_expr.get());
         rc = set_attr_from_unbound(ufe, left_obj);
-        if (rc != RC::SUCCESS) return rc;
+        if (rc != RC::SUCCESS) { delete filter_unit; return rc; }
       } else { // FIELD
         auto *fe = dynamic_cast<FieldExpr *>(condition.left_expr.get());
         left_obj.init_attr(fe->field());
@@ -380,7 +380,7 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<st
       if (rt == ExprType::UNBOUND_FIELD) {
         auto *ufe = dynamic_cast<UnboundFieldExpr *>(condition.right_expr.get());
         rc = set_attr_from_unbound(ufe, left_obj);
-        if (rc != RC::SUCCESS) return rc;
+        if (rc != RC::SUCCESS) { delete filter_unit; return rc; }
       } else { // FIELD
         auto *fe = dynamic_cast<FieldExpr *>(condition.right_expr.get());
         left_obj.init_attr(fe->field());
@@ -434,6 +434,7 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<st
       rc                     = get_table_and_field(db, default_table, tables, condition.left_attr, table, field);
       if (rc != RC::SUCCESS) {
         LOG_WARN("cannot find attr");
+        delete filter_unit;
         return rc;
       }
       FilterObj filter_obj;
@@ -451,6 +452,7 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<st
       rc                     = get_table_and_field(db, default_table, tables, condition.right_attr, table, field);
       if (rc != RC::SUCCESS) {
         LOG_WARN("cannot find attr");
+        delete filter_unit;
         return rc;
       }
       FilterObj filter_obj;

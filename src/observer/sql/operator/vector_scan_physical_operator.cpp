@@ -11,6 +11,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/vector_scan_physical_operator.h"
 #include "storage/table/table.h"
 #include "storage/index/index.h"
+#include "storage/index/ivfflat_index.h"
 #include "common/log/log.h"
 
 VectorScanPhysicalOperator::VectorScanPhysicalOperator(Table *table, std::string table_alias, Index *index, 
@@ -33,27 +34,27 @@ RC VectorScanPhysicalOperator::open(Trx *trx)
   }
 
   trx_ = trx;
-  // record_handler_ = table_->record_handler(); // 该方法不存在，暂时注释
-  // if (record_handler_ == nullptr) {
-  //   LOG_WARN("invalid record handler");
-  //   return RC::INTERNAL;
-  // }
 
-  // 执行向量索引搜索
-  // 注意：这里需要根据实际的向量索引实现来调用相应的搜索方法
-  // 由于ivfflat_index.h的具体实现可能不同，这里提供一个通用的框架
-  
-  // 假设向量索引有一个search方法
-  // RC rc = index_->search(base_vector_, limit_, result_rids_);
-  // if (rc != RC::SUCCESS) {
-  //   LOG_WARN("failed to search vector index. rc=%s", strrc(rc));
-  //   return rc;
-  // }
+  if (table_ == nullptr || index_ == nullptr) {
+    LOG_WARN("vector scan operator missing table or index");
+    return RC::INTERNAL;
+  }
 
-  // 暂时返回空结果，实际实现需要根据向量索引的API来调用
-  result_rids_.clear();
+  // 调用 IvfflatIndex::search 获取候选 RIDs
+  auto *ivf = dynamic_cast<IvfflatIndex *>(index_);
+  if (ivf == nullptr) {
+    LOG_WARN("index is not IvfflatIndex");
+    return RC::UNSUPPORTED;
+  }
+
+  RC rc = ivf->search(base_vector_, limit_, result_rids_);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to search vector index. rc=%s", strrc(rc));
+    return rc;
+  }
+
   current_index_ = 0;
-
+  tuple_.set_schema(table_, table_->table_meta().field_metas());
   opened_ = true;
   return RC::SUCCESS;
 }
@@ -64,34 +65,32 @@ RC VectorScanPhysicalOperator::next()
     return RC::RECORD_EOF;
   }
 
-  if (current_index_ >= result_rids_.size()) {
-    return RC::RECORD_EOF;
+  // 迭代候选 RIDs，逐条加载并过滤
+  while (current_index_ < result_rids_.size()) {
+    RID rid = result_rids_[current_index_++];
+
+    RC rc = table_->get_record(rid, current_record_);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to get record. rid=%s, rc=%s", rid.to_string().c_str(), strrc(rc));
+      return rc;
+    }
+
+    tuple_.set_record(&current_record_);
+
+    bool passed = false;
+    rc = filter(tuple_, passed);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+    if (!passed) {
+      continue;
+    }
+
+    // 可选：事务可见性检查（若需要，可接入 trx_->visit_record）
+    return RC::SUCCESS;
   }
 
-  RID rid = result_rids_[current_index_++];
-  
-  Record record;
-  // RC rc = record_handler_->get_record(rid, mode_, &record); // API不匹配，暂时简化
-  RC rc = RC::SUCCESS; // 暂时返回成功
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to get record. rid=%s, rc=%s", rid.to_string().c_str(), strrc(rc));
-    return rc;
-  }
-
-  tuple_.set_record(&record);
-
-  // 应用过滤条件
-  bool filter_result = false;
-  rc = filter(tuple_, filter_result);
-  if (rc != RC::SUCCESS) {
-    return rc;
-  }
-
-  if (!filter_result) {
-    return next();  // 递归调用直到找到满足条件的记录
-  }
-
-  return RC::SUCCESS;
+  return RC::RECORD_EOF;
 }
 
 RC VectorScanPhysicalOperator::close()
