@@ -15,8 +15,8 @@ See the Mulan PSL v2 for more details. */
 #include <sstream>
 #include <iomanip>
 
-// 向量最大维度限制（与测试约定：>2048 视为非法）
-static const int MAX_VECTOR_DIMENSION = 2048;
+// 向量最大维度限制（支持高维向量存储与检索，题目要求最大 16000 维）
+static const int MAX_VECTOR_DIMENSION = 16000;
 
 /**
  * @brief 向量类型
