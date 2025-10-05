@@ -35,6 +35,8 @@ public:
                                const char *right_key, int right_len, bool right_inclusive) override;
   RC sync() override;
 
+  bool is_vector_index() override { return true; }
+
   // 向量搜索方法
   RC search(const std::vector<float> &query_vector, size_t limit, std::vector<RID> &result_rids);
 

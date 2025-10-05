@@ -6,6 +6,7 @@
 #include "sql/expr/expression.h"
 #include "sql/expr/expression_tuple.h"
 #include "storage/table/table.h"
+#include "storage/index/index.h"
 
 // 简化版：捕捉 LIMIT(顶端) + ORDER BY(距离函数升序) + TABLE_GET
 RC VectorIndexScanRewrite::rewrite(std::unique_ptr<LogicalOperator> &oper, bool &change_made)
@@ -59,7 +60,7 @@ RC VectorIndexScanRewrite::rewrite(std::unique_ptr<LogicalOperator> &oper, bool 
   }
 
   Index *index = table->find_index_by_field(field_expr->field().field_name());
-  if (index == nullptr) {
+  if (index == nullptr || !index->is_vector_index()) {
     return RC::SUCCESS;
   }
 

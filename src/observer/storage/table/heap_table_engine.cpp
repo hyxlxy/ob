@@ -12,6 +12,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/record/heap_record_scanner.h"
 #include "common/log/log.h"
 #include "storage/index/bplus_tree_index.h"
+#include "storage/index/ivfflat_index.h"
 #include "storage/common/meta_util.h"
 #include "storage/db/db.h"
 
@@ -177,14 +178,19 @@ RC HeapTableEngine::create_index(Trx *trx, const FieldMeta *field_meta, const ch
     return rc;
   }
 
-  // 创建索引相关数据
-  BplusTreeIndex *index      = new BplusTreeIndex();
+  // 创建索引相关数据：向量字段使用 IvfflatIndex，其它使用 BplusTreeIndex
+  Index          *index      = nullptr;
+  if (field_meta->type() == AttrType::VECTORS) {
+    index = new IvfflatIndex();
+  } else {
+    index = new BplusTreeIndex();
+  }
   string          index_file = table_index_file(db_->path().c_str(), table_meta_->name(), index_name);
 
   rc = index->create(table_, index_file.c_str(), new_index_meta, *field_meta);
   if (rc != RC::SUCCESS) {
     delete index;
-    LOG_ERROR("Failed to create bplus tree index. file name=%s, rc=%d:%s", index_file.c_str(), rc, strrc(rc));
+    LOG_ERROR("Failed to create index. file name=%s, rc=%d:%s", index_file.c_str(), rc, strrc(rc));
     return rc;
   }
 
@@ -291,10 +297,12 @@ RC HeapTableEngine::create_index(Trx *trx, const vector<const FieldMeta *> &fiel
   }
 
   // 创建索引相关数据
-  BplusTreeIndex *index      = new BplusTreeIndex();
+  Index          *index      = nullptr;
   string          index_file = table_index_file(db_->path().c_str(), table_meta_->name(), index_name);
 
-  rc = index->create(table_, index_file.c_str(), new_index_meta, fields);
+  // 多字段索引仍使用 B+Tree
+  index = new BplusTreeIndex();
+  rc = static_cast<BplusTreeIndex *>(index)->create(table_, index_file.c_str(), new_index_meta, fields);
   if (rc != RC::SUCCESS) {
     delete index;
     LOG_ERROR("Failed to create bplus tree index for multi-field. file name=%s, rc=%d:%s", index_file.c_str(), rc, strrc(rc));
@@ -475,8 +483,14 @@ RC HeapTableEngine::open()
       return RC::INTERNAL;
     }
 
-    BplusTreeIndex *index      = new BplusTreeIndex();
+    Index          *index      = nullptr;
     string          index_file = table_index_file(db_->path().c_str(), table_meta_->name(), index_meta->name());
+
+    if (field_meta->type() == AttrType::VECTORS) {
+      index = new IvfflatIndex();
+    } else {
+      index = new BplusTreeIndex();
+    }
 
     rc = index->open(table_, index_file.c_str(), *index_meta, *field_meta);
     if (rc != RC::SUCCESS) {

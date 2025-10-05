@@ -52,6 +52,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/limit_physical_operator.h"
 #include "sql/operator/table_scan_vec_physical_operator.h"
 #include "sql/operator/view_scan_physical_operator.h"
+#include "sql/operator/vector_scan_physical_operator.h"
 #include "sql/optimizer/physical_plan_generator.h"
 
 using namespace std;
@@ -177,6 +178,73 @@ RC PhysicalPlanGenerator::create_plan(LimitLogicalOperator &logical_oper, unique
 {
   RC rc = RC::SUCCESS;
 
+  // Fast path: LIMIT -> ORDER_BY(distance ASC) -> TABLE_GET(table)
+  // Try to replace ORDER_BY + TABLE_GET with VECTOR_INDEX_SCAN when a vector index exists
+  if (logical_oper.children().size() == 1 && logical_oper.children().front()->type() == LogicalOperatorType::ORDER_BY) {
+    auto &order_by_logical = static_cast<OrderByLogicalOperator &>(*logical_oper.children().front());
+    auto &ob_exprs         = order_by_logical.order_by_expressions();
+    auto &ob_dirs          = order_by_logical.order_by_directions();
+    if (ob_exprs.size() == 1 && ob_dirs.size() == 1 && ob_dirs[0] == ASC_ORDER) {
+      // pattern check: single distance function
+      Expression *expr = ob_exprs[0].get();
+      if (expr->type() == ExprType::FUNCTION) {
+        auto *func = dynamic_cast<FunctionExpr *>(expr);
+        if (func != nullptr) {
+          std::string fname = func->function_name();
+          for (auto &c : fname) c = toupper(c);
+          if (fname == "L2_DISTANCE" || fname == "COSINE_DISTANCE" || fname == "INNER_PRODUCT") {
+            auto &scan_children = order_by_logical.children();
+            if (scan_children.size() == 1 && scan_children[0]->type() == LogicalOperatorType::TABLE_GET) {
+              auto *table_get = static_cast<TableGetLogicalOperator *>(scan_children[0].get());
+              Table *table    = table_get->table();
+              if (table != nullptr && func->args().size() == 2) {
+                FieldExpr *field_expr = nullptr;
+                RowTuple   dummy;
+                Value      literal;
+                if (func->args()[0]->type() == ExprType::FIELD) {
+                  field_expr = dynamic_cast<FieldExpr *>(func->args()[0].get());
+                  (void)func->args()[1]->get_value(dummy, literal);
+                } else if (func->args()[1]->type() == ExprType::FIELD) {
+                  field_expr = dynamic_cast<FieldExpr *>(func->args()[1].get());
+                  (void)func->args()[0]->get_value(dummy, literal);
+                }
+
+                if (field_expr != nullptr) {
+                  Index *index = table->find_index_by_field(field_expr->field().field_name());
+                  if (index != nullptr && index->is_vector_index()) {
+                    // Extract base vector from Value (binary layout: [int dim][float x dim])
+                    std::vector<float> base_vector;
+                    if (literal.attr_type() == AttrType::VECTORS && literal.data() != nullptr) {
+                      const char *data   = literal.data();
+                      int         dim    = *(int *)data;
+                      const float *fdata = (const float *)(data + sizeof(int));
+                      if (dim > 0 && dim < 20000) {
+                        base_vector.assign(fdata, fdata + dim);
+                      }
+                    }
+
+                    if (!base_vector.empty()) {
+                      // Build VECTOR_INDEX_SCAN under LIMIT
+                      auto vector_scan = std::make_unique<VectorScanPhysicalOperator>(
+                          table, std::string(), index, base_vector, static_cast<size_t>(logical_oper.limit_count()),
+                          ReadWriteMode::READ_ONLY);
+
+                      auto limit_oper = make_unique<LimitPhysicalOperator>(logical_oper.limit_count());
+                      limit_oper->add_child(std::move(vector_scan));
+                      oper = std::move(limit_oper);
+                      return RC::SUCCESS;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Fallback: build regular LIMIT over its child
   auto limit_oper = make_unique<LimitPhysicalOperator>(logical_oper.limit_count());
 
   ASSERT(logical_oper.children().size() == 1, "limit operator should have 1 child");

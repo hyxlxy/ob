@@ -540,6 +540,9 @@ attr_def:
       $$->nullable = false;  // default NOT NULL
       // For VECTOR(n), store bytes for [dimension(int32) + n float32 values]
       if ($$->type == AttrType::VECTORS) {
+        if ($4 > MAX_VECTOR_DIMENSION) {
+          yyerror(&@$, sql_string, sql_result, scanner, "Vector dimension exceeds system max");
+        }
         $$->length = static_cast<int>(sizeof(int) + ($4 * sizeof(float)));
       } else {
         $$->length = $4;
@@ -553,6 +556,9 @@ attr_def:
       $$->nullable = true;  // explicitly nullable
       // For VECTOR(n), store bytes for [dimension(int32) + n float32 values]
       if ($$->type == AttrType::VECTORS) {
+        if ($4 > MAX_VECTOR_DIMENSION) {
+          yyerror(&@$, sql_string, sql_result, scanner, "Vector dimension exceeds system max");
+        }
         $$->length = static_cast<int>(sizeof(int) + ($4 * sizeof(float)));
       } else {
         $$->length = $4;

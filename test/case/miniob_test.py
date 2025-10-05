@@ -1153,7 +1153,7 @@ def __init_log(options):
     log_level = logging.DEBUG
     GlobalConfig.debug = True
 
-  GlobalConfig.debug = True
+  # Respect --debug flag; do not force debug mode by default to allow cleanup
   log_stream = None
   if 'stdout' == options.log_file:
     log_stream = sys.stdout

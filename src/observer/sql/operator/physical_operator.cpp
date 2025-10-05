@@ -37,6 +37,7 @@ string physical_operator_type_name(PhysicalOperatorType type)
     case PhysicalOperatorType::SORT: return "SORT";
     case PhysicalOperatorType::ORDER_BY: return "ORDER_BY";
     case PhysicalOperatorType::LIMIT: return "LIMIT";
+    case PhysicalOperatorType::VECTOR_INDEX_SCAN: return "VECTOR_INDEX_SCAN";
     default: return "UNKNOWN";
   }
 }
