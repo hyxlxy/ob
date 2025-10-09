@@ -904,6 +904,120 @@ RC BplusTreeHandler::create(LogHandler &log_handler,
   return RC::SUCCESS;
 }
 
+// 多列索引创建方法 - BufferPoolManager版本
+RC BplusTreeHandler::create(LogHandler &log_handler,
+                            BufferPoolManager &bpm,
+                            const char *file_name, 
+                            const vector<FieldMeta> &field_metas,
+                            int total_length,
+                            int internal_max_size /* = -1*/,
+                            int leaf_max_size /* = -1 */)
+{
+  RC rc = bpm.create_file(file_name);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("Failed to create file. file name=%s, rc=%d:%s", file_name, rc, strrc(rc));
+    return rc;
+  }
+  LOG_INFO("Successfully create multi-field index file:%s", file_name);
+
+  DiskBufferPool *bp = nullptr;
+
+  rc = bpm.open_file(log_handler, file_name, bp);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("Failed to open file. file name=%s, rc=%d:%s", file_name, rc, strrc(rc));
+    return rc;
+  }
+  LOG_INFO("Successfully open multi-field index file %s.", file_name);
+
+  rc = this->create(log_handler, *bp, field_metas, total_length, internal_max_size, leaf_max_size);
+  if (OB_FAIL(rc)) {
+    bpm.close_file(file_name);
+    return rc;
+  }
+
+  LOG_INFO("Successfully create multi-field index file %s.", file_name);
+  return rc;
+}
+
+// 多列索引创建方法 - DiskBufferPool版本
+RC BplusTreeHandler::create(LogHandler &log_handler,
+            DiskBufferPool &buffer_pool,
+            const vector<FieldMeta> &field_metas,
+            int total_length,
+            int internal_max_size /* = -1 */,
+            int leaf_max_size /* = -1 */)
+{
+  if (internal_max_size < 0) {
+    internal_max_size = calc_internal_page_capacity(total_length);
+  }
+  if (leaf_max_size < 0) {
+    leaf_max_size = calc_leaf_page_capacity(total_length);
+  }
+
+  log_handler_      = &log_handler;
+  disk_buffer_pool_ = &buffer_pool;
+
+  RC rc = RC::SUCCESS;
+
+  BplusTreeMiniTransaction mtr(*this, &rc);
+
+  Frame *header_frame = nullptr;
+
+  rc = mtr.latch_memo().allocate_page(header_frame);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to allocate header page for multi-field bplus tree. rc=%d:%s", rc, strrc(rc));
+    return rc;
+  }
+
+  if (header_frame->page_num() != FIRST_INDEX_PAGE) {
+    LOG_WARN("header page num should be %d but got %d. is it a new file",
+             FIRST_INDEX_PAGE, header_frame->page_num());
+    return RC::INTERNAL;
+  }
+
+  char            *pdata         = header_frame->data();
+  IndexFileHeader *file_header   = (IndexFileHeader *)pdata;
+  file_header->attr_length       = total_length;
+  file_header->key_length        = total_length + sizeof(RID);
+  file_header->attr_type         = field_metas[0].type(); // 使用第一个字段的类型作为主要类型
+  file_header->internal_max_size = internal_max_size;
+  file_header->leaf_max_size     = leaf_max_size;
+  file_header->root_page         = BP_INVALID_PAGE_NUM;
+
+  // 取消记录日志的原因请参考下面的sync调用的地方。
+  // mtr.logger().init_header_page(header_frame, *file_header);
+
+  header_frame->mark_dirty();
+
+  memcpy(&file_header_, pdata, sizeof(file_header_));
+  header_dirty_ = false;
+
+  mem_pool_item_ = make_unique<common::MemPoolItem>("b+tree");
+  if (mem_pool_item_->init(file_header->key_length) < 0) {
+    LOG_WARN("Failed to init memory pool for multi-field index");
+    close();
+    return RC::NOMEM;
+  }
+
+  // 使用多列比较器初始化
+  key_comparator_.init(field_metas);
+  key_printer_.init(file_header->attr_type, file_header->attr_length);
+
+  /*
+  虽然我们针对B+树记录了WAL，但是我们记录的都是逻辑日志，并没有记录某个页面如何修改的物理日志。
+  在做恢复时，必须先创建出来一个tree handler对象。但是如果元数据页面不正确的话，我们无法创建一个正确的tree handler对象。
+  因此这里取消第一次元数据页面修改的WAL记录，而改用更简单的方式，直接将元数据页面刷到磁盘。
+  */
+  rc = this->sync();
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to sync multi-field index header. rc=%d:%s", rc, strrc(rc));
+    return rc;
+  }
+
+  LOG_INFO("Successfully create multi-field index");
+  return RC::SUCCESS;
+}
+
 RC BplusTreeHandler::open(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name)
 {
   if (disk_buffer_pool_ != nullptr) {

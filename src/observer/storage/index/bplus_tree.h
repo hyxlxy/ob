@@ -29,6 +29,8 @@ See the Mulan PSL v2 for more details. */
 #include "storage/record/record_manager.h"
 #include "storage/index/latch_memo.h"
 #include "storage/index/bplus_tree_log.h"
+#include "common/value.h"
+#include "storage/field/field_meta.h"
 
 class BplusTreeHandler;
 class BplusTreeMiniTransaction;
@@ -89,12 +91,40 @@ private:
 class KeyComparator
 {
 public:
-  void init(AttrType type, int length) { attr_comparator_.init(type, length); }
+  // 单列初始化（保持向后兼容）
+  void init(AttrType type, int length) { 
+    attr_comparator_.init(type, length); 
+    is_multi_field_ = false;
+  }
+  
+  // 多列初始化（新增）
+  void init(const vector<FieldMeta> &field_metas) {
+    field_metas_ = field_metas;
+    total_length_ = 0;
+    for (const auto &field : field_metas) {
+      total_length_ += field.len();
+    }
+    is_multi_field_ = true;
+  }
 
   const AttrComparator &attr_comparator() const { return attr_comparator_; }
+  
+  int attr_length() const { 
+    return is_multi_field_ ? total_length_ : attr_comparator_.attr_length(); 
+  }
 
   int operator()(const char *v1, const char *v2) const
   {
+    if (is_multi_field_) {
+      return compare_multi_field(v1, v2);
+    } else {
+      return compare_single_field(v1, v2);
+    }
+  }
+
+private:
+  int compare_single_field(const char *v1, const char *v2) const {
+    // 现有的单列比较逻辑
     int result = attr_comparator_(v1, v2);
     if (result != 0) {
       return result;
@@ -104,9 +134,37 @@ public:
     const RID *rid2 = (const RID *)(v2 + attr_comparator_.attr_length());
     return RID::compare(rid1, rid2);
   }
+  
+  int compare_multi_field(const char *v1, const char *v2) const {
+    // 多列比较逻辑
+    int offset1 = 0, offset2 = 0;
+    
+    for (const FieldMeta &field_meta : field_metas_) {
+      Value left, right;
+      left.set_type(field_meta.type());
+      left.set_data(v1 + offset1, field_meta.len());
+      right.set_type(field_meta.type());
+      right.set_data(v2 + offset2, field_meta.len());
+      
+      int result = DataType::type_instance(field_meta.type())->compare(left, right);
+      if (result != 0) {
+        return result;  // 当前字段不相等，返回结果
+      }
+      
+      offset1 += field_meta.len();
+      offset2 += field_meta.len();
+    }
+    
+    // 所有字段都相等，比较RID
+    const RID *rid1 = (const RID *)(v1 + total_length_);
+    const RID *rid2 = (const RID *)(v2 + total_length_);
+    return RID::compare(rid1, rid2);
+  }
 
-private:
   AttrComparator attr_comparator_;
+  vector<FieldMeta> field_metas_;
+  int total_length_;
+  bool is_multi_field_ = false;
 };
 
 /**
@@ -462,6 +520,12 @@ public:
   RC create(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name, AttrType attr_type, int attr_length,
       int internal_max_size = -1, int leaf_max_size = -1);
   RC create(LogHandler &log_handler, DiskBufferPool &buffer_pool, AttrType attr_type, int attr_length,
+      int internal_max_size = -1, int leaf_max_size = -1);
+  
+  // 多列索引创建方法
+  RC create(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name, const vector<FieldMeta> &field_metas, int total_length,
+      int internal_max_size = -1, int leaf_max_size = -1);
+  RC create(LogHandler &log_handler, DiskBufferPool &buffer_pool, const vector<FieldMeta> &field_metas, int total_length,
       int internal_max_size = -1, int leaf_max_size = -1);
 
   /**

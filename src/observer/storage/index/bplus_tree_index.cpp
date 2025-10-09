@@ -67,9 +67,11 @@ RC BplusTreeIndex::create(Table *table, const char *file_name, const IndexMeta &
   Index::init(index_meta, field_metas[0]);
   
   BufferPoolManager &bpm = table->db()->buffer_pool_manager();
-  // 使用组合键长度
-  RC rc = index_handler_.create(table->db()->log_handler(), bpm, file_name, field_metas[0].type(), total_len);
+  // 使用多列比较器创建索引
+  RC rc = index_handler_.create(table->db()->log_handler(), bpm, file_name, field_metas, total_len);
   if (rc != RC::SUCCESS) {
+    LOG_WARN("Failed to create multi-field index_handler, file_name:%s, index:%s, rc:%s",
+        file_name, index_meta.name(), strrc(rc));
     return rc;
   }
 
@@ -116,15 +118,63 @@ RC BplusTreeIndex::close()
 
 RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
 {
+  // Build multi-field key for multi-column indexes
+  vector<char> combined_key;
+  const char *key_data;
+  int key_len;
+  
+  if (!field_metas_.empty()) {
+    // Multi-field index: build combined key
+    for (const FieldMeta &field_meta : field_metas_) {
+      const char *field_data = record + field_meta.offset();
+      combined_key.insert(combined_key.end(), field_data, field_data + field_meta.len());
+    }
+    key_data = combined_key.data();
+    key_len = combined_key.size();
+    
+    // Debug output for multi-field key construction
+    LOG_INFO("=== MULTI-FIELD INDEX DEBUG ===");
+    LOG_INFO("Index: %s, RID: %s", index_meta_.name(), rid->to_string().c_str());
+    LOG_INFO("Field count: %zu", field_metas_.size());
+    for (size_t i = 0; i < field_metas_.size(); i++) {
+      const FieldMeta &fm = field_metas_[i];
+      const char *field_data = record + fm.offset();
+      LOG_INFO("Field[%zu]: name=%s, type=%d, len=%d, offset=%d", 
+               i, fm.name(), (int)fm.type(), fm.len(), fm.offset());
+      
+      // Print field data as hex
+      string hex_data;
+      for (int j = 0; j < fm.len(); j++) {
+        char hex[4];
+        snprintf(hex, sizeof(hex), "%02x", (unsigned char)field_data[j]);
+        hex_data += hex;
+        if (j < fm.len() - 1) hex_data += " ";
+      }
+      LOG_INFO("Field[%zu] data (hex): %s", i, hex_data.c_str());
+    }
+    LOG_INFO("Combined key length: %zu", combined_key.size());
+    string combined_hex;
+    for (size_t i = 0; i < combined_key.size(); i++) {
+      char hex[4];
+      snprintf(hex, sizeof(hex), "%02x", (unsigned char)combined_key[i]);
+      combined_hex += hex;
+      if (i < combined_key.size() - 1) combined_hex += " ";
+    }
+    LOG_INFO("Combined key (hex): %s", combined_hex.c_str());
+    LOG_INFO("=== END MULTI-FIELD INDEX DEBUG ===");
+  } else {
+    // Single-field index: use original logic
+    key_data = record + field_meta_.offset();
+    key_len = field_meta_.len();
+  }
+
   // Check for uniqueness if this is a unique index
   if (index_meta_.is_unique()) {
     // If the index is empty, no need to check for duplicates
     if (!index_handler_.is_empty()) {
       // Check if the key already exists
       BplusTreeScanner scanner(index_handler_);
-      const char *key_data = record + field_meta_.offset();
-
-      RC rc = scanner.open(key_data, field_meta_.len(), true, key_data, field_meta_.len(), true);
+      RC rc = scanner.open(key_data, key_len, true, key_data, key_len, true);
       if (rc == RC::SUCCESS) {
         RID existing_rid;
         rc = scanner.next_entry(existing_rid);
@@ -143,7 +193,7 @@ RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
     }
   }
 
-  RC insert_rc = index_handler_.insert_entry(record + field_meta_.offset(), rid);
+  RC insert_rc = index_handler_.insert_entry(key_data, rid);
   if (insert_rc != RC::SUCCESS) {
     LOG_WARN("Failed to insert entry into index %s, rc=%s", index_meta_.name(), strrc(insert_rc));
   }
@@ -152,7 +202,54 @@ RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
 
 RC BplusTreeIndex::delete_entry(const char *record, const RID *rid)
 {
-  return index_handler_.delete_entry(record + field_meta_.offset(), rid);
+  // Build multi-field key for multi-column indexes
+  vector<char> combined_key;
+  const char *key_data;
+  
+  if (!field_metas_.empty()) {
+    // Multi-field index: build combined key
+    for (const FieldMeta &field_meta : field_metas_) {
+      const char *field_data = record + field_meta.offset();
+      combined_key.insert(combined_key.end(), field_data, field_data + field_meta.len());
+    }
+    key_data = combined_key.data();
+    
+    // Debug output for multi-field key deletion
+    LOG_INFO("=== MULTI-FIELD INDEX DELETE DEBUG ===");
+    LOG_INFO("Index: %s, RID: %s", index_meta_.name(), rid->to_string().c_str());
+    LOG_INFO("Field count: %zu", field_metas_.size());
+    for (size_t i = 0; i < field_metas_.size(); i++) {
+      const FieldMeta &fm = field_metas_[i];
+      const char *field_data = record + fm.offset();
+      LOG_INFO("Field[%zu]: name=%s, type=%d, len=%d, offset=%d", 
+               i, fm.name(), (int)fm.type(), fm.len(), fm.offset());
+      
+      // Print field data as hex
+      string hex_data;
+      for (int j = 0; j < fm.len(); j++) {
+        char hex[4];
+        snprintf(hex, sizeof(hex), "%02x", (unsigned char)field_data[j]);
+        hex_data += hex;
+        if (j < fm.len() - 1) hex_data += " ";
+      }
+      LOG_INFO("Field[%zu] data (hex): %s", i, hex_data.c_str());
+    }
+    LOG_INFO("Combined key length: %zu", combined_key.size());
+    string combined_hex;
+    for (size_t i = 0; i < combined_key.size(); i++) {
+      char hex[4];
+      snprintf(hex, sizeof(hex), "%02x", (unsigned char)combined_key[i]);
+      combined_hex += hex;
+      if (i < combined_key.size() - 1) combined_hex += " ";
+    }
+    LOG_INFO("Combined key (hex): %s", combined_hex.c_str());
+    LOG_INFO("=== END MULTI-FIELD INDEX DELETE DEBUG ===");
+  } else {
+    // Single-field index: use original logic
+    key_data = record + field_meta_.offset();
+  }
+
+  return index_handler_.delete_entry(key_data, rid);
 }
 
 IndexScanner *BplusTreeIndex::create_scanner(
