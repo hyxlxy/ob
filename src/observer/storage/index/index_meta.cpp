@@ -52,7 +52,7 @@ RC IndexMeta::init(const char *name, const vector<FieldMeta> &fields, bool is_un
   }
 
   name_ = name;
-  field_ = fields[0].name(); // for backward compatibility
+  field_.clear();
   fields_.clear();
   for (const auto &field : fields) {
     fields_.push_back(field.name());

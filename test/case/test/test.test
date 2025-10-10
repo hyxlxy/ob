@@ -22,3 +22,9 @@ INSERT INTO unique_table2 VALUES (2,2,1,1);
 INSERT INTO unique_table2 VALUES (1,1,1,1);
 CREATE UNIQUE INDEX index_id on unique_table2(id);
 INSERT INTO unique_table2 VALUES (2,3,1,1);
+
+crete table student(id int,age int,name int);
+create index index_ia on student(id,age);
+insert into student values(1,1,1);
+insert into student values(2,2,2);
+select * from student where id=2;
