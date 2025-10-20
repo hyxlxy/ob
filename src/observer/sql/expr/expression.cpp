@@ -1447,6 +1447,34 @@ RC FunctionExpr::try_get_value_with_args(const vector<Value> &arg_values, Value 
     return VectorType::inner_product(arg_values[0], arg_values[1], value);
   }
 
+  // DISTANCE(vec1, vec2, metric)
+  if (strcasecmp(function_name_.c_str(), "DISTANCE") == 0) {
+    if (arg_values.size() != 3) {
+      LOG_WARN("DISTANCE function requires exactly 3 arguments, got %zu", arg_values.size());
+      return RC::INVALID_ARGUMENT;
+    }
+    const Value &left  = arg_values[0];
+    const Value &right = arg_values[1];
+    const Value &metric_val = arg_values[2];
+    if (metric_val.attr_type() != AttrType::CHARS) {
+      LOG_WARN("DISTANCE third argument must be string metric");
+      return RC::INVALID_ARGUMENT;
+    }
+    std::string metric = metric_val.get_string();
+    // uppercase
+    for (auto &c : metric) c = (char)toupper((unsigned char)c);
+    if (metric == "EUCLIDEAN" || metric == "L2" || metric == "L2_DISTANCE") {
+      return VectorType::l2_distance(left, right, value);
+    } else if (metric == "COSINE" || metric == "COSINE_DISTANCE") {
+      return VectorType::cosine_distance(left, right, value);
+    } else if (metric == "INNER" || metric == "INNER_PRODUCT" || metric == "IP" || metric == "DOT") {
+      return VectorType::inner_product(left, right, value);
+    } else {
+      LOG_WARN("Unknown DISTANCE metric: %s", metric.c_str());
+      return RC::INVALID_ARGUMENT;
+    }
+  }
+
   LOG_WARN("Unknown function: %s", function_name_.c_str());
   return RC::UNIMPLEMENTED;
 }

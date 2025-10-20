@@ -127,16 +127,17 @@ RC VectorType::parse_vector_string(const string &str, std::vector<float> &vec)
 
 RC VectorType::vector_to_string(const std::vector<float> &vec, string &result)
 {
-  stringstream ss;
+  std::ostringstream ss;
   ss << "[";
+  ss.setf(std::ios::scientific);
+  ss << std::setprecision(5);
 
   for (size_t i = 0; i < vec.size(); i++) {
     if (i > 0) {
       ss << ",";
     }
-
-    // 使用与FloatType相同的格式化方法
-    ss << common::double_to_str(vec[i]);
+    // 科学计数法，5位小数，形如 -4.87000e+00
+    ss << vec[i];
   }
   ss << "]";
 
