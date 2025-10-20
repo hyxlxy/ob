@@ -15,15 +15,13 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 #include "sql/expr/tuple.h"
 #include "sql/expr/arithmetic_operator.hpp"
-#include <set>
-#include <limits>
+// keep <limits> for numeric_limits usage elsewhere in this TU
 #include "common/type/vector_type.h"
 #include "common/log/log.h"
 #include "sql/stmt/select_stmt.h"
 #include "sql/stmt/filter_stmt.h"
 #include "sql/optimizer/logical_plan_generator.h"
 #include "sql/optimizer/physical_plan_generator.h"
-#include "sql/operator/project_physical_operator.h"
 #include "session/session.h"
 
 // 前向声明
@@ -560,7 +558,7 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
   // 检查右表达式是否是子查询
   if (right_->type() == ExprType::SUBQUERY) {
     printf("DEBUG: ComparisonExpr: Right expression is a subquery, calling get_value\n");
-    printf("DEBUG: ComparisonExpr: Subquery type: %s\n", typeid(*right_.get()).name());
+    printf("DEBUG: ComparisonExpr: Right expr type enum: %d\n", static_cast<int>(right_->type()));
   }
   
   rc = right_->get_value(tuple, right_value);
@@ -1320,7 +1318,20 @@ unique_ptr<Expression> FunctionExpr::copy() const
 
 AttrType FunctionExpr::value_type() const
 {
-  // 大多数向量函数返回float类型
+  // 专门处理字符串/向量互转与距离函数的返回类型
+  if (strcasecmp(function_name_.c_str(), "STRING_TO_VECTOR") == 0) {
+    return AttrType::VECTORS;
+  }
+  if (strcasecmp(function_name_.c_str(), "VECTOR_TO_STRING") == 0) {
+    return AttrType::CHARS;
+  }
+  // 距离/相似度类函数返回 float
+  if (strcasecmp(function_name_.c_str(), "L2_DISTANCE") == 0 ||
+      strcasecmp(function_name_.c_str(), "COSINE_DISTANCE") == 0 ||
+      strcasecmp(function_name_.c_str(), "INNER_PRODUCT") == 0) {
+    return AttrType::FLOATS;
+  }
+  // 默认：float
   return AttrType::FLOATS;
 }
 
@@ -1363,6 +1374,55 @@ RC FunctionExpr::try_get_value(Value &value) const
 
 RC FunctionExpr::try_get_value_with_args(const vector<Value> &arg_values, Value &value) const
 {
+  // STRING_TO_VECTOR: 将字符串解析为向量；若已是向量则直接返回
+  if (strcasecmp(function_name_.c_str(), "STRING_TO_VECTOR") == 0) {
+    if (arg_values.size() != 1) {
+      LOG_WARN("STRING_TO_VECTOR requires exactly 1 argument, got %zu", arg_values.size());
+      return RC::INVALID_ARGUMENT;
+    }
+    const Value &arg = arg_values[0];
+    LOG_INFO("DEBUG: STRING_TO_VECTOR called, arg_type=%d, arg_value=%s", (int)arg.attr_type(), arg.to_string().c_str());
+    if (arg.attr_type() == AttrType::VECTORS) {
+      value = arg; // 透传
+      LOG_INFO("DEBUG: STRING_TO_VECTOR passthrough vector, length=%d", value.length());
+      return RC::SUCCESS;
+    }
+    if (arg.attr_type() == AttrType::CHARS) {
+      VectorType vt;
+      RC rc = vt.set_value_from_str(value, arg.get_string());
+      LOG_INFO("DEBUG: STRING_TO_VECTOR parsed rc=%s, out_type=%d, out_len=%d", strrc(rc), (int)value.attr_type(), value.length());
+      return rc;
+    }
+    LOG_WARN("STRING_TO_VECTOR unsupported arg type: %d", (int)arg.attr_type());
+    return RC::INVALID_ARGUMENT;
+  }
+
+  // VECTOR_TO_STRING: 将向量转为标准字符串表示
+  if (strcasecmp(function_name_.c_str(), "VECTOR_TO_STRING") == 0) {
+    if (arg_values.size() != 1) {
+      LOG_WARN("VECTOR_TO_STRING requires exactly 1 argument, got %zu", arg_values.size());
+      return RC::INVALID_ARGUMENT;
+    }
+    const Value &arg = arg_values[0];
+    LOG_INFO("DEBUG: VECTOR_TO_STRING called, arg_type=%d, arg_len=%d", (int)arg.attr_type(), arg.length());
+    if (arg.attr_type() == AttrType::VECTORS) {
+      VectorType vt;
+      std::string out;
+      RC rc = vt.to_string(arg, out);
+      if (rc != RC::SUCCESS) return rc;
+      value.set_string(out.c_str());
+      LOG_INFO("DEBUG: VECTOR_TO_STRING result=%s", value.to_string().c_str());
+      return RC::SUCCESS;
+    }
+    if (arg.attr_type() == AttrType::CHARS) {
+      // 已是字符串则透传
+      value = arg;
+      return RC::SUCCESS;
+    }
+    LOG_WARN("VECTOR_TO_STRING unsupported arg type: %d", (int)arg.attr_type());
+    return RC::INVALID_ARGUMENT;
+  }
+
   if (strcasecmp(function_name_.c_str(), "L2_DISTANCE") == 0) {
     if (arg_values.size() != 2) {
       LOG_WARN("L2_DISTANCE function requires exactly 2 arguments, got %zu", arg_values.size());

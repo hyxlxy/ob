@@ -711,6 +711,18 @@ insert_value:
       $$ = new Value(-(float)$2);
       @$ = @2;
     }
+    // 支持 INSERT 中的常量表达式（例如 STRING_TO_VECTOR('...')）
+    | expression {
+      Value __v; RC __rc = $1->try_get_value(__v);
+      if (__rc != RC::SUCCESS) {
+        delete $1; $1 = nullptr;
+        yyerror(&@$, sql_string, sql_result, scanner, "Invalid constant expression in INSERT");
+        YYERROR;
+      }
+      $$ = new Value(__v);
+      delete $1; $1 = nullptr;
+      @$ = @1;
+    }
     ;
 
 value:

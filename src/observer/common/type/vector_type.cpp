@@ -14,8 +14,6 @@ See the Mulan PSL v2 for more details. */
 #include <cmath>
 #include <algorithm>
 #include <sstream>
-#include <iomanip>
-#include <numeric>
 
 using namespace std;
 
@@ -72,6 +70,7 @@ RC VectorType::parse_vector_string(const string &str, std::vector<float> &vec)
   string trimmed = str;
   trimmed.erase(0, trimmed.find_first_not_of(" \t\n\r"));
   trimmed.erase(trimmed.find_last_not_of(" \t\n\r") + 1);
+  LOG_INFO("DEBUG: parse_vector_string raw='%s' trimmed='%s'", str.c_str(), trimmed.c_str());
 
   // 检查格式：应该以[开头，]结尾
   if (trimmed.empty() || trimmed[0] != '[' || trimmed.back() != ']') {
@@ -106,7 +105,10 @@ RC VectorType::parse_vector_string(const string &str, std::vector<float> &vec)
 
     try {
       float value = stof(item);
+      // 与系统其余数值输出保持一致，规整到两位小数
+      value = roundf(value * 100.0f) / 100.0f;
       vec.push_back(value);
+      LOG_INFO("DEBUG: parse_vector_string push value=%s (rounded)", common::double_to_str(value).c_str());
 
       // 检查维度限制
       if (vec.size() > MAX_VECTOR_DIMENSION) {
@@ -119,6 +121,7 @@ RC VectorType::parse_vector_string(const string &str, std::vector<float> &vec)
     }
   }
 
+  LOG_INFO("DEBUG: parse_vector_string done, dim=%zu", vec.size());
   return RC::SUCCESS;
 }
 
@@ -310,13 +313,15 @@ RC VectorType::cast_to(const Value &val, AttrType type, Value &result) const
 
 RC VectorType::set_value_from_str(Value &val, const string &data) const
 {
+  LOG_INFO("DEBUG: VectorType::set_value_from_str input='%s'", data.c_str());
   std::vector<float> vec;
   RC rc = parse_vector_string(data, vec);
+  LOG_INFO("DEBUG: VectorType::set_value_from_str parse rc=%s, dim=%zu", strrc(rc), vec.size());
   if (rc != RC::SUCCESS) {
     return rc;
   }
-  
   set_vector_data(val, vec);
+  LOG_INFO("DEBUG: VectorType::set_value_from_str set done, out_len=%d", val.length());
   return RC::SUCCESS;
 }
 
@@ -437,3 +442,5 @@ RC VectorType::inner_product(const Value &left, const Value &right, Value &resul
   result.set_float(product);
   return RC::SUCCESS;
 }
+
+
