@@ -1032,6 +1032,26 @@ expression:
         args.swap(*$3);
         delete $3;
       }
+      // 解析期维度不一致快速失败：仅对向量距离类函数进行
+      // 函数名：DISTANCE/L2_DISTANCE/COSINE_DISTANCE/INNER_PRODUCT
+      auto __is_distance = [&](const char *fn)->bool {
+        return 0==strcasecmp(fn, "DISTANCE") || 0==strcasecmp(fn, "L2_DISTANCE") || 0==strcasecmp(fn, "COSINE_DISTANCE") || 0==strcasecmp(fn, "INNER_PRODUCT");
+      };
+      if (__is_distance($1) && args.size() >= 2 && args[0] && args[1]) {
+        Value __v0, __v1;
+        RC __rc0 = args[0]->try_get_value(__v0);
+        RC __rc1 = args[1]->try_get_value(__v1);
+        if (__rc0 == RC::SUCCESS && __rc1 == RC::SUCCESS &&
+            __v0.attr_type() == AttrType::VECTORS && __v1.attr_type() == AttrType::VECTORS &&
+            __v0.length() >= (int)sizeof(int) && __v1.length() >= (int)sizeof(int)) {
+          int __d0 = *(const int *)__v0.data();
+          int __d1 = *(const int *)__v1.data();
+          if (__d0 != __d1) {
+            yyerror(&@$, sql_string, sql_result, scanner, "Vector dimensions mismatch in distance function");
+            YYERROR;
+          }
+        }
+      }
       $$ = new FunctionExpr($1, std::move(args));
       $$->set_name(token_name(sql_string, &@$));
     }

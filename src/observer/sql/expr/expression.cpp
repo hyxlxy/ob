@@ -1368,6 +1368,79 @@ RC FunctionExpr::try_get_value(Value &value) const
     }
     arg_values.emplace_back(arg_value);
   }
+  // 对距离类函数：
+  // - 若参数是常量并且维度不一致，直接返回 INVALID_ARGUMENT（让语句 FAIL）
+  // - 若参数是常量且维度一致，直接在解析期计算出结果
+  // - 若存在行依赖（任一参数不可折叠），返回子表达式的 rc（通常为 INVALID_ARGUMENT），由上层决定不折叠
+  auto is_distance_name = [&](const char *name) {
+    return strcasecmp(name, "L2_DISTANCE") == 0 ||
+           strcasecmp(name, "COSINE_DISTANCE") == 0 ||
+           strcasecmp(name, "INNER_PRODUCT") == 0 ||
+           strcasecmp(name, "DISTANCE") == 0;
+  };
+
+  if (is_distance_name(function_name_.c_str())) {
+    // 2 参数类（L2/COSINE/INNER）维度检查
+    if (strcasecmp(function_name_.c_str(), "L2_DISTANCE") == 0 ||
+        strcasecmp(function_name_.c_str(), "COSINE_DISTANCE") == 0 ||
+        strcasecmp(function_name_.c_str(), "INNER_PRODUCT") == 0) {
+      if (arg_values.size() == 2 &&
+          arg_values[0].attr_type() == AttrType::VECTORS &&
+          arg_values[1].attr_type() == AttrType::VECTORS &&
+          arg_values[0].length() >= (int)sizeof(int) &&
+          arg_values[1].length() >= (int)sizeof(int)) {
+        int ldim = *(const int *)arg_values[0].data();
+        int rdim = *(const int *)arg_values[1].data();
+        if (ldim != rdim) {
+          LOG_WARN("constant distance dim mismatch: %d vs %d", ldim, rdim);
+          return RC::INVALID_ARGUMENT;
+        }
+        // 维度一致，直接计算
+        if (strcasecmp(function_name_.c_str(), "L2_DISTANCE") == 0) {
+          return VectorType::l2_distance(arg_values[0], arg_values[1], value);
+        } else if (strcasecmp(function_name_.c_str(), "COSINE_DISTANCE") == 0) {
+          return VectorType::cosine_distance(arg_values[0], arg_values[1], value);
+        } else { // INNER_PRODUCT
+          return VectorType::inner_product(arg_values[0], arg_values[1], value);
+        }
+      }
+      // 参数不是常量向量或无法取到维度，交由执行期
+      return RC::INVALID_ARGUMENT;
+    }
+    // 3 参数 DISTANCE 维度检查（前2为向量，第三为度量）
+    if (strcasecmp(function_name_.c_str(), "DISTANCE") == 0) {
+      if (arg_values.size() == 3 &&
+          arg_values[0].attr_type() == AttrType::VECTORS &&
+          arg_values[1].attr_type() == AttrType::VECTORS &&
+          arg_values[0].length() >= (int)sizeof(int) &&
+          arg_values[1].length() >= (int)sizeof(int)) {
+        int ldim = *(const int *)arg_values[0].data();
+        int rdim = *(const int *)arg_values[1].data();
+        if (ldim != rdim) {
+          LOG_WARN("constant DISTANCE dim mismatch: %d vs %d", ldim, rdim);
+          return RC::INVALID_ARGUMENT;
+        }
+        // 维度一致且第三参应为度量字符串，直接计算
+        const Value &metric_val = arg_values[2];
+        if (metric_val.attr_type() != AttrType::CHARS) {
+          return RC::INVALID_ARGUMENT;
+        }
+        std::string metric = metric_val.get_string();
+        for (auto &c : metric) c = (char)toupper((unsigned char)c);
+        if (metric == "EUCLIDEAN" || metric == "L2" || metric == "L2_DISTANCE") {
+          return VectorType::l2_distance(arg_values[0], arg_values[1], value);
+        } else if (metric == "COSINE" || metric == "COSINE_DISTANCE") {
+          return VectorType::cosine_distance(arg_values[0], arg_values[1], value);
+        } else if (metric == "INNER" || metric == "INNER_PRODUCT" || metric == "IP" || metric == "DOT") {
+          return VectorType::inner_product(arg_values[0], arg_values[1], value);
+        } else {
+          return RC::INVALID_ARGUMENT;
+        }
+      }
+      // 参数不是常量向量或无法取到维度，交由执行期
+      return RC::INVALID_ARGUMENT;
+    }
+  }
 
   return try_get_value_with_args(arg_values, value);
 }
@@ -1459,6 +1532,17 @@ RC FunctionExpr::try_get_value_with_args(const vector<Value> &arg_values, Value 
     if (metric_val.attr_type() != AttrType::CHARS) {
       LOG_WARN("DISTANCE third argument must be string metric");
       return RC::INVALID_ARGUMENT;
+    }
+    // 如果两个参数都是常量向量，提前进行维度校验，维度不一致直接返回错误以触发 FAILURE
+    if (left.attr_type() == AttrType::VECTORS && right.attr_type() == AttrType::VECTORS) {
+      if (left.length() >= (int)sizeof(int) && right.length() >= (int)sizeof(int)) {
+        int ldim = *(const int *)left.data();
+        int rdim = *(const int *)right.data();
+        if (ldim != rdim) {
+          LOG_WARN("DISTANCE constant-fold dim mismatch: %d vs %d", ldim, rdim);
+          return RC::INVALID_ARGUMENT;
+        }
+      }
     }
     std::string metric = metric_val.get_string();
     // uppercase

@@ -349,10 +349,8 @@ RC VectorType::l2_distance(const Value &left, const Value &right, Value &result)
   std::vector<float> right_vec = get_vector_data(right);
 
   if (left_vec.size() != right_vec.size()) {
-    LOG_INFO("DEBUG: L2 distance dim mismatch: %zu vs %zu (return NULL)", left_vec.size(), right_vec.size());
-    result.set_type(AttrType::UNDEFINED);
-    result.set_null(true);
-    return RC::SUCCESS;
+    LOG_WARN("Vector dimensions mismatch for L2 distance: %zu vs %zu", left_vec.size(), right_vec.size());
+    return RC::INVALID_ARGUMENT;
   }
 
   size_t dimension = left_vec.size();
@@ -388,10 +386,8 @@ RC VectorType::cosine_distance(const Value &left, const Value &right, Value &res
   std::vector<float> right_vec = get_vector_data(right);
 
   if (left_vec.size() != right_vec.size()) {
-    LOG_INFO("DEBUG: Cosine distance dim mismatch: %zu vs %zu (return NULL)", left_vec.size(), right_vec.size());
-    result.set_type(AttrType::UNDEFINED);
-    result.set_null(true);
-    return RC::SUCCESS;
+    LOG_WARN("Vector dimensions mismatch for cosine distance: %zu vs %zu", left_vec.size(), right_vec.size());
+    return RC::INVALID_ARGUMENT;
   }
 
   float dot_product = 0.0f;
@@ -424,10 +420,8 @@ RC VectorType::inner_product(const Value &left, const Value &right, Value &resul
   std::vector<float> right_vec = get_vector_data(right);
 
   if (left_vec.size() != right_vec.size()) {
-    LOG_INFO("DEBUG: Inner product dim mismatch: %zu vs %zu (return NULL)", left_vec.size(), right_vec.size());
-    result.set_type(AttrType::UNDEFINED);
-    result.set_null(true);
-    return RC::SUCCESS;
+    LOG_WARN("Vector dimensions mismatch for inner product: %zu vs %zu", left_vec.size(), right_vec.size());
+    return RC::INVALID_ARGUMENT;
   }
 
   float product = 0.0f;
