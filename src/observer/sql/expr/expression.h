@@ -16,7 +16,6 @@ See the Mulan PSL v2 for more details. */
 
 #include "common/lang/string.h"
 #include "common/lang/memory.h"
-#include "common/lang/unordered_set.h"
 #include "common/value.h"
 #include "storage/field/field.h"
 #include "sql/expr/aggregator.h"
@@ -24,7 +23,7 @@ See the Mulan PSL v2 for more details. */
 
 class Tuple;
 class SelectStmt;
-class SelectSqlNode;
+struct SelectSqlNode;
 class Stmt;
 class Field;
 class Db;
@@ -519,9 +518,10 @@ public:
 
   ExprType type() const override { return ExprType::FUNCTION; }
   AttrType value_type() const override;
-  int      value_length() const override { return 4; } // 大多数函数返回float
+  int      value_length() const override;
 
   RC get_value(const Tuple &tuple, Value &value) const override;
+  RC get_column(Chunk &chunk, Column &column) override;
   RC try_get_value(Value &value) const override;
 
   const char *function_name() const { return function_name_.c_str(); }

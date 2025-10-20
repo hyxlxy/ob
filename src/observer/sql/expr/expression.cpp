@@ -33,6 +33,8 @@ static RC execute_subquery_and_collect_results(Stmt *sub_query, std::vector<Valu
 #include "observer/common/null_like.h"
 
 using namespace std;
+#include <cmath>
+#include <cstdio>
 
 // 定义 FieldExpr 的静态成员变量
 const Tuple *FieldExpr::current_parent_tuple_ = nullptr;
@@ -1325,6 +1327,18 @@ AttrType FunctionExpr::value_type() const
   if (strcasecmp(function_name_.c_str(), "VECTOR_TO_STRING") == 0) {
     return AttrType::CHARS;
   }
+  // LENGTH returns INT
+  if (strcasecmp(function_name_.c_str(), "LENGTH") == 0) {
+    return AttrType::INTS;
+  }
+  // ROUND returns FLOAT
+  if (strcasecmp(function_name_.c_str(), "ROUND") == 0) {
+    return AttrType::FLOATS;
+  }
+  // DATE_FORMAT returns string
+  if (strcasecmp(function_name_.c_str(), "DATE_FORMAT") == 0) {
+    return AttrType::CHARS;
+  }
   // 距离/相似度类函数返回 float
   if (strcasecmp(function_name_.c_str(), "L2_DISTANCE") == 0 ||
       strcasecmp(function_name_.c_str(), "COSINE_DISTANCE") == 0 ||
@@ -1333,6 +1347,37 @@ AttrType FunctionExpr::value_type() const
   }
   // 默认：float
   return AttrType::FLOATS;
+}
+
+int FunctionExpr::value_length() const
+{
+  // Provide reasonable output length hints to column/chunk paths
+  if (strcasecmp(function_name_.c_str(), "LENGTH") == 0) {
+    return 4; // INT size
+  }
+  if (strcasecmp(function_name_.c_str(), "ROUND") == 0) {
+    return 4; // FLOAT size
+  }
+  if (strcasecmp(function_name_.c_str(), "DATE_FORMAT") == 0) {
+    // Worst-case for supported tokens: e.g., "September" (9), day with suffix (4), separators
+    // Simple conservative cap: 64 bytes
+    return 64;
+  }
+  if (strcasecmp(function_name_.c_str(), "VECTOR_TO_STRING") == 0) {
+    // Variable, keep a safe bound (text handled as chars); fall back
+    return 255;
+  }
+  if (strcasecmp(function_name_.c_str(), "STRING_TO_VECTOR") == 0) {
+    return 4; // header length minimal; actual vector size handled at runtime
+  }
+  // Distance family
+  if (strcasecmp(function_name_.c_str(), "L2_DISTANCE") == 0 ||
+      strcasecmp(function_name_.c_str(), "COSINE_DISTANCE") == 0 ||
+      strcasecmp(function_name_.c_str(), "INNER_PRODUCT") == 0 ||
+      strcasecmp(function_name_.c_str(), "DISTANCE") == 0) {
+    return 4;
+  }
+  return 4;
 }
 
 RC FunctionExpr::get_value(const Tuple &tuple, Value &value) const
@@ -1352,6 +1397,65 @@ RC FunctionExpr::get_value(const Tuple &tuple, Value &value) const
   }
 
   return try_get_value_with_args(arg_values, value);
+}
+
+RC FunctionExpr::get_column(Chunk &chunk, Column &column)
+{
+  // Generic vectorized evaluation: materialize child columns, then compute row-by-row using try_get_value_with_args
+  const int row_count = chunk.rows();
+  const AttrType out_type = value_type();
+  const int out_len = value_length();
+
+  // Prepare child columns
+  std::vector<std::unique_ptr<Column>> child_cols;
+  child_cols.reserve(args_.size());
+  for (const auto &arg : args_) {
+    auto col = std::make_unique<Column>();
+    RC rc = arg->get_column(chunk, *col);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+    child_cols.emplace_back(std::move(col));
+  }
+
+  // Initialize output column
+  column.init(out_type, out_len, row_count);
+  column.set_column_type(Column::Type::NORMAL_COLUMN);
+
+  const int n = row_count;
+  for (int i = 0; i < n; i++) {
+    // Build per-row args
+    std::vector<Value> argv;
+    argv.reserve(child_cols.size());
+    for (const auto &cc : child_cols) {
+      const bool is_const = cc->column_type() == Column::Type::CONSTANT_COLUMN;
+      argv.emplace_back(cc->get_value(is_const ? 0 : i));
+    }
+    Value outv;
+    RC rc = try_get_value_with_args(argv, outv);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+    // Append to output column by type
+    if (out_type == AttrType::INTS) {
+      int x = outv.get_int();
+      column.append(reinterpret_cast<char *>(&x), 1);
+    } else if (out_type == AttrType::FLOATS) {
+      float f = outv.get_float();
+      column.append(reinterpret_cast<char *>(&f), 1);
+    } else if (out_type == AttrType::CHARS) {
+      std::string s = outv.get_string();
+      const int len = column.attr_len();
+      std::string buf(len, '\0');
+      memcpy(buf.data(), s.data(), std::min((int)s.size(), len));
+      column.append(buf.data(), 1);
+    } else {
+      // Fallback: mark as unsupported
+      return RC::UNIMPLEMENTED;
+    }
+  }
+  column.set_count(n);
+  return RC::SUCCESS;
 }
 
 RC FunctionExpr::try_get_value(Value &value) const
@@ -1447,6 +1551,126 @@ RC FunctionExpr::try_get_value(Value &value) const
 
 RC FunctionExpr::try_get_value_with_args(const vector<Value> &arg_values, Value &value) const
 {
+  // LENGTH(char)
+  if (strcasecmp(function_name_.c_str(), "LENGTH") == 0) {
+    if (arg_values.size() != 1) {
+      return RC::INVALID_ARGUMENT;
+    }
+    const Value &arg = arg_values[0];
+    if (arg.attr_type() != AttrType::CHARS) {
+      return RC::UNSUPPORTED; // per assignment: only char supported
+    }
+    std::string s = arg.get_string();
+    value.set_int(static_cast<int>(s.size()));
+    return RC::SUCCESS;
+  }
+
+  // ROUND(float)
+  if (strcasecmp(function_name_.c_str(), "ROUND") == 0) {
+    if (arg_values.size() != 1) {
+      return RC::INVALID_ARGUMENT;
+    }
+    const Value &arg = arg_values[0];
+    if (arg.attr_type() != AttrType::FLOATS) {
+      return RC::UNSUPPORTED; // per assignment: only float supported
+    }
+    float f = arg.get_float();
+    // round to nearest integer, return as float to keep type FLOATS
+    float r = std::round(f);
+    value.set_float(r);
+    return RC::SUCCESS;
+  }
+
+  // DATE_FORMAT(date, format)
+  if (strcasecmp(function_name_.c_str(), "DATE_FORMAT") == 0) {
+    if (arg_values.size() != 2) {
+      return RC::INVALID_ARGUMENT;
+    }
+    const Value &datev = arg_values[0];
+    const Value &fmtv  = arg_values[1];
+    if (datev.attr_type() != AttrType::DATES || fmtv.attr_type() != AttrType::CHARS) {
+      return RC::UNSUPPORTED; // per assignment: only date + char
+    }
+    // extract y,m,d
+    int date_int = datev.get_date();
+    int year = date_int / 10000;
+    int month = (date_int % 10000) / 100;
+    int day = date_int % 100;
+
+    auto ordinal_suffix = [](int d) -> const char * {
+      int mod100 = d % 100;
+      if (mod100 >= 11 && mod100 <= 13) return "th";
+      switch (d % 10) {
+        case 1: return "st";
+        case 2: return "nd";
+        case 3: return "rd";
+        default: return "th";
+      }
+    };
+
+    static const char *MONTH_NAMES[13] = {
+      "", "January","February","March","April","May","June",
+      "July","August","September","October","November","December"
+    };
+
+    const std::string fmt = fmtv.get_string();
+    std::string out;
+    out.reserve(fmt.size() + 16);
+    for (size_t i = 0; i < fmt.size(); i++) {
+      char c = fmt[i];
+      if (c == '%' && i + 1 < fmt.size()) {
+        char t = fmt[i + 1];
+        switch (t) {
+          case 'Y': { // 4-digit year
+            char buf[8];
+            std::snprintf(buf, sizeof(buf), "%04d", year);
+            out += buf;
+            i++; break;
+          }
+          case 'y': { // 2-digit year
+            int yy = year % 100;
+            char buf[4];
+            std::snprintf(buf, sizeof(buf), "%02d", yy);
+            out += buf;
+            i++; break;
+          }
+          case 'm': { // month 01-12
+            char buf[4];
+            std::snprintf(buf, sizeof(buf), "%02d", month);
+            out += buf;
+            i++; break;
+          }
+          case 'd': { // day 01-31
+            char buf[4];
+            std::snprintf(buf, sizeof(buf), "%02d", day);
+            out += buf;
+            i++; break;
+          }
+          case 'D': { // day with suffix (English)
+            char buf[16];
+            const char *suf = ordinal_suffix(day);
+            std::snprintf(buf, sizeof(buf), "%d%s", day, suf);
+            out += buf;
+            i++; break;
+          }
+          case 'M': { // full month name (English)
+            if (month >= 1 && month <= 12) out += MONTH_NAMES[month];
+            i++; break;
+          }
+          default:
+            // illegal placeholder like %z, keep as-is
+            out.push_back('%');
+            // do not consume t; keep original chars
+            break;
+        }
+      } else {
+        out.push_back(c);
+      }
+    }
+    value.set_string(out.c_str());
+    return RC::SUCCESS;
+  }
+
   // STRING_TO_VECTOR: 将字符串解析为向量；若已是向量则直接返回
   if (strcasecmp(function_name_.c_str(), "STRING_TO_VECTOR") == 0) {
     if (arg_values.size() != 1) {

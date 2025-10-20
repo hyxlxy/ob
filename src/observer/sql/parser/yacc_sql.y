@@ -761,18 +761,21 @@ value:
           free(tmp);
         }
       } else {
-        // 检查是否为日期格式（YYYY-MM-DD或YYYY-M-D等）
-        bool looks_like_date = false;
-        int dash_count = 0;
-        for (int i = 0; tmp[i] != '\0'; i++) {
-          if (tmp[i] == '-') {
-            dash_count++;
-          }
+      // 检查是否为日期格式（YYYY-MM-DD或YYYY-M-D等）
+      bool looks_like_date = false;
+      int dash_count = 0;
+      bool only_digits_and_dash = true;
+      for (int i = 0; tmp[i] != '\0'; i++) {
+        if (tmp[i] == '-') {
+          dash_count++;
+        } else if (!(tmp[i] >= '0' && tmp[i] <= '9')) {
+          only_digits_and_dash = false;
         }
-        // 如果有两个破折号，可能是日期格式
-        if (dash_count == 2) {
-          looks_like_date = true;
-        }
+      }
+      // 仅当恰好两个 '-' 且其余字符全为数字时，才尝试按日期解析
+      if (dash_count == 2 && only_digits_and_dash) {
+        looks_like_date = true;
+      }
 
         if (looks_like_date) {
           // 尝试解析为日期类型
