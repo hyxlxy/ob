@@ -349,8 +349,10 @@ RC VectorType::l2_distance(const Value &left, const Value &right, Value &result)
   std::vector<float> right_vec = get_vector_data(right);
 
   if (left_vec.size() != right_vec.size()) {
-    LOG_WARN("Vector dimensions mismatch for L2 distance: %zu vs %zu", left_vec.size(), right_vec.size());
-    return RC::INVALID_ARGUMENT;
+    LOG_INFO("DEBUG: L2 distance dim mismatch: %zu vs %zu (return NULL)", left_vec.size(), right_vec.size());
+    result.set_type(AttrType::UNDEFINED);
+    result.set_null(true);
+    return RC::SUCCESS;
   }
 
   size_t dimension = left_vec.size();
@@ -376,10 +378,6 @@ RC VectorType::l2_distance(const Value &left, const Value &right, Value &result)
   }
 
   float distance = sqrt(sum);
-
-  // 保留2位小数
-  distance = round(distance * 100.0f) / 100.0f;
-
   result.set_float(distance);
   return RC::SUCCESS;
 }
@@ -390,8 +388,10 @@ RC VectorType::cosine_distance(const Value &left, const Value &right, Value &res
   std::vector<float> right_vec = get_vector_data(right);
 
   if (left_vec.size() != right_vec.size()) {
-    LOG_WARN("Vector dimensions mismatch for cosine distance: %zu vs %zu", left_vec.size(), right_vec.size());
-    return RC::INVALID_ARGUMENT;
+    LOG_INFO("DEBUG: Cosine distance dim mismatch: %zu vs %zu (return NULL)", left_vec.size(), right_vec.size());
+    result.set_type(AttrType::UNDEFINED);
+    result.set_null(true);
+    return RC::SUCCESS;
   }
 
   float dot_product = 0.0f;
@@ -414,10 +414,6 @@ RC VectorType::cosine_distance(const Value &left, const Value &right, Value &res
 
   float cosine_similarity = dot_product / (left_norm * right_norm);
   float distance = 1.0f - cosine_similarity;
-
-  // 保留2位小数
-  distance = round(distance * 100.0f) / 100.0f;
-
   result.set_float(distance);
   return RC::SUCCESS;
 }
@@ -428,17 +424,16 @@ RC VectorType::inner_product(const Value &left, const Value &right, Value &resul
   std::vector<float> right_vec = get_vector_data(right);
 
   if (left_vec.size() != right_vec.size()) {
-    LOG_WARN("Vector dimensions mismatch for inner product: %zu vs %zu", left_vec.size(), right_vec.size());
-    return RC::INVALID_ARGUMENT;
+    LOG_INFO("DEBUG: Inner product dim mismatch: %zu vs %zu (return NULL)", left_vec.size(), right_vec.size());
+    result.set_type(AttrType::UNDEFINED);
+    result.set_null(true);
+    return RC::SUCCESS;
   }
 
   float product = 0.0f;
   for (size_t i = 0; i < left_vec.size(); i++) {
     product += left_vec[i] * right_vec[i];
   }
-
-  // 保留2位小数
-  product = round(product * 100.0f) / 100.0f;
 
   result.set_float(product);
   return RC::SUCCESS;
