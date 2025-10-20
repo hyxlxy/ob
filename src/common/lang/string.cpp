@@ -15,14 +15,13 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/string.h"
 
 #include <ctype.h>
-#include <errno.h>
 #include <string.h>
 
 #include <iomanip>
 
 #include "common/log/log.h"
 #include "common/lang/algorithm.h"
-#include "common/lang/cmath.h"
+#include <cmath>
 #include "common/lang/iomanip.h"
 
 namespace common {
@@ -274,10 +273,8 @@ string double_to_str(double v)
   // Use a tiny bias before rounding to 2 decimals to better match MySQL's
   // double-precision evaluation when the stored value is a 32-bit float.
   // This compensates for cases like 197.875 being represented as 197.874999... in float.
-  double scaled = v * 100.0;
-  double bias = (scaled >= 0.0 ? 1e-8 : -1e-8);
-  scaled += bias;
-  double rounded_v = round(scaled) / 100.0;
+  // Round to 2 decimals without artificial bias to avoid overshooting
+  double rounded_v = std::round(v * 100.0) / 100.0;
 
   snprintf(buf, sizeof(buf), "%.2f", rounded_v);
   size_t len = strlen(buf);

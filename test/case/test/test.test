@@ -1,16 +1,7 @@
 
-CREATE TABLE function_table(id int, name char(20), score float, u_date date);
-CREATE TABLE function_table_2(id int, name char(30), score float, u_date date);
-insert into function_table VALUES (1, '83D4', 5.84, '2024-10-15');
-insert into function_table VALUES (7, 'GFYNUI84YECEAQ6ILA', 7.92, '2017-05-03');
-insert into function_table VALUES (4, '5R148BAZ7UZAOWGOX', 9.31, '2024-06-30');
-select length('') a1, length('abc') a2, length(name) a3 from function_table order by id;
-select length(score) fail_len from function_table;
-select round(score) r0 from function_table order by id;
-select round(3.8155, 2) r_prec;
-select round(score, 1) r1 from function_table order by id;
-select round(name) fail_round from function_table;
-select date_format(u_date, '%Y-%m-%d') f1, date_format(u_date, '%y-%m-%d') f2, date_format(u_date, '%D,%M,%Y') f3 from function_table order by id;
-select date_format('2024-05-20', 'abc %z def %n ghi') passthrough;
-select date_format(name, '%Y') fail_df1 from function_table;
-select date_format(u_date, 123) fail_df2 from function_table;
+create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
+create table exp_table2(id int, col1 int);
+insert into exp_table VALUES (2, 8, 1, 9.0, 6.23);
+insert into exp_table VALUES (7, 4, 5, 1.6, 5.68);
+insert into exp_table VALUES (4, 2, 8, 8.69, 5.12);
+select id,-(col2*(-3)+9)+(col4+7)*(col1+col3*1),(6+col2)*col3*3 from exp_table where -(col2*(-1)+6)+(col4+3)*(col1+col3*5) > (1+col2)*col3*4;
