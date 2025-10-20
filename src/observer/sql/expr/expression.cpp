@@ -15,15 +15,13 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 #include "sql/expr/tuple.h"
 #include "sql/expr/arithmetic_operator.hpp"
-#include <set>
-#include <limits>
+// keep <limits> for numeric_limits usage elsewhere in this TU
 #include "common/type/vector_type.h"
 #include "common/log/log.h"
 #include "sql/stmt/select_stmt.h"
 #include "sql/stmt/filter_stmt.h"
 #include "sql/optimizer/logical_plan_generator.h"
 #include "sql/optimizer/physical_plan_generator.h"
-#include "sql/operator/project_physical_operator.h"
 #include "session/session.h"
 
 // 前向声明
@@ -560,7 +558,7 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
   // 检查右表达式是否是子查询
   if (right_->type() == ExprType::SUBQUERY) {
     printf("DEBUG: ComparisonExpr: Right expression is a subquery, calling get_value\n");
-    printf("DEBUG: ComparisonExpr: Subquery type: %s\n", typeid(*right_.get()).name());
+    printf("DEBUG: ComparisonExpr: Right expr type enum: %d\n", static_cast<int>(right_->type()));
   }
   
   rc = right_->get_value(tuple, right_value);
@@ -1320,7 +1318,20 @@ unique_ptr<Expression> FunctionExpr::copy() const
 
 AttrType FunctionExpr::value_type() const
 {
-  // 大多数向量函数返回float类型
+  // 专门处理字符串/向量互转与距离函数的返回类型
+  if (strcasecmp(function_name_.c_str(), "STRING_TO_VECTOR") == 0) {
+    return AttrType::VECTORS;
+  }
+  if (strcasecmp(function_name_.c_str(), "VECTOR_TO_STRING") == 0) {
+    return AttrType::CHARS;
+  }
+  // 距离/相似度类函数返回 float
+  if (strcasecmp(function_name_.c_str(), "L2_DISTANCE") == 0 ||
+      strcasecmp(function_name_.c_str(), "COSINE_DISTANCE") == 0 ||
+      strcasecmp(function_name_.c_str(), "INNER_PRODUCT") == 0) {
+    return AttrType::FLOATS;
+  }
+  // 默认：float
   return AttrType::FLOATS;
 }
 
@@ -1357,12 +1368,134 @@ RC FunctionExpr::try_get_value(Value &value) const
     }
     arg_values.emplace_back(arg_value);
   }
+  // 对距离类函数：
+  // - 若参数是常量并且维度不一致，直接返回 INVALID_ARGUMENT（让语句 FAIL）
+  // - 若参数是常量且维度一致，直接在解析期计算出结果
+  // - 若存在行依赖（任一参数不可折叠），返回子表达式的 rc（通常为 INVALID_ARGUMENT），由上层决定不折叠
+  auto is_distance_name = [&](const char *name) {
+    return strcasecmp(name, "L2_DISTANCE") == 0 ||
+           strcasecmp(name, "COSINE_DISTANCE") == 0 ||
+           strcasecmp(name, "INNER_PRODUCT") == 0 ||
+           strcasecmp(name, "DISTANCE") == 0;
+  };
+
+  if (is_distance_name(function_name_.c_str())) {
+    // 2 参数类（L2/COSINE/INNER）维度检查
+    if (strcasecmp(function_name_.c_str(), "L2_DISTANCE") == 0 ||
+        strcasecmp(function_name_.c_str(), "COSINE_DISTANCE") == 0 ||
+        strcasecmp(function_name_.c_str(), "INNER_PRODUCT") == 0) {
+      if (arg_values.size() == 2 &&
+          arg_values[0].attr_type() == AttrType::VECTORS &&
+          arg_values[1].attr_type() == AttrType::VECTORS &&
+          arg_values[0].length() >= (int)sizeof(int) &&
+          arg_values[1].length() >= (int)sizeof(int)) {
+        int ldim = *(const int *)arg_values[0].data();
+        int rdim = *(const int *)arg_values[1].data();
+        if (ldim != rdim) {
+          LOG_WARN("constant distance dim mismatch: %d vs %d", ldim, rdim);
+          return RC::INVALID_ARGUMENT;
+        }
+        // 维度一致，直接计算
+        if (strcasecmp(function_name_.c_str(), "L2_DISTANCE") == 0) {
+          return VectorType::l2_distance(arg_values[0], arg_values[1], value);
+        } else if (strcasecmp(function_name_.c_str(), "COSINE_DISTANCE") == 0) {
+          return VectorType::cosine_distance(arg_values[0], arg_values[1], value);
+        } else { // INNER_PRODUCT
+          return VectorType::inner_product(arg_values[0], arg_values[1], value);
+        }
+      }
+      // 参数不是常量向量或无法取到维度，交由执行期
+      return RC::INVALID_ARGUMENT;
+    }
+    // 3 参数 DISTANCE 维度检查（前2为向量，第三为度量）
+    if (strcasecmp(function_name_.c_str(), "DISTANCE") == 0) {
+      if (arg_values.size() == 3 &&
+          arg_values[0].attr_type() == AttrType::VECTORS &&
+          arg_values[1].attr_type() == AttrType::VECTORS &&
+          arg_values[0].length() >= (int)sizeof(int) &&
+          arg_values[1].length() >= (int)sizeof(int)) {
+        int ldim = *(const int *)arg_values[0].data();
+        int rdim = *(const int *)arg_values[1].data();
+        if (ldim != rdim) {
+          LOG_WARN("constant DISTANCE dim mismatch: %d vs %d", ldim, rdim);
+          return RC::INVALID_ARGUMENT;
+        }
+        // 维度一致且第三参应为度量字符串，直接计算
+        const Value &metric_val = arg_values[2];
+        if (metric_val.attr_type() != AttrType::CHARS) {
+          return RC::INVALID_ARGUMENT;
+        }
+        std::string metric = metric_val.get_string();
+        for (auto &c : metric) c = (char)toupper((unsigned char)c);
+        if (metric == "EUCLIDEAN" || metric == "L2" || metric == "L2_DISTANCE") {
+          return VectorType::l2_distance(arg_values[0], arg_values[1], value);
+        } else if (metric == "COSINE" || metric == "COSINE_DISTANCE") {
+          return VectorType::cosine_distance(arg_values[0], arg_values[1], value);
+        } else if (metric == "INNER" || metric == "INNER_PRODUCT" || metric == "IP" || metric == "DOT") {
+          return VectorType::inner_product(arg_values[0], arg_values[1], value);
+        } else {
+          return RC::INVALID_ARGUMENT;
+        }
+      }
+      // 参数不是常量向量或无法取到维度，交由执行期
+      return RC::INVALID_ARGUMENT;
+    }
+  }
 
   return try_get_value_with_args(arg_values, value);
 }
 
 RC FunctionExpr::try_get_value_with_args(const vector<Value> &arg_values, Value &value) const
 {
+  // STRING_TO_VECTOR: 将字符串解析为向量；若已是向量则直接返回
+  if (strcasecmp(function_name_.c_str(), "STRING_TO_VECTOR") == 0) {
+    if (arg_values.size() != 1) {
+      LOG_WARN("STRING_TO_VECTOR requires exactly 1 argument, got %zu", arg_values.size());
+      return RC::INVALID_ARGUMENT;
+    }
+    const Value &arg = arg_values[0];
+    LOG_INFO("DEBUG: STRING_TO_VECTOR called, arg_type=%d, arg_value=%s", (int)arg.attr_type(), arg.to_string().c_str());
+    if (arg.attr_type() == AttrType::VECTORS) {
+      value = arg; // 透传
+      LOG_INFO("DEBUG: STRING_TO_VECTOR passthrough vector, length=%d", value.length());
+      return RC::SUCCESS;
+    }
+    if (arg.attr_type() == AttrType::CHARS) {
+      VectorType vt;
+      RC rc = vt.set_value_from_str(value, arg.get_string());
+      LOG_INFO("DEBUG: STRING_TO_VECTOR parsed rc=%s, out_type=%d, out_len=%d", strrc(rc), (int)value.attr_type(), value.length());
+      return rc;
+    }
+    LOG_WARN("STRING_TO_VECTOR unsupported arg type: %d", (int)arg.attr_type());
+    return RC::INVALID_ARGUMENT;
+  }
+
+  // VECTOR_TO_STRING: 将向量转为标准字符串表示
+  if (strcasecmp(function_name_.c_str(), "VECTOR_TO_STRING") == 0) {
+    if (arg_values.size() != 1) {
+      LOG_WARN("VECTOR_TO_STRING requires exactly 1 argument, got %zu", arg_values.size());
+      return RC::INVALID_ARGUMENT;
+    }
+    const Value &arg = arg_values[0];
+    LOG_INFO("DEBUG: VECTOR_TO_STRING called, arg_type=%d, arg_len=%d", (int)arg.attr_type(), arg.length());
+    if (arg.attr_type() == AttrType::VECTORS) {
+      VectorType vt;
+      std::string out;
+      RC rc = vt.to_string(arg, out);
+      if (rc != RC::SUCCESS) return rc;
+      value.set_string(out.c_str());
+      LOG_INFO("DEBUG: VECTOR_TO_STRING result=%s", value.to_string().c_str());
+      return RC::SUCCESS;
+    }
+    if (arg.attr_type() == AttrType::CHARS) {
+      // 已是字符串则透传
+      value = arg;
+      return RC::SUCCESS;
+    }
+    LOG_WARN("VECTOR_TO_STRING unsupported arg type: %d", (int)arg.attr_type());
+    return RC::INVALID_ARGUMENT;
+  }
+
   if (strcasecmp(function_name_.c_str(), "L2_DISTANCE") == 0) {
     if (arg_values.size() != 2) {
       LOG_WARN("L2_DISTANCE function requires exactly 2 arguments, got %zu", arg_values.size());
@@ -1385,6 +1518,45 @@ RC FunctionExpr::try_get_value_with_args(const vector<Value> &arg_values, Value 
       return RC::INVALID_ARGUMENT;
     }
     return VectorType::inner_product(arg_values[0], arg_values[1], value);
+  }
+
+  // DISTANCE(vec1, vec2, metric)
+  if (strcasecmp(function_name_.c_str(), "DISTANCE") == 0) {
+    if (arg_values.size() != 3) {
+      LOG_WARN("DISTANCE function requires exactly 3 arguments, got %zu", arg_values.size());
+      return RC::INVALID_ARGUMENT;
+    }
+    const Value &left  = arg_values[0];
+    const Value &right = arg_values[1];
+    const Value &metric_val = arg_values[2];
+    if (metric_val.attr_type() != AttrType::CHARS) {
+      LOG_WARN("DISTANCE third argument must be string metric");
+      return RC::INVALID_ARGUMENT;
+    }
+    // 如果两个参数都是常量向量，提前进行维度校验，维度不一致直接返回错误以触发 FAILURE
+    if (left.attr_type() == AttrType::VECTORS && right.attr_type() == AttrType::VECTORS) {
+      if (left.length() >= (int)sizeof(int) && right.length() >= (int)sizeof(int)) {
+        int ldim = *(const int *)left.data();
+        int rdim = *(const int *)right.data();
+        if (ldim != rdim) {
+          LOG_WARN("DISTANCE constant-fold dim mismatch: %d vs %d", ldim, rdim);
+          return RC::INVALID_ARGUMENT;
+        }
+      }
+    }
+    std::string metric = metric_val.get_string();
+    // uppercase
+    for (auto &c : metric) c = (char)toupper((unsigned char)c);
+    if (metric == "EUCLIDEAN" || metric == "L2" || metric == "L2_DISTANCE") {
+      return VectorType::l2_distance(left, right, value);
+    } else if (metric == "COSINE" || metric == "COSINE_DISTANCE") {
+      return VectorType::cosine_distance(left, right, value);
+    } else if (metric == "INNER" || metric == "INNER_PRODUCT" || metric == "IP" || metric == "DOT") {
+      return VectorType::inner_product(left, right, value);
+    } else {
+      LOG_WARN("Unknown DISTANCE metric: %s", metric.c_str());
+      return RC::INVALID_ARGUMENT;
+    }
   }
 
   LOG_WARN("Unknown function: %s", function_name_.c_str());

@@ -363,6 +363,8 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
     if (field->nullable()) {
       copy_len = field->len() - 1;  // Reserve last byte for NULL flag
     }
+    LOG_INFO("DEBUG: set_value_to_record VECTOR field=%s value_len=%zu field_len=%d copy_limit=%zu",
+             field->name(), data_len, field->len(), copy_len);
     // 对于向量类型，需要检查数据长度是否超过字段定义的长度
     if (data_len > copy_len) {
       LOG_WARN("Vector data length (%zu) exceeds field length (%zu) for field %s",
@@ -384,6 +386,8 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
         LOG_WARN("Vector dimension mismatch for field %s: expected %d, got %d", field->name(), expected_dim, actual_dim);
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
+      LOG_INFO("DEBUG: VECTOR dim ok field=%s expected_dim=%d actual_dim=%d out_len=%d",
+               field->name(), expected_dim, actual_dim, (int)data_len);
     }
     // 对于向量类型，使用实际数据长度
     copy_len = data_len;

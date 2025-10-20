@@ -29,7 +29,24 @@ RC InsertPhysicalOperator::open(Trx *trx)
   RC     rc = table_->make_record(static_cast<int>(values_.size()), values_.data(), record);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to make record. rc=%s", strrc(rc));
+    for (size_t i = 0; i < values_.size(); i++) {
+      LOG_INFO("DEBUG: INSERT make_record fail at i=%zu type=%d val=%s", i, (int)values_[i].attr_type(), values_[i].to_string().c_str());
+    }
     return rc;
+  }
+
+  // 打印各字段写入后的数据片段（向量字段重点）
+  const TableMeta &tm = table_->table_meta();
+  const int normal_field_start_index = tm.sys_field_num();
+  for (int i = 0; i < (int)values_.size(); i++) {
+    const FieldMeta *field = tm.field(i + normal_field_start_index);
+    if (field->type() == AttrType::VECTORS) {
+      const char *ptr = record.data() + field->offset();
+      if (field->len() >= (int)sizeof(int)) {
+        int dim = *(const int *)ptr;
+        LOG_INFO("DEBUG: INSERT vector field=%s dim_in_record=%d", field->name(), dim);
+      }
+    }
   }
 
   rc = trx->insert_record(table_, record);
