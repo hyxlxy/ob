@@ -14,11 +14,11 @@ See the Mulan PSL v2 for more details. */
 
 #include "common/log/log.h"
 #include "common/lang/string.h"
-#include "common/lang/ranges.h"
 #include "sql/parser/expression_binder.h"
 #include "sql/expr/expression_iterator.h"
 #include "observer/session/session.h"
 #include "storage/db/db.h"
+#include "common/value.h"
 
 using namespace common;
 
@@ -31,10 +31,10 @@ Table *BinderContext::find_table(const char *table_name) const
     }
   }
   // Fallback: search by real table names in query tables
-  auto pred = [table_name](Table *table) { return 0 == strcasecmp(table_name, table->name()); };
-  auto iter = ranges::find_if(query_tables_, pred);
-  if (iter != query_tables_.end()) {
-    return *iter;
+  for (Table *table : query_tables_) {
+    if (0 == strcasecmp(table_name, table->name())) {
+      return table;
+    }
   }
   
   // Search in outer contexts for correlated subqueries
@@ -368,6 +368,48 @@ RC ExpressionBinder::bind_comparison_expression(
   unique_ptr<Expression> &right = child_bound_expressions[0];
   if (right.get() != right_expr.get()) {
     right_expr.reset(right.release());
+  }
+
+  // Implicit cast for DATE comparisons with string literals.
+  // If one side is DATE and the other side is a constant CHARS, attempt to cast at bind time.
+  // On cast failure, return error so the statement results in FAILURE (as expected by tests).
+  AttrType ltype = left_expr->value_type();
+  AttrType rtype = right_expr->value_type();
+
+  auto try_cast_literal = [&](unique_ptr<Expression> &value_side, AttrType target_type) -> RC {
+    if (value_side->type() != ExprType::VALUE) {
+      return RC::SUCCESS; // only handle constant literals
+    }
+    ValueExpr *val_expr = static_cast<ValueExpr *>(value_side.get());
+    Value      src;
+    RC rc = val_expr->try_get_value(src);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+    if (src.attr_type() != AttrType::CHARS) {
+      return RC::SUCCESS; // not a string literal, skip
+    }
+    Value casted;
+    rc = Value::cast_to(src, target_type, casted);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("implicit cast from CHARS to target type %d failed", static_cast<int>(target_type));
+      return rc; // propagate error -> statement FAILURE
+    }
+    // Replace with casted constant
+    value_side.reset(new ValueExpr(casted));
+    return RC::SUCCESS;
+  };
+
+  if (ltype == AttrType::DATES && rtype == AttrType::CHARS) {
+    RC rc2 = try_cast_literal(right_expr, AttrType::DATES);
+    if (rc2 != RC::SUCCESS) {
+      return rc2;
+    }
+  } else if (rtype == AttrType::DATES && ltype == AttrType::CHARS) {
+    RC rc2 = try_cast_literal(left_expr, AttrType::DATES);
+    if (rc2 != RC::SUCCESS) {
+      return rc2;
+    }
   }
 
   bound_expressions.emplace_back(std::move(expr));
