@@ -1,9 +1,16 @@
 
 CREATE TABLE function_table(id int, name char(20), score float, u_date date);
 CREATE TABLE function_table_2(id int, name char(30), score float, u_date date);
-insert into function_table VALUES (2, '2N2B7203', 5.93, '2019-02-03');
-insert into function_table VALUES (6, 'SH3U6MXO7EQII1A1', 5.26, '2016-08-19');
-insert into function_table VALUES (9, 'K8ZR1OLU9AEGTYFG', 4.98, '2019-10-07');
-select length('BTKEAT817FZGFB1T4WHE3NZ0LYDS34FRNHV91C49OKTMNHMGV1WJLR8P61LPU7XX8HQZ6') len1, length('O2MLQYEO83LETRA92H') len2;
-select round(score) r1 from function_table order by id;
-select date_format(u_date, '%Y-%m-%d') f1, date_format(u_date, '%y-%m-%d') f2, date_format(u_date, '%D,%M,%Y') f3, date_format(u_date, 'abc %z def %n ghi') f4 from function_table order by id;
+insert into function_table VALUES (1, '83D4', 5.84, '2024-10-15');
+insert into function_table VALUES (7, 'GFYNUI84YECEAQ6ILA', 7.92, '2017-05-03');
+insert into function_table VALUES (4, '5R148BAZ7UZAOWGOX', 9.31, '2024-06-30');
+select length('') a1, length('abc') a2, length(name) a3 from function_table order by id;
+select length(score) fail_len from function_table;
+select round(score) r0 from function_table order by id;
+select round(3.8155, 2) r_prec;
+select round(score, 1) r1 from function_table order by id;
+select round(name) fail_round from function_table;
+select date_format(u_date, '%Y-%m-%d') f1, date_format(u_date, '%y-%m-%d') f2, date_format(u_date, '%D,%M,%Y') f3 from function_table order by id;
+select date_format('2024-05-20', 'abc %z def %n ghi') passthrough;
+select date_format(name, '%Y') fail_df1 from function_table;
+select date_format(u_date, 123) fail_df2 from function_table;

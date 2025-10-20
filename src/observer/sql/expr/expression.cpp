@@ -1567,7 +1567,7 @@ RC FunctionExpr::try_get_value_with_args(const vector<Value> &arg_values, Value 
 
   // ROUND(float)
   if (strcasecmp(function_name_.c_str(), "ROUND") == 0) {
-    if (arg_values.size() != 1) {
+    if (arg_values.size() != 1 && arg_values.size() != 2) {
       return RC::INVALID_ARGUMENT;
     }
     const Value &arg = arg_values[0];
@@ -1575,10 +1575,24 @@ RC FunctionExpr::try_get_value_with_args(const vector<Value> &arg_values, Value 
       return RC::UNSUPPORTED; // per assignment: only float supported
     }
     float f = arg.get_float();
-    // round to nearest integer, return as float to keep type FLOATS
-    float r = std::round(f);
-    value.set_float(r);
-    return RC::SUCCESS;
+    int decimals = 0;
+    if (arg_values.size() == 2) {
+      if (arg_values[1].attr_type() != AttrType::INTS) {
+        return RC::UNSUPPORTED;
+      }
+      decimals = arg_values[1].get_int();
+      if (decimals < 0) decimals = 0;
+    }
+    if (decimals == 0) {
+      float r = std::round(f);
+      value.set_float(r);
+      return RC::SUCCESS;
+    } else {
+      double p = std::pow(10.0, static_cast<double>(decimals));
+      double r = std::round(static_cast<double>(f) * p) / p;
+      value.set_float(static_cast<float>(r));
+      return RC::SUCCESS;
+    }
   }
 
   // DATE_FORMAT(date, format)
