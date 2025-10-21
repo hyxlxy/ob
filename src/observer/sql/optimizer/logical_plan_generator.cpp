@@ -16,7 +16,8 @@ See the Mulan PSL v2 for more details. */
 
 #include "common/log/log.h"
 #include "sql/parser/expression_binder.h"
-#include "session/session.h"
+#include <unordered_set>
+#include <functional>
 #include "storage/db/db.h"
 
 #include "sql/operator/calc_logical_operator.h"
@@ -29,7 +30,6 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/project_logical_operator.h"
 #include "sql/operator/table_get_logical_operator.h"
 #include "sql/operator/group_by_logical_operator.h"
-#include "sql/operator/sort_logical_operator.h"
 #include "sql/operator/order_by_logical_operator.h"
 #include "sql/operator/limit_logical_operator.h"
 
@@ -108,6 +108,46 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     }
   }
 
+  // Augment plan tables with any tables referenced by bound expressions in SELECT/GB/HAVING
+  vector<Table *> plan_tables = tables;
+  {
+    std::unordered_set<const Table *> present;
+    present.reserve(plan_tables.size());
+    for (Table *t : plan_tables) {
+      present.insert(t);
+    }
+
+    std::function<void(Expression *)> collect_tables_from_expr;
+    collect_tables_from_expr = [&](Expression *expr) {
+      if (expr == nullptr) return;
+      if (expr->type() == ExprType::FIELD) {
+        auto *fe = dynamic_cast<FieldExpr *>(expr);
+        if (fe != nullptr) {
+          const Table *tbl = fe->field().table();
+          if (tbl != nullptr && present.find(tbl) == present.end()) {
+            plan_tables.push_back(const_cast<Table *>(tbl));
+            binder_context_.add_table(const_cast<Table *>(tbl));
+            present.insert(tbl);
+          }
+        }
+      }
+      (void)ExpressionIterator::iterate_child_expr(*expr, [&](unique_ptr<Expression> &child) -> RC {
+        collect_tables_from_expr(child.get());
+        return RC::SUCCESS;
+      });
+    };
+
+    for (auto &expr : select_stmt->query_expressions()) {
+      collect_tables_from_expr(expr.get());
+    }
+    for (auto &gexpr : select_stmt->group_by()) {
+      collect_tables_from_expr(gexpr.get());
+    }
+    if (select_stmt->having_expr() != nullptr) {
+      collect_tables_from_expr(select_stmt->having_expr());
+    }
+  }
+
   unique_ptr<LogicalOperator> table_oper(nullptr);
   last_oper = &table_oper;
   unique_ptr<LogicalOperator> predicate_oper;
@@ -120,7 +160,7 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
 
 
-  for (Table *table : tables) {
+  for (Table *table : plan_tables) {
 
     unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY));
     if (table_oper == nullptr) {

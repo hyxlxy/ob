@@ -1,7 +1,13 @@
-
-create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
-create table exp_table2(id int, col1 int);
-insert into exp_table VALUES (2, 8, 1, 9.0, 6.23);
-insert into exp_table VALUES (7, 4, 5, 1.6, 5.68);
-insert into exp_table VALUES (4, 2, 8, 8.69, 5.12);
-select id,-(col2*(-3)+9)+(col4+7)*(col1+col3*1),(6+col2)*col3*3 from exp_table where -(col2*(-1)+6)+(col4+3)*(col1+col3*5) > (1+col2)*col3*4;
+DROP TABLE IF EXISTS join_table_1;
+DROP TABLE IF EXISTS join_table_2;
+DROP TABLE IF EXISTS join_table_3;
+CREATE TABLE join_table_1(id int, name char(20));
+CREATE TABLE join_table_2(id int, age int);
+CREATE TABLE join_table_3(id int, level int);
+INSERT INTO join_table_1 VALUES (23, 'U2NFIYGTU94MQNYT');
+INSERT INTO join_table_2 VALUES (23, 29);
+INSERT INTO join_table_3 VALUES (23, 7);
+SELECT join_table_1.id, join_table_1.name, join_table_2.age, join_table_3.level FROM join_table_1 INNER JOIN join_table_2 ON join_table_1.id=join_table_2.id, join_table_3 WHERE join_table_1.id=join_table_3.id;
+DROP TABLE join_table_1;
+DROP TABLE join_table_2;
+DROP TABLE join_table_3;
