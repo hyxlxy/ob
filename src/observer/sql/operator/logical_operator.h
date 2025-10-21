@@ -44,6 +44,7 @@ enum class LogicalOperatorType
   SORT,        ///< 排序
   ORDER_BY,    ///< 排序（ORDER BY）
   LIMIT,       ///< 限制结果数量
+  UNION,       ///< UNION操作
 };
 
 /**

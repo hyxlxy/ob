@@ -16,6 +16,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "common/lang/string.h"
 #include "common/lang/memory.h"
+#include "common/lang/unordered_set.h"
 #include "common/value.h"
 #include "storage/field/field.h"
 #include "sql/expr/aggregator.h"
@@ -23,7 +24,7 @@ See the Mulan PSL v2 for more details. */
 
 class Tuple;
 class SelectStmt;
-struct SelectSqlNode;
+class SelectSqlNode;
 class Stmt;
 class Field;
 class Db;

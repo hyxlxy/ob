@@ -208,6 +208,7 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
     }
   }
   scanner->close_scan();
+  delete scanner;
 
   // 执行更新
   if (update_stmt->is_multi_field()) {

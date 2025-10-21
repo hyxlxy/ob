@@ -53,6 +53,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/table_scan_vec_physical_operator.h"
 #include "sql/operator/view_scan_physical_operator.h"
 #include "sql/operator/vector_scan_physical_operator.h"
+#include "sql/operator/union_logical_operator.h"
+#include "sql/operator/union_physical_operator.h"
 #include "sql/optimizer/physical_plan_generator.h"
 
 using namespace std;
@@ -110,11 +112,38 @@ RC PhysicalPlanGenerator::create(LogicalOperator &logical_operator, unique_ptr<P
       return create_plan(static_cast<LimitLogicalOperator &>(logical_operator), oper, session);
     } break;
 
+    case LogicalOperatorType::UNION: {
+      return create_plan(static_cast<UnionLogicalOperator &>(logical_operator), oper, session);
+    } break;
+
     default: {
       ASSERT(false, "unknown logical operator type");
       return RC::INVALID_ARGUMENT;
     }
   }
+  return rc;
+}
+
+RC PhysicalPlanGenerator::create_plan(UnionLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper, Session *session)
+{
+  RC rc = RC::SUCCESS;
+
+  // 构造物理UNION算子并设置distinct_flags与结果schema
+  auto union_oper = make_unique<UnionPhysicalOperator>(logical_oper.distinct_flags());
+  union_oper->set_result_schema(logical_oper.result_types(), logical_oper.result_names());
+
+  // 递归创建并挂接所有子物理算子
+  for (auto &child_logical : logical_oper.children()) {
+    unique_ptr<PhysicalOperator> child_physical;
+    rc = create(*child_logical, child_physical, session);
+    if (OB_FAIL(rc)) {
+      LOG_WARN("failed to create child physical operator for UNION: %s", strrc(rc));
+      return rc;
+    }
+    union_oper->add_child(std::move(child_physical));
+  }
+
+  oper = std::move(union_oper);
   return rc;
 }
 

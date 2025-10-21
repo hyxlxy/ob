@@ -15,13 +15,15 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 #include "sql/expr/tuple.h"
 #include "sql/expr/arithmetic_operator.hpp"
-// keep <limits> for numeric_limits usage elsewhere in this TU
+#include <set>
+#include <limits>
 #include "common/type/vector_type.h"
 #include "common/log/log.h"
 #include "sql/stmt/select_stmt.h"
 #include "sql/stmt/filter_stmt.h"
 #include "sql/optimizer/logical_plan_generator.h"
 #include "sql/optimizer/physical_plan_generator.h"
+#include "sql/operator/project_physical_operator.h"
 #include "session/session.h"
 
 // 前向声明

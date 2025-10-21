@@ -59,7 +59,8 @@ enum class OpType
   HASHGROUPBY,
   ANALYZE,
   FILTER,
-  SCALARGROUPBY
+  SCALARGROUPBY,
+  UNION
 };
 
 // TODO: OperatorNode is the abstrace class of logical/physical operator

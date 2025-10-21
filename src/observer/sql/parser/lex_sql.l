@@ -98,6 +98,8 @@ EXISTS                                  RETURN_TOKEN(EXISTS);
 SHOW                                    RETURN_TOKEN(SHOW);
 SYNC                                    RETURN_TOKEN(SYNC);
 SELECT                                  RETURN_TOKEN(SELECT);
+UNION                                   RETURN_TOKEN(UNION);
+UNION[ \t]+ALL                          RETURN_TOKEN(UNION_ALL);
 CALC                                    RETURN_TOKEN(CALC);
 FROM                                    RETURN_TOKEN(FROM);
 WHERE                                   RETURN_TOKEN(WHERE);

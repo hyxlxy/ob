@@ -59,6 +59,7 @@ enum class PhysicalOperatorType
   SORT,
   ORDER_BY,
   LIMIT,
+  UNION,
 };
 
 /**

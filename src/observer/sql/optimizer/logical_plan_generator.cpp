@@ -29,7 +29,9 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/predicate_logical_operator.h"
 #include "sql/operator/project_logical_operator.h"
 #include "sql/operator/table_get_logical_operator.h"
+#include "sql/operator/union_logical_operator.h"
 #include "sql/operator/group_by_logical_operator.h"
+#include "sql/operator/sort_logical_operator.h"
 #include "sql/operator/order_by_logical_operator.h"
 #include "sql/operator/limit_logical_operator.h"
 
@@ -39,6 +41,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/filter_stmt.h"
 #include "sql/stmt/insert_stmt.h"
 #include "sql/stmt/select_stmt.h"
+#include "sql/stmt/union_stmt.h"
 #include "sql/stmt/stmt.h"
 
 #include "sql/expr/expression_iterator.h"
@@ -79,6 +82,17 @@ RC LogicalPlanGenerator::create(Stmt *stmt, unique_ptr<LogicalOperator> &logical
 
       rc = create_plan(explain_stmt, logical_operator);
     } break;
+
+    case StmtType::UNION: {
+      UnionStmt *union_stmt = dynamic_cast<UnionStmt *>(stmt);
+      if (union_stmt == nullptr) {
+        LOG_WARN("failed to cast Stmt to UnionStmt");
+        return RC::INVALID_ARGUMENT;
+      }
+
+      rc = create_plan(union_stmt, logical_operator);
+    } break;
+
     default: {
       rc = RC::UNIMPLEMENTED;
     }
@@ -912,6 +926,43 @@ RC LogicalPlanGenerator::create_expression_from_condition_tree(FilterConditionNo
       LOG_WARN("Unknown FilterConditionNode type: %d", static_cast<int>(node->type));
       return RC::INTERNAL;
   }
+}
+
+RC LogicalPlanGenerator::create_plan(UnionStmt *union_stmt, unique_ptr<LogicalOperator> &logical_operator)
+{
+  if (union_stmt == nullptr) {
+    LOG_WARN("UnionStmt is null");
+    return RC::INVALID_ARGUMENT;
+  }
+
+  // 1. 为每个SELECT语句创建逻辑算子
+  vector<unique_ptr<LogicalOperator>> child_operators;
+  const vector<SelectStmt*> &select_statements = union_stmt->select_statements();
+  
+  for (SelectStmt *select_stmt : select_statements) {
+    unique_ptr<LogicalOperator> child_operator;
+    RC rc = create_plan(select_stmt, child_operator);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to create logical plan for SELECT in UNION: %s", strrc(rc));
+      return rc;
+    }
+    child_operators.emplace_back(std::move(child_operator));
+  }
+
+  // 2. 创建UNION逻辑算子
+  auto union_operator = make_unique<UnionLogicalOperator>(
+      union_stmt->distinct_flags(),
+      union_stmt->result_types(),
+      union_stmt->result_names()
+  );
+
+  // 3. 将所有子算子添加到UNION算子
+  for (auto &child_operator : child_operators) {
+    union_operator->add_child(std::move(child_operator));
+  }
+  // 直接将UNION作为顶层输出
+  logical_operator = std::move(union_operator);
+  return RC::SUCCESS;
 }
 
 

@@ -170,16 +170,11 @@ struct TableReferencesSqlNode
   vector<JoinSqlNode>  joins;       ///< JOIN操作列表
 };
 
-/**
- * @brief 
- * @brief 
- * @brief 
- * @brief 
- */
+
 struct RelationWithAliasSqlNode
 {
-  string table_name;  ///< 
-  string alias;       ///< 
+  string table_name;  
+  string alias;       
 };
 
 
@@ -205,6 +200,21 @@ struct SelectSqlNode
   unique_ptr<Expression>         having_expr;   ///< having clause (expression)
   vector<OrderBySqlNode>         order_by;      ///< order by clause
   int                            limit_count = 0; ///< LIMIT 子句（0表示未指定）
+};
+
+/**
+ * @brief 描述一个UNION语句
+ * @ingroup SQLParser
+ * @details UNION操作将多个SELECT语句的结果合并
+ */
+struct UnionSqlNode
+{
+  vector<unique_ptr<SelectSqlNode>> select_statements;  ///< UNION的多个SELECT语句
+  vector<bool> distinct_flags;  ///< 每个UNION操作的标志位，true表示去重，false表示不去重
+  vector<AttrType> result_types;  ///< 结果集的列类型（由第一个SELECT决定）
+  vector<string> result_names;    ///< 结果集的列名（由第一个SELECT决定）
+  vector<OrderBySqlNode> order_by; ///< UNION结果的ORDER BY子句
+  int limit_count = 0;            ///< UNION结果的LIMIT子句（0表示未指定）
 };
 
 /**
@@ -400,7 +410,6 @@ struct ShowIndexSqlNode
   string relation_name;  ///< Table name
 };
 
-class ParsedSqlNode;
 
 /**
  * @brief 描述一个explain语句
@@ -458,12 +467,13 @@ enum SqlCommandFlag
   SCF_CREATE_VIEW,   ///< 创建视图
   SCF_DROP_VIEW,     ///< 删除视图
   SCF_SHOW_INDEX,    ///< 显示索引
+  SCF_UNION,         ///< UNION语句
 };
 /**
  * @brief 表示一个SQL语句
  * @ingroup SQLParser
  */
-class ParsedSqlNode
+struct ParsedSqlNode
 {
 public:
   enum SqlCommandFlag flag;
@@ -485,10 +495,12 @@ public:
   CreateViewSqlNode   create_view;
   DropViewSqlNode     drop_view;
   ShowIndexSqlNode    show_index;
+  UnionSqlNode        union_stmt;
 
 public:
   ParsedSqlNode();
   explicit ParsedSqlNode(SqlCommandFlag flag);
+  ~ParsedSqlNode() = default;  // 使用默认析构函数，因为成员都是RAII类型
 };
 
 /**
@@ -499,6 +511,7 @@ class ParsedSqlResult
 {
 public:
   void add_sql_node(unique_ptr<ParsedSqlNode> sql_node);
+  ~ParsedSqlResult() = default;  // 使用默认析构函数，unique_ptr会自动清理
 
   vector<unique_ptr<ParsedSqlNode>> &sql_nodes() { return sql_nodes_; }
 

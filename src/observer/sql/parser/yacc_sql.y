@@ -90,6 +90,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         EXISTS
         CALC
         SELECT
+        UNION
+        UNION_ALL
         DESC
         SHOW
         SYNC
@@ -220,6 +222,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <float_list>          number_list
 %type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
+%type <sql_node>            union_stmt
 %type <number>              limit_clause
 %type <sql_node>            insert_stmt
 %type <sql_node>            update_stmt
@@ -268,6 +271,7 @@ commands: command_wrapper opt_semicolon  //commands or sqls. parser starts here.
 command_wrapper:
     calc_stmt
   | select_stmt
+  | union_stmt
   | insert_stmt
   | update_stmt
   | delete_stmt
@@ -939,6 +943,51 @@ select_stmt:        /*  select 语句的语法解析树*/
       $$->selection.limit_count = $4;
     }
     ;
+
+union_stmt:        /* UNION语句的语法解析树 */
+    select_stmt UNION select_stmt
+    {
+      $$ = new ParsedSqlNode(SCF_UNION);
+      $$->union_stmt.select_statements.emplace_back(std::make_unique<SelectSqlNode>(std::move($1->selection)));
+      $$->union_stmt.select_statements.emplace_back(std::make_unique<SelectSqlNode>(std::move($3->selection)));
+      $$->union_stmt.distinct_flags.push_back(true);  // 第一个UNION去重
+      delete $1;
+      delete $3;
+    }
+  | select_stmt UNION_ALL select_stmt
+    {
+      $$ = new ParsedSqlNode(SCF_UNION);
+      $$->union_stmt.select_statements.emplace_back(std::make_unique<SelectSqlNode>(std::move($1->selection)));
+      $$->union_stmt.select_statements.emplace_back(std::make_unique<SelectSqlNode>(std::move($3->selection)));
+      $$->union_stmt.distinct_flags.push_back(false);  // 第一个UNION ALL不去重
+      delete $1;
+      delete $3;
+    }
+  | union_stmt UNION select_stmt
+    {
+      $1->union_stmt.select_statements.emplace_back(std::make_unique<SelectSqlNode>(std::move($3->selection)));
+      $1->union_stmt.distinct_flags.push_back(true);  // 添加新的UNION去重标志
+      $$ = $1;
+      delete $3;
+    }
+  | union_stmt UNION_ALL select_stmt
+    {
+      $1->union_stmt.select_statements.emplace_back(std::make_unique<SelectSqlNode>(std::move($3->selection)));
+      $1->union_stmt.distinct_flags.push_back(false);  // 添加新的UNION ALL不去重标志
+      $$ = $1;
+      delete $3;
+    }
+  | LBRACE union_stmt RBRACE order_by limit_clause
+    {
+      $$ = $2;
+      if ($4 != nullptr) {
+        $$->union_stmt.order_by.swap(*$4);
+        delete $4;
+      }
+      $$->union_stmt.limit_count = $5;
+    }
+    ;
+
 calc_stmt:
     CALC expression_list
     {

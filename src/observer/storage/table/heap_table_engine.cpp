@@ -95,44 +95,47 @@ RC HeapTableEngine::update_record_with_trx(const Record &old_record, const Recor
 {
   RC rc = RC::SUCCESS;
 
-  // 首先删除旧记录的索引条目
+  // 阶段1：先进行索引操作（检查unique约束）
+  // 1.1 删除旧记录的索引条目
   rc = delete_entry_of_indexes(old_record.data(), old_record.rid(), true /*error_on_not_exists*/);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to delete old record from indexes. table=%s, rc=%s", table_meta_->name(), strrc(rc));
     return rc;
   }
 
-  // 更新记录数据
-  rc = record_handler_->update_record(old_record.rid(), new_record.data(), new_record.len());
+  // 1.2 插入新记录的索引条目（这里会检查unique约束）
+  rc = insert_entry_of_indexes(new_record.data(), new_record.rid());
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to update record. table=%s, rc=%s", table_meta_->name(), strrc(rc));
-    // 回滚索引操作
+    LOG_WARN("failed to insert new record into indexes (unique constraint violation or other error). table=%s, rc=%s", 
+             table_meta_->name(), strrc(rc));
+    // 回滚：恢复旧索引
     RC rollback_rc = insert_entry_of_indexes(old_record.data(), old_record.rid());
     if (rollback_rc != RC::SUCCESS) {
-      LOG_ERROR("failed to rollback index entries after record update failed. table=%s, rc=%s",
+      LOG_ERROR("failed to rollback index entries after new index insertion failed. table=%s, rc=%s",
                 table_meta_->name(), strrc(rollback_rc));
     }
     return rc;
   }
 
-  // 插入新记录的索引条目
-  rc = insert_entry_of_indexes(new_record.data(), new_record.rid());
+  // 阶段2：更新记录数据
+  rc = record_handler_->update_record(old_record.rid(), new_record.data(), new_record.len());
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to insert new record into indexes. table=%s, rc=%s", table_meta_->name(), strrc(rc));
-    // 回滚记录更新和索引操作
-    RC rollback_rc = record_handler_->update_record(new_record.rid(), old_record.data(), old_record.len());
+    LOG_WARN("failed to update record. table=%s, rc=%s", table_meta_->name(), strrc(rc));
+    // 回滚：删除新索引，恢复旧索引
+    RC rollback_rc = delete_entry_of_indexes(new_record.data(), new_record.rid(), false);
     if (rollback_rc != RC::SUCCESS) {
-      LOG_ERROR("failed to rollback record update after index insertion failed. table=%s, rc=%s",
+      LOG_ERROR("failed to rollback new index entries after record update failed. table=%s, rc=%s",
                 table_meta_->name(), strrc(rollback_rc));
     }
     rollback_rc = insert_entry_of_indexes(old_record.data(), old_record.rid());
     if (rollback_rc != RC::SUCCESS) {
-      LOG_ERROR("failed to rollback index entries after record update failed. table=%s, rc=%s",
+      LOG_ERROR("failed to rollback old index entries after record update failed. table=%s, rc=%s",
                 table_meta_->name(), strrc(rollback_rc));
     }
     return rc;
   }
 
+  // 成功：索引和记录都已更新
   return RC::SUCCESS;
 }
 
