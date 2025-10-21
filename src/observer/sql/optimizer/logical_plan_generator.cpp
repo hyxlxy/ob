@@ -125,8 +125,9 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
         if (fe != nullptr) {
           const Table *tbl = fe->field().table();
           if (tbl != nullptr && present.find(tbl) == present.end()) {
+            // Only augment the physical join table chain; DO NOT mutate binder_context_
+            // to avoid changing expression binding/ambiguity for unqualified columns.
             plan_tables.push_back(const_cast<Table *>(tbl));
-            binder_context_.add_table(const_cast<Table *>(tbl));
             present.insert(tbl);
           }
         }
@@ -150,13 +151,9 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
   unique_ptr<LogicalOperator> table_oper(nullptr);
   last_oper = &table_oper;
+  // Defer WHERE predicate creation until after full JOIN chain is built
   unique_ptr<LogicalOperator> predicate_oper;
-
-  RC rc = create_plan(select_stmt->filter_stmt(), predicate_oper);
-  if (OB_FAIL(rc)) {
-    LOG_WARN("failed to create predicate logical plan. rc=%s", strrc(rc));
-    return rc;
-  }
+  RC rc = RC::SUCCESS;
 
 
 
@@ -174,19 +171,25 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   }
 
 
-  if (predicate_oper) {
-    if (*last_oper) {
-      predicate_oper->add_child(std::move(*last_oper));
-    } else {
-      // For queries without FROM clause but with WHERE clause (e.g., "select 1 where 1 in (1,2)")
-      // we need to create a dummy CalcLogicalOperator as the child of PredicateLogicalOperator
-      vector<unique_ptr<Expression>> dummy_expressions;
-      dummy_expressions.emplace_back(make_unique<ValueExpr>(Value(1))); // dummy expression
-      unique_ptr<LogicalOperator> calc_oper(new CalcLogicalOperator(std::move(dummy_expressions)));
-      predicate_oper->add_child(std::move(calc_oper));
+  // Now build WHERE predicate (on top of full JOIN chain)
+  if (select_stmt->filter_stmt() != nullptr) {
+    rc = create_plan(select_stmt->filter_stmt(), predicate_oper);
+    if (OB_FAIL(rc)) {
+      LOG_WARN("failed to create predicate logical plan. rc=%s", strrc(rc));
+      return rc;
     }
-
-    last_oper = &predicate_oper;
+    if (predicate_oper) {
+      if (*last_oper) {
+        predicate_oper->add_child(std::move(*last_oper));
+      } else {
+        // For queries without FROM clause but with WHERE clause
+        vector<unique_ptr<Expression>> dummy_expressions;
+        dummy_expressions.emplace_back(make_unique<ValueExpr>(Value(1)));
+        unique_ptr<LogicalOperator> calc_oper(new CalcLogicalOperator(std::move(dummy_expressions)));
+        predicate_oper->add_child(std::move(calc_oper));
+      }
+      last_oper = &predicate_oper;
+    }
   }
 
   unique_ptr<LogicalOperator> group_by_oper;

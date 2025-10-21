@@ -45,8 +45,9 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
     binder_context.add_outer_context(outer_context);
   }
 
-  // collect tables in `from` statement
+  // collect tables in `from` and `join` statements, preserving alias order aligned with `tables`
   vector<Table *>                tables;
+  vector<string>                 aliases_for_tables;  // alias per table entry in `tables`, empty string if none
   unordered_map<string, Table *> table_map;
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
     const char *table_name = select_sql.relations[i].c_str();
@@ -70,13 +71,14 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
       binder_context.add_table_with_name(table, alias_name);
     }
     tables.push_back(table);
+    aliases_for_tables.emplace_back(alias_name != nullptr ? alias_name : "");
     table_map.insert({table_name, table});
     if (alias_name != nullptr) {
       table_map.insert({alias_name, table});
     }
   }
 
-  // collect tables in `join` statement
+  // collect tables in `join` statement (append after relations in the same order)
   for (size_t i = 0; i < select_sql.joins.size(); i++) {
     const char *table_name = select_sql.joins[i].table_name.c_str();
     const char *alias_name = nullptr;
@@ -99,6 +101,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
       binder_context.add_table_with_name(table, alias_name);
     }
     tables.push_back(table);
+    aliases_for_tables.emplace_back(alias_name != nullptr ? alias_name : "");
     table_map.insert({table_name, table});
     if (alias_name != nullptr) {
       table_map.insert({alias_name, table});
@@ -216,7 +219,8 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
   SelectStmt *select_stmt = new SelectStmt();
 
   select_stmt->tables_.swap(tables);
-  select_stmt->table_aliases_ = select_sql.relation_aliases;  // 保存表别名
+  // 保存表别名：与 tables_ 一一对应（包含 FROM 与 JOIN 的别名，未命名则为空串）
+  select_stmt->table_aliases_.swap(aliases_for_tables);
   select_stmt->query_expressions_.swap(bound_expressions);
   select_stmt->filter_stmt_ = filter_stmt;
   select_stmt->raw_conditions_ = std::move(all_conditions);  // 移动原始条件
