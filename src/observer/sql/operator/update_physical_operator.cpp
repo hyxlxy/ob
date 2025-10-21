@@ -72,7 +72,18 @@ static RC set_field_value_to_record(Record *record, const FieldMeta &field_meta,
     if (field_meta.nullable()) {
       copy_len = field_meta.len() - 1;  // Reserve last byte for NULL flag
     }
-    if (copy_len > data_len) {
+    if (field_meta.type() == AttrType::CHARS) {
+      if (copy_len > data_len) {
+        copy_len = data_len;
+      }
+    }
+    if (field_meta.type() == AttrType::TEXTS) {
+      size_t limit = copy_len;
+      if (data_len > limit) {
+        LOG_WARN("TEXT data length %zu exceeds limit %zu for field %s",
+                 data_len, limit, field_meta.name());
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+      }
       copy_len = data_len;
     }
   } else if (field_meta.type() == AttrType::VECTORS) {

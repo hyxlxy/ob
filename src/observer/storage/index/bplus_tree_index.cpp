@@ -170,6 +170,36 @@ RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
 
   // Check for uniqueness if this is a unique index
   if (index_meta_.is_unique()) {
+    // MySQL semantics: if any indexed column is NULL, it does NOT participate in
+    // uniqueness checks (i.e., multiple NULLs are allowed). We detect NULL flags
+    // directly from the record bytes. For nullable fields, the last byte is the
+    // NULL flag: '1' means NULL, '0' means NOT NULL.
+
+    auto field_is_null = [&](const FieldMeta &fm) -> bool {
+      if (!fm.nullable()) {
+        return false;
+      }
+      const int null_flag_pos = fm.offset() + fm.len() - 1;
+      return *(record + null_flag_pos) == '1';
+    };
+
+    bool any_null_in_index_key = false;
+    if (!field_metas_.empty()) {
+      // Multi-column index: if ANY component is NULL, skip uniqueness check
+      for (const FieldMeta &fm : field_metas_) {
+        if (field_is_null(fm)) {
+          any_null_in_index_key = true;
+          break;
+        }
+      }
+    } else {
+      // Single-column index
+      if (field_is_null(field_meta_)) {
+        any_null_in_index_key = true;
+      }
+    }
+
+    if (!any_null_in_index_key) {
     // If the index is empty, no need to check for duplicates
     if (!index_handler_.is_empty()) {
       // Check if the key already exists
@@ -190,6 +220,9 @@ RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
         LOG_WARN("Scanner open failed for uniqueness check in non-empty index %s, rc=%s", index_meta_.name(), strrc(rc));
         return rc;
       }
+    }
+    } else {
+      LOG_TRACE("Skip unique check for NULL key on index %s", index_meta_.name());
     }
   }
 

@@ -589,7 +589,7 @@ attr_def:
       if ($$->type == AttrType::VECTORS) {
         $$->length = static_cast<int>(sizeof(int));
       } else if ($$->type == AttrType::TEXTS) {
-        $$->length = 255;  // TEXT default length (reduced for testing)
+        $$->length = 65535;  // TEXT default length aligned with MySQL
       } else {
         $$->length = 4;
       }
@@ -604,7 +604,7 @@ attr_def:
       if ($$->type == AttrType::VECTORS) {
         $$->length = static_cast<int>(sizeof(int));
       } else if ($$->type == AttrType::TEXTS) {
-        $$->length = 255;  // TEXT default length (reduced for testing)
+        $$->length = 65535;  // TEXT default length aligned with MySQL
       } else {
         $$->length = 4;
       }
@@ -623,7 +623,7 @@ attr_def:
       if ($$->type == AttrType::VECTORS) {
         $$->length = static_cast<int>(sizeof(int));
       } else if ($$->type == AttrType::TEXTS) {
-        $$->length = 255;  // TEXT default length (reduced for testing)
+        $$->length = 65535;  // TEXT default length aligned with MySQL
       } else {
         $$->length = 4;
       }
