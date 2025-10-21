@@ -19,7 +19,8 @@ See the Mulan PSL v2 for more details. */
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 #include "sql/stmt/select_stmt.h"
-
+#include "sql/expr/expression_iterator.h"
+#include "sql/expr/expression.h"
 FilterStmt::~FilterStmt()
 {
   for (FilterUnit *unit : filter_units_) {
@@ -214,6 +215,38 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<st
   if (comp < EQUAL_TO || comp >= NO_OP) {
     LOG_WARN("invalid compare operator : %d", comp);
     return RC::INVALID_ARGUMENT;
+  }
+
+
+  // 语义检查：WHERE 子句不允许出现聚合函数（聚合应放在 HAVING 或子查询中）
+  auto contains_aggregate = [&](const std::unique_ptr<Expression> &expr) -> bool {
+    if (!expr) return false;
+    std::function<bool(Expression &)> has_agg;
+    has_agg = [&](Expression &e) -> bool {
+      ExprType t = e.type();
+      if (t == ExprType::AGGREGATION || t == ExprType::UNBOUND_AGGREGATION) {
+        return true;
+      }
+      bool found = false;
+      (void)ExpressionIterator::iterate_child_expr(e, [&](std::unique_ptr<Expression> &child) -> RC {
+        if (found || !child) return RC::SUCCESS;
+        ExprType ct = child->type();
+        if (ct == ExprType::AGGREGATION || ct == ExprType::UNBOUND_AGGREGATION) {
+          found = true;
+          return RC::SUCCESS;
+        }
+        if (has_agg(*child)) {
+          found = true;
+        }
+        return RC::SUCCESS;
+      });
+      return found;
+    };
+    return has_agg(*expr);
+  };
+  if (contains_aggregate(condition.left_expr) || contains_aggregate(condition.right_expr)) {
+    LOG_WARN("aggregate functions are not allowed in WHERE clause. Use HAVING or subquery instead.");
+    return RC::SQL_SYNTAX;
   }
 
   // 处理IN_VALUES_OP和NOT_IN_VALUES_OP操作

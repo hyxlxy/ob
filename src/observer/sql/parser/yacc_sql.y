@@ -581,11 +581,11 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->nullable = false;  // default NOT NULL
-      // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension); TEXT default 65535
+      // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension); TEXT default 8192 (page-friendly)
       if ($$->type == AttrType::VECTORS) {
         $$->length = static_cast<int>(sizeof(int));
       } else if ($$->type == AttrType::TEXTS) {
-        $$->length = 255;  // TEXT default length (reduced for testing)
+        $$->length = 8192;  // TEXT default length
       } else {
         $$->length = 4;
       }
@@ -596,11 +596,11 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->nullable = true;  // explicitly nullable
-      // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension); TEXT default 65535
+      // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension); TEXT default 8192 (page-friendly)
       if ($$->type == AttrType::VECTORS) {
         $$->length = static_cast<int>(sizeof(int));
       } else if ($$->type == AttrType::TEXTS) {
-        $$->length = 255;  // TEXT default length (reduced for testing)
+        $$->length = 8192;  // TEXT default length
       } else {
         $$->length = 4;
       }
@@ -615,11 +615,11 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->nullable = false;  // explicitly not nullable
-      // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension); TEXT default 65535
+      // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension); TEXT default 8192 (page-friendly)
       if ($$->type == AttrType::VECTORS) {
         $$->length = static_cast<int>(sizeof(int));
       } else if ($$->type == AttrType::TEXTS) {
-        $$->length = 255;  // TEXT default length (reduced for testing)
+        $$->length = 8192;  // TEXT default length
       } else {
         $$->length = 4;
       }

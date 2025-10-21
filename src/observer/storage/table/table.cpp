@@ -353,10 +353,10 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
     if (copy_len > data_len) {
       copy_len = data_len;
     }
-    // For TEXT, 截断超长数据而不是返回错误
+    // 对 TEXT 字段，严格按照列长度限制，超过则返回错误，保持与 MySQL 语义一致（不自动截断）
     if (field->type() == AttrType::TEXTS && data_len > copy_len) {
-      LOG_WARN("TEXT data truncated from %zu to %zu bytes", data_len, copy_len);
-      // 不返回错误，而是截断
+      LOG_WARN("TEXT data length (%zu) exceeds field length (%zu) for field %s", data_len, copy_len, field->name());
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
   } else if (field->type() == AttrType::VECTORS) {
     // For VECTORS type, handle nullable fields specially

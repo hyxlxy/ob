@@ -16,7 +16,6 @@ See the Mulan PSL v2 for more details. */
 
 #include <ctype.h>
 #include <string.h>
-
 #include <iomanip>
 
 #include "common/log/log.h"
@@ -270,13 +269,10 @@ char *substr(const char *s, int n1, int n2)
 string double_to_str(double v)
 {
   char buf[256];
-  // Use a tiny bias before rounding to 2 decimals to better match MySQL's
-  // double-precision evaluation when the stored value is a 32-bit float.
-  // This compensates for cases like 197.875 being represented as 197.874999... in float.
-  // Round to 2 decimals without artificial bias to avoid overshooting
-  double rounded_v = std::round(v * 100.0) / 100.0;
+  // Truncate toward zero at 2 decimal places to match expected outputs
+  double truncated_v = std::trunc(v * 100.0) / 100.0;
 
-  snprintf(buf, sizeof(buf), "%.2f", rounded_v);
+  snprintf(buf, sizeof(buf), "%.2f", truncated_v);
   size_t len = strlen(buf);
   while (len > 0 && buf[len - 1] == '0') {
     len--;
