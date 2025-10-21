@@ -154,6 +154,27 @@ RC TableMeta::add_index(const IndexMeta &index)
   return RC::SUCCESS;
 }
 
+RC TableMeta::drop_index(const char *index_name)
+{
+  if (common::is_blank(index_name)) {
+    return RC::INVALID_ARGUMENT;
+  }
+
+  LOG_INFO("Trying to drop index: %s, total indexes: %d", index_name, (int)indexes_.size());
+  
+  for (auto it = indexes_.begin(); it != indexes_.end(); ++it) {
+    LOG_INFO("Checking index: %s vs %s", it->name(), index_name);
+    if (strcmp(it->name(), index_name) == 0) {
+      LOG_INFO("Found matching index, removing it");
+      indexes_.erase(it);
+      return RC::SUCCESS;
+    }
+  }
+
+  LOG_WARN("Index not found in table meta: %s", index_name);
+  return RC::SCHEMA_INDEX_NOT_EXIST;
+}
+
 const char *TableMeta::name() const { return name_.c_str(); }
 
 const FieldMeta *TableMeta::trx_field() const { return &fields_[0]; }

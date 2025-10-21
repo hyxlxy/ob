@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/index/ivfflat_index.h"
 #include "storage/common/meta_util.h"
 #include "storage/db/db.h"
+#include <filesystem>
 
 
 HeapTableEngine::~HeapTableEngine()
@@ -267,6 +268,87 @@ RC HeapTableEngine::create_index(Trx *trx, const FieldMeta *field_meta, const ch
 
   LOG_INFO("Successfully added a new index (%s) on the table (%s)", index_name, table_meta_->name());
   return rc;
+}
+
+RC HeapTableEngine::drop_index(Trx *trx, const char *index_name)
+{
+  if (common::is_blank(index_name)) {
+    LOG_INFO("Invalid input arguments, table name is %s, index_name is blank", table_meta_->name());
+    return RC::INVALID_ARGUMENT;
+  }
+
+  // 1. 检查索引是否存在
+  Index *index = find_index(index_name);
+  if (index == nullptr) {
+    LOG_WARN("Index not found: %s on table %s", index_name, table_meta_->name());
+    return RC::SCHEMA_INDEX_NOT_EXIST;
+  }
+
+  // 2. 获取索引文件路径
+  string index_file = table_index_file(db_->path().c_str(), table_meta_->name(), index_name);
+
+  // 3. 从内存中移除索引
+  for (auto it = indexes_.begin(); it != indexes_.end(); ++it) {
+    if (*it == index) {
+      indexes_.erase(it);
+      break;
+    }
+  }
+
+  // 4. 删除索引对象
+  delete index;
+
+  // 5. 更新TableMeta（移除索引元数据）
+  TableMeta new_table_meta(*table_meta_);
+
+  // 移除索引元数据
+  RC rc = new_table_meta.drop_index(index_name);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to drop index from table meta: %s", index_name);
+    return rc;
+  }
+
+  // 6. 原子性更新元数据文件
+  string meta_file = table_meta_file(db_->path().c_str(), table_meta_->name());
+  string tmp_file = meta_file + ".tmp";
+
+  fstream fs;
+  fs.open(tmp_file, ios_base::out | ios_base::binary | ios_base::trunc);
+  if (!fs.is_open()) {
+    LOG_ERROR("Failed to open file for write. file name=%s, errmsg=%s", tmp_file.c_str(), strerror(errno));
+    return RC::IOERR_OPEN;
+  }
+  
+  int serialize_ret = new_table_meta.serialize(fs);
+  fs.close();
+  if (serialize_ret < 0) {
+    LOG_ERROR("Failed to serialize new table meta to tmp file: %s", tmp_file.c_str());
+    return RC::IOERR_WRITE;
+  }
+
+  int ret = rename(tmp_file.c_str(), meta_file.c_str());
+  if (ret != 0) {
+    LOG_ERROR("Failed to rename tmp meta file (%s) to normal meta file (%s) while dropping index (%s) on table (%s). "
+              "system error=%d:%s",
+              tmp_file.c_str(), meta_file.c_str(), index_name, table_meta_->name(), errno, strerror(errno));
+    return RC::IOERR_WRITE;
+  }
+
+  // 7. 更新内存中的table_meta_
+  table_meta_->swap(new_table_meta);
+
+  // 8. 删除索引文件
+  if (filesystem::exists(index_file)) {
+    if (!filesystem::remove(index_file)) {
+      LOG_ERROR("Failed to remove index file: %s", index_file.c_str());
+      return RC::FILE_REMOVE;
+    } else {
+      LOG_INFO("Removed index file: %s", index_file.c_str());
+    }
+  }
+
+  LOG_INFO("Successfully dropped index (%s) from table (%s)", index_name, table_meta_->name());
+  return RC::SUCCESS;
 }
 
 RC HeapTableEngine::create_index(Trx *trx, const vector<const FieldMeta *> &field_metas, const char *index_name)
