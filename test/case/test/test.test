@@ -1,9 +1,8 @@
 
+
 create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
 create table exp_table2(id int, col1 int);
-insert into exp_table VALUES (9, 3, 4, 1.21, 4.46);
-insert into exp_table VALUES (7, 4, 4, 4.63, 5.71);
-insert into exp_table VALUES (9, 7, 8, 6.23, 5.1);
-select id,-(col2*(-2)+5)+(col4+7)*(col1+col3*5),(3+col2)*col3*1 from exp_table where -(col2*(-2)+3)+(col4+8)*(col1+col3*9) > (1+col2)*col3*7;
-
-
+insert into exp_table VALUES (1, 4, 4, 3.86, 5.48);
+insert into exp_table VALUES (1, 6, 3, 5.31, 3.33);
+insert into exp_table VALUES (6, 8, 6, 9.7, 6.26);
+select * from exp_table where 6+col2 < 12;

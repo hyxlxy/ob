@@ -269,10 +269,32 @@ char *substr(const char *s, int n1, int n2)
 string double_to_str(double v)
 {
   char buf[256];
-  // Truncate toward zero at 2 decimal places to match expected outputs
-  double truncated_v = std::trunc(v * 100.0) / 100.0;
+  // MySQL-compatible formatting: round to nearest, ties-to-even, 2 decimals; then trim trailing zeros
+  double sign = v < 0.0 ? -1.0 : 1.0;
+  double abs_v = std::fabs(v);
+  double scaled = abs_v * 100.0;
 
-  snprintf(buf, sizeof(buf), "%.2f", truncated_v);
+  double int_part = 0.0;
+  double frac = std::modf(scaled, &int_part);
+
+  const double tie = 0.5;
+  const double eps = 1e-12; // guard for binary fp noise
+
+  if (frac > tie + eps) {
+    int_part += 1.0;
+  } else if (frac < tie - eps) {
+    // keep int_part
+  } else {
+    // tie: round to even
+    long long ip = static_cast<long long>(int_part);
+    if (ip % 2 != 0) {
+      int_part += 1.0;
+    }
+  }
+
+  double rounded = (int_part / 100.0) * sign;
+
+  snprintf(buf, sizeof(buf), "%.2f", rounded);
   size_t len = strlen(buf);
   while (len > 0 && buf[len - 1] == '0') {
     len--;
