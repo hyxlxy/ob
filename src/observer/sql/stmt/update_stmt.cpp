@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
+ 
 
 UpdateStmt::UpdateStmt(Table *table, Value *values, int value_amount)
     : table_(table), values_(values), value_amount_(value_amount)
@@ -104,7 +105,7 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
 
   // Check if this is a sub-query update
   if (update.is_sub_query) {
-    // Create sub-query statement
+    // Create sub-query statement; actual evaluation is deferred to executor where session/trx exist
     Stmt *sub_query_stmt = nullptr;
     rc = Stmt::create_stmt(db, *update.sub_query, sub_query_stmt);
     if (rc != RC::SUCCESS) {
@@ -112,7 +113,6 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
       delete filter_stmt;
       return rc;
     }
-
     stmt = new UpdateStmt(table, field_meta, sub_query_stmt, filter_stmt);
   } else {
     // create value copy

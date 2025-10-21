@@ -1,0 +1,51 @@
+
+
+CREATE TABLE t_upd(id INT NOT NULL, a INT NULL, b CHAR(10) NULL, c TEXT NULL, v VECTOR(3) NULL);
+INSERT INTO t_upd VALUES (1, 10, 'x', 'hello', '[1,2,3]');
+INSERT INTO t_upd VALUES (2, 20, 'y', 'world', '[4,5,6]');
+INSERT INTO t_upd VALUES (3, 30, 'z', 'abc',   '[7,8,9]');
+
+UPDATE t_upd SET a = 11 WHERE id = 1;
+UPDATE t_upd SET b = 'yy' WHERE id = 2;
+
+
+UPDATE t_upd SET a = NULL WHERE id = 2;
+UPDATE t_upd SET b = NULL WHERE a IS NULL;
+UPDATE t_upd SET a = 99 WHERE b IS NULL;
+
+
+UPDATE t_upd SET a = 31, b = 'mm' WHERE id = 3;
+
+
+CREATE TABLE t_src(id INT NOT NULL, val INT NULL);
+INSERT INTO t_src VALUES (1, 777);
+INSERT INTO t_src VALUES (2, NULL);
+UPDATE t_upd SET a = { SELECT val FROM t_src WHERE id = 1 } WHERE id = 1;
+UPDATE t_upd SET a = { SELECT val FROM t_src WHERE id = 2 } WHERE id = 2;
+
+
+UPDATE t_upd SET b = 'or1' WHERE (id = 1 OR id = 3) AND a >= 11;
+
+
+UPDATE t_upd SET c = 'short' WHERE id = 1;
+UPDATE t_upd SET c = repeat('p', 1000) WHERE id = 2;
+
+
+UPDATE t_upd SET v = '[10,20,30]' WHERE id = 3;
+
+
+CREATE INDEX idx_a ON t_upd(a);
+UPDATE t_upd SET a = 555 WHERE id = 3;
+
+
+UPDATE t_upd SET a = 12.5 WHERE id = 1;
+
+
+UPDATE t_upd SET b = 'abcdefghij' WHERE id = 1;
+UPDATE t_upd SET b = '' WHERE id = 2;
+
+
+UPDATE t_upd SET b = 'allrows';
+
+
+DROP TABLE t_src;

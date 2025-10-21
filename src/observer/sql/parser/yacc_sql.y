@@ -844,6 +844,19 @@ update_stmt:      /*  update 语句的语法解析树*/
         delete $5;
       }
     }
+    | UPDATE ID SET ID EQ LBRACE sub_query RBRACE where
+    {
+      // 支持单字段：SET col = (subquery)
+      $$ = new ParsedSqlNode(SCF_UPDATE);
+      $$->update.relation_name = $2;
+      $$->update.attribute_name = $4;
+      $$->update.is_sub_query = true;
+      $$->update.sub_query.reset($7);
+      if ($9 != nullptr) {
+        $$->update.conditions.swap(*$9);
+        delete $9;
+      }
+    }
     ;
 
 update_kv_list:
