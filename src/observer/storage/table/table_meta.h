@@ -55,6 +55,7 @@ public:
                const string &select_sql);
 
   RC add_index(const IndexMeta &index);
+  RC drop_index(const char *index_name);
 
 public:
   int32_t             table_id() const { return table_id_; }
