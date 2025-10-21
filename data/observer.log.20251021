@@ -1,2 +1,0 @@
-[2025-10-21 23:31:27.734222 pid:1134905 tid:718849a686c0 ctx:504000000390 ERROR: insert_record@heap_table_engine.cpp:53] >> Failed to rollback index data when insert index entries failed. table name=null_table5, rc=20:RECORD_NOT_EXIST
-[2025-10-21 23:31:27.753496 pid:1134905 tid:718849a686c0 ctx:504000000390 ERROR: insert_record@heap_table_engine.cpp:53] >> Failed to rollback index data when insert index entries failed. table name=null_table5, rc=20:RECORD_NOT_EXIST

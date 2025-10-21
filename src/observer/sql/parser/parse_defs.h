@@ -18,10 +18,20 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/vector.h"
 #include "common/lang/memory.h"
 #include "common/value.h"
-#include "common/lang/utility.h"
 
 class Expression;
 struct ParsedSqlNode;
+
+/**
+ * @brief UPDATE 单个赋值项
+ */
+struct UpdateItemSqlNode
+{
+  string attr_name;                                 ///< 列名
+  bool is_sub_query = false;                        ///< 是否为子查询项
+  Value value;                                      ///< 常量值（当 is_sub_query=false 时有效）
+  std::unique_ptr<ParsedSqlNode> sub_query;         ///< 子查询（当 is_sub_query=true 时有效，flag=SCF_SELECT）
+};
 
 /**
  * @defgroup SQLParser SQL Parser
@@ -260,6 +270,10 @@ struct UpdateSqlNode
   // 多字段UPDATE支持
   vector<string>           attribute_names; ///< 更新的字段列表（多字段模式）
   vector<Value>            values;          ///< 更新的值列表（多字段模式）
+  // 多字段扩展：每个位置要么是常量，要么是子查询
+  // 若 value_is_sub_query[i] 为 true，则忽略 values[i]，使用 value_sub_queries[i]
+  vector<bool>             value_is_sub_query;          ///< 与 attribute_names 对齐
+  vector<unique_ptr<ParsedSqlNode>> value_sub_queries;  ///< 与 attribute_names 对齐（仅当对应为子查询时有效，flag=SCF_SELECT）
   
   vector<ConditionSqlNode> conditions;
   bool                     is_sub_query = false;  ///< 是否使用子查询更新

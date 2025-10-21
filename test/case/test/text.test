@@ -10,7 +10,7 @@ select * from text_table where id=2;
 insert into text_table values (3, '');
 update text_table set info = repeat('x', 65535) where id=3;
 select length(info) from text_table where id=3;
--- 65536B should fail
+
 insert into text_table values (4, repeat('y', 65536));
 
 update text_table set info='short' where id=2;

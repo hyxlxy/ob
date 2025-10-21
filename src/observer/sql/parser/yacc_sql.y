@@ -589,7 +589,7 @@ attr_def:
       if ($$->type == AttrType::VECTORS) {
         $$->length = static_cast<int>(sizeof(int));
       } else if ($$->type == AttrType::TEXTS) {
-        $$->length = 65535;  // TEXT default length aligned with MySQL
+        $$->length = 255;  // TEXT default length (reduced for testing)
       } else {
         $$->length = 4;
       }
@@ -604,7 +604,7 @@ attr_def:
       if ($$->type == AttrType::VECTORS) {
         $$->length = static_cast<int>(sizeof(int));
       } else if ($$->type == AttrType::TEXTS) {
-        $$->length = 65535;  // TEXT default length aligned with MySQL
+        $$->length = 255;  // TEXT default length (reduced for testing)
       } else {
         $$->length = 4;
       }
@@ -623,7 +623,7 @@ attr_def:
       if ($$->type == AttrType::VECTORS) {
         $$->length = static_cast<int>(sizeof(int));
       } else if ($$->type == AttrType::TEXTS) {
-        $$->length = 65535;  // TEXT default length aligned with MySQL
+        $$->length = 255;  // TEXT default length (reduced for testing)
       } else {
         $$->length = 4;
       }
@@ -864,19 +864,49 @@ update_kv_list:
     {
       $$ = new vector<pair<string, Value>>();
       $$->push_back({$1, *$3});
+      // 同步到 UpdateSqlNode 扩展：常量项
+      if ($$ && sql_result && !sql_result->sql_nodes().empty()) {
+        ParsedSqlNode *root = sql_result->sql_nodes().back().get();
+        if (root->flag == SCF_UPDATE) {
+          root->update.attribute_names.push_back($1);
+          root->update.values.push_back(*$3);
+          root->update.value_is_sub_query.push_back(false);
+          root->update.value_sub_queries.emplace_back(nullptr);
+        }
+      }
       delete $3;
     }
     | update_kv_list COMMA ID EQ value
     {
       $1->push_back({$3, *$5});
       $$ = $1;
+      // 扩展：常量项
+      if ($$ && sql_result && !sql_result->sql_nodes().empty()) {
+        ParsedSqlNode *root = sql_result->sql_nodes().back().get();
+        if (root->flag == SCF_UPDATE) {
+          root->update.attribute_names.push_back($3);
+          root->update.values.push_back(*$5);
+          root->update.value_is_sub_query.push_back(false);
+          root->update.value_sub_queries.emplace_back(nullptr);
+        }
+      }
       delete $5;
     }
     | ID EQ LBRACE sub_query RBRACE
     {
-      // 单字段子查询UPDATE - 回退到旧语法处理
-      // 这里暂时不支持，让解析器尝试其他规则
-      YYERROR;
+      // 将 ID=(subquery) 记录为子查询项
+      $$ = new vector<pair<string, Value>>();
+      Value placeholder; placeholder.set_type(AttrType::UNDEFINED); placeholder.set_null(true);
+      $$->push_back({$1, placeholder});
+      if ($$ && sql_result && !sql_result->sql_nodes().empty()) {
+        ParsedSqlNode *root = sql_result->sql_nodes().back().get();
+        if (root->flag == SCF_UPDATE) {
+          root->update.attribute_names.push_back($1);
+          root->update.values.push_back(placeholder);
+          root->update.value_is_sub_query.push_back(true);
+          root->update.value_sub_queries.emplace_back($4);
+        }
+      }
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/

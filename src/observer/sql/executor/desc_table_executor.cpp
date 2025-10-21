@@ -219,21 +219,35 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
       
       for (size_t i = 0; i < update_stmt->field_metas().size(); i++) {
         const FieldMeta *fm = update_stmt->field_metas()[i];
-        const Value &val = update_stmt->multi_values()[i];
+        Value val = update_stmt->multi_values()[i];
         char *data = new_rec.data();
-        
-        // 处理NULL值
+
+        // 如果该列来自子查询，则在此执行标量子查询
+        if (i < update_stmt->multi_is_sub_query().size() && update_stmt->multi_is_sub_query()[i]) {
+          Stmt *subq = nullptr;
+          if (i < update_stmt->multi_sub_queries().size()) subq = update_stmt->multi_sub_queries()[i];
+          if (subq != nullptr) {
+            Value sub_val;
+            rc = execute_sub_query(subq, session, sub_val);
+            if (rc != RC::SUCCESS) return rc;
+            val = sub_val; // 0 行 -> NULL；>1 行 -> 首行
+          } else {
+            // 无法获取到子查询实现，退化为 NULL（与占位一致）
+            val.set_type(AttrType::UNDEFINED); val.set_null(true);
+          }
+        }
+
+        // 写入（处理 NULL 标志）
         if (val.attr_type() == AttrType::UNDEFINED || val.is_null()) {
           if (!fm->nullable()) return RC::INVALID_ARGUMENT;
           memset(data + fm->offset(), 0, fm->len());
-          data[fm->offset() + fm->len() - 1] = '1';  // 设置NULL标志
+          data[fm->offset() + fm->len() - 1] = '1';
         } else {
-          // 非NULL值
           memset(data + fm->offset(), 0, fm->len());
           size_t len = std::min((size_t)val.length(), (size_t)(fm->len() - (fm->nullable() ? 1 : 0)));
           memcpy(data + fm->offset(), val.data(), len);
           if (fm->nullable()) {
-            data[fm->offset() + fm->len() - 1] = '0';  // 设置非NULL标志
+            data[fm->offset() + fm->len() - 1] = '0';
           }
         }
       }

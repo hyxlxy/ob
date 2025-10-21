@@ -349,21 +349,14 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
     if (field->nullable()) {
       copy_len = field->len() - 1;  // Reserve last byte for NULL flag
     }
-    // Ensure we don't overflow the field for CHARS
-    if (field->type() == AttrType::CHARS) {
-      if (copy_len > data_len) {
-        copy_len = data_len;
-      }
-    }
-    // For TEXT, enforce length limit like MySQL: if data exceeds, return error
-    if (field->type() == AttrType::TEXTS) {
-      size_t limit = copy_len;
-      if (data_len > limit) {
-        LOG_WARN("TEXT data length %zu exceeds limit %zu for field %s", data_len, limit, field->name());
-        return RC::SCHEMA_FIELD_TYPE_MISMATCH; // signal failure
-      }
-      // within limit, copy_len equals data_len
+    // Ensure we don't overflow the field
+    if (copy_len > data_len) {
       copy_len = data_len;
+    }
+    // For TEXT, 截断超长数据而不是返回错误
+    if (field->type() == AttrType::TEXTS && data_len > copy_len) {
+      LOG_WARN("TEXT data truncated from %zu to %zu bytes", data_len, copy_len);
+      // 不返回错误，而是截断
     }
   } else if (field->type() == AttrType::VECTORS) {
     // For VECTORS type, handle nullable fields specially

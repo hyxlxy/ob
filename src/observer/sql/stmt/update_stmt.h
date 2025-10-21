@@ -21,6 +21,7 @@ class Table;
 class Db;
 class FieldMeta;
 class FilterStmt;
+class Stmt;
 
 /**
  * @brief 更新语句
@@ -56,6 +57,8 @@ public:
   bool is_multi_field() const { return !field_metas_.empty(); }
   const vector<const FieldMeta *> &field_metas() const { return field_metas_; }
   const vector<Value> &multi_values() const { return multi_values_; }
+  const vector<Stmt *> &multi_sub_queries() const { return multi_sub_queries_; }
+  const vector<bool>  &multi_is_sub_query() const { return multi_is_sub_query_; }
 
 private:
   Table *table_        = nullptr;
@@ -71,4 +74,6 @@ private:
   // Multi-field update
   vector<const FieldMeta *> field_metas_;
   vector<Value> multi_values_;
+  vector<Stmt *> multi_sub_queries_;
+  vector<bool>  multi_is_sub_query_;
 };

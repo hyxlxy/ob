@@ -90,7 +90,56 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
       }
       field_metas.push_back(fm);
     }
-    stmt = new UpdateStmt(table, field_metas, update.values, filter_stmt);
+
+    // 构造常量值列表
+    vector<Value> values = update.values;
+    // 构造 per-field 子查询占位
+    vector<Stmt *> sub_queries;
+    vector<bool>  is_sub_query;
+    sub_queries.reserve(update.attribute_names.size());
+    is_sub_query.reserve(update.attribute_names.size());
+
+    // 若没有提供扩展数组，则全部视为常量
+    if (update.value_is_sub_query.size() != update.attribute_names.size()) {
+      is_sub_query.assign(update.attribute_names.size(), false);
+      sub_queries.assign(update.attribute_names.size(), nullptr);
+    } else {
+      for (size_t i = 0; i < update.attribute_names.size(); i++) {
+        if (update.value_is_sub_query[i]) {
+          // 构建子查询 Stmt
+          Stmt *sub_stmt = nullptr;
+          if (!update.value_sub_queries[i]) {
+            sub_queries.push_back(nullptr);
+            is_sub_query.push_back(false);
+          } else {
+            rc = Stmt::create_stmt(db, *update.value_sub_queries[i], sub_stmt);
+            if (rc != RC::SUCCESS) {
+              delete filter_stmt;
+              return rc;
+            }
+            sub_queries.push_back(sub_stmt);
+            is_sub_query.push_back(true);
+            // 为与执行一致，常量值位置放一个 NULL 占位
+            if (i < values.size()) {
+              values[i].set_type(AttrType::UNDEFINED);
+              values[i].set_null(true);
+            } else {
+              Value v; v.set_type(AttrType::UNDEFINED); v.set_null(true);
+              values.push_back(v);
+            }
+          }
+        } else {
+          sub_queries.push_back(nullptr);
+          is_sub_query.push_back(false);
+        }
+      }
+    }
+
+    UpdateStmt *u = new UpdateStmt(table, field_metas, values, filter_stmt);
+    // 将扩展信息写入对象（需要可访问成员，这里直接赋值）
+    u->multi_sub_queries_ = std::move(sub_queries);
+    u->multi_is_sub_query_ = std::move(is_sub_query);
+    stmt = u;
     return RC::SUCCESS;
   }
 

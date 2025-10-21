@@ -1,19 +1,13 @@
 
+CREATE TABLE null_table5(id int null, num int not null);
+CREATE UNIQUE INDEX index_id on null_table5(id);
+INSERT INTO null_table5 VALUES(1,1);
+INSERT INTO null_table5 VALUES(1,1);
+INSERT INTO null_table5 VALUES(null,1);
 
-CREATE TABLE null_table5(id INT NULL, num INT NOT NULL);
-CREATE UNIQUE INDEX index_id ON null_table5(id);
-
-
-INSERT INTO null_table5 VALUES (1, 1); 
-INSERT INTO null_table5 VALUES (1, 1); 
-
-
-INSERT INTO null_table5 VALUES (NULL, 2); 
-INSERT INTO null_table5 VALUES (NULL, 3);
-
-
-SELECT id, num, (id IS NULL) AS is_null FROM null_table5 ORDER BY is_null DESC, id;
-
-
-INSERT INTO null_table5 VALUES (2, 9);     
-INSERT INTO null_table5 VALUES (2, 9);     
+CREATE TABLE null_table6(id1 int null, id2 int null, num int not null);
+CREATE UNIQUE INDEX index_id on null_table6(id1, id2);
+INSERT INTO null_table6 VALUES(2,null,2);
+INSERT INTO null_table6 VALUES(1,null,2);
+INSERT INTO null_table6 VALUES(null,null,2);
+UPDATE null_table6 set id1=(select null_table5.id from null_table5 where null_table5.num=4),id2=2 where id1=1 and num=2;
