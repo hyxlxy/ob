@@ -120,7 +120,7 @@ private:
 
   bool trx_multi_operation_mode_ = false;  ///< 当前事务的模式，是否多语句模式. 单语句模式自动提交
 
-  bool sql_debug_   = true;  ///< 是否输出SQL调试信息
+  bool sql_debug_   = false;  ///< 是否输出SQL调试信息
   bool hash_join_   = false;  ///< 是否使用hash join
   bool use_cascade_ = false;  ///< 是否使用 cascade 优化器
 

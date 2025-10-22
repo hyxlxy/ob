@@ -104,7 +104,7 @@ RC UpdatePhysicalOperator::open(Trx *trx)
         if (new_value.attr_type() == AttrType::CHARS && eff_len == 0 && new_value.data() != nullptr) {
           eff_len = ::strlen(new_value.data());
         }
-        LOG_DEBUG("UPDATE TEXT field=%s eff_len=%zu attr_type=%d", real_fm->name(), eff_len, (int)new_value.attr_type());
+        printf("DEBUG: [TEXT] update field=%s eff_len=%zu attr_type=%d\n", real_fm->name(), eff_len, (int)new_value.attr_type());
         if (eff_len > 65535) {
           LOG_WARN("TEXT too long on update: %zu > 65535", eff_len);
           rollback();

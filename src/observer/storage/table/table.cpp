@@ -447,12 +447,12 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
     if (value.is_null()) {
       // handled by NULL path above
     } else {
-      LOG_DEBUG("TEXT write begin field=%s raw_len=%zu ptr_null=%d",
-                field->name(), data_len, value.data() == nullptr);
+      printf("DEBUG: [TEXT] write begin field=%s raw_len=%zu ptr_null=%d\n",
+             field->name(), data_len, value.data() == nullptr);
       // Fallback: some UPDATE constant folding可能未正确设置 Value.length()
       if (value.attr_type() == AttrType::CHARS && data_len == 0 && value.data() != nullptr) {
         data_len = strlen(value.data());
-        LOG_DEBUG("TEXT write corrected_len via strlen=%zu", data_len);
+        printf("DEBUG: [TEXT] write corrected_len via strlen=%zu\n", data_len);
       }
       if (data_len > 65535) {
         LOG_WARN("TEXT too long: %zu > 65535", data_len);
@@ -473,8 +473,8 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
       if (with_null_flag) {
         record_data[field->offset() + field->len() - 1] = '0';
       }
-      LOG_DEBUG("TEXT write done field=%s off=%llu len=%u nullflag_set=%d",
-                field->name(), (unsigned long long)lob_off, ulen, with_null_flag ? 1 : 0);
+      printf("DEBUG: [TEXT] write done field=%s off=%llu len=%u nullflag_set=%d\n",
+             field->name(), (unsigned long long)lob_off, ulen, with_null_flag ? 1 : 0);
       return RC::SUCCESS;
     }
   } else if (field->type() == AttrType::VECTORS) {

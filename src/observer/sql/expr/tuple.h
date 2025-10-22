@@ -214,8 +214,8 @@ public:
           const char *ptr = this->record_->data() + field_meta->offset();
           uint64_t off = 0; memcpy(&off, ptr, sizeof(uint64_t));
           uint32_t len = 0; memcpy(&len, ptr + sizeof(uint64_t), sizeof(uint32_t));
-          LOG_DEBUG("TEXT read field=%s off=%llu len=%u nullable=%d",
-                    field_meta->name(), (unsigned long long)off, len, field_meta->nullable());
+          printf("DEBUG: [TEXT] read field=%s off=%llu len=%u nullable=%d\n",
+                 field_meta->name(), (unsigned long long)off, len, field_meta->nullable());
           std::string content;
           // need table to read; here we only have record_ and table_ stored in RowTuple
           const Table *tbl = table_;
