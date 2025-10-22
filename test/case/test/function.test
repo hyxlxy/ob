@@ -1,0 +1,7 @@
+
+CREATE TABLE function_table(id int, name char(20), score float, u_date date);
+CREATE TABLE function_table_2(id int, name char(30), score float, u_date date);
+insert into function_table VALUES (8, '80BR2ZQX4EYRU6V', 2.95, '2024-07-25');
+insert into function_table VALUES (2, 'ZCD7XTFG', 5.16, '2024-10-02');
+insert into function_table VALUES (5, '8U4A7RI', 8.72, '2018-03-22');
+select id, date_format(u_date, '%z/%n/%d') as date_type from function_table where length(name) < 6;

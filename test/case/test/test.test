@@ -1,8 +1,10 @@
 
+create table text_table(id int, info text);
+insert into text_table values (1,'this is a very very long string');
+insert into text_table values (2,'this is a very very long string2');
+insert into text_table values (3,'this is a very very long string3');
 
-create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
-create table exp_table2(id int, col1 int);
-insert into exp_table VALUES (1, 4, 4, 3.86, 5.48);
-insert into exp_table VALUES (1, 6, 3, 5.31, 3.33);
-insert into exp_table VALUES (6, 8, 6, 9.7, 6.26);
-select * from exp_table where 6+col2 < 12;
+delete from text_table where id=1;
+select * from text_table;
+UPDATE text_table set info='a tmp data' where id = 2;
+select * from text_table;

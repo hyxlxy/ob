@@ -141,7 +141,6 @@ public:
   RC append_text_lob(const char *data, uint32_t len, uint64_t &offset);
   RC read_text_lob(uint64_t offset, uint32_t len, std::string &out) const;
 
-private:
   RC set_value_to_record(char *record_data, const Value &value, const FieldMeta *field);
 
 private:
