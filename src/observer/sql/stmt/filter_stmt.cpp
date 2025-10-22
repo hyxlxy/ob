@@ -637,5 +637,9 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<st
   filter_unit->set_comp(comp);
 
   // 检查两个类型是否能够比较
+
+  //对于char和date类型的转换
+  if (filter_unit->left().is_attr() and filter_unit->right().is_value()) {}
+
   return rc;
 }

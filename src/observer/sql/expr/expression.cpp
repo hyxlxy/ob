@@ -796,6 +796,20 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
       if (Value::cast_to(rv_cast, target, tmp) == RC::SUCCESS)
         rv_cast = tmp;
     }
+  } else if ((left_value.attr_type() == AttrType::CHARS and right_value.attr_type() == AttrType::DATES) or
+             (left_value.attr_type() == AttrType::DATES and right_value.attr_type() == AttrType::CHARS)) {
+    //日期和字符串进行比较，由于修改了后，不会在逻辑计划生成的时候bind，从而会判断char和date的关系了，所以在这里加一下这个判断
+    if (left_value.attr_type() == AttrType::DATES) {
+      Value one;
+      rc = Value::cast_to(rv_cast, AttrType::DATES, one);
+      CHECK_RETURN_RC(rc);
+      rv_cast = one;
+    } else {
+      Value one;
+      rc = Value::cast_to(lv_cast, AttrType::DATES, one);
+      CHECK_RETURN_RC(rc);
+      lv_cast = one;
+    }
   }
 
   bool bool_value = false;
