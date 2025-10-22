@@ -853,6 +853,7 @@ update_stmt:      /*  update 语句的语法解析树*/
       if($$->update.value_is_sub_query.size() == 1){
         $$->update.relation_name = $2;
         $$->update.attribute_name = $$->update.attribute_names.front();
+        $$->update.value = $$->update.values.front();
         if($$->update.value_is_sub_query.front() == true){
           $$->update.is_sub_query = true;
           $$->update.sub_query = std::move($$->update.value_sub_queries.front());
