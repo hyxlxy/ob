@@ -161,8 +161,11 @@ public:
   // 新增：创建条件树
   static RC create_condition_tree(Db *db, Table *default_table, unordered_map<string, Table *> *tables,
       ConditionSqlNode *conditions, int condition_num, FilterConditionNode *&tree);
+  void      set_is_and(bool fl) { is_and_ = fl; }
+  bool      is_and() { return is_and_; }
 
 private:
   vector<FilterUnit *> filter_units_;              // 默认当前都是AND关系（保持向后兼容）
   FilterConditionNode *condition_tree_ = nullptr;  // 新增：条件树结构
+  bool                 is_and_         = true;     //先暂时去掉了条件树方便修改，等到后来会恢复
 };

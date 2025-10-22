@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
+#include "sql/parser/expression_binder.h"
 
 UpdateStmt::UpdateStmt(Table *table, Value *values, int value_amount)
     : table_(table), values_(values), value_amount_(value_amount)
@@ -69,10 +70,17 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
   // create filter statement for WHERE clause
   FilterStmt                    *filter_stmt = nullptr;
   unordered_map<string, Table *> table_map;
+  BinderContext                  bind_context;
   table_map.insert(pair<string, Table *>(string(table_name), table));
+  bind_context.add_table(table);
 
-  RC rc = FilterStmt::create(
-      db, table, &table_map, update.conditions.data(), static_cast<int>(update.conditions.size()), filter_stmt);
+  RC rc = FilterStmt::create(db,
+      table,
+      &table_map,
+      update.conditions.data(),
+      static_cast<int>(update.conditions.size()),
+      filter_stmt,
+      &bind_context);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create filter statement. rc=%d:%s", rc, strrc(rc));
     return rc;

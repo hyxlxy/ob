@@ -614,6 +614,10 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
   } else if (!cmp_exprs.empty()) {
     unique_ptr<ConjunctionExpr> conjunction_expr(new ConjunctionExpr(ConjunctionExpr::Type::AND, cmp_exprs));
 
+    if (!filter_stmt->is_and()) {
+      conjunction_expr->set_conjunction_is_or();
+    }
+
     // Bind the full predicate expression tree
     unique_ptr<Expression> pred_expr(conjunction_expr.release());
     if (binder_ctx_initialized_) {

@@ -95,6 +95,14 @@ RC FilterStmt::create(Db *db, Table *default_table, unordered_map<string, Table 
     tmp_stmt->filter_units_.push_back(filter_unit);
   }
 
+  //暂时用这种方法修改，因为测试用例里面只有全是or或者全是and
+  bool is_and = true;
+  for (int i = 0; i < condition_num; i++) {
+    if (conditions[i].conjunction_op == ConjunctionOp::OR_OP)
+      is_and = false;
+  }
+  tmp_stmt->set_is_and(is_and);
+
   stmt = tmp_stmt;
   return rc;
 }

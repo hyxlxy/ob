@@ -192,6 +192,9 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
       LOG_WARN("FilterStmt creation failed (critical). rc=%s", strrc(rc));
       return rc;
     }
+    if (rc == RC::ERROR) {
+      return rc;
+    }
     // 非关键错误：出于兼容，忽略 WHERE，继续执行（与旧行为一致）
     LOG_WARN("FilterStmt creation failed (non-critical), ignoring WHERE. rc=%s", strrc(rc));
     filter_stmt = new FilterStmt();

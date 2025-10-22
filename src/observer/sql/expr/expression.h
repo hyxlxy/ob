@@ -442,6 +442,7 @@ public:
   Type conjunction_type() const { return conjunction_type_; }
 
   vector<unique_ptr<Expression>> &children() { return children_; }
+  void                            set_conjunction_is_or() { conjunction_type_ = Type::OR; }
 
 private:
   Type                           conjunction_type_;
