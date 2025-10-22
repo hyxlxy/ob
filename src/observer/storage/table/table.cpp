@@ -420,16 +420,16 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
 RC Table::set_value_to_record(char *record_data, const Value &value, const FieldMeta *field)
 {
   // Handle NULL values
-  if (value.attr_type() == AttrType::UNDEFINED) {
+  if (value.attr_type() == AttrType::UNDEFINED || value.is_null()) {
     if (field->nullable()) {
       // For nullable fields, set the field data to zeros and set NULL flag in last byte
       memset(record_data + field->offset(), 0, field->len());
       record_data[field->offset() + field->len() - 1] = '1';  // Set NULL flag
-    } else {
-      // For non-nullable fields, set the field data to all zeros
-      memset(record_data + field->offset(), 0, field->len());
+      return RC::SUCCESS;
     }
-    return RC::SUCCESS;
+    // For non-nullable fields, reject NULL assignment
+    LOG_WARN("Cannot set NULL to NOT NULL field %s", field->name());
+    return RC::INVALID_ARGUMENT;
   }
 
   size_t       copy_len = field->len();
@@ -442,6 +442,9 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
     if (copy_len > data_len) {
       copy_len = data_len;
     }
+    // 清理 CHAR 字段剩余区域，防止更新为更短字符串时残留旧字符
+    size_t chars_area_len = field->len() - (field->nullable() ? 1 : 0);
+    memset(record_data + field->offset(), 0, chars_area_len);
   } else if (field->type() == AttrType::TEXTS) {
     // For TEXT: write to LOB and store offset+length
     if (value.is_null()) {
