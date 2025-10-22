@@ -1716,9 +1716,10 @@ RC FunctionExpr::try_get_value_with_args(const vector<Value> &arg_values, Value 
             i++; break;
           }
           default:
-            // illegal placeholder like %z, keep as-is
-            out.push_back('%');
-            // do not consume t; keep original chars
+            // Unknown placeholder like %z: output the letter only and consume it
+            // so "%z" becomes "z" per expected behavior
+            out.push_back(t);
+            i++; // consume t
             break;
         }
       } else {
