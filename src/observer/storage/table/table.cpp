@@ -18,20 +18,19 @@ See the Mulan PSL v2 for more details. */
 #include "common/defs.h"
 #include "common/lang/string.h"
 #include "common/lang/span.h"
-#include "common/lang/algorithm.h"
+// #include "common/lang/algorithm.h"
 #include "common/log/log.h"
 #include "common/global_context.h"
 #include "storage/db/db.h"
 #include "storage/buffer/disk_buffer_pool.h"
 #include "storage/common/condition_filter.h"
 #include "storage/common/meta_util.h"
-#include "storage/index/bplus_tree_index.h"
 #include "storage/index/index.h"
 #include "storage/record/record_manager.h"
 #include "storage/table/table.h"
 #include "storage/trx/trx.h"
-#include "storage/record/heap_record_scanner.h"
-#include "storage/record/lsm_record_scanner.h"
+// #include "storage/record/heap_record_scanner.h"
+// #include "storage/record/lsm_record_scanner.h"
 #include "storage/table/heap_table_engine.h"
 #include "storage/table/lsm_table_engine.h"
 
@@ -100,6 +99,22 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to create disk buffer pool of data file. file name=%s", data_file.c_str());
     return rc;
+  }
+
+  // Ensure LOB file exists for TEXT columns
+  bool has_text = false;
+  for (int i = table_meta_.sys_field_num(); i < table_meta_.field_num(); ++i) {
+    const FieldMeta *f = table_meta_.field(i);
+    if (f && f->type() == AttrType::TEXTS) { has_text = true; break; }
+  }
+  if (has_text) {
+    string lob_file = table_text_lob_file(base_dir, name);
+    int lobfd = ::open(lob_file.c_str(), O_WRONLY | O_CREAT | O_CLOEXEC, 0600);
+    if (lobfd < 0) {
+      LOG_ERROR("Failed to create lob file. file name=%s, errmsg=%d:%s", lob_file.c_str(), errno, strerror(errno));
+      return RC::IOERR_OPEN;
+    }
+    ::close(lobfd);
   }
 
   // rc = init_record_handler(base_dir);
@@ -229,6 +244,82 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
   return rc;
 }
 
+RC Table::append_text_lob(const char *data, uint32_t len, uint64_t &offset)
+{
+  if (is_view()) {
+    return RC::UNIMPLEMENTED;
+  }
+  if (len > 65535) {
+    return RC::INVALID_ARGUMENT;
+  }
+  string lob_file = table_text_lob_file(db_->path().c_str(), table_meta_.name());
+  int fd = ::open(lob_file.c_str(), O_WRONLY | O_CREAT, 0600);
+  if (fd < 0) {
+    LOG_WARN("open lob file failed %s", lob_file.c_str());
+    return RC::IOERR_OPEN;
+  }
+  // append: seek to end
+  off_t end = ::lseek(fd, 0, SEEK_END);
+  if (end < 0) {
+    ::close(fd);
+    return RC::IOERR_SEEK;
+  }
+  uint32_t be_len = len; // store as native endian simple
+  // write header fully
+  size_t wrote = 0;
+  const char *hp = reinterpret_cast<const char *>(&be_len);
+  while (wrote < sizeof(uint32_t)) {
+    ssize_t w = ::write(fd, hp + wrote, sizeof(uint32_t) - wrote);
+    if (w <= 0) { ::close(fd); return RC::IOERR_WRITE; }
+    wrote += (size_t)w;
+  }
+  // write payload fully
+  size_t total = 0;
+  while (total < len) {
+    ssize_t w = ::write(fd, data + total, len - total);
+    if (w <= 0) { ::close(fd); return RC::IOERR_WRITE; }
+    total += (size_t)w;
+  }
+  ::fsync(fd);
+  ::close(fd);
+  offset = static_cast<uint64_t>(end);
+  return RC::SUCCESS;
+}
+
+RC Table::read_text_lob(uint64_t offset, uint32_t len, std::string &out) const
+{
+  if (is_view()) {
+    return RC::UNIMPLEMENTED;
+  }
+  string lob_file = table_text_lob_file(db_->path().c_str(), table_meta_.name());
+  int fd = ::open(lob_file.c_str(), O_RDONLY);
+  if (fd < 0) {
+    return RC::IOERR_OPEN;
+  }
+  if (::lseek(fd, (off_t)offset, SEEK_SET) < 0) {
+    ::close(fd);
+    return RC::IOERR_SEEK;
+  }
+  uint32_t stored_len = 0;
+  size_t got = 0;
+  char *hp = reinterpret_cast<char *>(&stored_len);
+  while (got < sizeof(uint32_t)) {
+    ssize_t r = ::read(fd, hp + got, sizeof(uint32_t) - got);
+    if (r <= 0) { ::close(fd); return RC::IOERR_READ; }
+    got += (size_t)r;
+  }
+  // Always use stored length to read full payload for robustness
+  out.resize(stored_len);
+  size_t have = 0;
+  while (have < stored_len) {
+    ssize_t r = ::read(fd, out.data() + have, stored_len - have);
+    if (r <= 0) { ::close(fd); return RC::IOERR_READ; }
+    have += (size_t)r;
+  }
+  ::close(fd);
+  return RC::SUCCESS;
+}
+
 RC Table::insert_record(Record &record)
 {
   if (is_view()) {
@@ -329,34 +420,65 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
 RC Table::set_value_to_record(char *record_data, const Value &value, const FieldMeta *field)
 {
   // Handle NULL values
-  if (value.attr_type() == AttrType::UNDEFINED) {
+  if (value.attr_type() == AttrType::UNDEFINED || value.is_null()) {
     if (field->nullable()) {
       // For nullable fields, set the field data to zeros and set NULL flag in last byte
       memset(record_data + field->offset(), 0, field->len());
       record_data[field->offset() + field->len() - 1] = '1';  // Set NULL flag
-    } else {
-      // For non-nullable fields, set the field data to all zeros
-      memset(record_data + field->offset(), 0, field->len());
+      return RC::SUCCESS;
     }
-    return RC::SUCCESS;
+    // For non-nullable fields, reject NULL assignment
+    LOG_WARN("Cannot set NULL to NOT NULL field %s", field->name());
+    return RC::INVALID_ARGUMENT;
   }
 
   size_t       copy_len = field->len();
-  const size_t data_len = value.length();
+  size_t       data_len = value.length();
 
-  if (field->type() == AttrType::CHARS || field->type() == AttrType::TEXTS) {
-    // For CHARS and TEXTS type, handle nullable fields specially
+  if (field->type() == AttrType::CHARS) {
     if (field->nullable()) {
-      copy_len = field->len() - 1;  // Reserve last byte for NULL flag
+      copy_len = field->len() - 1;
     }
-    // Ensure we don't overflow the field
     if (copy_len > data_len) {
       copy_len = data_len;
     }
-    // For TEXT, 截断超长数据而不是返回错误
-    if (field->type() == AttrType::TEXTS && data_len > copy_len) {
-      LOG_WARN("TEXT data truncated from %zu to %zu bytes", data_len, copy_len);
-      // 不返回错误，而是截断
+    // 清理 CHAR 字段剩余区域，防止更新为更短字符串时残留旧字符
+    size_t chars_area_len = field->len() - (field->nullable() ? 1 : 0);
+    memset(record_data + field->offset(), 0, chars_area_len);
+  } else if (field->type() == AttrType::TEXTS) {
+    // For TEXT: write to LOB and store offset+length
+    if (value.is_null()) {
+      // handled by NULL path above
+    } else {
+      printf("DEBUG: [TEXT] write begin field=%s raw_len=%zu ptr_null=%d\n",
+             field->name(), data_len, value.data() == nullptr);
+      // Fallback: some UPDATE constant folding可能未正确设置 Value.length()
+      if (value.attr_type() == AttrType::CHARS && data_len == 0 && value.data() != nullptr) {
+        data_len = strlen(value.data());
+        printf("DEBUG: [TEXT] write corrected_len via strlen=%zu\n", data_len);
+      }
+      if (data_len > 65535) {
+        LOG_WARN("TEXT too long: %zu > 65535", data_len);
+        return RC::INVALID_ARGUMENT;
+      }
+      uint64_t lob_off = 0;
+      RC lrc = append_text_lob(value.data(), static_cast<uint32_t>(data_len), lob_off);
+      if (lrc != RC::SUCCESS) {
+        return lrc;
+      }
+      // in-row layout: [offset(8)][length(4)][optional null flag]
+      bool with_null_flag = field->nullable();
+      // zero area
+      memset(record_data + field->offset(), 0, field->len());
+      memcpy(record_data + field->offset(), &lob_off, sizeof(uint64_t));
+      uint32_t ulen = static_cast<uint32_t>(data_len);
+      memcpy(record_data + field->offset() + sizeof(uint64_t), &ulen, sizeof(uint32_t));
+      if (with_null_flag) {
+        record_data[field->offset() + field->len() - 1] = '0';
+      }
+      printf("DEBUG: [TEXT] write done field=%s off=%llu len=%u nullflag_set=%d\n",
+             field->name(), (unsigned long long)lob_off, ulen, with_null_flag ? 1 : 0);
+      return RC::SUCCESS;
     }
   } else if (field->type() == AttrType::VECTORS) {
     // For VECTORS type, handle nullable fields specially

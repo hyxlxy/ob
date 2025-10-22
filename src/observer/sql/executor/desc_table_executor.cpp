@@ -237,19 +237,16 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
           }
         }
 
-        // 写入（处理 NULL 标志）
-        if (val.attr_type() == AttrType::UNDEFINED || val.is_null()) {
-          if (!fm->nullable()) return RC::INVALID_ARGUMENT;
-          memset(data + fm->offset(), 0, fm->len());
-          data[fm->offset() + fm->len() - 1] = '1';
-        } else {
-          memset(data + fm->offset(), 0, fm->len());
-          size_t len = std::min((size_t)val.length(), (size_t)(fm->len() - (fm->nullable() ? 1 : 0)));
-          memcpy(data + fm->offset(), val.data(), len);
-          if (fm->nullable()) {
-            data[fm->offset() + fm->len() - 1] = '0';
-          }
+        // 统一通过表封装进行写入（自动处理 NULL/TEXT LOB/可空位）
+        Value write_val = val;
+        if (!(write_val.attr_type() == AttrType::UNDEFINED || write_val.is_null()) && write_val.attr_type() != fm->type()) {
+          Value casted;
+          RC crc = Value::cast_to(write_val, fm->type(), casted);
+          if (crc != RC::SUCCESS) return crc;
+          write_val = casted;
         }
+        rc = table->set_value_to_record(data, write_val, fm);
+        if (rc != RC::SUCCESS) return rc;
       }
       
       rc = table->update_record_with_trx(old_rec, new_rec, trx);
@@ -275,19 +272,16 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
       
       char *data = new_rec.data();
       
-      // 处理NULL值
-      if (val->attr_type() == AttrType::UNDEFINED || val->is_null()) {
-        if (!fm->nullable()) return RC::INVALID_ARGUMENT;
-        memset(data + fm->offset(), 0, fm->len());
-        data[fm->offset() + fm->len() - 1] = '1';
-      } else {
-        memset(data + fm->offset(), 0, fm->len());
-        size_t len = std::min((size_t)val->length(), (size_t)(fm->len() - (fm->nullable() ? 1 : 0)));
-        memcpy(data + fm->offset(), val->data(), len);
-        if (fm->nullable()) {
-          data[fm->offset() + fm->len() - 1] = '0';
-        }
+      // 统一通过表封装进行写入（自动处理 NULL/TEXT LOB/可空位）
+      Value write_val = *val;
+      if (!(write_val.attr_type() == AttrType::UNDEFINED || write_val.is_null()) && write_val.attr_type() != fm->type()) {
+        Value casted;
+        RC crc = Value::cast_to(write_val, fm->type(), casted);
+        if (crc != RC::SUCCESS) return crc;
+        write_val = casted;
       }
+      rc = table->set_value_to_record(data, write_val, fm);
+      if (rc != RC::SUCCESS) return rc;
       
       rc = table->update_record_with_trx(old_rec, new_rec, trx);
       if (rc != RC::SUCCESS) return rc;

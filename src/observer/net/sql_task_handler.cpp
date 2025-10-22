@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include "event/session_event.h"
 #include "event/sql_event.h"
 #include "session/session.h"
+#include "event/sql_debug.h"
 
 RC SqlTaskHandler::handle_event(Communicator *communicator)
 {
@@ -40,6 +41,7 @@ RC SqlTaskHandler::handle_event(Communicator *communicator)
     session->clear_sql_error();
   }
 
+  sql_debug("SQL start: %s", event->query().c_str());
   rc = handle_sql(&sql_event);
   if (OB_FAIL(rc)) {
     LOG_TRACE("failed to handle sql. rc=%s", strrc(rc));
@@ -67,34 +69,41 @@ RC SqlTaskHandler::handle_event(Communicator *communicator)
 RC SqlTaskHandler::handle_sql(SQLStageEvent *sql_event)
 {
   RC rc = query_cache_stage_.handle_request(sql_event);
+  sql_debug("stage query_cache rc=%d", rc);
   if (OB_FAIL(rc)) {
     LOG_TRACE("failed to do query cache. rc=%s", strrc(rc));
     return rc;
   }
 
   rc = parse_stage_.handle_request(sql_event);
+  sql_debug("stage parse rc=%d", rc);
   if (OB_FAIL(rc)) {
     LOG_TRACE("failed to do parse. rc=%s", strrc(rc));
     return rc;
   }
 
   rc = resolve_stage_.handle_request(sql_event);
+  sql_debug("stage resolve rc=%d", rc);
   if (OB_FAIL(rc)) {
     LOG_TRACE("failed to do resolve. rc=%s", strrc(rc));
     return rc;
   }
 
   rc = optimize_stage_.handle_request(sql_event);
+  sql_debug("stage optimize rc=%d", rc);
   if (rc != RC::UNIMPLEMENTED && rc != RC::SUCCESS) {
     LOG_TRACE("failed to do optimize. rc=%s", strrc(rc));
     return rc;
   }
 
   rc = execute_stage_.handle_request(sql_event);
+  sql_debug("stage execute rc=%d", rc);
   if (OB_FAIL(rc)) {
     LOG_TRACE("failed to do execute. rc=%s", strrc(rc));
     return rc;
   }
+
+  sql_debug("SQL done rc=%d", rc);
 
   return rc;
 }

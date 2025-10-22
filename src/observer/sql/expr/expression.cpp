@@ -23,7 +23,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/filter_stmt.h"
 #include "sql/optimizer/logical_plan_generator.h"
 #include "sql/optimizer/physical_plan_generator.h"
-#include "sql/operator/project_physical_operator.h"
+// #include "sql/operator/project_physical_operator.h"
 #include "session/session.h"
 
 // 前向声明
@@ -1548,6 +1548,10 @@ AttrType FunctionExpr::value_type() const
   if (strcasecmp(function_name_.c_str(), "LENGTH") == 0) {
     return AttrType::INTS;
   }
+  // REPEAT returns string
+  if (strcasecmp(function_name_.c_str(), "REPEAT") == 0) {
+    return AttrType::CHARS;
+  }
   // ROUND returns FLOAT
   if (strcasecmp(function_name_.c_str(), "ROUND") == 0) {
     return AttrType::FLOATS;
@@ -1582,6 +1586,10 @@ int FunctionExpr::value_length() const
   }
   if (strcasecmp(function_name_.c_str(), "VECTOR_TO_STRING") == 0) {
     // Variable, keep a safe bound (text handled as chars); fall back
+    return 255;
+  }
+  if (strcasecmp(function_name_.c_str(), "REPEAT") == 0) {
+    // variable length, fallback bound
     return 255;
   }
   if (strcasecmp(function_name_.c_str(), "STRING_TO_VECTOR") == 0) {
@@ -1776,6 +1784,40 @@ RC FunctionExpr::try_get_value_with_args(const vector<Value> &arg_values, Value 
     return RC::SUCCESS;
   }
 
+  // REPEAT(str, count)
+  if (strcasecmp(function_name_.c_str(), "REPEAT") == 0) {
+    if (arg_values.size() != 2) {
+      return RC::INVALID_ARGUMENT;
+    }
+    const Value &s = arg_values[0];
+    const Value &n = arg_values[1];
+    if (s.attr_type() != AttrType::CHARS || n.attr_type() != AttrType::INTS) {
+      return RC::UNSUPPORTED;
+    }
+    int times = n.get_int();
+    if (times <= 0) {
+      value.set_string("");
+      return RC::SUCCESS;
+    }
+    std::string src = s.get_string();
+    if (src.empty()) {
+      value.set_string("");
+      return RC::SUCCESS;
+    }
+    // construct repeated string (may be large; caller may reject later)
+    std::string out;
+    // cautious reserve to avoid overflow
+    size_t each = src.size();
+    size_t total;
+    if (__builtin_mul_overflow(each, static_cast<size_t>(times), &total)) {
+      return RC::INVALID_ARGUMENT;
+    }
+    out.reserve(std::min(total, static_cast<size_t>(1<<20))); // soft cap reserve
+    for (int i = 0; i < times; i++) out += src;
+    value.set_string(out.c_str());
+    return RC::SUCCESS;
+  }
+
   // ROUND(float)
   if (strcasecmp(function_name_.c_str(), "ROUND") == 0) {
     if (arg_values.size() != 1 && arg_values.size() != 2) {
@@ -1901,9 +1943,10 @@ RC FunctionExpr::try_get_value_with_args(const vector<Value> &arg_values, Value 
             break;
           }
           default:
-            // illegal placeholder like %z, keep as-is
-            out.push_back('%');
-            // do not consume t; keep original chars
+            // Unknown placeholder like %z: output the letter only and consume it
+            // so "%z" becomes "z" per expected behavior
+            out.push_back(t);
+            i++; // consume t
             break;
         }
       } else {
