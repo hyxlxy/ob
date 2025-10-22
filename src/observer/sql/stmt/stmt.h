@@ -51,10 +51,10 @@ class Db;
   DEFINE_ENUM_ITEM(EXIT)          \
   DEFINE_ENUM_ITEM(EXPLAIN)       \
   DEFINE_ENUM_ITEM(PREDICATE)     \
-  DEFINE_ENUM_ITEM(SET_VARIABLE) \
-  DEFINE_ENUM_ITEM(CREATE_VIEW)  \
-  DEFINE_ENUM_ITEM(DROP_VIEW)    \
-  DEFINE_ENUM_ITEM(SHOW_INDEX)   \
+  DEFINE_ENUM_ITEM(SET_VARIABLE)  \
+  DEFINE_ENUM_ITEM(CREATE_VIEW)   \
+  DEFINE_ENUM_ITEM(DROP_VIEW)     \
+  DEFINE_ENUM_ITEM(SHOW_INDEX)    \
   DEFINE_ENUM_ITEM(UNION)
 
 enum class StmtType
@@ -76,7 +76,7 @@ inline const char *stmt_type_name(StmtType type)
 }
 
 bool stmt_type_ddl(StmtType type);
-
+class BinderContext;
 /**
  * @brief Stmt for Statement
  * @ingroup Statement
@@ -92,7 +92,7 @@ public:
   virtual StmtType type() const = 0;
 
 public:
-  static RC create_stmt(Db *db, ParsedSqlNode &sql_node, Stmt *&stmt);
+  static RC create_stmt(Db *db, ParsedSqlNode &sql_node, Stmt *&stmt, const BinderContext *outer_context = nullptr);
 
 private:
 };

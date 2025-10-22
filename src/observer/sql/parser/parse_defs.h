@@ -255,6 +255,17 @@ struct DeleteSqlNode
   vector<ConditionSqlNode> conditions;
 };
 
+struct UpdateKvSqlNode
+{
+  // 多字段UPDATE支持
+  string attribute_names;  ///< 更新的字段列表（多字段模式）
+  Value  values;           ///< 更新的值列表（多字段模式）
+  // 多字段扩展：每个位置要么是常量，要么是子查询
+  // 若 value_is_sub_query[i] 为 true，则忽略 values[i]，使用 value_sub_queries[i]
+  bool                      value_is_sub_query;  ///< 与 attribute_names 对齐
+  unique_ptr<ParsedSqlNode> value_sub_queries;   ///< 与 attribute_names
+};
+
 /**
  * @brief 描述一个update语句
  * @ingroup SQLParser
@@ -281,7 +292,7 @@ struct UpdateSqlNode
 
 /**
  * @brief 描述一个属性
- * @ingroup SQLParser
+ * @ingroa SQLParser
  * @details 属性，或者说字段(column, field)
  */
 struct AttrInfoSqlNode

@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/stmt/update_stmt.h"
+#include "sql/stmt/select_stmt.h"
 #include "sql/stmt/filter_stmt.h"
 #include "common/log/log.h"
 #include "storage/db/db.h"
@@ -120,7 +121,7 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
             sub_queries.push_back(nullptr);
             is_sub_query.push_back(false);
           } else {
-            rc = Stmt::create_stmt(db, *update.value_sub_queries[i], sub_stmt);
+            rc = Stmt::create_stmt(db, *update.value_sub_queries[i], sub_stmt, &bind_context);
             if (rc != RC::SUCCESS) {
               delete filter_stmt;
               return rc;
@@ -166,7 +167,7 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
   if (update.is_sub_query) {
     // Create sub-query statement; actual evaluation is deferred to executor where session/trx exist
     Stmt *sub_query_stmt = nullptr;
-    rc                   = Stmt::create_stmt(db, *update.sub_query, sub_query_stmt);
+    rc                   = Stmt::create_stmt(db, *update.sub_query, sub_query_stmt, &bind_context);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to create sub-query statement. rc=%d:%s", rc, strrc(rc));
       delete filter_stmt;
