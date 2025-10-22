@@ -1386,14 +1386,18 @@ condition:
     {
       $$ = new ConditionSqlNode;
       $$->left_expr.reset($1);
-      $$->sub_query.reset($4);
+      //$$->sub_query.reset($4);
+      unique_ptr<Expression> one = std::make_unique<SubQueryExpr>(std::move($4->selection)); 
+      $$->right_expr = std::move(one);
       $$->comp = IN_OP;
     }
     | expression NOT IN LBRACE sub_query RBRACE
     {
       $$ = new ConditionSqlNode;
       $$->left_expr.reset($1);
-      $$->sub_query.reset($5);
+      //$$->sub_query.reset($5);
+      unique_ptr<Expression> one = std::make_unique<SubQueryExpr>(std::move($5->selection)); 
+      $$->right_expr = std::move(one);
       $$->comp = NOT_IN_OP;
     }
     | expression IS NULL_T
@@ -1415,13 +1419,20 @@ condition:
     | EXISTS LBRACE sub_query RBRACE
     {
       $$ = new ConditionSqlNode;
-      $$->sub_query.reset($3);
+      // $$->sub_query.reset($3);
+      unique_ptr<Expression> one = std::make_unique<SubQueryExpr>(std::move($3->selection)); 
+      $$->right_expr = std::move(one);
+      $$->left_expr = std::make_unique<NothingExpr>();
       $$->comp = EXISTS_OP;
     }
     | NOT EXISTS LBRACE sub_query RBRACE
     {
       $$ = new ConditionSqlNode;
-      $$->sub_query.reset($4);
+      //$$->sub_query.reset($4);
+      unique_ptr<Expression> one = std::make_unique<SubQueryExpr>(std::move($4->selection)); 
+      $$->right_expr = std::move(one);
+      $$->left_expr = std::make_unique<NothingExpr>();
+
       $$->comp = NOT_EXISTS_OP;
     }
     ;

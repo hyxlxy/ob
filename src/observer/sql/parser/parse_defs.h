@@ -27,10 +27,10 @@ struct ParsedSqlNode;
  */
 struct UpdateItemSqlNode
 {
-  string attr_name;                                 ///< 列名
-  bool is_sub_query = false;                        ///< 是否为子查询项
-  Value value;                                      ///< 常量值（当 is_sub_query=false 时有效）
-  std::unique_ptr<ParsedSqlNode> sub_query;         ///< 子查询（当 is_sub_query=true 时有效，flag=SCF_SELECT）
+  string                         attr_name;             ///< 列名
+  bool                           is_sub_query = false;  ///< 是否为子查询项
+  Value                          value;                 ///< 常量值（当 is_sub_query=false 时有效）
+  std::unique_ptr<ParsedSqlNode> sub_query;  ///< 子查询（当 is_sub_query=true 时有效，flag=SCF_SELECT）
 };
 
 /**
@@ -56,22 +56,22 @@ struct RelAttrSqlNode
  */
 enum CompOp
 {
-  EQUAL_TO,     ///< "="
-  LESS_EQUAL,   ///< "<="
-  NOT_EQUAL,    ///< "<>"
-  LESS_THAN,    ///< "<"
-  GREAT_EQUAL,  ///< ">="
-  GREAT_THAN,   ///< ">"
-  LIKE_OP,      ///< "LIKE"
-  NOT_LIKE_OP,  ///< "NOT LIKE"
-  IN_OP,        ///< "IN"
-  NOT_IN_OP,    ///< "NOT IN"
-  IN_VALUES_OP, ///< "IN (values)"
-  NOT_IN_VALUES_OP, ///< "NOT IN (values)"
-  EXISTS_OP,    ///< "EXISTS"
-  NOT_EXISTS_OP,///< "NOT EXISTS"
-  IS_NULL_OP,     ///< "IS NULL"
-  IS_NOT_NULL_OP, ///< "IS NOT NULL"
+  EQUAL_TO,          ///< "="
+  LESS_EQUAL,        ///< "<="
+  NOT_EQUAL,         ///< "<>"
+  LESS_THAN,         ///< "<"
+  GREAT_EQUAL,       ///< ">="
+  GREAT_THAN,        ///< ">"
+  LIKE_OP,           ///< "LIKE"
+  NOT_LIKE_OP,       ///< "NOT LIKE"
+  IN_OP,             ///< "IN"
+  NOT_IN_OP,         ///< "NOT IN"
+  IN_VALUES_OP,      ///< "IN (values)"
+  NOT_IN_VALUES_OP,  ///< "NOT IN (values)"
+  EXISTS_OP,         ///< "EXISTS"
+  NOT_EXISTS_OP,     ///< "NOT EXISTS"
+  IS_NULL_OP,        ///< "IS NULL"
+  IS_NOT_NULL_OP,    ///< "IS NOT NULL"
   NO_OP
 };
 
@@ -81,8 +81,8 @@ enum CompOp
  */
 enum ConjunctionOp
 {
-  AND_OP,       ///< "AND"
-  OR_OP         ///< "OR"
+  AND_OP,  ///< "AND"
+  OR_OP    ///< "OR"
 };
 
 /**
@@ -91,8 +91,8 @@ enum ConjunctionOp
  */
 enum OrderDirection
 {
-  ASC_ORDER,    ///< 升序
-  DESC_ORDER    ///< 降序
+  ASC_ORDER,  ///< 升序
+  DESC_ORDER  ///< 降序
 };
 
 /**
@@ -137,14 +137,14 @@ struct ConditionSqlNode
   std::vector<Value> right_values;  ///< values for IN/NOT IN operations
 
   // 新增：支持逻辑连接符
-  ConjunctionOp  conjunction_op;    ///< AND or OR operator
+  ConjunctionOp conjunction_op = ConjunctionOp::AND_OP;  ///< AND or OR operator
 
   // 添加移动构造函数和移动赋值操作符
-  ConditionSqlNode() = default;
-  ConditionSqlNode(const ConditionSqlNode&) = delete;
-  ConditionSqlNode& operator=(const ConditionSqlNode&) = delete;
-  ConditionSqlNode(ConditionSqlNode&&) = default;
-  ConditionSqlNode& operator=(ConditionSqlNode&&) = default;
+  ConditionSqlNode()                                    = default;
+  ConditionSqlNode(const ConditionSqlNode &)            = delete;
+  ConditionSqlNode &operator=(const ConditionSqlNode &) = delete;
+  ConditionSqlNode(ConditionSqlNode &&)                 = default;
+  ConditionSqlNode &operator=(ConditionSqlNode &&)      = default;
 };
 
 /**
@@ -153,7 +153,7 @@ struct ConditionSqlNode
  */
 enum JoinType
 {
-  INNER_JOIN    ///< 内连接
+  INNER_JOIN  ///< 内连接
 };
 
 /**
@@ -163,10 +163,10 @@ enum JoinType
  */
 struct JoinSqlNode
 {
-  string                     table_name;   ///< 要连接的表名
-  string                     alias;        ///< 可选的表别名
-  JoinType                   join_type;    ///< 连接类型
-  vector<ConditionSqlNode>   conditions;   ///< 连接条件
+  string                   table_name;  ///< 要连接的表名
+  string                   alias;       ///< 可选的表别名
+  JoinType                 join_type;   ///< 连接类型
+  vector<ConditionSqlNode> conditions;  ///< 连接条件
 };
 
 /**
@@ -176,17 +176,15 @@ struct JoinSqlNode
  */
 struct TableReferencesSqlNode
 {
-  vector<string>       relations;   ///< 表列表
-  vector<JoinSqlNode>  joins;       ///< JOIN操作列表
+  vector<string>      relations;  ///< 表列表
+  vector<JoinSqlNode> joins;      ///< JOIN操作列表
 };
-
 
 struct RelationWithAliasSqlNode
 {
-  string table_name;  
-  string alias;       
+  string table_name;
+  string alias;
 };
-
 
 /**
  * @brief 描述一个select语句
@@ -201,15 +199,15 @@ struct RelationWithAliasSqlNode
 
 struct SelectSqlNode
 {
-  vector<unique_ptr<Expression>> expressions;   ///< 查询的表达式
-  vector<string>                 relations;     ///< 查询的表
-  vector<string>                 relation_aliases; ///< 与relations一一对应的别名，空字符串表示无别名
-  vector<JoinSqlNode>            joins;         ///< join操作
-  vector<ConditionSqlNode>       conditions;    ///< 查询条件，使用AND串联起来多个条件
-  vector<unique_ptr<Expression>> group_by;      ///< group by clause
-  unique_ptr<Expression>         having_expr;   ///< having clause (expression)
-  vector<OrderBySqlNode>         order_by;      ///< order by clause
-  int                            limit_count = 0; ///< LIMIT 子句（0表示未指定）
+  vector<unique_ptr<Expression>> expressions;       ///< 查询的表达式
+  vector<string>                 relations;         ///< 查询的表
+  vector<string>                 relation_aliases;  ///< 与relations一一对应的别名，空字符串表示无别名
+  vector<JoinSqlNode>            joins;             ///< join操作
+  vector<ConditionSqlNode>       conditions;        ///< 查询条件，使用AND串联起来多个条件
+  vector<unique_ptr<Expression>> group_by;          ///< group by clause
+  unique_ptr<Expression>         having_expr;       ///< having clause (expression)
+  vector<OrderBySqlNode>         order_by;          ///< order by clause
+  int                            limit_count = 0;   ///< LIMIT 子句（0表示未指定）
 };
 
 /**
@@ -220,11 +218,11 @@ struct SelectSqlNode
 struct UnionSqlNode
 {
   vector<unique_ptr<SelectSqlNode>> select_statements;  ///< UNION的多个SELECT语句
-  vector<bool> distinct_flags;  ///< 每个UNION操作的标志位，true表示去重，false表示不去重
-  vector<AttrType> result_types;  ///< 结果集的列类型（由第一个SELECT决定）
-  vector<string> result_names;    ///< 结果集的列名（由第一个SELECT决定）
-  vector<OrderBySqlNode> order_by; ///< UNION结果的ORDER BY子句
-  int limit_count = 0;            ///< UNION结果的LIMIT子句（0表示未指定）
+  vector<bool>           distinct_flags;   ///< 每个UNION操作的标志位，true表示去重，false表示不去重
+  vector<AttrType>       result_types;     ///< 结果集的列类型（由第一个SELECT决定）
+  vector<string>         result_names;     ///< 结果集的列名（由第一个SELECT决定）
+  vector<OrderBySqlNode> order_by;         ///< UNION结果的ORDER BY子句
+  int                    limit_count = 0;  ///< UNION结果的LIMIT子句（0表示未指定）
 };
 
 /**
@@ -263,21 +261,22 @@ struct DeleteSqlNode
  */
 struct UpdateSqlNode
 {
-  string                   relation_name;   ///< Relation to update
-  string                   attribute_name;  ///< 更新的字段（单字段模式）
-  Value                    value;           ///< 更新的值（单字段模式）
-  
+  string relation_name;   ///< Relation to update
+  string attribute_name;  ///< 更新的字段（单字段模式）
+  Value  value;           ///< 更新的值（单字段模式）
+
   // 多字段UPDATE支持
-  vector<string>           attribute_names; ///< 更新的字段列表（多字段模式）
-  vector<Value>            values;          ///< 更新的值列表（多字段模式）
+  vector<string> attribute_names;  ///< 更新的字段列表（多字段模式）
+  vector<Value>  values;           ///< 更新的值列表（多字段模式）
   // 多字段扩展：每个位置要么是常量，要么是子查询
   // 若 value_is_sub_query[i] 为 true，则忽略 values[i]，使用 value_sub_queries[i]
-  vector<bool>             value_is_sub_query;          ///< 与 attribute_names 对齐
-  vector<unique_ptr<ParsedSqlNode>> value_sub_queries;  ///< 与 attribute_names 对齐（仅当对应为子查询时有效，flag=SCF_SELECT）
-  
-  vector<ConditionSqlNode> conditions;
-  bool                     is_sub_query = false;  ///< 是否使用子查询更新
-  std::unique_ptr<ParsedSqlNode> sub_query;       ///< 子查询节点
+  vector<bool>                      value_is_sub_query;  ///< 与 attribute_names 对齐
+  vector<unique_ptr<ParsedSqlNode>> value_sub_queries;   ///< 与 attribute_names
+                                                        ///< 对齐（仅当对应为子查询时有效，flag=SCF_SELECT）
+
+  vector<ConditionSqlNode>       conditions;
+  bool                           is_sub_query = false;  ///< 是否使用子查询更新
+  std::unique_ptr<ParsedSqlNode> sub_query;             ///< 子查询节点
 };
 
 /**
@@ -320,7 +319,7 @@ struct CreateTableSqlNode
 struct DropTableSqlNode
 {
   string relation_name;  ///< 要删除的表名
-  bool if_exists;        ///< 是否使用IF EXISTS
+  bool   if_exists;      ///< 是否使用IF EXISTS
 };
 
 /**
@@ -340,15 +339,13 @@ struct AnalyzeTableSqlNode
  */
 struct CreateIndexSqlNode
 {
-  string index_name;           ///< Index name
-  string relation_name;        ///< Relation name
-  vector<string> attribute_names;  ///< Attribute names (支持多字段)
-  bool is_unique = false;      ///< 是否为唯一索引
+  string         index_name;         ///< Index name
+  string         relation_name;      ///< Relation name
+  vector<string> attribute_names;    ///< Attribute names (支持多字段)
+  bool           is_unique = false;  ///< 是否为唯一索引
 
   // 为了向后兼容，保留单字段访问接口
-  string attribute_name() const {
-    return attribute_names.empty() ? "" : attribute_names[0];
-  }
+  string attribute_name() const { return attribute_names.empty() ? "" : attribute_names[0]; }
 };
 
 /**
@@ -423,7 +420,6 @@ struct ShowIndexSqlNode
 {
   string relation_name;  ///< Table name
 };
-
 
 /**
  * @brief 描述一个explain语句
@@ -513,6 +509,7 @@ public:
 
 public:
   ParsedSqlNode();
+  ParsedSqlNode(ParsedSqlNode &&) = default;
   explicit ParsedSqlNode(SqlCommandFlag flag);
   ~ParsedSqlNode() = default;  // 使用默认析构函数，因为成员都是RAII类型
 };

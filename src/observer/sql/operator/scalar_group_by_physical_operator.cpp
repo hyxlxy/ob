@@ -35,7 +35,11 @@ RC ScalarGroupByPhysicalOperator::open(Trx *trx)
   }
 
   PhysicalOperator &child = *children_[0];
-  RC                rc    = child.open(trx);
+  if (parent_tuple_ != nullptr) {
+    cout << "set parent tuple" << endl;
+    child.set_parent_tuple(parent_tuple_);
+  }
+  RC rc = child.open(trx);
   if (OB_FAIL(rc)) {
     LOG_INFO("failed to open child operator. rc=%s", strrc(rc));
     return rc;
@@ -45,8 +49,8 @@ RC ScalarGroupByPhysicalOperator::open(Trx *trx)
 
   ValueListTuple group_by_evaluated_tuple;
 
-  int processed_rows = 0;
-  const int MAX_ROWS_PER_QUERY = 1000000; // 防止处理过多行
+  int       processed_rows     = 0;
+  const int MAX_ROWS_PER_QUERY = 1000000;  // 防止处理过多行
 
   while (OB_SUCC(rc = child.next())) {
     // 防止处理过多行导致内存问题

@@ -54,20 +54,22 @@ private:
 
   RC create_group_by_plan(SelectStmt *select_stmt, unique_ptr<LogicalOperator> &logical_operator);
 
-
   int implicit_cast_cost(AttrType from, AttrType to);
 
   // JOIN条件处理辅助函数
   bool is_join_condition(Expression *expr, const vector<Table *> &tables);
   bool involves_tables(Expression *expr, LogicalOperator *left_oper, LogicalOperator *right_oper);
-  
+
   // 条件树处理方法
   RC create_expression_from_condition_tree(FilterConditionNode *node, unique_ptr<Expression> &expr);
 
   // HAVING子句聚合表达式收集辅助函数
   void collect_having_aggregates(Expression *expr, vector<Expression *> &aggregate_expressions);
 
+  void set_out_binder(BinderContext one) { out_binder_ = one; }
+
 private:
   BinderContext binder_context_;
+  BinderContext out_binder_;
   bool          binder_ctx_initialized_ = false;
 };

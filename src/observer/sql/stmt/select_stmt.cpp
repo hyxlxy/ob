@@ -39,7 +39,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
   }
 
   BinderContext binder_context;
-  
+
   // Add outer context for correlated subqueries
   if (outer_context != nullptr) {
     binder_context.add_outer_context(outer_context);
@@ -110,16 +110,16 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
 
   // collect query fields in `select` statement
   vector<unique_ptr<Expression>> bound_expressions;
-  ExpressionBinder expression_binder(binder_context, outer_context);
-  
-  printf("======= SELECT_STMT::CREATE: select_sql.expressions.size() = %zu =======\n", select_sql.expressions.size());
-  
+  ExpressionBinder               expression_binder(binder_context);
+
+  // printf("======= SELECT_STMT::CREATE: select_sql.expressions.size() = %zu =======\n",
+  // select_sql.expressions.size());
+
   for (unique_ptr<Expression> &expression : select_sql.expressions) {
-    printf("Before bind: bound_expressions.size() = %zu, expression type = %d\n", 
-           bound_expressions.size(), static_cast<int>(expression->type()));
+    // printf("Before bind: bound_expressions.size() = %zu, expression type = %d\n",
+    //        bound_expressions.size(), static_cast<int>(expression->type()));
     RC rc = expression_binder.bind_expression(expression, bound_expressions);
-    printf("After bind: rc = %s, bound_expressions.size() = %zu\n", 
-           strrc(rc), bound_expressions.size());
+    // printf("After bind: rc = %s, bound_expressions.size() = %zu\n", strrc(rc), bound_expressions.size());
     if (OB_FAIL(rc)) {
       LOG_INFO("bind expression failed. rc=%s", strrc(rc));
       // 如果是字段不存在错误，可能是关联子查询，返回更友好的错误
@@ -130,8 +130,8 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
       return rc;
     }
   }
-  
-  printf("======= SELECT_STMT::CREATE: Final bound_expressions.size() = %zu =======\n", bound_expressions.size());
+
+  // printf("======= SELECT_STMT::CREATE: Final bound_expressions.size() = %zu =======\n", bound_expressions.size());
 
   vector<unique_ptr<Expression>> group_by_expressions;
   for (unique_ptr<Expression> &expression : select_sql.group_by) {
@@ -146,8 +146,8 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
   unique_ptr<Expression> having_expr;
   if (select_sql.having_expr) {
     vector<unique_ptr<Expression>> temp_bound;
-    unique_ptr<Expression> expr_copy(select_sql.having_expr->copy());
-    RC rc = expression_binder.bind_expression(expr_copy, temp_bound);
+    unique_ptr<Expression>         expr_copy(select_sql.having_expr->copy());
+    RC                             rc = expression_binder.bind_expression(expr_copy, temp_bound);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to bind having expression. rc=%s", strrc(rc));
       return rc;
@@ -172,7 +172,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
       all_conditions.push_back(std::move(condition));
     }
   }
-  
+
   printf("DEBUG: [SELECT_STMT] Creating SelectStmt with %zu conditions\n", all_conditions.size());
 
   // create filter statement in `where` statement
@@ -182,11 +182,13 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
       &table_map,
       all_conditions.data(),
       static_cast<int>(all_conditions.size()),
-      filter_stmt);
+      filter_stmt,
+      &binder_context);
+
   if (rc != RC::SUCCESS) {
     // 对关键错误直接返回，使语义严格；其余保持兼容旧行为
-    if (rc == RC::SCHEMA_FIELD_NOT_EXIST || rc == RC::SCHEMA_FIELD_MISSING ||
-        rc == RC::SQL_SYNTAX || rc == RC::UNIMPLEMENTED || rc == RC::UNSUPPORTED || rc == RC::INVALID_ARGUMENT) {
+    if (rc == RC::SCHEMA_FIELD_NOT_EXIST || rc == RC::SCHEMA_FIELD_MISSING || rc == RC::SQL_SYNTAX ||
+        rc == RC::UNIMPLEMENTED || rc == RC::UNSUPPORTED || rc == RC::INVALID_ARGUMENT) {
       LOG_WARN("FilterStmt creation failed (critical). rc=%s", strrc(rc));
       return rc;
     }
@@ -195,13 +197,11 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
     filter_stmt = new FilterStmt();
   }
 
-
-
   // bind order by expressions
   vector<unique_ptr<Expression>> order_by_expressions;
   vector<OrderDirection>         order_by_directions;
   for (const auto &order_by_item : select_sql.order_by) {
-    unique_ptr<Expression> order_by_expr = order_by_item.expression->copy();
+    unique_ptr<Expression>         order_by_expr = order_by_item.expression->copy();
     vector<unique_ptr<Expression>> temp_bound_expressions;
     rc = expression_binder.bind_expression(order_by_expr, temp_bound_expressions);
     if (rc != RC::SUCCESS) {
@@ -222,7 +222,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
   // 保存表别名：与 tables_ 一一对应（包含 FROM 与 JOIN 的别名，未命名则为空串）
   select_stmt->table_aliases_.swap(aliases_for_tables);
   select_stmt->query_expressions_.swap(bound_expressions);
-  select_stmt->filter_stmt_ = filter_stmt;
+  select_stmt->filter_stmt_    = filter_stmt;
   select_stmt->raw_conditions_ = std::move(all_conditions);  // 移动原始条件
   select_stmt->group_by_.swap(group_by_expressions);
   select_stmt->having_expr_ = std::move(having_expr);

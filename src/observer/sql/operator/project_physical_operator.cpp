@@ -20,9 +20,8 @@ See the Mulan PSL v2 for more details. */
 using namespace std;
 
 ProjectPhysicalOperator::ProjectPhysicalOperator(vector<unique_ptr<Expression>> &&expressions)
-  : expressions_(std::move(expressions)), tuple_(expressions_)
-{
-}
+    : expressions_(std::move(expressions)), tuple_(expressions_)
+{}
 
 RC ProjectPhysicalOperator::open(Trx *trx)
 {
@@ -34,7 +33,11 @@ RC ProjectPhysicalOperator::open(Trx *trx)
   }
 
   PhysicalOperator *child = children_[0].get();
-  RC                rc    = child->open(trx);
+  if (parent_tuple_ != nullptr) {
+    cout << "set parent tuple" << endl;
+    child->set_parent_tuple(parent_tuple_);
+  }
+  RC rc = child->open(trx);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to open child operator: %s", strrc(rc));
     return rc;

@@ -31,13 +31,13 @@ class TableScanPhysicalOperator : public PhysicalOperator
 public:
   TableScanPhysicalOperator(Table *table, ReadWriteMode mode) : table_(table), mode_(mode) {}
 
-  virtual ~TableScanPhysicalOperator() {
-    if (record_scanner_) {
-      delete record_scanner_;
-      record_scanner_ = nullptr;
-    }
-  }
-
+  // virtual ~TableScanPhysicalOperator() {
+  //   if (record_scanner_) {
+  //     delete record_scanner_;
+  //     record_scanner_ = nullptr;
+  //   }
+  // }
+  virtual ~TableScanPhysicalOperator() = default;
   string param() const override;
 
   PhysicalOperatorType type() const override { return PhysicalOperatorType::TABLE_SCAN; }
@@ -80,9 +80,9 @@ private:
   RC filter(RowTuple &tuple, bool &result);
 
 private:
-  Table                         *table_ = nullptr;
-  Trx                           *trx_   = nullptr;
-  ReadWriteMode                  mode_  = ReadWriteMode::READ_WRITE;
+  Table                         *table_          = nullptr;
+  Trx                           *trx_            = nullptr;
+  ReadWriteMode                  mode_           = ReadWriteMode::READ_WRITE;
   RecordScanner                 *record_scanner_ = nullptr;
   Record                         current_record_;
   RowTuple                       tuple_;

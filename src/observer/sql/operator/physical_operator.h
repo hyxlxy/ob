@@ -98,9 +98,9 @@ public:
   vector<unique_ptr<PhysicalOperator>> &children() { return children_; }
 
   // 设置父级 tuple 上下文以支持关联子查询
-  void set_parent_tuple(const Tuple *tuple) { parent_tuple_ = tuple; }
+  void set_parent_tuple(Tuple *tuple) { parent_tuple_ = tuple; }
 
 protected:
   vector<unique_ptr<PhysicalOperator>> children_;
-  const Tuple *parent_tuple_ = nullptr;  // 关联子查询时使用
+  Tuple                               *parent_tuple_ = nullptr;  // 关联子查询时使用
 };
