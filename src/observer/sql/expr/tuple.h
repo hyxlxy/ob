@@ -17,7 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "sql/expr/expression.h"
 #include "sql/expr/tuple_cell.h"
-#include "sql/parser/parse.h"
+// #include "sql/parser/parse.h"
 #include "common/value.h"
 #include "storage/record/record.h"
 
@@ -198,7 +198,7 @@ public:
     cell.reset();
 
     // Use NULL flag bit system like reference code
-    if (field_meta->nullable()) {
+      if (field_meta->nullable()) {
       // Check NULL flag in the last byte of the field
       bool is_null = this->record_->data()[field_meta->offset() + field_meta->len() - 1] == '1';
       if (is_null) {
@@ -207,14 +207,37 @@ public:
         cell.set_null(true);
         // Don't set data for NULL values
       } else {
-        // For non-NULL values, use original type and exclude NULL flag byte from actual data
+        // For non-NULL values
         cell.set_type(field_meta->type());
-        size_t data_len = field_meta->len() - 1;
-
-        // Special handling for string types (CHARS and TEXTS)
-        if (field_meta->type() == AttrType::CHARS || field_meta->type() == AttrType::TEXTS) {
+        if (field_meta->type() == AttrType::TEXTS) {
+          // read offset+len and fetch payload
+          const char *ptr = this->record_->data() + field_meta->offset();
+          uint64_t off = 0; memcpy(&off, ptr, sizeof(uint64_t));
+          uint32_t len = 0; memcpy(&len, ptr + sizeof(uint64_t), sizeof(uint32_t));
+          LOG_DEBUG("TEXT read field=%s off=%llu len=%u nullable=%d",
+                    field_meta->name(), (unsigned long long)off, len, field_meta->nullable());
+          std::string content;
+          // need table to read; here we only have record_ and table_ stored in RowTuple
+          const Table *tbl = table_;
+          if (tbl) {
+            Table *nonconst_tbl = const_cast<Table *>(tbl);
+            if (len > 0) {
+              if (nonconst_tbl->read_text_lob(off, len, content) == RC::SUCCESS) {
+                cell.set_string(content.c_str(), (int)content.size());
+              } else {
+                cell.set_string("", 0);
+              }
+            } else {
+              cell.set_string("", 0);
+            }
+          } else {
+            cell.set_string("", 0);
+          }
+        } else if (field_meta->type() == AttrType::CHARS) {
+          size_t data_len = field_meta->len() - 1;
           cell.set_string(this->record_->data() + field_meta->offset(), data_len);
         } else {
+          size_t data_len = field_meta->len() - 1;
           cell.set_data(this->record_->data() + field_meta->offset(), data_len);
         }
         cell.set_null(false);
@@ -223,8 +246,23 @@ public:
       // For non-nullable fields, use full length and set not null
       cell.set_type(field_meta->type());
 
-      // Special handling for string types (CHARS and TEXTS)
-      if (field_meta->type() == AttrType::CHARS || field_meta->type() == AttrType::TEXTS) {
+      if (field_meta->type() == AttrType::TEXTS) {
+        const char *ptr = this->record_->data() + field_meta->offset();
+        uint64_t off = 0; memcpy(&off, ptr, sizeof(uint64_t));
+        uint32_t len = 0; memcpy(&len, ptr + sizeof(uint64_t), sizeof(uint32_t));
+        std::string content;
+        const Table *tbl = table_;
+        if (tbl) {
+          Table *nonconst_tbl = const_cast<Table *>(tbl);
+          if (len > 0 && nonconst_tbl->read_text_lob(off, len, content) == RC::SUCCESS) {
+            cell.set_string(content.c_str(), (int)content.size());
+          } else {
+            cell.set_string("", 0);
+          }
+        } else {
+          cell.set_string("", 0);
+        }
+      } else if (field_meta->type() == AttrType::CHARS) {
         cell.set_string(this->record_->data() + field_meta->offset(), field_meta->len());
       } else {
         cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());

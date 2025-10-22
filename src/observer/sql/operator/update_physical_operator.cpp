@@ -22,96 +22,7 @@ See the Mulan PSL v2 for more details. */
  * @param field_meta 字段元数据
  * @param value 新值
  */
-static RC set_field_value_to_record(Record *record, const FieldMeta &field_meta, const Value &value)
-{
-  if (!record) {
-    return RC::INVALID_ARGUMENT;
-  }
-
-  char *record_data = record->data();
-  if (!record_data) {
-    return RC::INVALID_ARGUMENT;
-  }
-
-  // Handle NULL values
-  if (value.attr_type() == AttrType::UNDEFINED) {
-    if (field_meta.nullable()) {
-      // For nullable fields, clear the field and set NULL flag in last byte
-      // First clear the entire field
-      memset(record_data + field_meta.offset(), 0, field_meta.len());
-      // Then set NULL flag at the last byte
-      record_data[field_meta.offset() + field_meta.len() - 1] = '1';  // Set NULL flag
-    } else {
-      LOG_WARN("Cannot set NULL to NOT NULL field: %s", field_meta.name());
-      return RC::INVALID_ARGUMENT;
-    }
-    return RC::SUCCESS;  // Return here! Don't continue to copy data
-  }
-
-  // Check type compatibility and convert if necessary
-  Value actual_value;
-  if (field_meta.type() != value.attr_type()) {
-    RC rc = Value::cast_to(value, field_meta.type(), actual_value);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("Failed to cast value for field %s: %s", field_meta.name(), strrc(rc));
-      return rc;
-    }
-  } else {
-    actual_value = value;
-  }
-
-  size_t       copy_len = field_meta.len();
-  const size_t data_len = actual_value.length();
-
-  if (field_meta.type() == AttrType::CHARS || field_meta.type() == AttrType::TEXTS) {
-    // For CHARS and TEXT types, we need to clear the entire field first to avoid leftover data
-    // Clear the entire field space
-    memset(record_data + field_meta.offset(), 0, field_meta.len());
-    
-    // Calculate how much data we can write
-    if (field_meta.nullable()) {
-      copy_len = field_meta.len() - 1;  // Reserve last byte for NULL flag
-    }
-    if (copy_len > data_len) {
-      copy_len = data_len;
-    }
-  } else if (field_meta.type() == AttrType::VECTORS) {
-    // For VECTORS type, handle nullable fields specially
-    if (field_meta.nullable()) {
-      copy_len = field_meta.len() - 1;  // Reserve last byte for NULL flag
-    }
-    // 对于向量类型，需要检查数据长度是否超过字段定义的长度
-    if (data_len > copy_len) {
-      LOG_WARN("Vector data length (%zu) exceeds field length (%zu) for field %s",
-               data_len, copy_len, field_meta.name());
-      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
-    }
-    // 对于向量类型，使用实际数据长度
-    copy_len = data_len;
-  } else {
-    // For fixed-length types (INT, FLOAT, DATE, etc.), always use full data length
-    copy_len = data_len;
-  }
-
-  memcpy(record_data + field_meta.offset(), actual_value.data(), copy_len);
-
-  // For nullable fields, set NULL flag to '0' (not NULL)
-  if (field_meta.nullable()) {
-    if (field_meta.type() == AttrType::CHARS || field_meta.type() == AttrType::TEXTS || 
-        field_meta.type() == AttrType::VECTORS) {
-      // For variable-length types, NULL flag is at the end
-      record_data[field_meta.offset() + field_meta.len() - 1] = '0';
-    } else {
-      // For fixed-length types, we need to place NULL flag after the data
-      // but within the field's allocated space
-      if (copy_len < field_meta.len()) {
-        record_data[field_meta.offset() + field_meta.len() - 1] = '0';
-      }
-    }
-  }
-
-  return RC::SUCCESS;
-}
+// removed custom setter; use Table::set_value_to_record for consistency
 
 RC UpdatePhysicalOperator::open(Trx *trx)
 {
@@ -178,8 +89,33 @@ RC UpdatePhysicalOperator::open(Trx *trx)
         return rc;
       }
       
-      // 设置新值到记录中
-      rc = set_field_value_to_record(&new_record, field_meta, new_value);
+      // 设置新值到记录中，使用表实际元数据中的 FieldMeta，避免长度/偏移不一致
+      const FieldMeta *real_fm = table_->table_meta().field(field_meta.name());
+      if (real_fm == nullptr) {
+        LOG_WARN("failed to find field meta by name %s", field_meta.name());
+        rollback();
+        return RC::SCHEMA_FIELD_NOT_EXIST;
+      }
+      // 执行期对 TEXT 做真实长度计算与上限校验，并传递纠正后的值
+      const Value *pv = &new_value;
+      Value adjusted;
+      if (real_fm->type() == AttrType::TEXTS && !new_value.is_null()) {
+        size_t eff_len = new_value.length();
+        if (new_value.attr_type() == AttrType::CHARS && eff_len == 0 && new_value.data() != nullptr) {
+          eff_len = ::strlen(new_value.data());
+        }
+        LOG_DEBUG("UPDATE TEXT field=%s eff_len=%zu attr_type=%d", real_fm->name(), eff_len, (int)new_value.attr_type());
+        if (eff_len > 65535) {
+          LOG_WARN("TEXT too long on update: %zu > 65535", eff_len);
+          rollback();
+          return RC::INVALID_ARGUMENT;
+        }
+        if (new_value.attr_type() == AttrType::CHARS) {
+          adjusted.set_string(new_value.data(), static_cast<int>(eff_len));
+          pv = &adjusted;
+        }
+      }
+      rc = table_->set_value_to_record(new_record.data(), *pv, real_fm);
       if (rc != RC::SUCCESS) {
         LOG_WARN("failed to set field value for field %s: %s", field_meta.name(), strrc(rc));
         rollback();

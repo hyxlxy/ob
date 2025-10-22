@@ -1,19 +1,33 @@
-create table text_table(id int, info text);
-insert into text_table values (1,'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+CREATE TABLE t_text(id INT, article TEXT);
+INSERT INTO t_text VALUES(1, 'hello');
+SELECT id, article FROM t_text;
+INSERT INTO t_text VALUES(2, '');
+SELECT id, article FROM t_text WHERE id=2;
+INSERT INTO t_text VALUES(3, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+SELECT LENGTH(article) FROM t_text WHERE id=3;
+INSERT INTO t_text VALUES(4, REPEAT('b', 70000));
 
-select * from text_table;
+CREATE TABLE text_table(id int, info text);
+INSERT INTO text_table VALUES (1,'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+INSERT INTO text_table VALUES (6, REPEAT('A', 65535));
+SELECT LENGTH(info) FROM text_table WHERE id=6;
+UPDATE text_table SET info = REPEAT('X', 65535) WHERE id=6;
+SELECT LENGTH(info) FROM text_table WHERE id=6;
+UPDATE text_table SET info = REPEAT('Y', 65536) WHERE id=6;
+UPDATE text_table SET info='SHORT' WHERE id=6;
+SELECT id, info FROM text_table WHERE id=6;
+INSERT INTO text_table VALUES (7, REPEAT('Z', 65536));
+DELETE FROM text_table WHERE id=1;
+SELECT * FROM text_table;
 
+CREATE TABLE t_null(id INT, article TEXT NULL);
+INSERT INTO t_null VALUES (1, NULL);
+SELECT id, article FROM t_null;
+SELECT id FROM t_null WHERE article IS NULL;
+UPDATE t_null SET article='X' WHERE id=1;
+SELECT LENGTH(article) FROM t_null WHERE id=1;
+UPDATE t_null SET article=NULL WHERE id=1;
+SELECT id FROM t_null WHERE article IS NULL;
 
-insert into text_table values (2, 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb');
-select * from text_table where id=2;
-
-insert into text_table values (3, '');
-update text_table set info = repeat('x', 65535) where id=3;
-select length(info) from text_table where id=3;
-
-insert into text_table values (4, repeat('y', 65536));
-
-update text_table set info='short' where id=2;
-delete from text_table where id=1;
-insert into text_table values (5, 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz');
-select * from text_table;
+UPDATE t_text SET article='' WHERE id=1;
+SELECT LENGTH(article) FROM t_text WHERE id=1;
