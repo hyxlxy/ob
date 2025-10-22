@@ -545,6 +545,9 @@ attr_def:
       // For VECTOR(n), store bytes for [dimension(int32) + n float32 values]
       if ($$->type == AttrType::VECTORS) {
         $$->length = static_cast<int>(sizeof(int) + ($4 * sizeof(float)));
+      } else if ($$->type == AttrType::TEXTS) {
+        // TEXT stores offset(8)+length(4) in-row
+        $$->length = static_cast<int>(8 + 4);
       } else {
         $$->length = $4;
       }
@@ -558,6 +561,9 @@ attr_def:
       // For VECTOR(n), store bytes for [dimension(int32) + n float32 values]
       if ($$->type == AttrType::VECTORS) {
         $$->length = static_cast<int>(sizeof(int) + ($4 * sizeof(float)));
+      } else if ($$->type == AttrType::TEXTS) {
+        // TEXT in-row header size
+        $$->length = static_cast<int>(8 + 4);
       } else {
         $$->length = $4;
       }
@@ -575,6 +581,8 @@ attr_def:
       // For VECTOR(n), store bytes for [dimension(int32) + n float32 values]
       if ($$->type == AttrType::VECTORS) {
         $$->length = static_cast<int>(sizeof(int) + ($4 * sizeof(float)));
+      } else if ($$->type == AttrType::TEXTS) {
+        $$->length = static_cast<int>(8 + 4);
       } else {
         $$->length = $4;
       }
@@ -585,11 +593,11 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->nullable = false;  // default NOT NULL
-      // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension); TEXT default 65535
+      // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension); TEXT header 12
       if ($$->type == AttrType::VECTORS) {
         $$->length = static_cast<int>(sizeof(int));
       } else if ($$->type == AttrType::TEXTS) {
-        $$->length = 255;  // TEXT default length (reduced for testing)
+        $$->length = static_cast<int>(8 + 4);
       } else {
         $$->length = 4;
       }
@@ -600,11 +608,11 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->nullable = true;  // explicitly nullable
-      // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension); TEXT default 65535
+      // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension); TEXT header 12
       if ($$->type == AttrType::VECTORS) {
         $$->length = static_cast<int>(sizeof(int));
       } else if ($$->type == AttrType::TEXTS) {
-        $$->length = 255;  // TEXT default length (reduced for testing)
+        $$->length = static_cast<int>(8 + 4);
       } else {
         $$->length = 4;
       }
@@ -619,11 +627,11 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->nullable = false;  // explicitly not nullable
-      // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension); TEXT default 65535
+      // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension); TEXT header 12
       if ($$->type == AttrType::VECTORS) {
         $$->length = static_cast<int>(sizeof(int));
       } else if ($$->type == AttrType::TEXTS) {
-        $$->length = 255;  // TEXT default length (reduced for testing)
+        $$->length = static_cast<int>(8 + 4);
       } else {
         $$->length = 4;
       }
@@ -886,6 +894,51 @@ update_kv_list:
         if (root->flag == SCF_UPDATE) {
           root->update.attribute_names.push_back($3);
           root->update.values.push_back(*$5);
+          root->update.value_is_sub_query.push_back(false);
+          root->update.value_sub_queries.emplace_back(nullptr);
+        }
+      }
+      delete $5;
+    }
+    // 允许函数或一般表达式作为赋值右侧：ID = expression
+    | ID EQ expression
+    {
+      $$ = new vector<pair<string, Value>>();
+      // 尝试在解析期将表达式折叠为常量；失败则报错以保持简化实现
+      Value __v; RC __rc = $3->try_get_value(__v);
+      if (__rc != RC::SUCCESS) {
+        yyerror(&@$, sql_string, sql_result, scanner, "Only constant or foldable expressions are allowed in UPDATE SET");
+        delete $3;
+        YYERROR;
+      }
+      $$->push_back({$1, __v});
+      if ($$ && sql_result && !sql_result->sql_nodes().empty()) {
+        ParsedSqlNode *root = sql_result->sql_nodes().back().get();
+        if (root->flag == SCF_UPDATE) {
+          root->update.attribute_names.push_back($1);
+          root->update.values.push_back(__v);
+          root->update.value_is_sub_query.push_back(false);
+          root->update.value_sub_queries.emplace_back(nullptr);
+        }
+      }
+      delete $3;
+    }
+    | update_kv_list COMMA ID EQ expression
+    {
+      // 叠加一个可折叠表达式
+      Value __v; RC __rc = $5->try_get_value(__v);
+      if (__rc != RC::SUCCESS) {
+        yyerror(&@$, sql_string, sql_result, scanner, "Only constant or foldable expressions are allowed in UPDATE SET");
+        delete $5;
+        YYERROR;
+      }
+      $1->push_back({$3, __v});
+      $$ = $1;
+      if ($$ && sql_result && !sql_result->sql_nodes().empty()) {
+        ParsedSqlNode *root = sql_result->sql_nodes().back().get();
+        if (root->flag == SCF_UPDATE) {
+          root->update.attribute_names.push_back($3);
+          root->update.values.push_back(__v);
           root->update.value_is_sub_query.push_back(false);
           root->update.value_sub_queries.emplace_back(nullptr);
         }

@@ -1,0 +1,21 @@
+
+create table big_order_by_0(i0 int, i1 int, i2 int, i3 int, i4 int, i5 int, i6 int, i7 int, i8 int, i9 int, i10 int, i11 int, i12 int, i13 int, i14 int, i15 int, i16 int, i17 int, i18 int, i19 int);
+create table big_order_by_1(i0 int, i1 int, i2 int, i3 int, i4 int, i5 int, i6 int, i7 int, i8 int, i9 int, i10 int, i11 int, i12 int, i13 int, i14 int, i15 int, i16 int, i17 int, i18 int, i19 int);
+create table big_order_by_2(i0 int, i1 int, i2 int, i3 int, i4 int, i5 int, i6 int, i7 int, i8 int, i9 int, i10 int, i11 int, i12 int, i13 int, i14 int, i15 int, i16 int, i17 int, i18 int, i19 int);
+create table big_order_by_3(i0 int, i1 int, i2 int, i3 int, i4 int, i5 int, i6 int, i7 int, i8 int, i9 int, i10 int, i11 int, i12 int, i13 int, i14 int, i15 int, i16 int, i17 int, i18 int, i19 int);
+
+
+insert into big_order_by_0 values (92867,159098,112369,146135,115970,52260,126297,125090,8781,159287,6227,100377,101365,151114,48444,14118,31856,12664,32848,140816);
+insert into big_order_by_0 values (41903,70912,98440,78014,39802,154504,139359,88243,31079,68805,125423,104808,142578,126167,91207,126157,145136,11024,140293,128284);
+insert into big_order_by_0 values (28106,67797,109615,97387,15265,124821,71031,17817,63607,113678,112349,144339,72383,30147,92572,139223,144004,15949,117467,107882);
+insert into big_order_by_1 values (105840,123003,65389,46036,107741,69357,105844,145489,79352,19588,128055,88417,61647,145962,105689,155363,14163,78574,32492,155165);
+insert into big_order_by_1 values (123116,13738,146042,96157,23189,22142,133941,45792,159846,71549,67044,27542,82364,82802,61224,88228,158993,138756,30344,118805);
+insert into big_order_by_2 values (518,432,123,456,789,101,112,131,415,161,718,192,212,223,242,526,272,829,303,313);
+insert into big_order_by_2 values (100,200,300,400,500,600,700,800,900,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000);
+insert into big_order_by_3 values (7,6,5,4,3,2,1,0,9,8,7,6,5,4,3,2,1,0,9,8);
+insert into big_order_by_3 values (9,8,7,6,5,4,3,2,1,0,9,8,7,6,5,4,3,2,1,0);
+
+select big_order_by_1.i0, big_order_by_1.i15, big_order_by_0.i11 from big_order_by_0, big_order_by_1 order by big_order_by_1.i0 asc, big_order_by_1.i15 asc, big_order_by_0.i11 desc limit 20;
+select big_order_by_1.i0, big_order_by_0.i11 from big_order_by_0, big_order_by_1 order by big_order_by_1.i0 asc limit 20;
+select big_order_by_1.i0, big_order_by_3.i4, big_order_by_1.i15, big_order_by_0.i11 from big_order_by_0, big_order_by_1, big_order_by_3 order by big_order_by_1.i0 asc, big_order_by_3.i4 asc, big_order_by_1.i15 asc, big_order_by_0.i11 desc limit 20;
+select big_order_by_1.i0, big_order_by_3.i4, big_order_by_1.i15, big_order_by_0.i11, big_order_by_2.i0 from big_order_by_0, big_order_by_1, big_order_by_2, big_order_by_3 order by big_order_by_1.i0 asc, big_order_by_3.i4 asc, big_order_by_1.i15 asc, big_order_by_0.i11 desc, big_order_by_2.i0 asc limit 20;

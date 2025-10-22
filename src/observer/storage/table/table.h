@@ -47,6 +47,7 @@ public:
   // TODO: use TableEngine replace Table
   friend class TableEngine;
   friend class HeapTableEngine;
+  friend class UpdatePhysicalOperator; // allow update operator to reuse record write helper
 
   /**
    * 创建一个表
@@ -136,7 +137,10 @@ public:
   bool is_view() const { return table_meta_.is_view(); }
   const string &select_sql() const { return table_meta_.select_sql(); }
 
-private:
+  // TEXT LOB helpers
+  RC append_text_lob(const char *data, uint32_t len, uint64_t &offset);
+  RC read_text_lob(uint64_t offset, uint32_t len, std::string &out) const;
+
   RC set_value_to_record(char *record_data, const Value &value, const FieldMeta *field);
 
 private:

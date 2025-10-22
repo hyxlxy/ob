@@ -1,0 +1,7 @@
+
+CREATE TABLE csq_1(id int, col1 int, feat1 float);
+CREATE TABLE csq_2(id int, col2 int, feat2 float);
+CREATE TABLE csq_3(id int, col3 int, feat3 float);
+CREATE TABLE csq_4(id int, col4 int, feat4 float);
+INSERT INTO csq_1 VALUES (67, 16, 42.55);
+select * from csq_1 where (select max(csq_2.feat2) from csq_2) > feat1 and exists (select * from csq_3 where csq_3.col3 < csq_1.col1);

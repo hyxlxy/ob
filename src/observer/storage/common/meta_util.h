@@ -25,3 +25,4 @@ string db_meta_file(const char *base_dir, const char *db_name);
 string table_meta_file(const char *base_dir, const char *table_name);
 string table_data_file(const char *base_dir, const char *table_name);
 string table_index_file(const char *base_dir, const char *table_name, const char *index_name);
+string table_text_lob_file(const char *base_dir, const char *table_name);

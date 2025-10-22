@@ -48,6 +48,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/sort_physical_operator.h"
 #include "sql/operator/order_by_logical_operator.h"
 #include "sql/operator/order_by_physical_operator.h"
+#include "sql/operator/external_sort_physical_operator.h"
 #include "sql/operator/limit_logical_operator.h"
 #include "sql/operator/limit_physical_operator.h"
 #include "sql/operator/table_scan_vec_physical_operator.h"
@@ -56,6 +57,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/union_logical_operator.h"
 #include "sql/operator/union_physical_operator.h"
 #include "sql/optimizer/physical_plan_generator.h"
+#include "event/sql_debug.h"
 
 using namespace std;
 
@@ -184,9 +186,6 @@ RC PhysicalPlanGenerator::create_plan(OrderByLogicalOperator &logical_oper, uniq
     order_by_expressions.emplace_back(expr->copy());
   }
 
-  auto order_by_oper = make_unique<OrderByPhysicalOperator>(std::move(order_by_expressions),
-                                                            logical_oper.order_by_directions());
-
   ASSERT(logical_oper.children().size() == 1, "order by operator should have 1 child");
 
   LogicalOperator             &child_oper = *logical_oper.children().front();
@@ -197,8 +196,27 @@ RC PhysicalPlanGenerator::create_plan(OrderByLogicalOperator &logical_oper, uniq
     return rc;
   }
 
-  order_by_oper->add_child(std::move(child_physical_oper));
+  // Heuristic: use external sort only for single-source scans; otherwise fallback to in-memory ORDER BY
+  bool use_external = false;
+  if (child_physical_oper) {
+    auto t = child_physical_oper->type();
+    if (t == PhysicalOperatorType::TABLE_SCAN || t == PhysicalOperatorType::INDEX_SCAN || t == PhysicalOperatorType::TABLE_SCAN_VEC) {
+      use_external = true;
+    }
+  }
 
+  unique_ptr<PhysicalOperator> order_by_oper;
+  if (use_external) {
+    order_by_oper.reset(new ExternalSortPhysicalOperator(std::move(order_by_expressions),
+                                                         logical_oper.order_by_directions(),
+                                                         300ULL * 1024ULL * 1024ULL));
+  } else {
+    order_by_oper.reset(new OrderByPhysicalOperator(std::move(order_by_expressions),
+                                                    logical_oper.order_by_directions()));
+  }
+
+  order_by_oper->add_child(std::move(child_physical_oper));
+  sql_debug("PLAN ORDER_BY use_external=%d", use_external ? 1 : 0);
   oper = std::move(order_by_oper);
   return rc;
 }
@@ -281,6 +299,17 @@ RC PhysicalPlanGenerator::create_plan(LimitLogicalOperator &logical_oper, unique
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to create child physical operator of limit operator. rc=%s", strrc(rc));
     return rc;
+  }
+
+  // push down LIMIT to external sort if applicable
+  if (child_physical_oper && child_oper.type() == LogicalOperatorType::ORDER_BY) {
+    if (auto *ext = dynamic_cast<ExternalSortPhysicalOperator *>(child_physical_oper.get())) {
+      size_t k = static_cast<size_t>(logical_oper.limit_count());
+      if (k > 0) {
+        ext->set_top_k(k);
+        sql_debug("PLAN LIMIT pushdown k=%zu", k);
+      }
+    }
   }
 
   limit_oper->add_child(std::move(child_physical_oper));
