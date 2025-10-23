@@ -24,22 +24,30 @@ public:
   virtual ~BinderContext() = default;
 
   // Add a table into current query context and register its real name
-  void add_table(Table *table) {
+  void add_table(Table *table)
+  {
     query_tables_.push_back(table);
-    if (table != nullptr) {
-      name_to_table_[table->name()] = table;
-    }
+    // if (table != nullptr) {
+    //   name_to_table_[table->name()] = table;
+    // }
   }
 
   // Register an additional name (e.g., alias) for a table
-  void add_table_with_name(Table *table, const char *name) {
-    if (table != nullptr && name != nullptr) {
-      name_to_table_[name] = table;
+  RC add_table_with_name(Table *table, const string &name)
+  {
+    if (name.empty()) {
+      return RC::SUCCESS;
     }
+    if (name_to_table_.count(name)) {
+      return RC::ERROR;
+    }
+    name_to_table_[name] = table;
+    return RC::SUCCESS;
   }
 
   // Add outer query context for correlated subqueries
-  void add_outer_context(const BinderContext *outer_context) {
+  void add_outer_context(const BinderContext *outer_context)
+  {
     if (outer_context != nullptr) {
       outer_contexts_.push_back(outer_context);
     }
@@ -50,9 +58,9 @@ public:
   const vector<Table *> &query_tables() const { return query_tables_; }
 
 private:
-  vector<Table *>                query_tables_;
+  vector<Table *>                     query_tables_;
   std::unordered_map<string, Table *> name_to_table_;
-  vector<const BinderContext *>  outer_contexts_;  // 外层查询上下文
+  vector<const BinderContext *>       outer_contexts_;  // 外层查询上下文
 };
 
 /**
@@ -62,8 +70,9 @@ private:
 class ExpressionBinder
 {
 public:
-  ExpressionBinder(BinderContext &context, const BinderContext *outer_context = nullptr) 
-    : context_(context), outer_context_(outer_context) {}
+  ExpressionBinder(BinderContext &context, const BinderContext *outer_context = nullptr)
+      : context_(context), outer_context_(outer_context)
+  {}
   virtual ~ExpressionBinder() = default;
 
   RC bind_expression(unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions);
@@ -81,14 +90,12 @@ private:
       unique_ptr<Expression> &conjunction_expr, vector<unique_ptr<Expression>> &bound_expressions);
   RC bind_arithmetic_expression(
       unique_ptr<Expression> &arithmetic_expr, vector<unique_ptr<Expression>> &bound_expressions);
-  RC bind_function_expression(
-      unique_ptr<Expression> &function_expr, vector<unique_ptr<Expression>> &bound_expressions);
+  RC bind_function_expression(unique_ptr<Expression> &function_expr, vector<unique_ptr<Expression>> &bound_expressions);
   RC bind_aggregate_expression(
       unique_ptr<Expression> &aggregate_expr, vector<unique_ptr<Expression>> &bound_expressions);
-  RC bind_list_expression(
-      unique_ptr<Expression> &list_expr, vector<unique_ptr<Expression>> &bound_expressions);
+  RC bind_list_expression(unique_ptr<Expression> &list_expr, vector<unique_ptr<Expression>> &bound_expressions);
 
 private:
-  BinderContext &context_;
+  BinderContext       &context_;
   const BinderContext *outer_context_;
 };

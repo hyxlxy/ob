@@ -68,7 +68,10 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
 
     binder_context.add_table(table);
     if (alias_name != nullptr) {
-      binder_context.add_table_with_name(table, alias_name);
+      RC rc = binder_context.add_table_with_name(table, alias_name);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
     }
     tables.push_back(table);
     aliases_for_tables.emplace_back(alias_name != nullptr ? alias_name : "");
@@ -98,7 +101,10 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
 
     binder_context.add_table(table);
     if (alias_name != nullptr) {
-      binder_context.add_table_with_name(table, alias_name);
+      RC rc = binder_context.add_table_with_name(table, alias_name);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
     }
     tables.push_back(table);
     aliases_for_tables.emplace_back(alias_name != nullptr ? alias_name : "");
