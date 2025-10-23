@@ -1,0 +1,96 @@
+#owner: shouju.zyp 
+#owner group: RS
+#tags: schema
+#description: check sys view definition in mysql
+--disable_abort_on_error
+connect (sys,$OBMYSQL_MS0,root,,oceanbase,$OBMYSQL_PORT);
+connect (mysql,$OBMYSQL_MS0,root@mysql,,test,$OBMYSQL_PORT);
+connection sys;
+let $tenant_id = query_get_value(select tenant_id from oceanbase.__all_tenant where tenant_name = 'mysql', tenant_id, 1);
+let $cnt = query_get_value(select count(*) as cnt from oceanbase.__all_virtual_table where tenant_id = $tenant_id and table_type = 1, cnt, 1);
+
+##gather some necessary sys table stat.
+connection mysql;
+--source mysql_test/test_suite/histogram/include/gather_sys_table_stat.inc
+
+let $check_tenant_id=$tenant_id;
+connect (connection_sys,$OBMYSQL_MS0,root,,oceanbase,$OBMYSQL_PORT);
+connect (connection_tenant,$OBMYSQL_MS0,root@mysql,,test,$OBMYSQL_PORT);
+let $query_type_2_str='|KEY_COLUMN_USAGE|';
+let $query_type_3_str='';
+let $query_type_4_str='|V\$OB_SS_SSTABLES|';
+--source mysql_test/test_suite/inner_table/t/desc_all_views.inc
+
+--disable_query_log
+--disable_result_log
+let $check_time = 120;
+while ($check_time > 0)
+{
+  connection sys;
+  let $view_not_compiled=query_get_value(select count(*) a from oceanbase.__all_virtual_table where table_id > 20000 and table_id < 25000 and tenant_id = $tenant_id and table_id not in (select distinct table_id from oceanbase.__all_virtual_column where tenant_id = $tenant_id), a, 1);
+  if ($view_not_compiled == 0)
+  {
+    let $check_time = 0;
+  }
+  --source mysql_test/test_suite/inner_table/t/desc_all_views.inc
+  dec $check_time;
+  sleep 1;
+}
+--enable_query_log
+--enable_result_log
+
+if ($view_not_compiled != 0)
+{
+  --echo there is view not compiled
+  --exit
+}
+
+--disable_warnings
+select case cnt when 0 then NULL else 'UNEXPECTED ERROR: It is expected to be an empty set, which means that all GV$ and V$ view column names are defined consistently' end ERROR_INFO from (select /*+no_rewrite*/ count(*) cnt from
+(SELECT t.table_name,
+       group_concat(c.column_name) as column_name_list
+FROM   oceanbase.__all_table t,
+        oceanbase.__all_column c
+WHERE  c.table_id = t.table_id
+       AND t.table_id > 20000
+       AND t.table_id < 25000
+       AND t.table_id != 21342
+       AND t.object_status = 1
+       AND t.table_name LIKE 'V$%'
+GROUP  BY t.table_name) t1
+join
+(SELECT t.table_name,
+       group_concat(c.column_name) as column_name_list
+FROM   oceanbase.__all_table t,
+        oceanbase.__all_column c
+WHERE  c.table_id = t.table_id
+       AND t.table_id > 20000
+       AND t.table_id < 25000
+       AND t.table_name LIKE 'GV$%'
+GROUP  BY t.table_name) t2
+on t1.table_name = substr(t2.table_name,2) and t1.column_name_list != t2.column_name_list) T;
+
+
+select /*+no_rewrite*/ t1.table_name,t2.table_name from
+(SELECT t.table_name,
+       group_concat(c.column_name) as column_name_list
+FROM   oceanbase.__all_table t,
+        oceanbase.__all_column c
+WHERE  c.table_id = t.table_id
+       AND t.table_id > 20000
+       AND t.table_id < 25000
+       AND t.table_id != 21342
+       AND t.object_status = 1
+       AND t.table_name LIKE 'V$%'
+GROUP  BY t.table_name) t1
+join
+(SELECT t.table_name,
+       group_concat(c.column_name) as column_name_list
+FROM   oceanbase.__all_table t,
+        oceanbase.__all_column c
+WHERE  c.table_id = t.table_id
+       AND t.table_id > 20000
+       AND t.table_id < 25000
+       AND t.table_name LIKE 'GV$%'
+GROUP  BY t.table_name) t2
+on t1.table_name = substr(t2.table_name,2) and t1.column_name_list != t2.column_name_list;
