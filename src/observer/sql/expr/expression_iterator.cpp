@@ -102,6 +102,7 @@ RC ExpressionIterator::iterate_child_expr(Expression &expr, function<RC(unique_p
       // TODO: Add support for UNBOUND_AGGREGATION expression iteration if needed
     } break;
 
+    case ExprType::NOTHING:
     case ExprType::NONE:
     case ExprType::STAR:
     case ExprType::UNBOUND_FIELD:

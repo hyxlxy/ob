@@ -13,11 +13,12 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/stmt/update_stmt.h"
+#include "sql/stmt/select_stmt.h"
 #include "sql/stmt/filter_stmt.h"
 #include "common/log/log.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
- 
+#include "sql/parser/expression_binder.h"
 
 UpdateStmt::UpdateStmt(Table *table, Value *values, int value_amount)
     : table_(table), values_(values), value_amount_(value_amount)
@@ -31,7 +32,8 @@ UpdateStmt::UpdateStmt(Table *table, const FieldMeta *field_meta, Stmt *sub_quer
     : table_(table), field_meta_(field_meta), filter_stmt_(filter_stmt), sub_query_stmt_(sub_query_stmt)
 {}
 
-UpdateStmt::UpdateStmt(Table *table, const vector<const FieldMeta *> &field_metas, const vector<Value> &values, FilterStmt *filter_stmt)
+UpdateStmt::UpdateStmt(
+    Table *table, const vector<const FieldMeta *> &field_metas, const vector<Value> &values, FilterStmt *filter_stmt)
     : table_(table), filter_stmt_(filter_stmt), field_metas_(field_metas), multi_values_(values)
 {}
 
@@ -51,7 +53,7 @@ UpdateStmt::~UpdateStmt()
   }
 }
 
-RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
+RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
 {
   const char *table_name = update.relation_name.c_str();
   if (nullptr == db || nullptr == table_name) {
@@ -67,12 +69,19 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
   }
 
   // create filter statement for WHERE clause
-  FilterStmt *filter_stmt = nullptr;
+  FilterStmt                    *filter_stmt = nullptr;
   unordered_map<string, Table *> table_map;
+  BinderContext                  bind_context;
   table_map.insert(pair<string, Table *>(string(table_name), table));
+  bind_context.add_table(table);
 
-  RC rc = FilterStmt::create(db, table, &table_map,
-                             update.conditions.data(), static_cast<int>(update.conditions.size()), filter_stmt);
+  RC rc = FilterStmt::create(db,
+      table,
+      &table_map,
+      update.conditions.data(),
+      static_cast<int>(update.conditions.size()),
+      filter_stmt,
+      &bind_context);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create filter statement. rc=%d:%s", rc, strrc(rc));
     return rc;
@@ -95,7 +104,7 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
     vector<Value> values = update.values;
     // 构造 per-field 子查询占位
     vector<Stmt *> sub_queries;
-    vector<bool>  is_sub_query;
+    vector<bool>   is_sub_query;
     sub_queries.reserve(update.attribute_names.size());
     is_sub_query.reserve(update.attribute_names.size());
 
@@ -112,7 +121,7 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
             sub_queries.push_back(nullptr);
             is_sub_query.push_back(false);
           } else {
-            rc = Stmt::create_stmt(db, *update.value_sub_queries[i], sub_stmt);
+            rc = Stmt::create_stmt(db, *update.value_sub_queries[i], sub_stmt, &bind_context);
             if (rc != RC::SUCCESS) {
               delete filter_stmt;
               return rc;
@@ -124,7 +133,9 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
               values[i].set_type(AttrType::UNDEFINED);
               values[i].set_null(true);
             } else {
-              Value v; v.set_type(AttrType::UNDEFINED); v.set_null(true);
+              Value v;
+              v.set_type(AttrType::UNDEFINED);
+              v.set_null(true);
               values.push_back(v);
             }
           }
@@ -137,9 +148,9 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
 
     UpdateStmt *u = new UpdateStmt(table, field_metas, values, filter_stmt);
     // 将扩展信息写入对象（需要可访问成员，这里直接赋值）
-    u->multi_sub_queries_ = std::move(sub_queries);
+    u->multi_sub_queries_  = std::move(sub_queries);
     u->multi_is_sub_query_ = std::move(is_sub_query);
-    stmt = u;
+    stmt                   = u;
     return RC::SUCCESS;
   }
 
@@ -156,7 +167,7 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
   if (update.is_sub_query) {
     // Create sub-query statement; actual evaluation is deferred to executor where session/trx exist
     Stmt *sub_query_stmt = nullptr;
-    rc = Stmt::create_stmt(db, *update.sub_query, sub_query_stmt);
+    rc                   = Stmt::create_stmt(db, *update.sub_query, sub_query_stmt, &bind_context);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to create sub-query statement. rc=%d:%s", rc, strrc(rc));
       delete filter_stmt;
@@ -166,7 +177,7 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
   } else {
     // create value copy
     Value *value = new Value();
-    *value = update.value;
+    *value       = update.value;
 
     // Do not strictly validate or cast here to match baseline behavior.
     // Defer casting/validation to execution; mismatches will not cause statement failure.

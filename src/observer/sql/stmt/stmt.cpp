@@ -38,7 +38,6 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/update_stmt.h"
 #include "sql/stmt/alter_table_stmt.h"
 
-
 bool stmt_type_ddl(StmtType type)
 {
   switch (type) {
@@ -58,7 +57,7 @@ bool stmt_type_ddl(StmtType type)
     }
   }
 }
-RC Stmt::create_stmt(Db *db, ParsedSqlNode &sql_node, Stmt *&stmt)
+RC Stmt::create_stmt(Db *db, ParsedSqlNode &sql_node, Stmt *&stmt, const BinderContext *outer_context)
 {
   stmt = nullptr;
 
@@ -73,7 +72,7 @@ RC Stmt::create_stmt(Db *db, ParsedSqlNode &sql_node, Stmt *&stmt)
       return UpdateStmt::create(db, sql_node.update, stmt);
     }
     case SCF_SELECT: {
-      return SelectStmt::create(db, sql_node.selection, stmt);
+      return SelectStmt::create(db, sql_node.selection, stmt, outer_context);
     }
 
     case SCF_UNION: {

@@ -71,6 +71,7 @@ enum class ExprType
   SUBQUERY_IN,  ///< IN操作（子查询）
   LIST,         ///< 表达式列表
   SUBQUERY,     ///< 标量子查询
+  NOTHING
 };
 
 /**
@@ -158,6 +159,17 @@ public:
    */
   virtual RC eval(Chunk &chunk, vector<uint8_t> &select) { return RC::UNIMPLEMENTED; }
 
+  virtual RC get_value_trx(const Tuple &tuple, Value &value, Trx *trx = nullptr)
+  {
+    std::cout << "virtual get_value_trx" << std::endl;
+    return RC::SUCCESS;
+  }
+
+  virtual void clear_open_flag() {}
+
+  virtual const char *alias() const { return alias_.c_str(); }
+  virtual void        set_alias(string name) { alias_ = std::move(name); }
+
 protected:
   /**
    * @brief 表达式在下层算子返回的 chunk 中的位置
@@ -169,6 +181,7 @@ protected:
 
 private:
   string name_;
+  string alias_;
 };
 
 class StarExpr : public Expression
@@ -239,9 +252,9 @@ public:
   Field &field() { return field_; }
 
   const Field &field() const { return field_; }
-  
+
   // 支持相关子查询的静态方法
-  static void set_current_parent_tuple(const Tuple *parent_tuple) { current_parent_tuple_ = parent_tuple; }
+  static void         set_current_parent_tuple(const Tuple *parent_tuple) { current_parent_tuple_ = parent_tuple; }
   static const Tuple *get_current_parent_tuple() { return current_parent_tuple_; }
 
   const char *table_name() const { return field_.table_name(); }
@@ -253,7 +266,7 @@ public:
 
 private:
   Field field_;
-  
+
   // 支持相关子查询的静态成员变量
   static const Tuple *current_parent_tuple_;
 };
@@ -357,8 +370,8 @@ public:
    */
   RC eval(Chunk &chunk, vector<uint8_t> &select) override;
 
-  unique_ptr<Expression> &left() { return left_; }
-  unique_ptr<Expression> &right() { return right_; }
+  unique_ptr<Expression>            &left() { return left_; }
+  unique_ptr<Expression>            &right() { return right_; }
   const std::unique_ptr<class Stmt> &sub_query() const { return sub_query_; }
 
   /**
@@ -382,15 +395,15 @@ public:
   bool is_correlated_subquery() const;
 
 private:
-  CompOp                 comp_;
-  unique_ptr<Expression> left_;
-  unique_ptr<Expression> right_;
-  std::unique_ptr<class Stmt> sub_query_;  // For IN/NOT IN subquery operations
-  class FilterUnit *filter_unit_;  // Alternative way to access subquery
+  CompOp                      comp_;
+  unique_ptr<Expression>      left_;
+  unique_ptr<Expression>      right_;
+  std::unique_ptr<class Stmt> sub_query_;    // For IN/NOT IN subquery operations
+  class FilterUnit           *filter_unit_;  // Alternative way to access subquery
 
   // Subquery result caching
   mutable std::vector<Value> sub_query_results_;
-  mutable bool sub_query_executed_ = false;
+  mutable bool               sub_query_executed_ = false;
 };
 
 /**
@@ -429,6 +442,7 @@ public:
   Type conjunction_type() const { return conjunction_type_; }
 
   vector<unique_ptr<Expression>> &children() { return children_; }
+  void                            set_conjunction_is_or() { conjunction_type_ = Type::OR; }
 
 private:
   Type                           conjunction_type_;
@@ -527,7 +541,7 @@ public:
 
   const char *function_name() const { return function_name_.c_str(); }
   // Provide both const and non-const accessors to allow tree rewrites
-  vector<unique_ptr<Expression>> &args() { return args_; }
+  vector<unique_ptr<Expression>>       &args() { return args_; }
   const vector<unique_ptr<Expression>> &args() const { return args_; }
 
 private:
@@ -561,7 +575,8 @@ public:
   unique_ptr<Expression> &child() { return child_; }
 
   RC       get_value(const Tuple &tuple, Value &value) const override { return RC::INTERNAL; }
-  AttrType value_type() const override {
+  AttrType value_type() const override
+  {
     if (child_) {
       return child_->value_type();
     }
@@ -592,7 +607,8 @@ public:
 
   bool equal(const Expression &other) const override;
 
-  unique_ptr<Expression> copy() const override {
+  unique_ptr<Expression> copy() const override
+  {
     auto copied = make_unique<AggregateExpr>(aggregate_type_, child_->copy());
     copied->set_name(name());
     copied->set_pos(pos());
@@ -645,40 +661,40 @@ public:
 
 private:
   unique_ptr<Expression> left_;
-  std::vector<Value> values_;
-  bool is_not_in_;
+  std::vector<Value>     values_;
+  bool                   is_not_in_;
 };
 
 /**
  * @brief 子查询IN表达式
  * @ingroup Expression
  */
-class SubQueryInExpr : public Expression
-{
-public:
-  SubQueryInExpr(unique_ptr<Expression> left, unique_ptr<class Stmt> sub_query, bool is_not_in = false);
-  virtual ~SubQueryInExpr();
+// class SubQueryInExpr : public Expression
+// {
+// public:
+//   SubQueryInExpr(unique_ptr<Expression> left, unique_ptr<class Stmt> sub_query, bool is_not_in = false);
+//   virtual ~SubQueryInExpr();
 
-  unique_ptr<Expression> copy() const override;
+//   unique_ptr<Expression> copy() const override;
 
-  ExprType type() const override { return ExprType::SUBQUERY_IN; }
-  AttrType value_type() const override { return AttrType::BOOLEANS; }
+//   ExprType type() const override { return ExprType::SUBQUERY_IN; }
+//   AttrType value_type() const override { return AttrType::BOOLEANS; }
 
-  RC get_value(const Tuple &tuple, Value &value) const override;
-  RC try_get_value(Value &value) const override;
-  RC eval(Chunk &chunk, vector<uint8_t> &select) override;
+//   RC get_value(const Tuple &tuple, Value &value) const override;
+//   RC try_get_value(Value &value) const override;
+//   RC eval(Chunk &chunk, vector<uint8_t> &select) override;
 
-  const std::unique_ptr<class Stmt> &sub_query() const { return sub_query_; }
+//   const std::unique_ptr<class Stmt> &sub_query() const { return sub_query_; }
 
-private:
-  unique_ptr<Expression> left_;
-  std::unique_ptr<class Stmt> sub_query_;
-  bool is_not_in_;
-  
-  // 子查询结果缓存
-  mutable std::vector<Value> sub_query_results_;
-  mutable bool sub_query_executed_ = false;
-};
+// private:
+//   unique_ptr<Expression>      left_;
+//   std::unique_ptr<class Stmt> sub_query_;
+//   bool                        is_not_in_;
+
+//   // 子查询结果缓存
+//   mutable std::vector<Value> sub_query_results_;
+//   mutable bool               sub_query_executed_ = false;
+// };
 
 /**
  * @brief 表达式列表
@@ -688,89 +704,187 @@ private:
 class ListExpr : public Expression
 {
 public:
-  ListExpr(std::vector<std::unique_ptr<Expression>> &&exprs);
-  virtual ~ListExpr() = default;
+  ListExpr() = default;
+  ListExpr(const std::vector<Value> &values) : values_(values) {}
+  ListExpr(std::vector<std::unique_ptr<Expression>> &&exprs)
+  {
+    for (auto &&one : exprs) {
+      Value value;
+      one->try_get_value(value);
+      values_.push_back(value);
+    }
+  }
+  RC get_value(const Tuple &tuple, Value &value) const override;
+  RC get_value_trx(const Tuple &tuple, Value &value, Trx *trx = nullptr) override;
 
-  unique_ptr<Expression> copy() const override;
+  RC try_get_value(Value &value) const override
+  {
+    value = values_[0];
+    return RC::SUCCESS;
+  }
+  unique_ptr<Expression> copy() const override { return make_unique<ListExpr>(values_); }
 
   ExprType type() const override { return ExprType::LIST; }
-  AttrType value_type() const override { return AttrType::UNDEFINED; }
 
-  RC get_value(const Tuple &tuple, Value &value) const override;
-  RC try_get_value(Value &value) const override;
+  AttrType value_type() const override { return values_[0].attr_type(); }
 
-  void reset() { current_index_ = 0; }
-  size_t size() const { return exprs_.size(); }
+  const std::vector<Value> &get_values() const { return values_; }
+
+  RC pre_work(Trx *trx);
+  RC end_work();
+
+  void clear_open_flag() override
+  {
+    open_flag_  = false;
+    close_flag_ = true;
+    pos_        = -1;
+  }
+  RC reset();
 
 private:
-  std::vector<std::unique_ptr<Expression>> exprs_;
-  mutable size_t current_index_ = 0;
+  std::vector<Value> values_;
+  int                pos_;
+  bool               open_flag_  = false;
+  bool               close_flag_ = true;
+  Trx               *trx_;
 };
 
-/**
- * @brief 标量子查询表达式
- * @ingroup Expression
- */
+// /**
+//  * @brief 标量子查询表达式
+//  * @ingroup Expression
+//  */
+// class SubQueryExpr : public Expression
+// {
+// public:
+//   explicit SubQueryExpr(SelectSqlNode &select_node);
+//   explicit SubQueryExpr(std::unique_ptr<SelectSqlNode> select_node);
+//   virtual ~SubQueryExpr();
+
+//   RC   open(Trx *trx, const Tuple &tuple);
+//   RC   reset();
+//   RC   close();
+//   bool has_more_row(const Tuple &tuple) const;
+
+//   RC get_value(const Tuple &tuple, Value &value) const override;
+
+//   RC try_get_value(Value &value) const override;
+
+//   ExprType type() const override;
+
+//   AttrType value_type() const override;
+
+//   std::unique_ptr<Expression> deep_copy() const;
+
+//   RC generate_select_stmt(Db *db, const std::unordered_map<std::string, BaseTable *> &tables,
+//       const BinderContext *outer_context = nullptr) const;
+
+//   // 设置外层上下文用于相关子查询
+//   void set_outer_context(const BinderContext *outer_context) { outer_context_ = outer_context; }
+
+//   RC generate_logical_oper() const;
+//   RC generate_physical_oper() const;
+
+//   size_t res_nums() const { return res_query.size(); }
+
+//   bool one_row_ret() const;
+
+//   // 初始化子查询
+//   RC initialize_subquery() const;
+
+//   // 兼容性方法
+//   unique_ptr<Expression> copy() const override
+//   {
+//     // 创建一个新的SubQueryExpr，共享相同的SelectSqlNode引用
+//     // 这是安全的，因为SelectSqlNode由ParsedSqlNode拥有，生命周期贯穿整个SQL执行
+//     // 注意：多个SubQueryExpr实例会共享同一个SelectSqlNode，但它们各自维护自己的状态
+//     return std::make_unique<SubQueryExpr>(sql_node_);
+//   }
+
+// private:
+//   SelectSqlNode                            &sql_node_;
+//   std::unique_ptr<SelectSqlNode>            owned_sql_node_;  // 拥有SelectSqlNode的所有权
+//   mutable std::unique_ptr<SelectStmt>       select_stmt_;
+//   mutable std::unique_ptr<LogicalOperator>  logical_oper_;
+//   mutable std::unique_ptr<PhysicalOperator> physical_oper_;
+
+//   std::vector<Value> res_query;
+//   size_t             visited_index = 0;
+
+//   // 缓存标量子查询的结果，避免重复执行
+//   mutable Value cached_value_;
+//   mutable bool  is_opened_ = false;  // 标记physical_oper_是否已打开
+
+//   // 外层查询上下文，用于相关子查询
+//   const BinderContext *outer_context_;
+// };
 class SubQueryExpr : public Expression
 {
 public:
-  explicit SubQueryExpr(SelectSqlNode &select_node);
-  explicit SubQueryExpr(std::unique_ptr<SelectSqlNode> select_node);
-  virtual ~SubQueryExpr();
+  SubQueryExpr(SelectSqlNode sub_query_node);
+  SubQueryExpr(unique_ptr<SelectSqlNode> &&sub_query_node);
 
-  RC   open(Trx *trx, const Tuple &tuple);
-  RC   reset();
-  RC   close();
-  bool has_more_row(const Tuple &tuple) const;
-
-  RC get_value(const Tuple &tuple, Value &value) const override;
-
-  RC try_get_value(Value &value) const override;
-
+  ~SubQueryExpr();
   ExprType type() const override;
 
+  //先暂时设置未定义
   AttrType value_type() const override;
+  RC       get_value(const Tuple &tuple, Value &value) const override;
+  RC       get_value_trx(const Tuple &tuple, Value &value, Trx *trx = nullptr) override;
 
-  std::unique_ptr<Expression> deep_copy() const;
+  //这个函数会往后走一个的，不是try_get。
+  bool can_get_next_value(const Tuple &tuple, Trx *trx = nullptr);
 
-  RC generate_select_stmt(Db *db, const std::unordered_map<std::string, BaseTable *> &tables, const BinderContext *outer_context = nullptr) const;
-  
-  // 设置外层上下文用于相关子查询
-  void set_outer_context(const BinderContext *outer_context) { outer_context_ = outer_context; }
-
-  RC generate_logical_oper() const;
-  RC generate_physical_oper() const;
-
-  size_t res_nums() const { return res_query.size(); }
-
-  bool one_row_ret() const;
-
-  // 初始化子查询
-  RC initialize_subquery() const;
-
-  // 兼容性方法
-  unique_ptr<Expression> copy() const override
-  {
-    // 创建一个新的SubQueryExpr，共享相同的SelectSqlNode引用
-    // 这是安全的，因为SelectSqlNode由ParsedSqlNode拥有，生命周期贯穿整个SQL执行
-    // 注意：多个SubQueryExpr实例会共享同一个SelectSqlNode，但它们各自维护自己的状态
-    return std::make_unique<SubQueryExpr>(sql_node_);
-  }
+  //先直接返回空指针
+  unique_ptr<Expression>                   copy() const override;
+  const SelectSqlNode                     &sub_query_node() const;
+  SelectSqlNode                           &sub_query_node();
+  const std::unique_ptr<SelectStmt>       &stmt() const;
+  std::unique_ptr<SelectStmt>             &stmt();
+  const std::unique_ptr<LogicalOperator>  &logical_operator() const;
+  std::unique_ptr<LogicalOperator>        &logical_operator();
+  const std::unique_ptr<PhysicalOperator> &physical_operator() const;
+  std::unique_ptr<PhysicalOperator>       &physical_operator();
+  void                                     set_stmt(std::unique_ptr<SelectStmt> &&stmt);
+  void                                     set_logical_operator(std::unique_ptr<LogicalOperator> &&log_operator);
+  void                                     set_py_operator(std::unique_ptr<PhysicalOperator> &&py_operator);
+  void                                     clear_open_flag() override;
+  bool                                     comp_is_exist() { return comp_is_exist_; }
+  void                                     set_comp_is_exist(bool fl) { comp_is_exist_ = fl; }
 
 private:
-  SelectSqlNode                    &sql_node_;
-  std::unique_ptr<SelectSqlNode>   owned_sql_node_;  // 拥有SelectSqlNode的所有权
-  mutable std::unique_ptr<SelectStmt>       select_stmt_;
-  mutable std::unique_ptr<LogicalOperator>  logical_oper_;
-  mutable std::unique_ptr<PhysicalOperator> physical_oper_;
+  void                              open_py();
+  void                              close_py();
+  RC                                pre_work(Trx *trx, Tuple *main_tuple);
+  RC                                end_work();
+  SelectSqlNode                     sub_query_node_;
+  std::unique_ptr<SelectStmt>       stmt_;
+  std::unique_ptr<LogicalOperator>  logical_operator_;
+  std::unique_ptr<PhysicalOperator> physical_operator_;
+  bool                              open_flag_     = false;
+  bool                              close_flag_    = true;
+  bool                              comp_is_exist_ = false;
+  Trx                              *trx_;
+};
+class NothingExpr : public Expression
+{
+public:
+  NothingExpr() = default;
+  ExprType type() const override { return ExprType::NOTHING; }
+  /*
+  这里就随便先暂时使得value_type设置为null
+  */
+  AttrType value_type() const override
+  {
+    // ASSERT(0,"nothing expr value_type");
+    std::cout << "nothing expr: type: int" << std::endl;
+    return AttrType::INTS;
+  }
 
-  std::vector<Value> res_query;
-  size_t             visited_index = 0;
-  
-  // 缓存标量子查询的结果，避免重复执行
-  mutable Value cached_value_;
-  mutable bool is_opened_ = false;  // 标记physical_oper_是否已打开
-  
-  // 外层查询上下文，用于相关子查询
-  const BinderContext *outer_context_;
+  RC get_value(const Tuple &tuple, Value &value) const override
+  {
+    //先暂时设置成一个null
+    value.set_null();
+    return RC::SUCCESS;
+  }
+  unique_ptr<Expression> copy() const override { return std::make_unique<NothingExpr>(); }
 };

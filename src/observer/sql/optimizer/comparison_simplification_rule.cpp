@@ -28,7 +28,8 @@ RC ComparisonSimplificationRule::rewrite(unique_ptr<Expression> &expr, bool &cha
 
     printf("DEBUG: [SIMPLIFICATION] ComparisonSimplificationRule: about to call try_get_value on comparison expr\n");
     printf("DEBUG: [SIMPLIFICATION] Left expr type: %d, Right expr type: %d\n",
-           static_cast<int>(cmp_expr->left()->type()), static_cast<int>(cmp_expr->right()->type()));
+        static_cast<int>(cmp_expr->left()->type()),
+        static_cast<int>(cmp_expr->right()->type()));
 
     RC sub_rc = cmp_expr->try_get_value(value);
     printf("DEBUG: [SIMPLIFICATION] try_get_value result: rc=%s\n", strrc(sub_rc));

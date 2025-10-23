@@ -54,6 +54,17 @@ RC PredicatePhysicalOperator::next()
       break;
     }
 
+    if (parent_tuple_ != nullptr) {
+      // 说明我们此刻筛选的是子查询。
+      // 由于之前子查询没有下推操作，所以就不会在table get 里面去搞了。
+      // 目前只在筛选操作符里面判断这个外部主查询传来的tuple。
+      // 这里不需要delete
+      JoinedTuple *join_tuple = new JoinedTuple();
+      join_tuple->set_left(tuple);  //这个里面放的是指针
+      join_tuple->set_right(parent_tuple_);
+      tuple = join_tuple;
+    }
+
     Value value;
     rc = expression_->get_value(*tuple, value);
     if (rc != RC::SUCCESS) {
@@ -79,7 +90,4 @@ RC PredicatePhysicalOperator::close()
 
 Tuple *PredicatePhysicalOperator::current_tuple() { return children_[0]->current_tuple(); }
 
-RC PredicatePhysicalOperator::tuple_schema(TupleSchema &schema) const
-{
-  return children_[0]->tuple_schema(schema);
-}
+RC PredicatePhysicalOperator::tuple_schema(TupleSchema &schema) const { return children_[0]->tuple_schema(schema); }

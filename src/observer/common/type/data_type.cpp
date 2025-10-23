@@ -36,7 +36,7 @@ int DateType::compare(const Value &left, const Value &right) const
   ASSERT(left.attr_type() == AttrType::DATES && right.attr_type() == AttrType::DATES,
          "invalid type");
 
-  int left_date = left.get_date();
+  int left_date  = left.get_date();
   int right_date = right.get_date();
 
   if (left_date < right_date) {
@@ -53,15 +53,14 @@ RC DateType::cast_to(const Value &val, AttrType type, Value &result) const
   switch (type) {
     case AttrType::CHARS: {
       string date_str;
-      RC rc = to_string(val, date_str);
+      RC     rc = to_string(val, date_str);
       if (rc != RC::SUCCESS) {
         return rc;
       }
       result.set_string(date_str.c_str());
       return RC::SUCCESS;
     }
-    default:
-      return RC::UNSUPPORTED;
+    default: return RC::UNSUPPORTED;
   }
 }
 
@@ -71,7 +70,7 @@ int DateType::cast_cost(AttrType type)
     return 0;
   }
   if (type == AttrType::CHARS) {
-    return 1;  // 支持从字符串转换到日期
+    return 2;  // 支持从字符串转换到日期 //这里改成了2，也就是优先char转成date
   }
   return INT32_MAX;
 }
@@ -79,7 +78,7 @@ int DateType::cast_cost(AttrType type)
 RC DateType::set_value_from_str(Value &val, const string &data) const
 {
   int date_int;
-  RC rc = parse_date_string(data, date_int);
+  RC  rc = parse_date_string(data, date_int);
   if (rc != RC::SUCCESS) {
     return rc;
   }
@@ -93,10 +92,7 @@ RC DateType::to_string(const Value &val, string &result) const
   return format_date_int(val.get_date(), result);
 }
 
-bool DateType::is_leap_year(int year)
-{
-  return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
-}
+bool DateType::is_leap_year(int year) { return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0); }
 
 int DateType::days_in_month(int year, int month)
 {
@@ -133,7 +129,7 @@ bool DateType::is_valid_date(int year, int month, int day)
 RC DateType::parse_date_string(const string &date_str, int &date_int)
 {
   // 支持多种日期格式: YYYY-MM-DD, YYYY-M-DD, YYYY-MM-D, YYYY-M-D
-  size_t first_dash = date_str.find('-');
+  size_t first_dash  = date_str.find('-');
   size_t second_dash = date_str.find('-', first_dash + 1);
 
   if (first_dash == string::npos || second_dash == string::npos) {
@@ -142,9 +138,9 @@ RC DateType::parse_date_string(const string &date_str, int &date_int)
   }
 
   // 解析年、月、日
-  string year_str = date_str.substr(0, first_dash);
+  string year_str  = date_str.substr(0, first_dash);
   string month_str = date_str.substr(first_dash + 1, second_dash - first_dash - 1);
-  string day_str = date_str.substr(second_dash + 1);
+  string day_str   = date_str.substr(second_dash + 1);
 
   // 验证年份长度必须是4位
   if (year_str.length() != 4) {
@@ -153,17 +149,16 @@ RC DateType::parse_date_string(const string &date_str, int &date_int)
   }
 
   // 验证月份和日期长度（1-2位）
-  if (month_str.length() == 0 || month_str.length() > 2 ||
-      day_str.length() == 0 || day_str.length() > 2) {
+  if (month_str.length() == 0 || month_str.length() > 2 || day_str.length() == 0 || day_str.length() > 2) {
     LOG_WARN("Invalid month/day format in date: %s", date_str.c_str());
     return RC::INVALID_ARGUMENT;
   }
 
   int year, month, day;
   try {
-    year = std::stoi(year_str);
+    year  = std::stoi(year_str);
     month = std::stoi(month_str);
-    day = std::stoi(day_str);
+    day   = std::stoi(day_str);
   } catch (const std::exception &e) {
     LOG_WARN("Failed to parse date: %s", date_str.c_str());
     return RC::INVALID_ARGUMENT;
@@ -182,9 +177,9 @@ RC DateType::parse_date_string(const string &date_str, int &date_int)
 
 RC DateType::format_date_int(int date_int, string &date_str)
 {
-  int year = date_int / 10000;
+  int year  = date_int / 10000;
   int month = (date_int % 10000) / 100;
-  int day = date_int % 100;
+  int day   = date_int % 100;
 
   // 验证日期合法性
   if (!is_valid_date(year, month, day)) {
@@ -194,9 +189,7 @@ RC DateType::format_date_int(int date_int, string &date_str)
 
   // 格式化为YYYY-MM-DD
   std::ostringstream oss;
-  oss << std::setfill('0') << std::setw(4) << year << "-"
-      << std::setw(2) << month << "-"
-      << std::setw(2) << day;
+  oss << std::setfill('0') << std::setw(4) << year << "-" << std::setw(2) << month << "-" << std::setw(2) << day;
 
   date_str = oss.str();
   return RC::SUCCESS;
@@ -207,13 +200,13 @@ int UndefinedType::compare(const Value &left, const Value &right) const
   // Handle NULL value comparisons according to SQL standards
   // In SQL, NULL values have special comparison semantics for ORDER BY
 
-  bool left_is_null = (left.attr_type() == AttrType::UNDEFINED || left.is_null());
+  bool left_is_null  = (left.attr_type() == AttrType::UNDEFINED || left.is_null());
   bool right_is_null = (right.attr_type() == AttrType::UNDEFINED || right.is_null());
 
   if (left_is_null && right_is_null) {
     return 0;  // NULL == NULL for sorting purposes
   } else if (left_is_null) {
-    return -1; // NULL < non-NULL (NULL values sort first in ASC order, matching MySQL 8.0)
+    return -1;  // NULL < non-NULL (NULL values sort first in ASC order, matching MySQL 8.0)
   } else if (right_is_null) {
     return 1;  // non-NULL > NULL
   }

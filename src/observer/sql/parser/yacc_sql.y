@@ -181,7 +181,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   vector<RelationWithAliasSqlNode> *         relation_with_alias_list;
   RelationWithAliasSqlNode *                 relation_with_alias;
   JoinSqlNode *                              join_item;
-  vector<pair<string, Value>> *              update_kv_list;
+  vector<UpdateKvSqlNode> *                  update_kv_list;
 }
 
 %token <number> NUMBER
@@ -889,6 +889,7 @@ delete_stmt:    /*  delete 语句的语法解析树*/
     }
     ;
 update_stmt:      /*  update 语句的语法解析树*/
+
     UPDATE ID SET update_kv_list where
     {
       $$ = new ParsedSqlNode(SCF_UPDATE);
@@ -896,28 +897,32 @@ update_stmt:      /*  update 语句的语法解析树*/
       
       if ($4 && !$4->empty()) {
         for (auto &kv : *$4) {
-          $$->update.attribute_names.push_back(kv.first);
-          $$->update.values.push_back(kv.second);
+          $$->update.attribute_names.push_back(kv.attribute_names);
+          $$->update.values.push_back(kv.values);
+          $$->update.value_is_sub_query.push_back(kv.value_is_sub_query);
+          $$->update.value_sub_queries.push_back(std::move(kv.value_sub_queries));
         }
         delete $4;
       }
       
+      if($$->update.value_is_sub_query.size() == 1){
+        $$->update.relation_name = $2;
+        $$->update.attribute_name = $$->update.attribute_names.front();
+        $$->update.value = $$->update.values.front();
+        if($$->update.value_is_sub_query.front() == true){
+          $$->update.is_sub_query = true;
+          $$->update.sub_query = std::move($$->update.value_sub_queries.front());
+        }
+        else{
+          $$->update.is_sub_query = false;
+          $$->update.sub_query.reset(nullptr);
+        }
+        $$->update.attribute_names.clear();
+      }
+
       if ($5 != nullptr) {
         $$->update.conditions.swap(*$5);
         delete $5;
-      }
-    }
-    | UPDATE ID SET ID EQ LBRACE sub_query RBRACE where
-    {
-      // 支持单字段：SET col = (subquery)
-      $$ = new ParsedSqlNode(SCF_UPDATE);
-      $$->update.relation_name = $2;
-      $$->update.attribute_name = $4;
-      $$->update.is_sub_query = true;
-      $$->update.sub_query.reset($7);
-      if ($9 != nullptr) {
-        $$->update.conditions.swap(*$9);
-        delete $9;
       }
     }
     ;
@@ -925,98 +930,74 @@ update_stmt:      /*  update 语句的语法解析树*/
 update_kv_list:
     ID EQ value
     {
-      $$ = new vector<pair<string, Value>>();
-      $$->push_back({$1, *$3});
-      // 同步到 UpdateSqlNode 扩展：常量项
-      if ($$ && sql_result && !sql_result->sql_nodes().empty()) {
-        ParsedSqlNode *root = sql_result->sql_nodes().back().get();
-        if (root->flag == SCF_UPDATE) {
-          root->update.attribute_names.push_back($1);
-          root->update.values.push_back(*$3);
-          root->update.value_is_sub_query.push_back(false);
-          root->update.value_sub_queries.emplace_back(nullptr);
-        }
-      }
+      $$ = new vector<UpdateKvSqlNode>();
+      $$->push_back({$1, *$3,false,nullptr});
       delete $3;
     }
     | update_kv_list COMMA ID EQ value
     {
-      $1->push_back({$3, *$5});
+      $1->push_back({$3, *$5,false,nullptr});
       $$ = $1;
-      // 扩展：常量项
-      if ($$ && sql_result && !sql_result->sql_nodes().empty()) {
-        ParsedSqlNode *root = sql_result->sql_nodes().back().get();
-        if (root->flag == SCF_UPDATE) {
-          root->update.attribute_names.push_back($3);
-          root->update.values.push_back(*$5);
-          root->update.value_is_sub_query.push_back(false);
-          root->update.value_sub_queries.emplace_back(nullptr);
-        }
-      }
       delete $5;
     }
     // 允许函数或一般表达式作为赋值右侧：ID = expression
     | ID EQ expression
     {
-      $$ = new vector<pair<string, Value>>();
-      // 尝试在解析期将表达式折叠为常量；失败则报错以保持简化实现
-      Value __v; RC __rc = $3->try_get_value(__v);
-      if (__rc != RC::SUCCESS) {
-        yyerror(&@$, sql_string, sql_result, scanner, "Only constant or foldable expressions are allowed in UPDATE SET");
-        delete $3;
-        YYERROR;
+        cout<<"push subqry11"<<endl;
+
+      $$ = new vector<UpdateKvSqlNode>();
+
+      if(auto && sub_qry = dynamic_cast<SubQueryExpr*>($3)){
+        auto && one = std::make_unique<ParsedSqlNode>(SCF_SELECT);
+        one->selection = std::move(sub_qry->sub_query_node());
+        cout<<"push subqry"<<endl;
+        Value placeholder; placeholder.set_type(AttrType::UNDEFINED); placeholder.set_null(true);
+        $$->push_back({$1, placeholder,true,std::move(one)});
       }
-      $$->push_back({$1, __v});
-      if ($$ && sql_result && !sql_result->sql_nodes().empty()) {
-        ParsedSqlNode *root = sql_result->sql_nodes().back().get();
-        if (root->flag == SCF_UPDATE) {
-          root->update.attribute_names.push_back($1);
-          root->update.values.push_back(__v);
-          root->update.value_is_sub_query.push_back(false);
-          root->update.value_sub_queries.emplace_back(nullptr);
+      else{
+
+        // 尝试在解析期将表达式折叠为常量；失败则报错以保持简化实现
+        Value __v; RC __rc = $3->try_get_value(__v);
+        if (__rc != RC::SUCCESS) {
+          yyerror(&@$, sql_string, sql_result, scanner, "Only constant or foldable expressions are allowed in UPDATE SET");
+          delete $3;
+          YYERROR;
         }
+        cout<<"push subqry22"<<endl;
+
+        $$->push_back({$1, __v,false,nullptr}); 
       }
+      
       delete $3;
     }
     | update_kv_list COMMA ID EQ expression
     {
-      // 叠加一个可折叠表达式
-      Value __v; RC __rc = $5->try_get_value(__v);
-      if (__rc != RC::SUCCESS) {
-        yyerror(&@$, sql_string, sql_result, scanner, "Only constant or foldable expressions are allowed in UPDATE SET");
-        delete $5;
-        YYERROR;
+
+      if(auto && sub_qry = dynamic_cast<SubQueryExpr*>($5)){
+        auto && one = std::make_unique<ParsedSqlNode>(SCF_SELECT);
+        one->selection = std::move(sub_qry->sub_query_node());
+        Value placeholder; placeholder.set_type(AttrType::UNDEFINED); placeholder.set_null(true);
+
+        $1->push_back({$3, placeholder,true,std::move(one)});
       }
-      $1->push_back({$3, __v});
-      $$ = $1;
-      if ($$ && sql_result && !sql_result->sql_nodes().empty()) {
-        ParsedSqlNode *root = sql_result->sql_nodes().back().get();
-        if (root->flag == SCF_UPDATE) {
-          root->update.attribute_names.push_back($3);
-          root->update.values.push_back(__v);
-          root->update.value_is_sub_query.push_back(false);
-          root->update.value_sub_queries.emplace_back(nullptr);
+      else{
+
+        // 叠加一个可折叠表达式
+        Value __v; RC __rc = $5->try_get_value(__v);
+        if (__rc != RC::SUCCESS) {
+          yyerror(&@$, sql_string, sql_result, scanner, "Only constant or foldable expressions are allowed in UPDATE SET");
+          delete $5;
+          YYERROR;
         }
+        
+        $1->push_back({$3, __v,false,nullptr});
+                
       }
+      $$ = $1;
       delete $5;
     }
-    | ID EQ LBRACE sub_query RBRACE
-    {
-      // 将 ID=(subquery) 记录为子查询项
-      $$ = new vector<pair<string, Value>>();
-      Value placeholder; placeholder.set_type(AttrType::UNDEFINED); placeholder.set_null(true);
-      $$->push_back({$1, placeholder});
-      if ($$ && sql_result && !sql_result->sql_nodes().empty()) {
-        ParsedSqlNode *root = sql_result->sql_nodes().back().get();
-        if (root->flag == SCF_UPDATE) {
-          root->update.attribute_names.push_back($1);
-          root->update.values.push_back(placeholder);
-          root->update.value_is_sub_query.push_back(true);
-          root->update.value_sub_queries.emplace_back($4);
-        }
-      }
-    }
     ;
+
 select_stmt:        /*  select 语句的语法解析树*/
     SELECT projection_list FROM rel_list join_list where group_by having order_by limit_clause
     {
@@ -1272,6 +1253,7 @@ expression:
     }
     | sub_query_expr {
       $$ = $1;
+      cout<<"sub_expr"<<endl;
     }
     ;
 
@@ -1494,14 +1476,18 @@ condition:
     {
       $$ = new ConditionSqlNode;
       $$->left_expr.reset($1);
-      $$->sub_query.reset($4);
+      //$$->sub_query.reset($4);
+      unique_ptr<Expression> one = std::make_unique<SubQueryExpr>(std::move($4->selection)); 
+      $$->right_expr = std::move(one);
       $$->comp = IN_OP;
     }
     | expression NOT IN LBRACE sub_query RBRACE
     {
       $$ = new ConditionSqlNode;
       $$->left_expr.reset($1);
-      $$->sub_query.reset($5);
+      //$$->sub_query.reset($5);
+      unique_ptr<Expression> one = std::make_unique<SubQueryExpr>(std::move($5->selection)); 
+      $$->right_expr = std::move(one);
       $$->comp = NOT_IN_OP;
     }
     | expression IS NULL_T
@@ -1523,13 +1509,20 @@ condition:
     | EXISTS LBRACE sub_query RBRACE
     {
       $$ = new ConditionSqlNode;
-      $$->sub_query.reset($3);
+      // $$->sub_query.reset($3);
+      unique_ptr<Expression> one = std::make_unique<SubQueryExpr>(std::move($3->selection)); 
+      $$->right_expr = std::move(one);
+      $$->left_expr = std::make_unique<NothingExpr>();
       $$->comp = EXISTS_OP;
     }
     | NOT EXISTS LBRACE sub_query RBRACE
     {
       $$ = new ConditionSqlNode;
-      $$->sub_query.reset($4);
+      //$$->sub_query.reset($4);
+      unique_ptr<Expression> one = std::make_unique<SubQueryExpr>(std::move($4->selection)); 
+      $$->right_expr = std::move(one);
+      $$->left_expr = std::make_unique<NothingExpr>();
+
       $$->comp = NOT_EXISTS_OP;
     }
     ;

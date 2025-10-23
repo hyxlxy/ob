@@ -37,7 +37,7 @@ Table *BinderContext::find_table(const char *table_name) const
       return table;
     }
   }
-  
+
   // Search in outer contexts for correlated subqueries
   for (const BinderContext *outer_context : outer_contexts_) {
     Table *table = outer_context->find_table(table_name);
@@ -45,7 +45,7 @@ Table *BinderContext::find_table(const char *table_name) const
       return table;
     }
   }
-  
+
   return nullptr;
 }
 
@@ -138,6 +138,10 @@ RC ExpressionBinder::bind_expression(unique_ptr<Expression> &expr, vector<unique
       return RC::SUCCESS;
     } break;
 
+    case ExprType::NOTHING: {
+      bound_expressions.emplace_back(std::move(expr));
+      return RC::SUCCESS;
+    }
     default: {
       LOG_WARN("unknown expression type: %d", static_cast<int>(expr->type()));
       return RC::INTERNAL;
@@ -204,7 +208,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
       LOG_INFO("no such table in from list: %s", table_name);
       // 检查是否可能是关联子查询中的外层表引用
       LOG_WARN("Table '%s' not found in current context. This might be a correlated subquery reference.", table_name);
-      
+
       // 尝试在外层上下文中查找表
       if (outer_context_ != nullptr) {
         table = outer_context_->find_table(table_name);
@@ -252,8 +256,8 @@ RC ExpressionBinder::bind_unbound_field_expression(
       return RC::SCHEMA_FIELD_MISSING;
     }
 
-    Field      field(table, field_meta);
-    FieldExpr *field_expr = new FieldExpr(field);
+    Field       field(table, field_meta);
+    FieldExpr  *field_expr = new FieldExpr(field);
     const char *alias_name = expr->name();
 
     // Set field name according to the following rules:
@@ -262,7 +266,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
     if (alias_name != nullptr && alias_name[0] != '\0') {
       // Check if this is a qualified name (table.field or alias.field)
       bool is_qualified = (strchr(alias_name, '.') != nullptr);
-      
+
       if (is_qualified) {
         // Qualified name without explicit AS alias: use only the field name
         // (e.g., "SELECT t1.id" displays as "id", not "t1.id")
@@ -379,22 +383,22 @@ RC ExpressionBinder::bind_comparison_expression(
 
   auto try_cast_literal = [&](unique_ptr<Expression> &value_side, AttrType target_type) -> RC {
     if (value_side->type() != ExprType::VALUE) {
-      return RC::SUCCESS; // only handle constant literals
+      return RC::SUCCESS;  // only handle constant literals
     }
     ValueExpr *val_expr = static_cast<ValueExpr *>(value_side.get());
     Value      src;
-    RC rc = val_expr->try_get_value(src);
+    RC         rc = val_expr->try_get_value(src);
     if (rc != RC::SUCCESS) {
       return rc;
     }
     if (src.attr_type() != AttrType::CHARS) {
-      return RC::SUCCESS; // not a string literal, skip
+      return RC::SUCCESS;  // not a string literal, skip
     }
     Value casted;
     rc = Value::cast_to(src, target_type, casted);
     if (rc != RC::SUCCESS) {
       LOG_WARN("implicit cast from CHARS to target type %d failed", static_cast<int>(target_type));
-      return rc; // propagate error -> statement FAILURE
+      return rc;  // propagate error -> statement FAILURE
     }
     // Replace with casted constant
     value_side.reset(new ValueExpr(casted));
@@ -512,12 +516,12 @@ RC ExpressionBinder::bind_function_expression(
 
   // Bind each argument by copying, binding, then collecting back
   vector<unique_ptr<Expression>> new_args;
-  const auto &old_args = func_expr->args();
+  const auto                    &old_args = func_expr->args();
   new_args.reserve(old_args.size());
 
   for (const auto &arg : old_args) {
     vector<unique_ptr<Expression>> child_bound_expressions;
-    unique_ptr<Expression>          arg_copy = arg->copy();
+    unique_ptr<Expression>         arg_copy = arg->copy();
 
     RC rc = bind_expression(arg_copy, child_bound_expressions);
     if (OB_FAIL(rc)) {
@@ -544,7 +548,6 @@ RC ExpressionBinder::bind_function_expression(
   bound_expressions.emplace_back(std::move(expr));
   return RC::SUCCESS;
 }
-
 
 RC check_aggregate_expression(AggregateExpr &expression)
 {
@@ -576,7 +579,7 @@ RC check_aggregate_expression(AggregateExpr &expression)
   }
 
   // 子表达式中不能再包含聚合表达式
-  function<RC(unique_ptr<Expression>&)> check_aggregate_expr = [&](unique_ptr<Expression> &expr) -> RC {
+  function<RC(unique_ptr<Expression> &)> check_aggregate_expr = [&](unique_ptr<Expression> &expr) -> RC {
     RC rc = RC::SUCCESS;
     if (expr->type() == ExprType::AGGREGATION) {
       LOG_WARN("aggregate expression cannot be nested");
@@ -598,10 +601,10 @@ RC ExpressionBinder::bind_aggregate_expression(
     return RC::SUCCESS;
   }
 
-  auto unbound_aggregate_expr = static_cast<UnboundAggregateExpr *>(expr.get());
-  const char *aggregate_name = unbound_aggregate_expr->aggregate_name();
+  auto                unbound_aggregate_expr = static_cast<UnboundAggregateExpr *>(expr.get());
+  const char         *aggregate_name         = unbound_aggregate_expr->aggregate_name();
   AggregateExpr::Type aggregate_type;
-  RC rc = AggregateExpr::type_from_string(aggregate_name, aggregate_type);
+  RC                  rc = AggregateExpr::type_from_string(aggregate_name, aggregate_type);
   if (OB_FAIL(rc)) {
     LOG_WARN("invalid aggregate name: %s", aggregate_name);
     return rc;
@@ -614,7 +617,8 @@ RC ExpressionBinder::bind_aggregate_expression(
     // COUNT(*) case - child_expr is nullptr
     ValueExpr *value_expr = new ValueExpr(Value(1));
     child_expr.reset(value_expr);
-  } else if (child_expr != nullptr && child_expr->type() == ExprType::STAR && aggregate_type == AggregateExpr::Type::COUNT) {
+  } else if (child_expr != nullptr && child_expr->type() == ExprType::STAR &&
+             aggregate_type == AggregateExpr::Type::COUNT) {
     ValueExpr *value_expr = new ValueExpr(Value(1));
     child_expr.reset(value_expr);
   } else if (child_expr != nullptr) {
@@ -656,5 +660,3 @@ RC ExpressionBinder::bind_list_expression(
   bound_expressions.emplace_back(std::move(expr));
   return RC::SUCCESS;
 }
-
-
