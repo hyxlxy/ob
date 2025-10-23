@@ -1,0 +1,71 @@
+CREATE TABLE t_add(id INT);
+INSERT INTO t_add VALUES (1);
+INSERT INTO t_add VALUES (2);
+ALTER TABLE t_add ADD COLUMN c INT;
+SELECT COUNT(*) FROM t_add WHERE c IS NULL;
+INSERT INTO t_add(id, c) VALUES (3, 10);
+INSERT INTO t_add VALUES (4, 20);
+SELECT * FROM t_add ORDER BY id;
+SYNC;
+
+CREATE TABLE t_drop(a INT, b INT);
+CREATE INDEX i_b ON t_drop(b);
+INSERT INTO t_drop VALUES (1, 100);
+INSERT INTO t_drop VALUES (2, 200);
+ALTER TABLE t_drop DROP COLUMN b;
+SELECT * FROM t_drop ORDER BY a;
+INSERT INTO t_drop VALUES (3);
+SELECT * FROM t_drop ORDER BY a;
+SYNC;
+
+CREATE TABLE t_change(col INT);
+CREATE INDEX i_col ON t_change(col);
+INSERT INTO t_change VALUES (10);
+INSERT INTO t_change VALUES (20);
+ALTER TABLE t_change CHANGE COLUMN col id INT;
+SELECT * FROM t_change WHERE id = 10;
+INSERT INTO t_change VALUES (30);
+SELECT * FROM t_change ORDER BY id;
+SYNC;
+
+CREATE TABLE t_rename(id INT);
+CREATE INDEX i_id ON t_rename(id);
+INSERT INTO t_rename VALUES (9);
+INSERT INTO t_rename VALUES (8);
+INSERT INTO t_rename VALUES (1);
+ALTER TABLE t_rename RENAME TO t_rename2;
+SELECT * FROM t_rename2 ORDER BY id;
+ALTER TABLE t_rename2 RENAME TO t_rename2;
+CREATE TABLE t_exists(dummy INT);
+ALTER TABLE t_rename2 RENAME TO t_exists;
+SYNC;
+
+CREATE TABLE t_err1(id INT);
+ALTER TABLE t_err1 ADD COLUMN id INT;
+CREATE TABLE t_err2(id INT);
+ALTER TABLE t_err2 DROP COLUMN col;
+CREATE TABLE t_err3(a INT, b INT);
+ALTER TABLE t_err3 CHANGE COLUMN a b INT;
+CREATE TABLE t_err4(c CHAR(8));
+ALTER TABLE t_err4 ADD COLUMN d INT;
+CREATE TABLE t_err5(x INT);
+ALTER TABLE t_err5 DROP COLUMN x;
+SELECT * FROM t_err5;
+SYNC;
+
+CREATE TABLE t_persist(id INT);
+INSERT INTO t_persist VALUES (1);
+INSERT INTO t_persist VALUES (2);
+ALTER TABLE t_persist ADD COLUMN c INT;
+SYNC;
+SELECT COUNT(*) FROM t_persist WHERE c IS NULL;
+
+CREATE TABLE t_idx(a INT, b INT, c INT);
+CREATE INDEX i_b ON t_idx(b);
+CREATE INDEX i_c ON t_idx(c);
+INSERT INTO t_idx VALUES (1, 10, 100);
+INSERT INTO t_idx VALUES (2, 20, 200);
+ALTER TABLE t_idx DROP COLUMN b;
+INSERT INTO t_idx(a, c) VALUES (3, 300);
+SELECT * FROM t_idx ORDER BY a;
+SYNC;

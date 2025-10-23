@@ -244,7 +244,8 @@ struct CalcSqlNode
 struct InsertSqlNode
 {
   string        relation_name;  ///< Relation to insert into
-  vector<Value> values;         ///< 要插入的值
+  vector<string> attribute_names; ///< 可选：按列插入时的列名列表
+  vector<Value> values;         ///< 要插入的值（若提供attribute_names，则与之等长）
 };
 
 /**

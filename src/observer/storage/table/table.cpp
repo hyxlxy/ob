@@ -661,6 +661,15 @@ RC Table::alter_add_column_int(const char *new_name)
     }
   }
 
+  // 记录现有索引元数据，ADD COLUMN 不应影响已有索引
+  vector<IndexMeta> preserved_indexes;
+  for (int i = 0; i < table_meta_.index_num(); ++i) {
+    const IndexMeta *im = table_meta_.index(i);
+    if (im != nullptr) {
+      preserved_indexes.push_back(*im);
+    }
+  }
+
   // 1) 提取旧数据（保留 NULL 语义）
   vector<vector<Value>> rows;
   {
@@ -703,6 +712,11 @@ RC Table::alter_add_column_int(const char *new_name)
   TableMeta new_meta;
   RC rc = new_meta.init(table_meta_.table_id(), table_meta_.name(), &trx_copy, attrs, table_meta_.primary_keys(), table_meta_.storage_format(), table_meta_.storage_engine());
   if (rc != RC::SUCCESS) return rc;
+
+  // 复制旧索引元数据（所有老列仍然存在，索引仍然有效）
+  for (const auto &im : preserved_indexes) {
+    (void)new_meta.add_index(im);
+  }
 
   // 3) 原子写入新元数据
   string base = db_->path();
@@ -778,10 +792,26 @@ RC Table::alter_drop_column(const char *name)
   }
   if (drop_idx < 0) return RC::SCHEMA_FIELD_NOT_EXIST;
 
-  // 如有索引，先删除
-  const IndexMeta *idx = table_meta_.find_index_by_field(name);
-  if (idx != nullptr) {
-    (void)drop_index(nullptr, idx->name());
+  // 处理索引：
+  // 1) 删除所有引用该列的索引文件（包含多列索引）
+  // 2) 保留其他索引，在新元数据中继续存在
+  vector<IndexMeta> preserved_indexes;
+  for (int i = 0; i < table_meta_.index_num(); ++i) {
+    const IndexMeta *im = table_meta_.index(i);
+    if (im == nullptr) continue;
+    bool uses_dropped = false;
+    if (!im->fields().empty()) {
+      for (const auto &fn : im->fields()) {
+        if (fn == string(name)) { uses_dropped = true; break; }
+      }
+    } else if (im->field() != nullptr) {
+      if (0 == strcmp(im->field(), name)) uses_dropped = true;
+    }
+    if (uses_dropped) {
+      (void)drop_index(nullptr, im->name());
+    } else {
+      preserved_indexes.push_back(*im);
+    }
   }
 
   // 1) 提取旧数据（保留 NULL 语义）
@@ -821,6 +851,11 @@ RC Table::alter_drop_column(const char *name)
   TableMeta new_meta;
   RC rc = new_meta.init(table_meta_.table_id(), table_meta_.name(), &trx_copy, attrs, table_meta_.primary_keys(), table_meta_.storage_format(), table_meta_.storage_engine());
   if (rc != RC::SUCCESS) return rc;
+
+  // 恢复仍然有效的索引元数据
+  for (const auto &im : preserved_indexes) {
+    (void)new_meta.add_index(im);
+  }
 
   // 3) 原子写入新元数据
   string base = db_->path();

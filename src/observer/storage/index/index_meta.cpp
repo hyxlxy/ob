@@ -103,6 +103,10 @@ RC IndexMeta::from_json(const TableMeta &table, const Json::Value &json_value, I
       fields.push_back(*field);
     }
     bool is_unique = unique_value.isBool() ? unique_value.asBool() : false;
+    // 兼容单字段索引：若数组仅1项，按单字段索引初始化，确保 field_ 被正确设置
+    if (fields.size() == 1) {
+      return index.init(name_value.asCString(), fields[0], is_unique);
+    }
     return index.init(name_value.asCString(), fields, is_unique);
   }
 
