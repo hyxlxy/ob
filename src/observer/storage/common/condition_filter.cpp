@@ -169,15 +169,68 @@ bool DefaultConditionFilter::filter(const Record &rec) const
   Value right_value;
 
   if (left_.is_attr) {  // value
-    left_value.set_type(attr_type_);
-    left_value.set_data(rec.data() + left_.attr_offset, left_.attr_length);
+    const char *base = rec.data() + left_.attr_offset;
+    int len = left_.attr_length;
+    bool is_null = false;
+    // Heuristic: for fixed-length types, last byte stores NULL flag when nullable
+    switch (attr_type_) {
+      case AttrType::INTS:
+        if (len > (int)sizeof(int) && base[len-1] == '1') is_null = true;
+        break;
+      case AttrType::FLOATS:
+        if (len > (int)sizeof(float) && base[len-1] == '1') is_null = true;
+        break;
+      case AttrType::DATES:
+        if (len > (int)sizeof(int) && base[len-1] == '1') is_null = true;
+        break;
+      default:
+        // leave is_null=false for non-fixed types
+        break;
+    }
+    if (is_null) {
+      left_value.set_type(AttrType::UNDEFINED);
+      left_value.set_null(true);
+    } else {
+      left_value.set_type(attr_type_);
+      // for fixed types, pass payload size; for others, pass full len
+      int payload_len = len;
+      if (attr_type_ == AttrType::INTS) payload_len = sizeof(int);
+      else if (attr_type_ == AttrType::FLOATS) payload_len = sizeof(float);
+      else if (attr_type_ == AttrType::DATES) payload_len = sizeof(int);
+      left_value.set_data(const_cast<char *>(base), payload_len);
+    }
   } else {
     left_value.set_value(left_.value);
   }
 
   if (right_.is_attr) {
-    right_value.set_type(attr_type_);
-    right_value.set_data(rec.data() + right_.attr_offset, right_.attr_length);
+    const char *base = rec.data() + right_.attr_offset;
+    int len = right_.attr_length;
+    bool is_null = false;
+    switch (attr_type_) {
+      case AttrType::INTS:
+        if (len > (int)sizeof(int) && base[len-1] == '1') is_null = true;
+        break;
+      case AttrType::FLOATS:
+        if (len > (int)sizeof(float) && base[len-1] == '1') is_null = true;
+        break;
+      case AttrType::DATES:
+        if (len > (int)sizeof(int) && base[len-1] == '1') is_null = true;
+        break;
+      default:
+        break;
+    }
+    if (is_null) {
+      right_value.set_type(AttrType::UNDEFINED);
+      right_value.set_null(true);
+    } else {
+      right_value.set_type(attr_type_);
+      int payload_len = len;
+      if (attr_type_ == AttrType::INTS) payload_len = sizeof(int);
+      else if (attr_type_ == AttrType::FLOATS) payload_len = sizeof(float);
+      else if (attr_type_ == AttrType::DATES) payload_len = sizeof(int);
+      right_value.set_data(const_cast<char *>(base), payload_len);
+    }
   } else {
     right_value.set_value(right_.value);
   }

@@ -39,7 +39,8 @@ RC AlterTableExecutor::execute(SQLStageEvent *sql_event)
   if (alter_stmt->op_type == ParsedSqlNode::AlterOpType::RENAME_TABLE) {
     const std::string &old_name = alter_stmt->table_name;
     const std::string &new_name = alter_stmt->new_table_name;
-    if (new_name.empty() || old_name == new_name) return RC::INVALID_ARGUMENT;
+    if (new_name.empty()) return RC::INVALID_ARGUMENT;
+    if (old_name == new_name) return RC::SUCCESS; // no-op rename should succeed
     if (db->find_table(new_name.c_str()) != nullptr) return RC::SCHEMA_TABLE_EXIST;
     // 全量委托 DB：执行文件改名、刷新元数据内部名称与 opened_tables_ 映射
     return db->rename_table(old_name.c_str(), new_name.c_str());
