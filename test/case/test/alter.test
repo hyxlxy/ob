@@ -1,13 +1,13 @@
+
 CREATE TABLE alter_table_1(id int);
 CREATE index i_id on alter_table_1(id);
+INSERT INTO alter_table_1 VALUES (5);
 INSERT INTO alter_table_1 VALUES (7);
-INSERT INTO alter_table_1 VALUES (3);
-INSERT INTO alter_table_1 VALUES (3);
-ALTER TABLE alter_table_1 ADD COLUMN col INT;
-ALTER TABLE alter_table_1 DROP COLUMN col;
-ALTER TABLE alter_table_1 ADD COLUMN col INT;
-ALTER TABLE alter_table_1 CHANGE COLUMN col new_col INT;
-ALTER TABLE alter_table_1 RENAME TO alter_table_2;
-SELECT * FROM alter_table_2;
-CREATE index i_new_col on alter_table_2(new_col);
-ALTER TABLE alter_table_2 DROP COLUMN new_col;
+INSERT INTO alter_table_1 VALUES (8);
+
+alter table alter_table_1 add column col int;
+select * from alter_table_1;
+alter table alter_table_1 add column col int;
+insert into alter_table_1 values(1);
+alter table alter_table_1 drop column id;
+select * from alter_table_1;

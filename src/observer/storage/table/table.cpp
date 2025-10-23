@@ -371,9 +371,10 @@ const TableMeta &Table::table_meta() const { return table_meta_; }
 RC Table::make_record(int value_num, const Value *values, Record &record)
 {
   RC rc = RC::SUCCESS;
-  // 检查字段类型是否一致
-  if (value_num + table_meta_.sys_field_num() != table_meta_.field_num()) {
-    LOG_WARN("Input values don't match the table's schema, table name:%s", table_meta_.name());
+  // 允许少于列数的值，缺省值按 NULL 补齐（不可空列仍然报错）
+  const int expected_user_cols = table_meta_.field_num() - table_meta_.sys_field_num();
+  if (value_num > expected_user_cols) {
+    LOG_WARN("Too many values for table %s", table_meta_.name());
     return RC::SCHEMA_FIELD_MISSING;
   }
 
@@ -383,7 +384,8 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   char *record_data = (char *)malloc(record_size);
   memset(record_data, 0, record_size);
 
-  for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
+  int i = 0;
+  for (; i < value_num && OB_SUCC(rc); i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value &    value = values[i];
 
@@ -409,6 +411,17 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
     } else {
       rc = set_value_to_record(record_data, value, field);
     }
+  }
+  // 填充缺省字段为 NULL
+  for (; i < expected_user_cols && OB_SUCC(rc); i++) {
+    const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
+    Value nullv; nullv.set_type(AttrType::UNDEFINED); nullv.set_null(true);
+    if (!field->nullable()) {
+      LOG_WARN("Missing value for NOT NULL field. table=%s, field=%s", table_meta_.name(), field->name());
+      rc = RC::INVALID_ARGUMENT;
+      break;
+    }
+    rc = set_value_to_record(record_data, nullv, field);
   }
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to make record. table name:%s", table_meta_.name());
@@ -648,20 +661,25 @@ RC Table::alter_add_column_int(const char *new_name)
     }
   }
 
-  // 1) 提取旧数据
-  vector<vector<int>> rows;
+  // 1) 提取旧数据（保留 NULL 语义）
+  vector<vector<Value>> rows;
   {
     RecordScanner *scanner = nullptr;
     RC rc = engine_->get_record_scanner(scanner, nullptr, ReadWriteMode::READ_ONLY);
     if (rc != RC::SUCCESS) return rc;
     Record record;
     while (OB_SUCC(scanner->next(record))) {
-      vector<int> row;
+      vector<Value> row;
       for (int i = table_meta_.sys_field_num(); i < table_meta_.field_num(); ++i) {
         const FieldMeta *f = table_meta_.field(i);
-        int v = 0;
-        memcpy(&v, record.data() + f->offset(), sizeof(int));
-        row.push_back(v);
+        if (f->nullable() && f->len() > 4 && record.data()[f->offset() + f->len() - 1] == '1') {
+          Value nullv; nullv.set_type(AttrType::UNDEFINED); nullv.set_null(true);
+          row.push_back(nullv);
+        } else {
+          int v = 0;
+          memcpy(&v, record.data() + f->offset(), sizeof(int));
+          row.push_back(Value(v));
+        }
       }
       rows.push_back(std::move(row));
     }
@@ -727,7 +745,7 @@ RC Table::alter_add_column_int(const char *new_name)
   for (const auto &row : rows) {
     vector<Value> vals;
     vals.reserve(row.size() + 1);
-    for (int v : row) { vals.emplace_back(Value(v)); }
+    for (const Value &cell : row) { vals.emplace_back(cell); }
     Value nullv; nullv.set_type(AttrType::UNDEFINED); nullv.set_null(true);
     vals.emplace_back(nullv);
     Record rec;
@@ -766,20 +784,25 @@ RC Table::alter_drop_column(const char *name)
     (void)drop_index(nullptr, idx->name());
   }
 
-  // 1) 提取旧数据
-  vector<vector<int>> rows;
+  // 1) 提取旧数据（保留 NULL 语义）
+  vector<vector<Value>> rows;
   {
     RecordScanner *scanner = nullptr;
     RC rc = engine_->get_record_scanner(scanner, nullptr, ReadWriteMode::READ_ONLY);
     if (rc != RC::SUCCESS) return rc;
     Record record;
     while (OB_SUCC(scanner->next(record))) {
-      vector<int> row;
+      vector<Value> row;
       for (int i = table_meta_.sys_field_num(); i < table_meta_.field_num(); ++i) {
         const FieldMeta *f = table_meta_.field(i);
-        int v = 0;
-        memcpy(&v, record.data() + f->offset(), sizeof(int));
-        row.push_back(v);
+        if (f->nullable() && f->len() > 4 && record.data()[f->offset() + f->len() - 1] == '1') {
+          Value nullv; nullv.set_type(AttrType::UNDEFINED); nullv.set_null(true);
+          row.push_back(nullv);
+        } else {
+          int v = 0;
+          memcpy(&v, record.data() + f->offset(), sizeof(int));
+          row.push_back(Value(v));
+        }
       }
       rows.push_back(std::move(row));
     }
@@ -840,7 +863,7 @@ RC Table::alter_drop_column(const char *name)
     vals.reserve(row.size() - 1);
     for (size_t j = 0; j < row.size(); ++j) {
       if ((int)j == drop_user_idx) continue;
-      vals.emplace_back(Value((int)row[j]));
+      vals.emplace_back(row[j]);
     }
     Record rec;
     rc = make_record(static_cast<int>(vals.size()), vals.data(), rec);

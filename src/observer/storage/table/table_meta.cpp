@@ -56,10 +56,7 @@ RC TableMeta::init(int32_t table_id, const char *name, const vector<FieldMeta> *
     return RC::INVALID_ARGUMENT;
   }
 
-  if (attributes.size() == 0) {
-    LOG_ERROR("Invalid argument. name=%s, field_num=%d", name, attributes.size());
-    return RC::INVALID_ARGUMENT;
-  }
+  // 允许 0 个用户字段（例如 DROP 掉最后一个用户列后，仍保留系统字段）
 
   RC rc = RC::SUCCESS;
 
