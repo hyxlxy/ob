@@ -169,6 +169,12 @@ public:
 
   virtual const char *alias() const { return alias_.c_str(); }
   virtual void        set_alias(string name) { alias_ = std::move(name); }
+  virtual void        set_alias(const char *name)
+  {
+    if (name != nullptr) {
+      alias_ = (name);
+    }
+  }
 
 protected:
   /**
@@ -264,8 +270,12 @@ public:
 
   RC get_value(const Tuple &tuple, Value &value) const override;
 
+  const string &table_alias() const { return table_alias_; }
+  void          set_table_alias(string name) { table_alias_ = std::move(name); }
+
 private:
-  Field field_;
+  Field  field_;
+  string table_alias_;
 
   // 支持相关子查询的静态成员变量
   static const Tuple *current_parent_tuple_;

@@ -1151,6 +1151,7 @@ projection_list:
     {
       if ($2 != nullptr) {
         $1->set_name($2);
+        $1->set_alias($2);
       }
       $$ = new vector<unique_ptr<Expression>>;
       $$->emplace_back($1);
@@ -1159,6 +1160,7 @@ projection_list:
     {
       if ($2 != nullptr) {
         $1->set_name($2);
+        $1->set_alias($2);
       }
       if ($4 != nullptr) {
         $$ = $4;

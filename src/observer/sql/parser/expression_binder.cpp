@@ -25,16 +25,18 @@ using namespace common;
 
 Table *BinderContext::find_table(const char *table_name) const
 {
-  // First try alias/registered names map (case-insensitive match)
-  for (const auto &kv : name_to_table_) {
-    if (0 == strcasecmp(table_name, kv.first.c_str())) {
-      return kv.second;
-    }
-  }
+
   // Fallback: search by real table names in query tables
   for (Table *table : query_tables_) {
     if (0 == strcasecmp(table_name, table->name())) {
       return table;
+    }
+  }
+
+  // First try alias/registered names map (case-insensitive match)
+  for (const auto &kv : name_to_table_) {
+    if (0 == strcasecmp(table_name, kv.first.c_str())) {
+      return kv.second;
     }
   }
 
@@ -157,9 +159,15 @@ RC ExpressionBinder::bind_star_expression(
     return RC::SUCCESS;
   }
 
-  auto star_expr = static_cast<StarExpr *>(expr.get());
-
+  auto        star_expr  = static_cast<StarExpr *>(expr.get());
   const char *table_name = star_expr->table_name();
+  const char *alias      = star_expr->alias();
+
+  if (strlen(alias) != 0) {
+    //就说明查询的是 * ，但是却有别名，这是不被允许的。
+    return RC::ERROR;
+  }
+
   if (!is_blank(table_name) && 0 != strcmp(table_name, "*")) {
     // Specific table specified (e.g., "t2.*")
     Table *table = context_.find_table(table_name);
@@ -193,8 +201,9 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
   const char *table_name = unbound_field_expr->table_name();
   const char *field_name = unbound_field_expr->field_name();
+  const char *alias      = unbound_field_expr->alias();
+  Table      *table      = nullptr;
 
-  Table *table = nullptr;
   if (is_blank(table_name)) {
     if (context_.query_tables().size() != 1) {
       LOG_INFO("cannot determine table for field: %s", field_name);
@@ -247,6 +256,12 @@ RC ExpressionBinder::bind_unbound_field_expression(
   }
 
   if (0 == strcmp(field_name, "*")) {
+
+    if (strlen(alias) != 0) {
+      //说明查询的是*，但是有别名，那么就不可以.
+      return RC::ERROR;
+    }
+
     // Use table_name (which could be an alias) for wildcard expansion
     wildcard_fields(table, table_name, bound_expressions);
   } else {
@@ -256,29 +271,36 @@ RC ExpressionBinder::bind_unbound_field_expression(
       return RC::SCHEMA_FIELD_MISSING;
     }
 
-    Field       field(table, field_meta);
-    FieldExpr  *field_expr = new FieldExpr(field);
-    const char *alias_name = expr->name();
+    Field      field(table, field_meta);
+    FieldExpr *field_expr = new FieldExpr(field);
+    // const char *alias_name = expr->name();
 
     // Set field name according to the following rules:
     // 1. If there's an explicit alias (user provided via AS), use it
     // 2. If no alias, use just the field name (not table.field)
-    if (alias_name != nullptr && alias_name[0] != '\0') {
-      // Check if this is a qualified name (table.field or alias.field)
-      bool is_qualified = (strchr(alias_name, '.') != nullptr);
+    // if (alias_name != nullptr && alias_name[0] != '\0') {
+    //   // Check if this is a qualified name (table.field or alias.field)
+    //   bool is_qualified = (strchr(alias_name, '.') != nullptr);
 
-      if (is_qualified) {
-        // Qualified name without explicit AS alias: use only the field name
-        // (e.g., "SELECT t1.id" displays as "id", not "t1.id")
-        field_expr->set_name(field_name);
-      } else {
-        // Unqualified name: this is an explicit alias or bare field reference
-        field_expr->set_name(alias_name);
-      }
-    } else {
-      // No name set, default to field name
-      field_expr->set_name(field_name);
+    //   if (is_qualified) {
+    //     // Qualified name without explicit AS alias: use only the field name
+    //     // (e.g., "SELECT t1.id" displays as "id", not "t1.id")
+    //     field_expr->set_name(field_name);
+    //   } else {
+    //     // Unqualified name: this is an explicit alias or bare field reference
+    //     field_expr->set_name(alias_name);
+    //   }
+    // } else {
+    //   // No name set, default to field name
+    //   field_expr->set_name(field_name);
+    // }
+    field_expr->set_name(field_name);
+    field_expr->set_alias(alias);
+    if (string(table->table_meta().name()) != string(table_name)) {
+      //说明这里的table_name其实是别名
+      field_expr->set_table_alias(table_name);
     }
+
     bound_expressions.emplace_back(field_expr);
   }
 
@@ -639,6 +661,7 @@ RC ExpressionBinder::bind_aggregate_expression(
 
   auto aggregate_expr = make_unique<AggregateExpr>(aggregate_type, std::move(child_expr));
   aggregate_expr->set_name(unbound_aggregate_expr->name());
+  aggregate_expr->set_alias(unbound_aggregate_expr->alias());
   rc = check_aggregate_expression(*aggregate_expr);
   if (OB_FAIL(rc)) {
     return rc;
