@@ -482,6 +482,7 @@ enum SqlCommandFlag
   SCF_DROP_VIEW,     ///< 删除视图
   SCF_SHOW_INDEX,    ///< 显示索引
   SCF_UNION,         ///< UNION语句
+  SCF_ALTER_TABLE,   ///< ALTER TABLE
 };
 /**
  * @brief 表示一个SQL语句
@@ -510,6 +511,19 @@ public:
   DropViewSqlNode     drop_view;
   ShowIndexSqlNode    show_index;
   UnionSqlNode        union_stmt;
+  
+  // ALTER TABLE
+  enum class AlterOpType { ADD_COLUMN, DROP_COLUMN, CHANGE_COLUMN_RENAME, RENAME_TABLE };
+  struct AlterTableSqlNode {
+    AlterOpType op_type = AlterOpType::ADD_COLUMN;
+    // 目标表
+    string table_name;
+    string new_table_name; // for RENAME TO
+    // 列操作
+    string column_name;        // for ADD/DROP/CHANGE old name
+    string new_column_name;    // for CHANGE new name
+    AttrType data_type = AttrType::UNDEFINED; // simplified: only INTS used in grammar
+  } alter_table;
 
 public:
   ParsedSqlNode();

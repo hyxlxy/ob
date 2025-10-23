@@ -93,6 +93,11 @@ public:
   RC drop_view(const char *view_name);
 
   /**
+   * @brief 重命名表（仅普通表）
+   */
+  RC rename_table(const char *old_name, const char *new_name);
+
+  /**
    * @brief 根据表名查找表
    */
   Table *find_table(const char *table_name) const;

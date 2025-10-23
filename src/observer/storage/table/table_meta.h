@@ -57,6 +57,9 @@ public:
   RC add_index(const IndexMeta &index);
   RC drop_index(const char *index_name);
 
+  // Rename a user column (not trx/sys fields). Update internal field meta and any single-column index meta
+  RC rename_column(const char *old_name, const char *new_name);
+
 public:
   int32_t             table_id() const { return table_id_; }
   const char         *name() const;

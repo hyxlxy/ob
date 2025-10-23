@@ -84,6 +84,12 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         TABLE
         TABLES
         INDEX
+        ALTER
+        ADD
+        CHANGE
+        COLUMN
+        RENAME
+        TO
         /* allow 'CREATE VECTOR INDEX' */
         /* reuse VECTOR_T token for keyword VECTOR before INDEX */
         IF
@@ -234,6 +240,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <sql_node>            show_index_stmt
 %type <sql_node>            desc_table_stmt
 %type <sql_node>            create_index_stmt
+%type <sql_node>            alter_table_stmt
 /* remove duplicate %type limit_clause declaration */
 %type <number>              option_list
 %type <number>              option_item
@@ -292,9 +299,43 @@ command_wrapper:
   | set_variable_stmt
   | create_view_stmt
   | drop_view_stmt
+  | alter_table_stmt
   | help_stmt
   | exit_stmt
     ;
+/* ALTER TABLE simplified grammar */
+alter_table_stmt:
+    ALTER TABLE ID ADD COLUMN ID INT_T {
+      $$ = new ParsedSqlNode(SCF_ALTER_TABLE);
+      $$->alter_table.op_type = ParsedSqlNode::AlterOpType::ADD_COLUMN;
+      $$->alter_table.table_name = $3;
+      $$->alter_table.column_name = $6;
+      $$->alter_table.new_column_name.clear();
+      $$->alter_table.data_type = AttrType::INTS;
+    }
+  | ALTER TABLE ID DROP COLUMN ID {
+      $$ = new ParsedSqlNode(SCF_ALTER_TABLE);
+      $$->alter_table.op_type = ParsedSqlNode::AlterOpType::DROP_COLUMN;
+      $$->alter_table.table_name = $3;
+      $$->alter_table.column_name = $6;
+      $$->alter_table.new_column_name.clear();
+      $$->alter_table.data_type = AttrType::UNDEFINED;
+    }
+  | ALTER TABLE ID CHANGE COLUMN ID ID INT_T {
+      $$ = new ParsedSqlNode(SCF_ALTER_TABLE);
+      $$->alter_table.op_type = ParsedSqlNode::AlterOpType::CHANGE_COLUMN_RENAME;
+      $$->alter_table.table_name = $3;
+      $$->alter_table.column_name = $6;
+      $$->alter_table.new_column_name = $7;
+      $$->alter_table.data_type = AttrType::INTS; /* type not used, but present */
+    }
+  | ALTER TABLE ID RENAME TO ID {
+      $$ = new ParsedSqlNode(SCF_ALTER_TABLE);
+      $$->alter_table.op_type = ParsedSqlNode::AlterOpType::RENAME_TABLE;
+      $$->alter_table.table_name = $3;
+      $$->alter_table.new_table_name = $6;
+    }
+  ;
 
 exit_stmt:
     EXIT {

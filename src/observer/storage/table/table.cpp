@@ -27,12 +27,15 @@ See the Mulan PSL v2 for more details. */
 #include "storage/common/meta_util.h"
 #include "storage/index/index.h"
 #include "storage/record/record_manager.h"
+#include "storage/record/heap_record_scanner.h"
 #include "storage/table/table.h"
 #include "storage/trx/trx.h"
 // #include "storage/record/heap_record_scanner.h"
 // #include "storage/record/lsm_record_scanner.h"
 #include "storage/table/heap_table_engine.h"
 #include "storage/table/lsm_table_engine.h"
+#include "storage/record/record_manager.h"
+#include <filesystem>
 
 Table::~Table()
 {
@@ -602,4 +605,249 @@ RC Table::sync()
     return RC::SUCCESS;
   }
   return engine_->sync();
+}
+
+RC Table::alter_change_column_rename(const char *old_name, const char *new_name)
+{
+  if (is_view()) return RC::UNIMPLEMENTED;
+  if (common::is_blank(old_name) || common::is_blank(new_name)) return RC::INVALID_ARGUMENT;
+
+  // build new meta and atomically persist
+  TableMeta new_meta(table_meta_);
+  RC rc = new_meta.rename_column(old_name, new_name);
+  if (rc != RC::SUCCESS) return rc;
+
+  string base = db_->path();
+  string tmp_file = table_meta_file(base.c_str(), table_meta_.name()) + ".tmp";
+  {
+    fstream fs;
+    fs.open(tmp_file, ios_base::out | ios_base::binary | ios_base::trunc);
+    if (!fs.is_open()) return RC::IOERR_OPEN;
+    new_meta.serialize(fs);
+    fs.close();
+  }
+  string meta_file = table_meta_file(base.c_str(), table_meta_.name());
+  if (std::rename(tmp_file.c_str(), meta_file.c_str()) != 0) {
+    return RC::IOERR_WRITE;
+  }
+
+  table_meta_.swap(new_meta);
+  return RC::SUCCESS;
+}
+
+RC Table::alter_add_column_int(const char *new_name)
+{
+  if (is_view()) return RC::UNIMPLEMENTED;
+  if (common::is_blank(new_name)) return RC::INVALID_ARGUMENT;
+
+  // 仅支持在现有全部用户字段均为 INT 的前提下重写
+  for (int i = table_meta_.sys_field_num(); i < table_meta_.field_num(); ++i) {
+    const FieldMeta *f = table_meta_.field(i);
+    if (f->type() != AttrType::INTS) {
+      return RC::UNSUPPORTED;
+    }
+  }
+
+  // 1) 提取旧数据
+  vector<vector<int>> rows;
+  {
+    RecordScanner *scanner = nullptr;
+    RC rc = engine_->get_record_scanner(scanner, nullptr, ReadWriteMode::READ_ONLY);
+    if (rc != RC::SUCCESS) return rc;
+    Record record;
+    while (OB_SUCC(scanner->next(record))) {
+      vector<int> row;
+      for (int i = table_meta_.sys_field_num(); i < table_meta_.field_num(); ++i) {
+        const FieldMeta *f = table_meta_.field(i);
+        int v = 0;
+        memcpy(&v, record.data() + f->offset(), sizeof(int));
+        row.push_back(v);
+      }
+      rows.push_back(std::move(row));
+    }
+    delete scanner;
+  }
+
+  // 2) 生成新元数据（与 MySQL 一致：新增列默认允许 NULL，且未指定 DEFAULT 时，历史行值为 NULL）
+  vector<AttrInfoSqlNode> attrs;
+  for (int i = table_meta_.sys_field_num(); i < table_meta_.field_num(); ++i) {
+    const FieldMeta *f = table_meta_.field(i);
+    AttrInfoSqlNode a; a.name = f->name(); a.type = f->type(); a.length = f->len(); a.nullable = f->nullable();
+    attrs.push_back(a);
+  }
+  {
+    // INT 可空：长度按现有规范需额外 1 字节 NULL 标志
+    AttrInfoSqlNode a; a.name = new_name; a.type = AttrType::INTS; a.length = 5; a.nullable = true;
+    attrs.push_back(a);
+  }
+
+  vector<FieldMeta> trx_copy(table_meta_.trx_fields().begin(), table_meta_.trx_fields().end());
+  TableMeta new_meta;
+  RC rc = new_meta.init(table_meta_.table_id(), table_meta_.name(), &trx_copy, attrs, table_meta_.primary_keys(), table_meta_.storage_format(), table_meta_.storage_engine());
+  if (rc != RC::SUCCESS) return rc;
+
+  // 3) 原子写入新元数据
+  string base = db_->path();
+  string tmp_meta = table_meta_file(base.c_str(), table_meta_.name()) + ".tmp";
+  {
+    fstream fs;
+    fs.open(tmp_meta, ios_base::out | ios_base::binary | ios_base::trunc);
+    if (!fs.is_open()) return RC::IOERR_OPEN;
+    new_meta.serialize(fs);
+    fs.close();
+  }
+  string meta_file_path = table_meta_file(base.c_str(), table_meta_.name());
+  if (std::rename(tmp_meta.c_str(), meta_file_path.c_str()) != 0) return RC::IOERR_WRITE;
+
+  // 4) 重建数据文件
+  // 关闭现引擎，删除旧数据文件，创建新文件
+  engine_.reset();
+  string data_file = table_data_file(base.c_str(), table_meta_.name());
+  std::error_code fec;
+  std::filesystem::remove(data_file, fec);
+  BufferPoolManager &bpm = db_->buffer_pool_manager();
+  rc = bpm.create_file(data_file.c_str());
+  if (rc != RC::SUCCESS) return rc;
+
+  // 切换内存中的元数据
+  table_meta_.swap(new_meta);
+
+  // 重新打开引擎
+  if (table_meta_.storage_engine() == StorageEngine::HEAP) {
+    engine_ = make_unique<HeapTableEngine>(&table_meta_, db_, this);
+  } else if (table_meta_.storage_engine() == StorageEngine::LSM) {
+    engine_ = make_unique<LsmTableEngine>(&table_meta_, db_, this);
+  } else {
+    return RC::UNSUPPORTED;
+  }
+  rc = engine_->open();
+  if (rc != RC::SUCCESS) return rc;
+
+  // 插入数据（新增列默认 NULL）
+  for (const auto &row : rows) {
+    vector<Value> vals;
+    vals.reserve(row.size() + 1);
+    for (int v : row) { vals.emplace_back(Value(v)); }
+    Value nullv; nullv.set_type(AttrType::UNDEFINED); nullv.set_null(true);
+    vals.emplace_back(nullv);
+    Record rec;
+    rc = make_record(static_cast<int>(vals.size()), vals.data(), rec);
+    if (rc != RC::SUCCESS) return rc;
+    rc = insert_record(rec);
+    if (rc != RC::SUCCESS) return rc;
+  }
+
+  return RC::SUCCESS;
+}
+
+RC Table::alter_drop_column(const char *name)
+{
+  if (is_view()) return RC::UNIMPLEMENTED;
+  if (common::is_blank(name)) return RC::INVALID_ARGUMENT;
+
+  // 仅支持所有用户字段为 INT
+  for (int i = table_meta_.sys_field_num(); i < table_meta_.field_num(); ++i) {
+    const FieldMeta *f = table_meta_.field(i);
+    if (f->type() != AttrType::INTS) {
+      return RC::UNSUPPORTED;
+    }
+  }
+
+  // 找到要删除的列序
+  int drop_idx = -1;
+  for (int i = table_meta_.sys_field_num(); i < table_meta_.field_num(); ++i) {
+    if (0 == strcmp(table_meta_.field(i)->name(), name)) { drop_idx = i; break; }
+  }
+  if (drop_idx < 0) return RC::SCHEMA_FIELD_NOT_EXIST;
+
+  // 如有索引，先删除
+  const IndexMeta *idx = table_meta_.find_index_by_field(name);
+  if (idx != nullptr) {
+    (void)drop_index(nullptr, idx->name());
+  }
+
+  // 1) 提取旧数据
+  vector<vector<int>> rows;
+  {
+    RecordScanner *scanner = nullptr;
+    RC rc = engine_->get_record_scanner(scanner, nullptr, ReadWriteMode::READ_ONLY);
+    if (rc != RC::SUCCESS) return rc;
+    Record record;
+    while (OB_SUCC(scanner->next(record))) {
+      vector<int> row;
+      for (int i = table_meta_.sys_field_num(); i < table_meta_.field_num(); ++i) {
+        const FieldMeta *f = table_meta_.field(i);
+        int v = 0;
+        memcpy(&v, record.data() + f->offset(), sizeof(int));
+        row.push_back(v);
+      }
+      rows.push_back(std::move(row));
+    }
+    delete scanner;
+  }
+
+  // 2) 生成新元数据（移除该列）
+  vector<AttrInfoSqlNode> attrs;
+  for (int i = table_meta_.sys_field_num(); i < table_meta_.field_num(); ++i) {
+    const FieldMeta *f = table_meta_.field(i);
+    if (0 == strcmp(f->name(), name)) continue;
+    AttrInfoSqlNode a; a.name = f->name(); a.type = f->type(); a.length = f->len(); a.nullable = f->nullable();
+    attrs.push_back(a);
+  }
+  vector<FieldMeta> trx_copy(table_meta_.trx_fields().begin(), table_meta_.trx_fields().end());
+  TableMeta new_meta;
+  RC rc = new_meta.init(table_meta_.table_id(), table_meta_.name(), &trx_copy, attrs, table_meta_.primary_keys(), table_meta_.storage_format(), table_meta_.storage_engine());
+  if (rc != RC::SUCCESS) return rc;
+
+  // 3) 原子写入新元数据
+  string base = db_->path();
+  string tmp_meta = table_meta_file(base.c_str(), table_meta_.name()) + ".tmp";
+  {
+    fstream fs;
+    fs.open(tmp_meta, ios_base::out | ios_base::binary | ios_base::trunc);
+    if (!fs.is_open()) return RC::IOERR_OPEN;
+    new_meta.serialize(fs);
+    fs.close();
+  }
+  string meta_file_path = table_meta_file(base.c_str(), table_meta_.name());
+  if (std::rename(tmp_meta.c_str(), meta_file_path.c_str()) != 0) return RC::IOERR_WRITE;
+
+  // 4) 重建数据文件
+  engine_.reset();
+  string data_file = table_data_file(base.c_str(), table_meta_.name());
+  std::error_code fec;
+  std::filesystem::remove(data_file, fec);
+  BufferPoolManager &bpm = db_->buffer_pool_manager();
+  rc = bpm.create_file(data_file.c_str());
+  if (rc != RC::SUCCESS) return rc;
+
+  table_meta_.swap(new_meta);
+
+  if (table_meta_.storage_engine() == StorageEngine::HEAP) {
+    engine_ = make_unique<HeapTableEngine>(&table_meta_, db_, this);
+  } else if (table_meta_.storage_engine() == StorageEngine::LSM) {
+    engine_ = make_unique<LsmTableEngine>(&table_meta_, db_, this);
+  } else {
+    return RC::UNSUPPORTED;
+  }
+  rc = engine_->open();
+  if (rc != RC::SUCCESS) return rc;
+
+  // 插入数据（跳过该列）
+  int drop_user_idx = drop_idx - table_meta_.sys_field_num();
+  for (const auto &row : rows) {
+    vector<Value> vals;
+    vals.reserve(row.size() - 1);
+    for (size_t j = 0; j < row.size(); ++j) {
+      if ((int)j == drop_user_idx) continue;
+      vals.emplace_back(Value((int)row[j]));
+    }
+    Record rec;
+    rc = make_record(static_cast<int>(vals.size()), vals.data(), rec);
+    if (rc != RC::SUCCESS) return rc;
+    rc = insert_record(rec);
+    if (rc != RC::SUCCESS) return rc;
+  }
+
+  return RC::SUCCESS;
 }

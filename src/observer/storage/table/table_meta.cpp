@@ -178,6 +178,54 @@ RC TableMeta::drop_index(const char *index_name)
   return RC::SCHEMA_INDEX_NOT_EXIST;
 }
 
+RC TableMeta::rename_column(const char *old_name, const char *new_name)
+{
+  if (common::is_blank(old_name) || common::is_blank(new_name)) {
+    return RC::INVALID_ARGUMENT;
+  }
+
+  bool found = false;
+  for (auto &field : fields_) {
+    if (!field.visible()) { continue; }
+    if (0 == strcmp(field.name(), old_name)) {
+      FieldMeta repl;
+      RC rc = repl.init(new_name, field.type(), field.offset(), field.len(), field.visible(), field.field_id(), field.nullable());
+      if (rc != RC::SUCCESS) return rc;
+      field = repl;
+      found = true;
+      break;
+    }
+  }
+  if (!found) return RC::SCHEMA_FIELD_NOT_EXIST;
+
+  // update single-field index meta if any
+  for (auto &idx : indexes_) {
+    if (!idx.fields().empty()) {
+      // multi-field index: try to replace matching component
+      auto names = idx.fields();
+      for (auto &n : names) {
+        if (n == old_name) { n = new_name; }
+      }
+      // rebuild IndexMeta
+      vector<FieldMeta> fms;
+      for (const auto &nm : names) {
+        const FieldMeta *fm = field(nm.c_str());
+        if (fm == nullptr) return RC::SCHEMA_FIELD_NOT_EXIST;
+        fms.push_back(*fm);
+      }
+      IndexMeta rebuilt; rebuilt.init(idx.name(), fms, idx.is_unique());
+      idx = rebuilt;
+    } else if (idx.field() && 0 == strcmp(idx.field(), old_name)) {
+      const FieldMeta *fm = field(new_name);
+      if (fm == nullptr) return RC::SCHEMA_FIELD_NOT_EXIST;
+      IndexMeta rebuilt; rebuilt.init(idx.name(), *fm, idx.is_unique());
+      idx = rebuilt;
+    }
+  }
+
+  return RC::SUCCESS;
+}
+
 const char *TableMeta::name() const { return name_.c_str(); }
 
 const FieldMeta *TableMeta::trx_field() const { return &fields_[0]; }

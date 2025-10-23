@@ -150,6 +150,11 @@ public:
   Index *find_index(const char *index_name) const;
   Index *find_index_by_field(const char *field_name) const;
 
+  // ALTER helpers
+  RC alter_change_column_rename(const char *old_name, const char *new_name);
+  RC alter_add_column_int(const char *new_name);
+  RC alter_drop_column(const char *name);
+
 private:
   Db       *db_ = nullptr;
   TableMeta table_meta_;

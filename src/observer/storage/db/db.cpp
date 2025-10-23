@@ -326,6 +326,108 @@ RC Db::drop_view(const char *view_name)
   return RC::SUCCESS;
 }
 
+RC Db::rename_table(const char *old_name, const char *new_name)
+{
+  if (nullptr == old_name || nullptr == new_name || common::is_blank(old_name) || common::is_blank(new_name)) {
+    return RC::INVALID_ARGUMENT;
+  }
+
+  if (opened_tables_.find(old_name) == opened_tables_.end()) {
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+  if (opened_tables_.find(new_name) != opened_tables_.end()) {
+    return RC::SCHEMA_TABLE_EXIST;
+  }
+
+  namespace fs = std::filesystem;
+  Table *old_table = opened_tables_[old_name];
+  std::error_code ec;
+
+  string base = path_;
+  string old_meta_path = table_meta_file(base.c_str(), old_name);
+  string new_meta_path = table_meta_file(base.c_str(), new_name);
+  string old_data_path = table_data_file(base.c_str(), old_name);
+  string new_data_path = table_data_file(base.c_str(), new_name);
+  string old_lob_path  = table_text_lob_file(base.c_str(), old_name);
+  string new_lob_path  = table_text_lob_file(base.c_str(), new_name);
+
+  // Capture old meta info before closing
+  const TableMeta &old_meta_ref = old_table->table_meta();
+  int32_t table_id = old_meta_ref.table_id();
+  StorageFormat sf = old_meta_ref.storage_format();
+  StorageEngine se = old_meta_ref.storage_engine();
+  vector<string> pks = old_meta_ref.primary_keys();
+  vector<AttrInfoSqlNode> attrs;
+  for (int i = old_meta_ref.sys_field_num(); i < old_meta_ref.field_num(); ++i) {
+    const FieldMeta *f = old_meta_ref.field(i);
+    AttrInfoSqlNode a; a.name = f->name(); a.type = f->type(); a.length = f->len(); a.nullable = f->nullable();
+    attrs.push_back(a);
+  }
+  vector<FieldMeta> trx_copy(old_meta_ref.trx_fields().begin(), old_meta_ref.trx_fields().end());
+  vector<IndexMeta> idx_copy;
+  for (int i = 0; i < old_meta_ref.index_num(); ++i) {
+    const IndexMeta *im = old_meta_ref.index(i);
+    if (im) idx_copy.push_back(*im);
+  }
+
+  // Close old table and remove mapping, release file handles/buffers
+  opened_tables_.erase(old_name);
+  delete old_table;
+
+  // Rename files
+  fs::rename(old_meta_path, new_meta_path, ec); if (ec) return RC::IOERR_WRITE;
+  fs::rename(old_data_path, new_data_path, ec); if (ec) return RC::IOERR_WRITE;
+  if (fs::exists(old_lob_path)) { fs::rename(old_lob_path, new_lob_path, ec); if (ec) return RC::IOERR_WRITE; }
+
+  // Rename index files old-*.index -> new-*.index
+  try {
+    for (const auto &entry : fs::directory_iterator(base)) {
+      if (!entry.is_regular_file()) continue;
+      string fname = entry.path().filename().string();
+      string prefix_old = string(old_name) + "-";
+      string suffix_index = TABLE_INDEX_SUFFIX;
+      size_t suffix_len = suffix_index.size();
+      if (fname.size() > prefix_old.size() + suffix_len &&
+          fname.rfind(suffix_index) == fname.size() - suffix_len &&
+          fname.find(prefix_old) == 0) {
+        string middle = fname.substr(prefix_old.size(), fname.size() - prefix_old.size() - suffix_len);
+        string new_fname = string(new_name) + "-" + middle + suffix_index;
+        fs::rename(entry.path(), fs::path(base) / new_fname, ec);
+        if (ec) return RC::IOERR_WRITE;
+      }
+    }
+  } catch (...) {
+    return RC::IOERR_WRITE;
+  }
+
+  // Write new meta content with updated table name
+  {
+    TableMeta new_meta_obj;
+    RC irc = new_meta_obj.init(table_id, new_name, &trx_copy, attrs, pks, sf, se);
+    if (irc != RC::SUCCESS) return irc;
+    for (const auto &im : idx_copy) {
+      new_meta_obj.add_index(im);
+    }
+    string tmp_meta = new_meta_path + string(".tmp");
+    fstream fs2;
+    fs2.open(tmp_meta, ios_base::out | ios_base::binary | ios_base::trunc);
+    if (!fs2.is_open()) return RC::IOERR_OPEN;
+    new_meta_obj.serialize(fs2);
+    fs2.close();
+    if (std::rename(tmp_meta.c_str(), new_meta_path.c_str()) != 0) return RC::IOERR_WRITE;
+  }
+
+  // Open new table and insert mapping
+  Table *new_table = new Table();
+  RC rc = new_table->open(this, (string(new_name) + TABLE_META_SUFFIX).c_str(), base.c_str());
+  if (rc != RC::SUCCESS) {
+    delete new_table;
+    return rc;
+  }
+  opened_tables_[new_name] = new_table;
+  return RC::SUCCESS;
+}
+
 Table *Db::find_table(const char *table_name) const
 {
   unordered_map<string, Table *>::const_iterator iter = opened_tables_.find(table_name);
