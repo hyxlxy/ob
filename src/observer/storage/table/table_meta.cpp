@@ -93,7 +93,7 @@ RC TableMeta::init(int32_t table_id, const char *name, const vector<FieldMeta> *
     }
     // `i` is the col_id of fields[i]
     rc = fields_[i + trx_field_num].init(
-        attr_info.name.c_str(), attr_info.type, field_offset, col_len, true /*visible*/, i, attr_info.nullable);
+        attr_info.name.c_str(), attr_info.type, field_offset, col_len, true, i, attr_info.nullable);
     if (OB_FAIL(rc)) {
       LOG_ERROR("Failed to init field meta. table name=%s, field name: %s", name, attr_info.name.c_str());
       return rc;
@@ -115,6 +115,7 @@ RC TableMeta::init(int32_t table_id, const char *name, const vector<FieldMeta> *
 
 RC TableMeta::init_view(int32_t table_id, const char *name, const vector<string> &attr_names, const string &select_sql)
 {
+  ASSERT(0, "init_view no way");
   if (table_id < 0) {
     LOG_WARN("invalid table id. table id = %d, table name = %s", table_id, name);
     return RC::INVALID_ARGUMENT;

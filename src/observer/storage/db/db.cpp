@@ -547,6 +547,14 @@ RC Db::open_all_tables()
     }
     opened_tables_[table->name()] = table;
     LOG_INFO("Open table: %s, file: %s", table->name(), filename.c_str());
+    // debug
+    {
+      for (auto &&field : *table->table_meta().field_metas()) {
+        cout << "table_name: " << table->name() << " "
+             << "field: " << field.name() << " "
+             << "nullable: " << field.nullable() << endl;
+      }
+    }
   }
 
   LOG_INFO("All table have been opened. num=%d", opened_tables_.size());

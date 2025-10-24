@@ -274,7 +274,7 @@ struct UpdateKvSqlNode
 struct UpdateSqlNode
 {
   string relation_name;   ///< Relation to update
-  string attribute_name;  ///< 更新的字段（单字段模式）
+  string attribute_name;  ///< 更新的字段\（单字段模式）
   Value  value;           ///< 更新的值（单字段模式）
 
   // 多字段UPDATE支持
@@ -298,9 +298,9 @@ struct UpdateSqlNode
  */
 struct AttrInfoSqlNode
 {
-  AttrType type;      ///< Type of attribute
-  string   name;      ///< Attribute name
-  size_t   length;    ///< Length of attribute
+  AttrType type;             ///< Type of attribute
+  string   name;             ///< Attribute name
+  size_t   length;           ///< Length of attribute
   bool     nullable = true;  ///< Whether the attribute can be NULL (default: true)
 
   AttrInfoSqlNode() : type(AttrType::UNDEFINED), length(0), nullable(true) {}
@@ -313,6 +313,7 @@ struct AttrInfoSqlNode
     } else {
       length = 4;
     }
+    nullable = true;
   }
 };
 
