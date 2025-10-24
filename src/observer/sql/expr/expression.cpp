@@ -492,6 +492,7 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
           if (rc != RC::SUCCESS and rc != RC::RECORD_EOF) {
           } else {
             if (rc == RC::RECORD_EOF) {
+              left_value.set_type(AttrType::UNDEFINED);
               left_value.set_null();
               rc = RC::SUCCESS;
             } else if (expr->can_get_next_value(tuple, nullptr)) {
@@ -511,6 +512,7 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
           if (rc != RC::SUCCESS and rc != RC::RECORD_EOF) {
           } else {
             if (rc == RC::RECORD_EOF) {
+              right_value.set_type(AttrType::UNDEFINED);
               right_value.set_null();
               rc = RC::SUCCESS;
             } else if (expr->can_get_next_value(tuple, nullptr)) {

@@ -22,19 +22,14 @@ See the Mulan PSL v2 for more details. */
 using namespace std;
 using namespace std::filesystem;
 
-ExternalSortPhysicalOperator::ExternalSortPhysicalOperator(
-    vector<unique_ptr<Expression>> order_by_expressions,
-    vector<OrderDirection> order_by_directions,
-    size_t memory_limit_bytes)
+ExternalSortPhysicalOperator::ExternalSortPhysicalOperator(vector<unique_ptr<Expression>> order_by_expressions,
+    vector<OrderDirection> order_by_directions, size_t memory_limit_bytes)
     : order_by_expressions_(std::move(order_by_expressions)),
       order_by_directions_(std::move(order_by_directions)),
       memory_limit_bytes_(memory_limit_bytes)
 {}
 
-ExternalSortPhysicalOperator::~ExternalSortPhysicalOperator()
-{
-  cleanup_runs();
-}
+ExternalSortPhysicalOperator::~ExternalSortPhysicalOperator() { cleanup_runs(); }
 
 RC ExternalSortPhysicalOperator::open(Trx *trx)
 {
@@ -101,7 +96,7 @@ RC ExternalSortPhysicalOperator::next()
   // pop smallest and refill from that run
   // Extract without copying (top() is const-ref)
   size_t run_index = heap_.top().run_index;
-  current_ = std::move(const_cast<HeapItem &>(heap_.top()).tuple);
+  current_         = std::move(const_cast<HeapItem &>(heap_.top()).tuple);
   heap_.pop();
   // Ensure specs are present
   if (current_ && current_->cell_num() > 0) {
@@ -114,11 +109,11 @@ RC ExternalSortPhysicalOperator::next()
   }
 
   std::unique_ptr<ValueListTuple> repl;
-  RC rc = read_next_from_run(run_index, repl);
+  RC                              rc = read_next_from_run(run_index, repl);
   if (rc == RC::SUCCESS && repl) {
     HeapItem item;
     item.run_index = run_index;
-    item.tuple = std::move(repl);
+    item.tuple     = std::move(repl);
     heap_.push(std::move(item));
   }
   return RC::SUCCESS;
@@ -139,10 +134,7 @@ RC ExternalSortPhysicalOperator::close()
   return RC::SUCCESS;
 }
 
-Tuple *ExternalSortPhysicalOperator::current_tuple()
-{
-  return current_.get();
-}
+Tuple *ExternalSortPhysicalOperator::current_tuple() { return current_.get(); }
 
 RC ExternalSortPhysicalOperator::tuple_schema(TupleSchema &schema) const
 {
@@ -171,7 +163,8 @@ bool ExternalSortPhysicalOperator::HeapComparator::operator()(const HeapItem &a,
     if (cmp != 0) {
       bool asc = (*dirs)[i] == ASC_ORDER;
       // want min-heap: return true if (tb before ta)
-      if (asc) return cmp > 0; // tb<ta => cmp<0 => return false; if cmp>0 then tb>ta so a should come before b => return true
+      if (asc)
+        return cmp > 0;  // tb<ta => cmp<0 => return false; if cmp>0 then tb>ta so a should come before b => return true
       return cmp < 0;
     }
   }
@@ -187,7 +180,8 @@ bool ExternalSortPhysicalOperator::tuple_less(const ValueListTuple &left, const 
     order_by_expressions_[i]->get_value(right, rv);
     int cmp = lv.compare(rv);
     if (cmp != 0) {
-      if (order_by_directions_[i] == ASC_ORDER) return cmp < 0;
+      if (order_by_directions_[i] == ASC_ORDER)
+        return cmp < 0;
       return cmp > 0;
     }
   }
@@ -201,31 +195,37 @@ size_t ExternalSortPhysicalOperator::approximate_tuple_size(const ValueListTuple
   for (int i = 0; i < t.cell_num(); i++) {
     Value v;
     if (t.cell_at(i, v) == RC::SUCCESS) {
-      total += v.length() + 8; // 8 bytes overhead per cell
+      total += v.length() + 8;  // 8 bytes overhead per cell
     } else {
       total += 8;
     }
   }
-  return total + 32; // tuple header
+  return total + 32;  // tuple header
 }
 
 RC ExternalSortPhysicalOperator::serialize_tuple(std::FILE *fp, const ValueListTuple &t)
 {
   // simple length-prefixed encoding by cells
   uint32_t cell_count = static_cast<uint32_t>(t.cell_num());
-  if (fwrite(&cell_count, sizeof(cell_count), 1, fp) != 1) return RC::IOERR_WRITE;
+  if (fwrite(&cell_count, sizeof(cell_count), 1, fp) != 1)
+    return RC::IOERR_WRITE;
   for (uint32_t i = 0; i < cell_count; i++) {
     Value v;
-    RC rc = const_cast<ValueListTuple &>(t).cell_at(static_cast<int>(i), v);
-    if (rc != RC::SUCCESS) return rc;
+    RC    rc = const_cast<ValueListTuple &>(t).cell_at(static_cast<int>(i), v);
+    if (rc != RC::SUCCESS)
+      return rc;
     uint32_t type = static_cast<uint32_t>(v.attr_type());
     uint32_t len  = static_cast<uint32_t>(v.length());
-    if (fwrite(&type, sizeof(type), 1, fp) != 1) return RC::IOERR_WRITE;
-    if (fwrite(&len, sizeof(len), 1, fp) != 1) return RC::IOERR_WRITE;
+    if (fwrite(&type, sizeof(type), 1, fp) != 1)
+      return RC::IOERR_WRITE;
+    if (fwrite(&len, sizeof(len), 1, fp) != 1)
+      return RC::IOERR_WRITE;
     if (len > 0) {
-      if (fwrite(v.data(), 1, len, fp) != len) return RC::IOERR_WRITE;
+      if (fwrite(v.data(), 1, len, fp) != len)
+        return RC::IOERR_WRITE;
     }
-    // NULL flag is embedded in Value (UNDEFINED->null) via length==0 for fixed types; already carried by type/len/data semantics
+    // NULL flag is embedded in Value (UNDEFINED->null) via length==0 for fixed types; already carried by type/len/data
+    // semantics
   }
   return RC::SUCCESS;
 }
@@ -234,21 +234,25 @@ RC ExternalSortPhysicalOperator::deserialize_tuple(std::FILE *fp, std::unique_pt
 {
   uint32_t cell_count = 0;
   if (fread(&cell_count, sizeof(cell_count), 1, fp) != 1) {
-    if (feof(fp)) return RC::RECORD_EOF;
+    if (feof(fp))
+      return RC::RECORD_EOF;
     return RC::IOERR_READ;
   }
   std::vector<Value> cells;
   cells.reserve(cell_count);
   for (uint32_t i = 0; i < cell_count; i++) {
     uint32_t type = 0, len = 0;
-    if (fread(&type, sizeof(type), 1, fp) != 1) return RC::IOERR_READ;
-    if (fread(&len, sizeof(len), 1, fp) != 1) return RC::IOERR_READ;
+    if (fread(&type, sizeof(type), 1, fp) != 1)
+      return RC::IOERR_READ;
+    if (fread(&len, sizeof(len), 1, fp) != 1)
+      return RC::IOERR_READ;
     Value v;
     v.set_type(static_cast<AttrType>(type));
     if (len > 0) {
       std::string buf;
       buf.resize(len);
-      if (fread(buf.data(), 1, len, fp) != len) return RC::IOERR_READ;
+      if (fread(buf.data(), 1, len, fp) != len)
+        return RC::IOERR_READ;
       // For string-like types, prefer set_string to avoid ambiguity
       if (v.attr_type() == AttrType::CHARS || v.attr_type() == AttrType::TEXTS) {
         v.set_string(buf.data(), len);
@@ -259,6 +263,7 @@ RC ExternalSortPhysicalOperator::deserialize_tuple(std::FILE *fp, std::unique_pt
     } else {
       // length 0 -> may be null/fixed zero
       if (v.attr_type() == AttrType::UNDEFINED) {
+        v.set_type(AttrType::UNDEFINED);
         v.set_null(true);
       } else {
         v.set_data((const char *)nullptr, 0);
@@ -289,20 +294,25 @@ RC ExternalSortPhysicalOperator::prepare_temp_dir()
 
 RC ExternalSortPhysicalOperator::flush_run()
 {
-  if (buffer_.empty()) return RC::SUCCESS;
+  if (buffer_.empty())
+    return RC::SUCCESS;
   size_t run_rows_before_cut = buffer_.size();
   if (top_k_ > 0 && buffer_.size() > top_k_) {
     // Partial select smallest top_k_ in buffer to reduce spill size
-    std::nth_element(buffer_.begin(), buffer_.begin() + static_cast<long>(top_k_), buffer_.end(),
-                     [&](const ValueListTuple &a, const ValueListTuple &b) { return tuple_less(a, b); });
+    std::nth_element(buffer_.begin(),
+        buffer_.begin() + static_cast<long>(top_k_),
+        buffer_.end(),
+        [&](const ValueListTuple &a, const ValueListTuple &b) { return tuple_less(a, b); });
     buffer_.resize(top_k_);
   }
-  std::sort(buffer_.begin(), buffer_.end(),
-            [&](const ValueListTuple &a, const ValueListTuple &b) { return tuple_less(a, b); });
+  std::sort(buffer_.begin(), buffer_.end(), [&](const ValueListTuple &a, const ValueListTuple &b) {
+    return tuple_less(a, b);
+  });
 
   if (temp_dir_.empty()) {
     RC rc = prepare_temp_dir();
-    if (rc != RC::SUCCESS) return rc;
+    if (rc != RC::SUCCESS)
+      return rc;
   }
 
   char fname[256];
@@ -333,12 +343,15 @@ RC ExternalSortPhysicalOperator::finalize_runs()
   if (runs_.empty()) {
     // all data in-memory: keep buffer_ sorted order
     if (top_k_ > 0 && buffer_.size() > top_k_) {
-      std::nth_element(buffer_.begin(), buffer_.begin() + static_cast<long>(top_k_), buffer_.end(),
-                       [&](const ValueListTuple &a, const ValueListTuple &b) { return tuple_less(a, b); });
+      std::nth_element(buffer_.begin(),
+          buffer_.begin() + static_cast<long>(top_k_),
+          buffer_.end(),
+          [&](const ValueListTuple &a, const ValueListTuple &b) { return tuple_less(a, b); });
       buffer_.resize(top_k_);
     }
-    std::sort(buffer_.begin(), buffer_.end(),
-              [&](const ValueListTuple &a, const ValueListTuple &b) { return tuple_less(a, b); });
+    std::sort(buffer_.begin(), buffer_.end(), [&](const ValueListTuple &a, const ValueListTuple &b) {
+      return tuple_less(a, b);
+    });
     // ensure specs present for ValueListTuple in-memory output
     std::vector<TupleCellSpec> specs;
     specs.reserve(tuple_schema_.cell_num());
@@ -367,9 +380,10 @@ RC ExternalSortPhysicalOperator::open_runs_for_merge()
 
   for (size_t i = 0; i < runs_.size(); i++) {
     runs_[i].fp = fopen(runs_[i].path.c_str(), "rb");
-    if (!runs_[i].fp) return RC::IOERR_OPEN;
+    if (!runs_[i].fp)
+      return RC::IOERR_OPEN;
     std::unique_ptr<ValueListTuple> t;
-    RC rc = deserialize_tuple(runs_[i].fp, t);
+    RC                              rc = deserialize_tuple(runs_[i].fp, t);
     if (rc == RC::SUCCESS && t) {
       // attach specs from output schema
       std::vector<TupleCellSpec> specs;
@@ -380,7 +394,7 @@ RC ExternalSortPhysicalOperator::open_runs_for_merge()
       t->set_names(specs);
       HeapItem item;
       item.run_index = i;
-      item.tuple = std::move(t);
+      item.tuple     = std::move(t);
       heap_.push(std::move(item));
     } else if (rc == RC::RECORD_EOF) {
       // empty run; ignore
@@ -395,7 +409,8 @@ RC ExternalSortPhysicalOperator::open_runs_for_merge()
 
 RC ExternalSortPhysicalOperator::read_next_from_run(size_t run_index, std::unique_ptr<ValueListTuple> &out)
 {
-  if (run_index >= runs_.size() || runs_[run_index].fp == nullptr) return RC::RECORD_EOF;
+  if (run_index >= runs_.size() || runs_[run_index].fp == nullptr)
+    return RC::RECORD_EOF;
   return deserialize_tuple(runs_[run_index].fp, out);
 }
 
@@ -424,21 +439,24 @@ RC ExternalSortPhysicalOperator::produce_all()
   buffer_.clear();
   buffer_bytes_used_ = 0;
 
-  RC rc = RC::SUCCESS;
+  RC     rc       = RC::SUCCESS;
   size_t produced = 0;
   while ((rc = children_[0]->next()) == RC::SUCCESS) {
     Tuple *t = children_[0]->current_tuple();
-    if (t == nullptr) return RC::INTERNAL;
+    if (t == nullptr)
+      return RC::INTERNAL;
 
     // materialize to ValueListTuple
-    ValueListTuple vt;
-    vector<Value> cells;
+    ValueListTuple        vt;
+    vector<Value>         cells;
     vector<TupleCellSpec> specs;
     for (int i = 0; i < t->cell_num(); i++) {
-      Value v; TupleCellSpec s;
-      RC r1 = t->cell_at(i, v);
-      RC r2 = t->spec_at(i, s);
-      if (r1 != RC::SUCCESS || r2 != RC::SUCCESS) return RC::INTERNAL;
+      Value         v;
+      TupleCellSpec s;
+      RC            r1 = t->cell_at(i, v);
+      RC            r2 = t->spec_at(i, s);
+      if (r1 != RC::SUCCESS || r2 != RC::SUCCESS)
+        return RC::INTERNAL;
       cells.push_back(v);
       specs.push_back(s);
     }
@@ -451,7 +469,8 @@ RC ExternalSortPhysicalOperator::produce_all()
 
     if (buffer_bytes_used_ >= memory_limit_bytes_) {
       RC fr = flush_run();
-      if (fr != RC::SUCCESS) return fr;
+      if (fr != RC::SUCCESS)
+        return fr;
     }
     if ((++produced % 10000) == 0) {
       sql_debug("EXTSORT fetched=%zu mem_bytes=%zu", produced, buffer_bytes_used_);
@@ -464,8 +483,7 @@ RC ExternalSortPhysicalOperator::produce_all()
 
   // flush tail and prepare for output
   RC fr = flush_run();
-  if (fr != RC::SUCCESS) return fr;
+  if (fr != RC::SUCCESS)
+    return fr;
   return finalize_runs();
 }
-
-

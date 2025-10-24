@@ -894,6 +894,7 @@ public:
   RC get_value(const Tuple &tuple, Value &value) const override
   {
     //先暂时设置成一个null
+    value.set_type(AttrType::UNDEFINED);
     value.set_null();
     return RC::SUCCESS;
   }
