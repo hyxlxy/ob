@@ -79,18 +79,24 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
     }
     // ASSERT(view->base_tables().size()==1, "view base_table_size!=1");
 
-    unique_ptr<ParsedSqlNode> node;
-    view->get_sql(node);
-    Stmt *child_stmt = nullptr;
-    RC    rc         = SelectStmt::create(db, node->selection, child_stmt);
-    if (rc != RC::SUCCESS) {
-      return RC::ERROR;
-    }
-    view->set_stmt(child_stmt);
-    view->set_table_meta(db);
-    view->set_table_field_name(db);
+    do {
 
-    table = view;
+      table = view->base_tables().front();
+      break;
+
+      unique_ptr<ParsedSqlNode> node;
+      view->get_sql(node);
+      Stmt *child_stmt = nullptr;
+      RC    rc         = SelectStmt::create(db, node->selection, child_stmt);
+      if (rc != RC::SUCCESS) {
+        return RC::ERROR;
+      }
+      view->set_stmt(child_stmt);
+      view->set_table_meta(db);
+      view->set_table_field_name(db);
+
+      table = view;
+    } while (0);
   }
 
   // create filter statement for WHERE clause
