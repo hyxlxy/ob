@@ -81,8 +81,8 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
 
     do {
 
-      // table = view->base_tables().front();
-      // break;
+      table = view->base_tables().front();
+      break;
 
       unique_ptr<ParsedSqlNode> node;
       view->get_sql(node);
