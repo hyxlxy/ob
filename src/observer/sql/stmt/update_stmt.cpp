@@ -16,6 +16,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/select_stmt.h"
 #include "sql/stmt/filter_stmt.h"
 #include "common/log/log.h"
+#include "storage/table/view.h"
+
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 #include "sql/parser/expression_binder.h"
@@ -64,8 +66,31 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
   // check whether the table exists
   Table *table = db->find_table(table_name);
   if (nullptr == table) {
-    LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
-    return RC::SCHEMA_TABLE_NOT_EXIST;
+    View *view = db->find_view(table_name);
+    if (view == nullptr) {
+      LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+      return RC::SCHEMA_TABLE_NOT_EXIST;
+    }
+
+    //说明当前的是view
+
+    if (!view->can_update()) {
+      return RC::ERROR;
+    }
+    // ASSERT(view->base_tables().size()==1, "view base_table_size!=1");
+
+    unique_ptr<ParsedSqlNode> node;
+    view->get_sql(node);
+    Stmt *child_stmt = nullptr;
+    RC    rc         = SelectStmt::create(db, node->selection, child_stmt);
+    if (rc != RC::SUCCESS) {
+      return RC::ERROR;
+    }
+    view->set_stmt(child_stmt);
+    view->set_table_meta(db);
+    view->set_table_field_name(db);
+
+    table = view;
   }
 
   // create filter statement for WHERE clause

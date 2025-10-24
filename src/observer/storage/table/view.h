@@ -1,75 +1,62 @@
-/* Copyright (c) 2021 OceanBase and/or its affiliates. All rights reserved.
-miniob is licensed under Mulan PSL v2.
-You can use this software according to the terms and conditions of the Mulan PSL v2.
-You may obtain a copy of Mulan PSL v2 at:
-         http://license.coscl.org.cn/MulanPSL2
-THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
-EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
-MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
-See the Mulan PSL v2 for more details. */
-
 #pragma once
 
+#include "sql/parser/parse.h"
+#include "storage/field/field.h"
 #include "storage/table/table.h"
-#include "sql/operator/physical_operator.h"
 
+class Stmt;
 class SelectStmt;
-
-class View
+/*
+对于view来说，我们创建它，除了构造函数以外，还需要搞出来他的basic_tables
+*/
+class View : public Table
 {
+
 public:
-  View()           = default;
-  ~View() = default;
+  View(string view_name, vector<string> attr_names, bool can_update, int id, string def)
+      : view_name_(std::move(view_name)),
+        attr_names_(std::move(attr_names)),
+        can_update_(can_update),
+        view_id_(id),
+        def_(def)
+  {}
+  ~View();
+  const string         &view_name() const { return view_name_; }
+  const vector<Table *> base_tables() const { return base_tables_; }
+  vector<Table *>       base_tables() { return base_tables_; }
+  void                  add_base_table(Table *table) { base_tables_.push_back(table); }
+  void                  set_base_tables(vector<Table *> tables) { base_tables_ = std::move(tables); }
+  bool                  can_update() const { return can_update_; }
+  int                   view_id() const { return view_id_; }
+  const vector<string> &attr_names() const { return attr_names_; }
+  std::unordered_map<string, std::pair<string, string>> &attr_from_table_and_field()
+  {
+    return attr_from_table_and_field_;
+  };
 
-  /**
-   * 创建一个视图
-   * @param path 元数据保存的文件(完整路径)
-   * @param name 视图名
-   * @param base_dir 视图数据存放的路径
-   * @param attr_names 字段
-   * @param select_sql 查询 sql
-   * @param select_stmt 查询 stmt
-   * @param storage_format 存储格式，与基表一致
-   */
-  RC create(Db *db, int32_t table_id, const char *path, const char *name, const char *base_dir,
-      std::vector<std::string> attr_names, std::string select_sql, SelectStmt *select_stmt,
-      StorageFormat storage_format);
+  void get_sql(unique_ptr<ParsedSqlNode> &node)
+  {
+    ParsedSqlResult parsed_sql_result;
+    parse(def_.c_str(), &parsed_sql_result);
+    node = std::move(parsed_sql_result.sql_nodes().back());
+    parsed_sql_result.sql_nodes().pop_back();
+  }
+  void  set_stmt(Stmt *one) { stmt_ = one; }
+  Stmt *stmt() { return stmt_; }
 
-  RC drop();
+  void                                    set_stmt_by_self();
+  static vector<std::pair<Field, string>> get_fields(Db *db, SelectStmt *stmt_);
 
-  /**
-   * 打开一个视图
-   * @param meta_file 保存视图元数据的文件完整路径
-   * @param base_dir 视图所在的文件夹
-   */
-  RC open(Db *db, const char *meta_file, const char *base_dir);
-
-  RC init_data();
-
-  RC init_member();
-
-  /**
-   * 获取视图的查询SQL
-   */
-  const std::string &select_sql() const { return select_sql_; }
-
-  /**
-   * 获取视图的查询语句
-   */
-  SelectStmt *select_stmt() const { return select_stmt_; }
-
-  /**
-   * 设置视图的查询语句
-   */
-  void set_select_stmt(SelectStmt *stmt) { select_stmt_ = stmt; }
-
-  /**
-   * 获取视图名称
-   */
-  const char *name() const;
+  void set_table_meta(Db *db);
+  void set_table_field_name(Db *db);
 
 private:
-  std::string  name_;         ///< 视图名称
-  std::string  select_sql_;   ///< 视图的查询SQL
-  SelectStmt  *select_stmt_ = nullptr; ///< 视图的查询语句
+  string                                                view_name_;
+  vector<Table *>                                       base_tables_;
+  vector<string>                                        attr_names_;
+  bool                                                  can_update_;
+  int                                                   view_id_;
+  string                                                def_;
+  Stmt                                                 *stmt_;
+  std::unordered_map<string, std::pair<string, string>> attr_from_table_and_field_;
 };

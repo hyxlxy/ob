@@ -9,7 +9,7 @@ MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 See the Mulan PSL v2 for more details. */
 
 //
-// Created by AI Assistant on 2024/12/20.
+// Created by Wangyunlai on 2023/6/13.
 //
 
 #pragma once
@@ -19,14 +19,13 @@ See the Mulan PSL v2 for more details. */
 class SQLStageEvent;
 
 /**
- * @brief CREATE VIEW执行器
+ * @brief 创建表的执行器
  * @ingroup Executor
- * @details 负责执行CREATE VIEW语句
  */
 class CreateViewExecutor
 {
 public:
-  CreateViewExecutor() = default;
+  CreateViewExecutor()          = default;
   virtual ~CreateViewExecutor() = default;
 
   RC execute(SQLStageEvent *sql_event);

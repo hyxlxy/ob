@@ -76,6 +76,10 @@ RC OptimizeStage::handle_request(SQLStageEvent *sql_event)
 
   sql_event->set_operator(std::move(physical_operator));
 
+  if (sql_event->stmt()->type() == StmtType::CREATE_VIEW) {
+    sql_event->set_use_physical_operator(false);
+  }
+
   return rc;
 }
 
@@ -89,10 +93,11 @@ RC OptimizeStage::generate_physical_plan(
     unique_ptr<LogicalOperator> &logical_operator, unique_ptr<PhysicalOperator> &physical_operator, Session *session)
 {
   RC rc = RC::SUCCESS;
-  if (session->get_execution_mode() == ExecutionMode::CHUNK_ITERATOR && LogicalOperator::can_generate_vectorized_operator(logical_operator->type())) {
+  if (session->get_execution_mode() == ExecutionMode::CHUNK_ITERATOR &&
+      LogicalOperator::can_generate_vectorized_operator(logical_operator->type())) {
     LOG_TRACE("use chunk iterator");
     session->set_used_chunk_mode(true);
-    rc    = physical_plan_generator_.create_vec(*logical_operator, physical_operator, session);
+    rc = physical_plan_generator_.create_vec(*logical_operator, physical_operator, session);
   } else {
     LOG_TRACE("use tuple iterator");
     session->set_used_chunk_mode(false);

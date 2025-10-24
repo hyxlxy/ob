@@ -114,33 +114,33 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
 
   // ========== 完全重写简化的UpdateExecutor ==========
   UpdateStmt *update_stmt = static_cast<UpdateStmt *>(stmt);
-  Table *table = update_stmt->table();
-  Trx *trx = session->current_trx();
+  Table      *table       = update_stmt->table();
+  Trx        *trx         = session->current_trx();
 
   // 获取scanner
   RecordScanner *scanner = nullptr;
-  RC rc = table->get_record_scanner(scanner, trx, ReadWriteMode::READ_WRITE);
+  RC             rc      = table->get_record_scanner(scanner, trx, ReadWriteMode::READ_WRITE);
   if (rc != RC::SUCCESS) {
     return rc;
   }
 
   // 收集要更新的记录
   vector<Record> records;
-  Record rec;
-  FilterStmt *fs = update_stmt->filter_stmt();
-  bool has_where = (fs && !fs->filter_units().empty());
-  
+  Record         rec;
+  FilterStmt    *fs        = update_stmt->filter_stmt();
+  bool           has_where = (fs && !fs->filter_units().empty());
+
   while (scanner->next(rec) == RC::SUCCESS) {
     if (!has_where) {
       records.push_back(rec);
       continue;
     }
-    
+
     // 评估WHERE条件
-      bool match = true;
+    bool match = true;
     for (const FilterUnit *fu : fs->filter_units()) {
       Value lv, rv;
-      
+
       // 获取左值（检查NULL标志）
       if (fu->left().is_attr()) {
         const FieldMeta *fm = fu->left().field.meta();
@@ -155,7 +155,7 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
       } else if (fu->left().is_value()) {
         lv = fu->left().value;
       }
-      
+
       // 获取右值（检查NULL标志）
       if (fu->right().is_attr()) {
         const FieldMeta *fm = fu->right().field.meta();
@@ -170,7 +170,7 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
       } else if (fu->right().is_value()) {
         rv = fu->right().value;
       }
-      
+
       // 比较（处理NULL）
       bool cond_match = false;
       if (fu->comp() == IS_NULL_OP) {
@@ -179,8 +179,8 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
         cond_match = !(lv.attr_type() == AttrType::UNDEFINED || lv.is_null());
       } else {
         // 其他比较：NULL参与返回false
-        if (lv.attr_type() == AttrType::UNDEFINED || lv.is_null() ||
-            rv.attr_type() == AttrType::UNDEFINED || rv.is_null()) {
+        if (lv.attr_type() == AttrType::UNDEFINED || lv.is_null() || rv.attr_type() == AttrType::UNDEFINED ||
+            rv.is_null()) {
           cond_match = false;
         } else {
           int cmp = lv.compare(rv);
@@ -195,13 +195,13 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
           }
         }
       }
-      
+
       if (!cond_match) {
         match = false;
         break;
       }
     }
-    
+
     if (match) {
       records.push_back(rec);
     }
@@ -216,75 +216,87 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
       Record new_rec;
       new_rec.copy_data(old_rec.data(), old_rec.len());
       new_rec.set_rid(old_rec.rid());
-      
+
       for (size_t i = 0; i < update_stmt->field_metas().size(); i++) {
-        const FieldMeta *fm = update_stmt->field_metas()[i];
-        Value val = update_stmt->multi_values()[i];
-        char *data = new_rec.data();
+        const FieldMeta *fm   = update_stmt->field_metas()[i];
+        Value            val  = update_stmt->multi_values()[i];
+        char            *data = new_rec.data();
 
         // 如果该列来自子查询，则在此执行标量子查询
         if (i < update_stmt->multi_is_sub_query().size() && update_stmt->multi_is_sub_query()[i]) {
           Stmt *subq = nullptr;
-          if (i < update_stmt->multi_sub_queries().size()) subq = update_stmt->multi_sub_queries()[i];
+          if (i < update_stmt->multi_sub_queries().size())
+            subq = update_stmt->multi_sub_queries()[i];
           if (subq != nullptr) {
             Value sub_val;
             rc = execute_sub_query(subq, session, sub_val);
-            if (rc != RC::SUCCESS) return rc;
-            val = sub_val; // 0 行 -> NULL；>1 行 -> 首行
+            if (rc != RC::SUCCESS)
+              return rc;
+            val = sub_val;  // 0 行 -> NULL；>1 行 -> 首行
           } else {
             // 无法获取到子查询实现，退化为 NULL（与占位一致）
-            val.set_type(AttrType::UNDEFINED); val.set_null(true);
+            val.set_type(AttrType::UNDEFINED);
+            val.set_null(true);
           }
         }
 
         // 统一通过表封装进行写入（自动处理 NULL/TEXT LOB/可空位）
         Value write_val = val;
-        if (!(write_val.attr_type() == AttrType::UNDEFINED || write_val.is_null()) && write_val.attr_type() != fm->type()) {
+        if (!(write_val.attr_type() == AttrType::UNDEFINED || write_val.is_null()) &&
+            write_val.attr_type() != fm->type()) {
           Value casted;
-          RC crc = Value::cast_to(write_val, fm->type(), casted);
-          if (crc != RC::SUCCESS) return crc;
+          RC    crc = Value::cast_to(write_val, fm->type(), casted);
+          if (crc != RC::SUCCESS)
+            return crc;
           write_val = casted;
         }
         rc = table->set_value_to_record(data, write_val, fm);
-        if (rc != RC::SUCCESS) return rc;
+        if (rc != RC::SUCCESS)
+          return rc;
       }
-      
+
       rc = table->update_record_with_trx(old_rec, new_rec, trx);
-      if (rc != RC::SUCCESS) return rc;
+      if (rc != RC::SUCCESS)
+        return rc;
     }
   } else {
     // 单字段UPDATE
-    const FieldMeta *fm = update_stmt->field_meta();
-    Value *val = update_stmt->value();
-    
+    const FieldMeta *fm  = update_stmt->field_meta();
+    Value           *val = update_stmt->value();
+
     // 如果是子查询UPDATE，先执行子查询
     Value sub_val;
     if (update_stmt->is_sub_query()) {
       rc = execute_sub_query(update_stmt->sub_query_stmt(), session, sub_val);
-      if (rc != RC::SUCCESS) return rc;
+      if (rc != RC::SUCCESS)
+        return rc;
       val = &sub_val;
     }
-    
+
     for (Record &old_rec : records) {
       Record new_rec;
       new_rec.copy_data(old_rec.data(), old_rec.len());
       new_rec.set_rid(old_rec.rid());
-      
+
       char *data = new_rec.data();
-      
+
       // 统一通过表封装进行写入（自动处理 NULL/TEXT LOB/可空位）
       Value write_val = *val;
-      if (!(write_val.attr_type() == AttrType::UNDEFINED || write_val.is_null()) && write_val.attr_type() != fm->type()) {
+      if (!(write_val.attr_type() == AttrType::UNDEFINED || write_val.is_null()) &&
+          write_val.attr_type() != fm->type()) {
         Value casted;
-        RC crc = Value::cast_to(write_val, fm->type(), casted);
-        if (crc != RC::SUCCESS) return crc;
+        RC    crc = Value::cast_to(write_val, fm->type(), casted);
+        if (crc != RC::SUCCESS)
+          return crc;
         write_val = casted;
       }
       rc = table->set_value_to_record(data, write_val, fm);
-      if (rc != RC::SUCCESS) return rc;
-      
+      if (rc != RC::SUCCESS)
+        return rc;
+
       rc = table->update_record_with_trx(old_rec, new_rec, trx);
-      if (rc != RC::SUCCESS) return rc;
+      if (rc != RC::SUCCESS)
+        return rc;
     }
   }
 
@@ -302,16 +314,16 @@ RC execute_sub_query(Stmt *sub_query_stmt, Session *session, Value &result_value
   SelectStmt *select_stmt = static_cast<SelectStmt *>(sub_query_stmt);
 
   // Generate logical plan
-  LogicalPlanGenerator logical_plan_generator;
+  LogicalPlanGenerator             logical_plan_generator;
   std::unique_ptr<LogicalOperator> logical_operator;
-  RC rc = logical_plan_generator.create(select_stmt, logical_operator);
+  RC                               rc = logical_plan_generator.create(select_stmt, logical_operator);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create logical plan for sub-query. rc=%s", strrc(rc));
     return rc;
   }
 
   // Generate physical plan
-  PhysicalPlanGenerator physical_plan_generator;
+  PhysicalPlanGenerator             physical_plan_generator;
   std::unique_ptr<PhysicalOperator> physical_operator;
   rc = physical_plan_generator.create(*logical_operator, physical_operator, session);
   if (rc != RC::SUCCESS) {
@@ -331,7 +343,9 @@ RC execute_sub_query(Stmt *sub_query_stmt, Session *session, Value &result_value
   if (rc != RC::SUCCESS) {
     // 空结果集：按 SQL 语义返回 NULL，而不是失败
     if (rc == RC::RECORD_EOF) {
-      Value nullv; nullv.set_type(AttrType::UNDEFINED); nullv.set_null(true);
+      Value nullv;
+      nullv.set_type(AttrType::UNDEFINED);
+      nullv.set_null(true);
       result_value = nullv;
       physical_operator->close();
       return RC::SUCCESS;
@@ -345,7 +359,9 @@ RC execute_sub_query(Stmt *sub_query_stmt, Session *session, Value &result_value
   Tuple *tuple = physical_operator->current_tuple();
   if (tuple == nullptr) {
     // 视为 NULL
-    Value nullv; nullv.set_type(AttrType::UNDEFINED); nullv.set_null(true);
+    Value nullv;
+    nullv.set_type(AttrType::UNDEFINED);
+    nullv.set_null(true);
     result_value = nullv;
     physical_operator->close();
     return RC::SUCCESS;
@@ -354,7 +370,9 @@ RC execute_sub_query(Stmt *sub_query_stmt, Session *session, Value &result_value
   // Get the first cell from the tuple
   if (tuple->cell_num() == 0) {
     // 视为 NULL
-    Value nullv; nullv.set_type(AttrType::UNDEFINED); nullv.set_null(true);
+    Value nullv;
+    nullv.set_type(AttrType::UNDEFINED);
+    nullv.set_null(true);
     result_value = nullv;
     physical_operator->close();
     return RC::SUCCESS;

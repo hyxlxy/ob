@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 #include "sql/parser/expression_binder.h"
+#include "storage/table/view.h"
 
 using namespace std;
 using namespace common;
@@ -62,8 +63,37 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
 
     Table *table = db->find_table(table_name);
     if (nullptr == table) {
-      LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
-      return RC::SCHEMA_TABLE_NOT_EXIST;
+      // LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+      // return RC::SCHEMA_TABLE_NOT_EXIST;
+      auto &&view = db->find_view(table_name);
+      if (view == nullptr) {
+        LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+        return RC::SCHEMA_TABLE_NOT_EXIST;
+      }
+
+      ///////以下内容我们需要把他当做view来处理了。
+      unique_ptr<ParsedSqlNode> node;
+      view->get_sql(node);
+      Stmt *child_stmt = nullptr;
+      RC    rc         = create(db, node->selection, child_stmt);
+      if (rc != RC::SUCCESS) {
+        return RC::ERROR;
+      }
+      view->set_stmt(child_stmt);
+      view->set_table_meta(db);
+      view->set_table_field_name(db);
+      // auto &&view_select = dynamic_cast<SelectStmt *>(child_stmt);
+      table = dynamic_cast<Table *>(view);
+      binder_context.add_table(table);
+      rc = binder_context.add_table_with_name(table, alias_name);
+      if (rc == RC::ERROR) {
+        return rc;
+      }
+      tables.push_back(table);
+      table_map.emplace(select_sql.relations[i], table);
+      aliases_for_tables.emplace_back(alias_name != nullptr ? alias_name : "");
+
+      continue;
     }
 
     binder_context.add_table(table);
@@ -95,8 +125,37 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
 
     Table *table = db->find_table(table_name);
     if (nullptr == table) {
-      LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
-      return RC::SCHEMA_TABLE_NOT_EXIST;
+      // LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+      // return RC::SCHEMA_TABLE_NOT_EXIST;
+      View *view = db->find_view(table_name);
+      if (view == nullptr) {
+        LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+        return RC::SCHEMA_TABLE_NOT_EXIST;
+      }
+
+      // join的是view
+      ///////以下内容我们需要把他当做view来处理了。
+      unique_ptr<ParsedSqlNode> node;
+      view->get_sql(node);
+      Stmt *child_stmt = nullptr;
+      RC    rc         = create(db, node->selection, child_stmt);
+      if (rc != RC::SUCCESS) {
+        return RC::ERROR;
+      }
+      view->set_stmt(child_stmt);
+      view->set_table_meta(db);
+      view->set_table_field_name(db);
+      // auto &&view_select = dynamic_cast<SelectStmt *>(child_stmt);
+      table = dynamic_cast<Table *>(view);
+      binder_context.add_table(table);
+      rc = binder_context.add_table_with_name(table, alias_name);
+      if (rc == RC::ERROR) {
+        return rc;
+      }
+      tables.push_back(table);
+      table_map.emplace(table_name, table);
+      aliases_for_tables.emplace_back(alias_name != nullptr ? alias_name : "");
+      continue;
     }
 
     binder_context.add_table(table);

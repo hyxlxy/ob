@@ -241,9 +241,9 @@ struct CalcSqlNode
  */
 struct InsertSqlNode
 {
-  string        relation_name;  ///< Relation to insert into
-  vector<string> attribute_names; ///< 可选：按列插入时的列名列表
-  vector<Value> values;         ///< 要插入的值（若提供attribute_names，则与之等长）
+  string         relation_name;    ///< Relation to insert into
+  vector<string> attribute_names;  ///< 可选：按列插入时的列名列表
+  vector<Value>  values;           ///< 要插入的值（若提供attribute_names，则与之等长）
 };
 
 /**
@@ -301,9 +301,19 @@ struct AttrInfoSqlNode
   AttrType type;      ///< Type of attribute
   string   name;      ///< Attribute name
   size_t   length;    ///< Length of attribute
-  bool     nullable;  ///< Whether the attribute can be NULL (default: true)
+  bool     nullable = true;  ///< Whether the attribute can be NULL (default: true)
 
   AttrInfoSqlNode() : type(AttrType::UNDEFINED), length(0), nullable(true) {}
+  AttrInfoSqlNode(std::string name_, AttrType type_) : AttrInfoSqlNode()
+  {
+    name = std::move(name_);
+    type = std::move(type_);
+    if (type == AttrType::DATES) {
+      length = 4;
+    } else {
+      length = 4;
+    }
+  }
 };
 
 /**
@@ -409,9 +419,10 @@ struct SetVariableSqlNode
  */
 struct CreateViewSqlNode
 {
-  string                    relation_name;       ///< View name
-  vector<string>            attribute_names;     ///< Attribute names (optional)
-  unique_ptr<SelectSqlNode> create_view_select;  ///< SELECT statement for view
+  string                    relation_name;
+  string                    definition;
+  unique_ptr<ParsedSqlNode> selection;
+  vector<string>            attr_names;
 };
 
 /**
@@ -519,18 +530,25 @@ public:
   DropViewSqlNode     drop_view;
   ShowIndexSqlNode    show_index;
   UnionSqlNode        union_stmt;
-  
+
   // ALTER TABLE
-  enum class AlterOpType { ADD_COLUMN, DROP_COLUMN, CHANGE_COLUMN_RENAME, RENAME_TABLE };
-  struct AlterTableSqlNode {
+  enum class AlterOpType
+  {
+    ADD_COLUMN,
+    DROP_COLUMN,
+    CHANGE_COLUMN_RENAME,
+    RENAME_TABLE
+  };
+  struct AlterTableSqlNode
+  {
     AlterOpType op_type = AlterOpType::ADD_COLUMN;
     // 目标表
     string table_name;
-    string new_table_name; // for RENAME TO
+    string new_table_name;  // for RENAME TO
     // 列操作
-    string column_name;        // for ADD/DROP/CHANGE old name
-    string new_column_name;    // for CHANGE new name
-    AttrType data_type = AttrType::UNDEFINED; // simplified: only INTS used in grammar
+    string   column_name;                      // for ADD/DROP/CHANGE old name
+    string   new_column_name;                  // for CHANGE new name
+    AttrType data_type = AttrType::UNDEFINED;  // simplified: only INTS used in grammar
   } alter_table;
 
 public:

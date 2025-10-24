@@ -30,6 +30,7 @@ class Table;
 class LogHandler;
 class BufferPoolManager;
 class TrxKit;
+class View;
 
 /**
  * @brief 一个DB实例负责管理一批表
@@ -70,15 +71,19 @@ public:
   RC create_table(const char *table_name, span<const AttrInfoSqlNode> attributes, const vector<string> &primary_keys,
       const StorageFormat storage_format = StorageFormat::ROW_FORMAT);
 
-  /**
-   * @brief 创建一个视图
-   * @param view_name 视图名
-   * @param attr_names 属性名列表（可选）
-   * @param select_sql SELECT语句的SQL文本
-   * @param select_stmt SELECT语句对象
-   */
-  RC create_view(const char *view_name, const vector<string> &attr_names,
-                 const string &select_sql, class SelectStmt *select_stmt);
+  // /**
+  //  * @brief 创建一个视图
+  //  * @param view_name 视图名
+  //  * @param attr_names 属性名列表（可选）
+  //  * @param select_sql SELECT语句的SQL文本
+  //  * @param select_stmt SELECT语句对象
+  //  */
+  // RC create_view(const char *view_name, const vector<string> &attr_names,
+  //                const string &select_sql, class SelectStmt *select_stmt);
+  RC create_view(const string &view_name, bool can_be_update, const vector<string> &attr_names, string def,
+      const vector<Table *> tables);
+  RC create_view(View *view_one);
+  RC drop_view(const char *view_name);
 
   /**
    * @brief 删除表
@@ -90,7 +95,7 @@ public:
    * @brief 删除视图
    * @param view_name 视图名
    */
-  RC drop_view(const char *view_name);
+  // RC drop_view(const char *view_name);
 
   /**
    * @brief 重命名表（仅普通表）
@@ -106,11 +111,16 @@ public:
    */
   Table *find_table(int32_t table_id) const;
 
+  View *find_view(const char *view_name) const;
+
+  View *find_view(int32_t view_id) const;
+
   /// @brief 当前数据库的名称
   const char *name() const;
 
   /// @brief 列出所有的表
   void all_tables(vector<string> &table_names) const;
+  void all_views(vector<string> &view_names) const;
 
   /**
    * @brief 将所有内存中的数据，刷新到磁盘中。
@@ -134,6 +144,8 @@ public:
 private:
   /// @brief 打开所有的表。在数据库初始化的时候会执行
   RC open_all_tables();
+  RC open_all_views();
+
   /// @brief 恢复数据。在数据库初始化的时候运行。
   RC recover();
 
@@ -159,18 +171,22 @@ private:
     }
     return engine;
   }
+  RC init_view_table();
 
 private:
-  string                         name_;                 ///< 数据库名称
-  string                         path_;                 ///< 数据库文件存放的目录
-  unordered_map<string, Table *> opened_tables_;        ///< 当前所有打开的表
-  unique_ptr<BufferPoolManager>  buffer_pool_manager_;  ///< 当前数据库的buffer pool管理器
-  unique_ptr<LogHandler>         log_handler_;          ///< 当前数据库的日志处理器
-  unique_ptr<TrxKit>             trx_kit_;              ///< 当前数据库的事务管理器
-  oceanbase::ObLsm              *lsm_;                  ///< 当前数据库的 LSM-Tree 存储引擎
+  string                         name_;           ///< 数据库名称
+  string                         path_;           ///< 数据库文件存放的目录
+  unordered_map<string, Table *> opened_tables_;  ///< 当前所有打开的表
+  unordered_map<string, View *>  opened_views_;   ///< 当前所有打开的视图
+  ///
+  unique_ptr<BufferPoolManager> buffer_pool_manager_;  ///< 当前数据库的buffer pool管理器
+  unique_ptr<LogHandler>        log_handler_;          ///< 当前数据库的日志处理器
+  unique_ptr<TrxKit>            trx_kit_;              ///< 当前数据库的事务管理器
+  oceanbase::ObLsm             *lsm_;                  ///< 当前数据库的 LSM-Tree 存储引擎
 
   /// 给每个table都分配一个ID，用来记录日志。这里假设所有的DDL都不会并发操作，所以相关的数据都不上锁
   int32_t next_table_id_ = 0;
+  int32_t next_view_id_  = 512;
 
   LSN    check_point_lsn_ = 0;  ///< 当前数据库的检查点LSN。会记录到磁盘中。
   string storage_engine_;

@@ -9,71 +9,90 @@ MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 See the Mulan PSL v2 for more details. */
 
 //
-// Created by AI Assistant on 2024/12/20.
+// Created by Wangyunlai on 2023/6/13.
 //
 
 #include "sql/executor/create_view_executor.h"
-#include "sql/stmt/create_view_stmt.h"
-#include "event/sql_event.h"
-#include "event/session_event.h"
-#include "session/session.h"
-#include "storage/db/db.h"
-#include "common/log/log.h"
 
-/**
- * @brief 从CREATE VIEW SQL中提取SELECT部分
- * @param create_view_sql 完整的CREATE VIEW SQL语句
- * @return SELECT部分的SQL文本
- */
-string extract_select_from_create_view(const string &create_view_sql)
-{
-  string lower_sql = create_view_sql;
-  std::transform(lower_sql.begin(), lower_sql.end(), lower_sql.begin(), ::tolower);
-  
-  // 查找 "as" 关键字
-  size_t as_pos = lower_sql.find(" as ");
-  if (as_pos == string::npos) {
-    return "";
-  }
-  
-  // 返回AS之后的部分
-  size_t select_start = as_pos + 4; // " as " 的长度是4
-  return create_view_sql.substr(select_start);
-}
+#include "common/log/log.h"
+#include "event/session_event.h"
+#include "event/sql_event.h"
+#include "session/session.h"
+#include "sql/stmt/create_view_stmt.h"
+#include "storage/db/db.h"
+#include "storage/trx/trx.h"
+#include "storage/table/view.h"
 
 RC CreateViewExecutor::execute(SQLStageEvent *sql_event)
 {
-  Stmt *stmt = sql_event->stmt();
+  Stmt    *stmt    = sql_event->stmt();
   Session *session = sql_event->session_event()->session();
-  
+  RC       rc      = RC::SUCCESS;
   ASSERT(stmt->type() == StmtType::CREATE_VIEW,
-         "create view executor can not run this command: %d",
-         static_cast<int>(stmt->type()));
+            "create table executor can not run this command: %d",
+            static_cast<int>(stmt->type()));
+
+  //
+  //以下内容是检测
+
+  auto &&physical_operator = sql_event->physical_operator();
+  if (physical_operator) {
+    // 检测一下select是否有没有问题
+    // 这里sql_event里的物理操作符存放的是as之后的查询语句
+    rc = physical_operator->open(session->current_trx());
+
+    CHECK_RETURN_RC(rc);
+    while ((rc = physical_operator->next()) == RC::SUCCESS)
+      ;
+    if (rc != RC::RECORD_EOF)
+      return rc;
+    physical_operator->close();
+  }
 
   CreateViewStmt *create_view_stmt = static_cast<CreateViewStmt *>(stmt);
-  const string &view_name = create_view_stmt->view_name();
-  const vector<string> &attr_names = create_view_stmt->attr_names();
-  SelectStmt *select_stmt = create_view_stmt->select_stmt();
+  //   const string   &view_name        = create_view_stmt->view_name();
 
-  if (select_stmt == nullptr) {
-    LOG_ERROR("CREATE VIEW statement missing SELECT clause");
-    return RC::INVALID_ARGUMENT;
+  {
+    Table *table = session->get_current_db()->find_table("ad_views");
+
+    auto make_values = [&](vector<Value>        &values,
+                           const string         &name,
+                           const vector<string> &attr_names,
+                           bool                  can_be_update,
+                           string                def) {
+      Value one;
+      one.set_string(name.c_str());
+      values.push_back(std::move(one));
+
+      one.set_int(can_be_update);
+      values.push_back(std::move(one));
+
+      string attr_sum;
+      for (auto &&attr : attr_names) {
+        attr_sum += attr;
+        attr_sum += ",";
+      }
+      one.set_string(attr_sum.c_str());
+      values.push_back(one);
+
+      one.set_string(def.c_str());
+      // cout << "view_vlaues: def: " << one.get_string() << endl;
+      values.push_back(one);
+    };
+    std::vector<Value> values;
+    auto             &&stmt = create_view_stmt;
+    make_values(values, stmt->view_name(), stmt->attr_names(), stmt->can_be_update(), stmt->def());
+    Record record;
+    rc = table->make_record(values.size(), values.data(), record);
+    CHECK_RETURN_RC(rc);
+
+    rc = session->current_trx()->insert_record(table, record);
+    CHECK_RETURN_RC(rc);
+    // View *new_view = new View();
+    rc = session->get_current_db()->create_view(
+        stmt->view_name(), stmt->can_be_update(), stmt->attr_names(), stmt->def(), stmt->base_tables());
+    CHECK_RETURN_RC(rc);
   }
 
-  // 从原始SQL中提取SELECT部分
-  string select_sql = extract_select_from_create_view(sql_event->sql());
-  if (select_sql.empty()) {
-    LOG_ERROR("Failed to extract SELECT clause from CREATE VIEW statement");
-    return RC::SQL_SYNTAX;
-  }
-
-  // 创建视图
-  RC rc = session->get_current_db()->create_view(view_name.c_str(), attr_names, select_sql, select_stmt);
-  if (rc != RC::SUCCESS) {
-    LOG_ERROR("Failed to create view: %s", view_name.c_str());
-    return rc;
-  }
-
-  LOG_INFO("Successfully created view: %s", view_name.c_str());
   return RC::SUCCESS;
 }

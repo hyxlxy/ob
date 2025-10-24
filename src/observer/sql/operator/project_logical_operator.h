@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 #include "sql/operator/logical_operator.h"
 #include "storage/field/field.h"
+class View;
 
 /**
  * @brief project 表示投影运算
@@ -26,6 +27,7 @@ See the Mulan PSL v2 for more details. */
 class ProjectLogicalOperator : public LogicalOperator
 {
 public:
+  //这里面的expressions是select里面的我们要查询的表达式，所以别名都存到了这个里面。
   ProjectLogicalOperator(vector<unique_ptr<Expression>> &&expressions);
   virtual ~ProjectLogicalOperator() = default;
 
@@ -35,4 +37,6 @@ public:
 
   vector<unique_ptr<Expression>>       &expressions() { return expressions_; }
   const vector<unique_ptr<Expression>> &expressions() const { return expressions_; }
+  void                                  set_view(View *view) { view_ = view; }
+  View                                 *view_ = nullptr;
 };

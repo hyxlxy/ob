@@ -28,6 +28,8 @@ See the Mulan PSL v2 for more details. */
 #include "storage/trx/trx.h"
 #include "storage/clog/disk_log_handler.h"
 #include "storage/clog/integrated_log_replayer.h"
+#include "storage/table/view.h"
+#include "sql/expr/expression.h"
 
 using namespace common;
 
@@ -36,7 +38,9 @@ Db::~Db()
   for (auto &iter : opened_tables_) {
     delete iter.second;
   }
-
+  for (auto &&one : opened_views_) {
+    delete one.second;
+  }
   if (log_handler_) {
     // 停止日志并等待写入完成
     log_handler_->stop();
@@ -50,7 +54,39 @@ Db::~Db()
   LOG_INFO("Db has been closed: %s", name_.c_str());
 }
 
-RC Db::init(const char *name, const char *dbpath, const char *trx_kit_name, const char *log_handler_name, const char *storage_engine)
+RC Db::init_view_table()
+{
+  RC rc = RC::SUCCESS;
+  //默认table的name是：  ad_views
+
+  const char *table_name = "ad_views";
+
+  vector<AttrInfoSqlNode> attributes;
+
+  auto make_attri_and_push =
+      [](vector<AttrInfoSqlNode> &attributes, AttrType type, std::string name, size_t len, bool can_be_null = false) {
+        AttrInfoSqlNode one;
+        one.name     = std::move(name);
+        one.length   = len;
+        one.nullable = can_be_null;
+        one.type     = type;
+        attributes.push_back(std::move(one));
+      };
+  // attributes.emplace_back(AttrType::CHARS, "view_name", 32, false);
+  make_attri_and_push(attributes, AttrType::CHARS, "view_name", 32);
+  make_attri_and_push(attributes, AttrType::INTS, "can_be_update", 4);
+  make_attri_and_push(attributes, AttrType::CHARS, "attr_names", 32);
+  make_attri_and_push(attributes, AttrType::CHARS, "definition", 128);
+
+  rc = create_table(table_name, attributes, {});
+  if (rc == RC::SCHEMA_TABLE_EXIST) {
+    rc = RC::SUCCESS;
+  }
+  return rc;
+}
+
+RC Db::init(const char *name, const char *dbpath, const char *trx_kit_name, const char *log_handler_name,
+    const char *storage_engine)
 {
   RC rc = RC::SUCCESS;
 
@@ -65,7 +101,7 @@ RC Db::init(const char *name, const char *dbpath, const char *trx_kit_name, cons
   }
 
   oceanbase::ObLsmOptions options;
-  filesystem::path lsm_path = filesystem::path(dbpath) / "lsm";
+  filesystem::path        lsm_path = filesystem::path(dbpath) / "lsm";
   filesystem::create_directory(lsm_path);
 
   rc = oceanbase::ObLsm::open(options, lsm_path, &lsm_);
@@ -135,6 +171,13 @@ RC Db::init(const char *name, const char *dbpath, const char *trx_kit_name, cons
     return rc;
   }
 
+  //这里额外搞一个关于view的表结构
+  rc = init_view_table();
+  if (OB_FAIL(rc)) {
+    std::cout << "init view table fail!" << std::endl;
+    return rc;
+  }
+
   rc = init_dblwr_buffer();
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to init dblwr buffer. rc = %s", strrc(rc));
@@ -151,7 +194,8 @@ RC Db::init(const char *name, const char *dbpath, const char *trx_kit_name, cons
   return rc;
 }
 
-RC Db::create_table(const char *table_name, span<const AttrInfoSqlNode> attributes, const vector<string>& primary_keys, const StorageFormat storage_format)
+RC Db::create_table(const char *table_name, span<const AttrInfoSqlNode> attributes, const vector<string> &primary_keys,
+    const StorageFormat storage_format)
 {
   RC rc = RC::SUCCESS;
   // check table_name
@@ -164,8 +208,15 @@ RC Db::create_table(const char *table_name, span<const AttrInfoSqlNode> attribut
   string  table_file_path = table_meta_file(path_.c_str(), table_name);
   Table  *table           = new Table();
   int32_t table_id        = next_table_id_++;
-  rc = table->create(this, table_id, table_file_path.c_str(), table_name, path_.c_str(), attributes, primary_keys, storage_format,
-                     get_storage_engine());
+  rc                      = table->create(this,
+      table_id,
+      table_file_path.c_str(),
+      table_name,
+      path_.c_str(),
+      attributes,
+      primary_keys,
+      storage_format,
+      get_storage_engine());
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to create table %s.", table_name);
     delete table;
@@ -177,29 +228,29 @@ RC Db::create_table(const char *table_name, span<const AttrInfoSqlNode> attribut
   return RC::SUCCESS;
 }
 
-RC Db::create_view(const char *view_name, const vector<string> &attr_names,
-                   const string &select_sql, SelectStmt *select_stmt)
-{
-  if (opened_tables_.count(view_name) != 0) {
-    LOG_WARN("View %s has been opened before.", view_name);
-    return RC::SCHEMA_TABLE_EXIST;
-  }
+// RC Db::create_view(
+//     const char *view_name, const vector<string> &attr_names, const string &select_sql, SelectStmt *select_stmt)
+// {
+//   if (opened_tables_.count(view_name) != 0) {
+//     LOG_WARN("View %s has been opened before.", view_name);
+//     return RC::SCHEMA_TABLE_EXIST;
+//   }
 
-  string view_file_path = table_meta_file(path_.c_str(), view_name);
-  Table *view = new Table();
-  int32_t table_id = next_table_id_++;
+//   string  view_file_path = table_meta_file(path_.c_str(), view_name);
+//   Table  *view           = new Table();
+//   int32_t table_id       = next_table_id_++;
 
-  RC rc = view->create_view(this, table_id, view_file_path.c_str(), view_name, attr_names, select_sql);
-  if (rc != RC::SUCCESS) {
-    LOG_ERROR("Failed to create view %s.", view_name);
-    delete view;
-    return rc;
-  }
+//   RC rc = view->create_view(this, table_id, view_file_path.c_str(), view_name, attr_names, select_sql);
+//   if (rc != RC::SUCCESS) {
+//     LOG_ERROR("Failed to create view %s.", view_name);
+//     delete view;
+//     return rc;
+//   }
 
-  opened_tables_[view_name] = view;
-  LOG_INFO("Create view success. view name=%s, table_id:%d", view_name, table_id);
-  return RC::SUCCESS;
-}
+//   opened_tables_[view_name] = view;
+//   LOG_INFO("Create view success. view name=%s, table_id:%d", view_name, table_id);
+//   return RC::SUCCESS;
+// }
 
 RC Db::drop_table(const char *table_name)
 {
@@ -250,14 +301,13 @@ RC Db::drop_table(const char *table_name)
 
   // 删除索引文件（查找所有以table_name开头的.index文件）
   try {
-    for (const auto& entry : filesystem::directory_iterator(path_)) {
+    for (const auto &entry : filesystem::directory_iterator(path_)) {
       if (entry.is_regular_file()) {
         string filename = entry.path().filename().string();
-        string prefix = string(table_name) + "-";
-        string suffix = TABLE_INDEX_SUFFIX;
+        string prefix   = string(table_name) + "-";
+        string suffix   = TABLE_INDEX_SUFFIX;
 
-        if (filename.length() > prefix.length() + suffix.length() &&
-            filename.substr(0, prefix.length()) == prefix &&
+        if (filename.length() > prefix.length() + suffix.length() && filename.substr(0, prefix.length()) == prefix &&
             filename.substr(filename.length() - suffix.length()) == suffix) {
 
           if (!filesystem::remove(entry.path())) {
@@ -269,7 +319,7 @@ RC Db::drop_table(const char *table_name)
         }
       }
     }
-  } catch (const filesystem::filesystem_error& ex) {
+  } catch (const filesystem::filesystem_error &ex) {
     LOG_ERROR("Error while removing index files: %s", ex.what());
     rc = RC::FILE_REMOVE;
   }
@@ -283,48 +333,48 @@ RC Db::drop_table(const char *table_name)
   return rc;
 }
 
-RC Db::drop_view(const char *view_name)
-{
-  if (nullptr == view_name || common::is_blank(view_name)) {
-    LOG_WARN("Invalid view name");
-    return RC::INVALID_ARGUMENT;
-  }
+// RC Db::drop_view(const char *view_name)
+// {
+//   if (nullptr == view_name || common::is_blank(view_name)) {
+//     LOG_WARN("Invalid view name");
+//     return RC::INVALID_ARGUMENT;
+//   }
 
-  // 检查视图是否存在
-  auto iter = opened_tables_.find(view_name);
-  if (iter == opened_tables_.end()) {
-    LOG_WARN("View not found: %s", view_name);
-    return RC::SCHEMA_TABLE_NOT_EXIST;
-  }
+//   // 检查视图是否存在
+//   auto iter = opened_tables_.find(view_name);
+//   if (iter == opened_tables_.end()) {
+//     LOG_WARN("View not found: %s", view_name);
+//     return RC::SCHEMA_TABLE_NOT_EXIST;
+//   }
 
-  Table *view = iter->second;
+//   Table *view = iter->second;
 
-  // 检查是否为视图
-  if (!view->is_view()) {
-    LOG_WARN("Cannot drop table %s using DROP VIEW", view_name);
-    return RC::INVALID_ARGUMENT;
-  }
+//   // 检查是否为视图
+//   if (!view->is_view()) {
+//     LOG_WARN("Cannot drop table %s using DROP VIEW", view_name);
+//     return RC::INVALID_ARGUMENT;
+//   }
 
-  // 从内存中移除视图
-  opened_tables_.erase(iter);
+//   // 从内存中移除视图
+//   opened_tables_.erase(iter);
 
-  // 删除视图对象
-  delete view;
+//   // 删除视图对象
+//   delete view;
 
-  // 删除元数据文件
-  string meta_file = table_meta_file(path_.c_str(), view_name);
-  if (filesystem::exists(meta_file)) {
-    if (!filesystem::remove(meta_file)) {
-      LOG_ERROR("Failed to remove view meta file: %s", meta_file.c_str());
-      return RC::FILE_REMOVE;
-    } else {
-      LOG_INFO("Removed view meta file: %s", meta_file.c_str());
-    }
-  }
+//   // 删除元数据文件
+//   string meta_file = table_meta_file(path_.c_str(), view_name);
+//   if (filesystem::exists(meta_file)) {
+//     if (!filesystem::remove(meta_file)) {
+//       LOG_ERROR("Failed to remove view meta file: %s", meta_file.c_str());
+//       return RC::FILE_REMOVE;
+//     } else {
+//       LOG_INFO("Removed view meta file: %s", meta_file.c_str());
+//     }
+//   }
 
-  LOG_INFO("Successfully dropped view: %s", view_name);
-  return RC::SUCCESS;
-}
+//   LOG_INFO("Successfully dropped view: %s", view_name);
+//   return RC::SUCCESS;
+// }
 
 RC Db::rename_table(const char *old_name, const char *new_name)
 {
@@ -339,11 +389,11 @@ RC Db::rename_table(const char *old_name, const char *new_name)
     return RC::SCHEMA_TABLE_EXIST;
   }
 
-  namespace fs = std::filesystem;
-  Table *old_table = opened_tables_[old_name];
+  namespace fs              = std::filesystem;
+  Table          *old_table = opened_tables_[old_name];
   std::error_code ec;
 
-  string base = path_;
+  string base          = path_;
   string old_meta_path = table_meta_file(base.c_str(), old_name);
   string new_meta_path = table_meta_file(base.c_str(), new_name);
   string old_data_path = table_data_file(base.c_str(), old_name);
@@ -352,22 +402,27 @@ RC Db::rename_table(const char *old_name, const char *new_name)
   string new_lob_path  = table_text_lob_file(base.c_str(), new_name);
 
   // Capture old meta info before closing
-  const TableMeta &old_meta_ref = old_table->table_meta();
-  int32_t table_id = old_meta_ref.table_id();
-  StorageFormat sf = old_meta_ref.storage_format();
-  StorageEngine se = old_meta_ref.storage_engine();
-  vector<string> pks = old_meta_ref.primary_keys();
+  const TableMeta        &old_meta_ref = old_table->table_meta();
+  int32_t                 table_id     = old_meta_ref.table_id();
+  StorageFormat           sf           = old_meta_ref.storage_format();
+  StorageEngine           se           = old_meta_ref.storage_engine();
+  vector<string>          pks          = old_meta_ref.primary_keys();
   vector<AttrInfoSqlNode> attrs;
   for (int i = old_meta_ref.sys_field_num(); i < old_meta_ref.field_num(); ++i) {
     const FieldMeta *f = old_meta_ref.field(i);
-    AttrInfoSqlNode a; a.name = f->name(); a.type = f->type(); a.length = f->len(); a.nullable = f->nullable();
+    AttrInfoSqlNode  a;
+    a.name     = f->name();
+    a.type     = f->type();
+    a.length   = f->len();
+    a.nullable = f->nullable();
     attrs.push_back(a);
   }
   vector<FieldMeta> trx_copy(old_meta_ref.trx_fields().begin(), old_meta_ref.trx_fields().end());
   vector<IndexMeta> idx_copy;
   for (int i = 0; i < old_meta_ref.index_num(); ++i) {
     const IndexMeta *im = old_meta_ref.index(i);
-    if (im) idx_copy.push_back(*im);
+    if (im)
+      idx_copy.push_back(*im);
   }
 
   // Close old table and remove mapping, release file handles/buffers
@@ -375,25 +430,34 @@ RC Db::rename_table(const char *old_name, const char *new_name)
   delete old_table;
 
   // Rename files
-  fs::rename(old_meta_path, new_meta_path, ec); if (ec) return RC::IOERR_WRITE;
-  fs::rename(old_data_path, new_data_path, ec); if (ec) return RC::IOERR_WRITE;
-  if (fs::exists(old_lob_path)) { fs::rename(old_lob_path, new_lob_path, ec); if (ec) return RC::IOERR_WRITE; }
+  fs::rename(old_meta_path, new_meta_path, ec);
+  if (ec)
+    return RC::IOERR_WRITE;
+  fs::rename(old_data_path, new_data_path, ec);
+  if (ec)
+    return RC::IOERR_WRITE;
+  if (fs::exists(old_lob_path)) {
+    fs::rename(old_lob_path, new_lob_path, ec);
+    if (ec)
+      return RC::IOERR_WRITE;
+  }
 
   // Rename index files old-*.index -> new-*.index
   try {
     for (const auto &entry : fs::directory_iterator(base)) {
-      if (!entry.is_regular_file()) continue;
-      string fname = entry.path().filename().string();
-      string prefix_old = string(old_name) + "-";
+      if (!entry.is_regular_file())
+        continue;
+      string fname        = entry.path().filename().string();
+      string prefix_old   = string(old_name) + "-";
       string suffix_index = TABLE_INDEX_SUFFIX;
-      size_t suffix_len = suffix_index.size();
-      if (fname.size() > prefix_old.size() + suffix_len &&
-          fname.rfind(suffix_index) == fname.size() - suffix_len &&
+      size_t suffix_len   = suffix_index.size();
+      if (fname.size() > prefix_old.size() + suffix_len && fname.rfind(suffix_index) == fname.size() - suffix_len &&
           fname.find(prefix_old) == 0) {
-        string middle = fname.substr(prefix_old.size(), fname.size() - prefix_old.size() - suffix_len);
+        string middle    = fname.substr(prefix_old.size(), fname.size() - prefix_old.size() - suffix_len);
         string new_fname = string(new_name) + "-" + middle + suffix_index;
         fs::rename(entry.path(), fs::path(base) / new_fname, ec);
-        if (ec) return RC::IOERR_WRITE;
+        if (ec)
+          return RC::IOERR_WRITE;
       }
     }
   } catch (...) {
@@ -403,23 +467,26 @@ RC Db::rename_table(const char *old_name, const char *new_name)
   // Write new meta content with updated table name
   {
     TableMeta new_meta_obj;
-    RC irc = new_meta_obj.init(table_id, new_name, &trx_copy, attrs, pks, sf, se);
-    if (irc != RC::SUCCESS) return irc;
+    RC        irc = new_meta_obj.init(table_id, new_name, &trx_copy, attrs, pks, sf, se);
+    if (irc != RC::SUCCESS)
+      return irc;
     for (const auto &im : idx_copy) {
       new_meta_obj.add_index(im);
     }
-    string tmp_meta = new_meta_path + string(".tmp");
+    string  tmp_meta = new_meta_path + string(".tmp");
     fstream fs2;
     fs2.open(tmp_meta, ios_base::out | ios_base::binary | ios_base::trunc);
-    if (!fs2.is_open()) return RC::IOERR_OPEN;
+    if (!fs2.is_open())
+      return RC::IOERR_OPEN;
     new_meta_obj.serialize(fs2);
     fs2.close();
-    if (std::rename(tmp_meta.c_str(), new_meta_path.c_str()) != 0) return RC::IOERR_WRITE;
+    if (std::rename(tmp_meta.c_str(), new_meta_path.c_str()) != 0)
+      return RC::IOERR_WRITE;
   }
 
   // Open new table and insert mapping
   Table *new_table = new Table();
-  RC rc = new_table->open(this, (string(new_name) + TABLE_META_SUFFIX).c_str(), base.c_str());
+  RC     rc        = new_table->open(this, (string(new_name) + TABLE_META_SUFFIX).c_str(), base.c_str());
   if (rc != RC::SUCCESS) {
     delete new_table;
     return rc;
@@ -667,3 +734,44 @@ RC Db::init_dblwr_buffer()
 LogHandler        &Db::log_handler() { return *log_handler_; }
 BufferPoolManager &Db::buffer_pool_manager() { return *buffer_pool_manager_; }
 TrxKit            &Db::trx_kit() { return *trx_kit_; }
+
+//////////////////////////////////////////////////////////////
+/// 以下是视图
+/////////////////////////////////////////////////////////////
+
+View *Db::find_view(const char *view_name) const
+{
+  auto it = opened_views_.find(view_name);
+  if (it == nullptr)
+    return nullptr;
+  return it->second;
+}
+//好像暂时用不到这个函数
+View *Db::find_view(int32_t view_id) const { return nullptr; }
+
+void Db::all_views(vector<string> &view_names) const
+{
+  view_names.clear();
+  for (auto &&[name, _] : opened_views_) {
+    view_names.push_back(name);
+  }
+}
+
+//这里的create_view实际上就只是在表里添加了view罢了。
+// 表里添加已经在算子里搞过了
+// 这里的创建主要就是在opened_views里面添加进去。
+RC Db::create_view(const string &view_name, bool can_be_update, const vector<string> &attr_names, string def,
+    const vector<Table *> tables)
+{
+
+  if (view_name.empty() or attr_names.empty() or def.empty()) {
+    return RC::ERROR;
+  }
+  View *view = new View(view_name, attr_names, can_be_update, next_view_id_++, def);
+  view->set_base_tables(tables);
+  opened_views_[view_name] = view;
+  return RC::SUCCESS;
+}
+
+//也先暂时不实现这个，如果测试里有drop view的时候再开始搞
+RC Db::drop_view(const char *view_name) { return RC::ERROR; }

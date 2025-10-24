@@ -37,12 +37,11 @@ See the Mulan PSL v2 for more details. */
 #include "storage/record/record_manager.h"
 #include <filesystem>
 
-Table::~Table()
-{
-}
+Table::~Table() {}
 
 RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, const char *base_dir,
-    span<const AttrInfoSqlNode> attributes, const vector<string> &primary_keys, StorageFormat storage_format, StorageEngine storage_engine)
+    span<const AttrInfoSqlNode> attributes, const vector<string> &primary_keys, StorageFormat storage_format,
+    StorageEngine storage_engine)
 {
   if (table_id < 0) {
     LOG_WARN("invalid table id. table_id=%d, table_name=%s", table_id, name);
@@ -78,7 +77,8 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
 
   // 创建文件
   const vector<FieldMeta> *trx_fields = db->trx_kit().trx_fields();
-  if ((rc = table_meta_.init(table_id, name, trx_fields, attributes, primary_keys, storage_format, storage_engine)) != RC::SUCCESS) {
+  if ((rc = table_meta_.init(table_id, name, trx_fields, attributes, primary_keys, storage_format, storage_engine)) !=
+      RC::SUCCESS) {
     LOG_ERROR("Failed to init table meta. name:%s, ret:%d", name, rc);
     return rc;  // delete table file
   }
@@ -94,7 +94,7 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
   table_meta_.serialize(fs);
   fs.close();
 
-  db_       = db;
+  db_ = db;
 
   string             data_file = table_data_file(base_dir, name);
   BufferPoolManager &bpm       = db->buffer_pool_manager();
@@ -108,11 +108,14 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
   bool has_text = false;
   for (int i = table_meta_.sys_field_num(); i < table_meta_.field_num(); ++i) {
     const FieldMeta *f = table_meta_.field(i);
-    if (f && f->type() == AttrType::TEXTS) { has_text = true; break; }
+    if (f && f->type() == AttrType::TEXTS) {
+      has_text = true;
+      break;
+    }
   }
   if (has_text) {
     string lob_file = table_text_lob_file(base_dir, name);
-    int lobfd = ::open(lob_file.c_str(), O_WRONLY | O_CREAT | O_CLOEXEC, 0600);
+    int    lobfd    = ::open(lob_file.c_str(), O_WRONLY | O_CREAT | O_CLOEXEC, 0600);
     if (lobfd < 0) {
       LOG_ERROR("Failed to create lob file. file name=%s, errmsg=%d:%s", lob_file.c_str(), errno, strerror(errno));
       return RC::IOERR_OPEN;
@@ -146,8 +149,8 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
   return rc;
 }
 
-RC Table::create_view(Db *db, int32_t table_id, const char *path, const char *name,
-                      const vector<string> &attr_names, const string &select_sql)
+RC Table::create_view(Db *db, int32_t table_id, const char *path, const char *name, const vector<string> &attr_names,
+    const string &select_sql)
 {
   if (table_id < 0) {
     LOG_WARN("invalid table id. table_id=%d, table_name=%s", table_id, name);
@@ -214,7 +217,7 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
   }
   fs.close();
 
-  db_       = db;
+  db_ = db;
 
   // // 加载数据文件
   // RC rc = init_record_handler(base_dir);
@@ -229,7 +232,7 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
   if (!table_meta_.is_view()) {
     if (table_meta_.storage_engine() == StorageEngine::HEAP) {
       engine_ = make_unique<HeapTableEngine>(&table_meta_, db_, this);
-    }  else if (table_meta_.storage_engine() == StorageEngine::LSM) {
+    } else if (table_meta_.storage_engine() == StorageEngine::LSM) {
       engine_ = make_unique<LsmTableEngine>(&table_meta_, db_, this);
     } else {
       rc = RC::UNSUPPORTED;
@@ -256,7 +259,7 @@ RC Table::append_text_lob(const char *data, uint32_t len, uint64_t &offset)
     return RC::INVALID_ARGUMENT;
   }
   string lob_file = table_text_lob_file(db_->path().c_str(), table_meta_.name());
-  int fd = ::open(lob_file.c_str(), O_WRONLY | O_CREAT, 0600);
+  int    fd       = ::open(lob_file.c_str(), O_WRONLY | O_CREAT, 0600);
   if (fd < 0) {
     LOG_WARN("open lob file failed %s", lob_file.c_str());
     return RC::IOERR_OPEN;
@@ -267,20 +270,26 @@ RC Table::append_text_lob(const char *data, uint32_t len, uint64_t &offset)
     ::close(fd);
     return RC::IOERR_SEEK;
   }
-  uint32_t be_len = len; // store as native endian simple
+  uint32_t be_len = len;  // store as native endian simple
   // write header fully
-  size_t wrote = 0;
-  const char *hp = reinterpret_cast<const char *>(&be_len);
+  size_t      wrote = 0;
+  const char *hp    = reinterpret_cast<const char *>(&be_len);
   while (wrote < sizeof(uint32_t)) {
     ssize_t w = ::write(fd, hp + wrote, sizeof(uint32_t) - wrote);
-    if (w <= 0) { ::close(fd); return RC::IOERR_WRITE; }
+    if (w <= 0) {
+      ::close(fd);
+      return RC::IOERR_WRITE;
+    }
     wrote += (size_t)w;
   }
   // write payload fully
   size_t total = 0;
   while (total < len) {
     ssize_t w = ::write(fd, data + total, len - total);
-    if (w <= 0) { ::close(fd); return RC::IOERR_WRITE; }
+    if (w <= 0) {
+      ::close(fd);
+      return RC::IOERR_WRITE;
+    }
     total += (size_t)w;
   }
   ::fsync(fd);
@@ -295,7 +304,7 @@ RC Table::read_text_lob(uint64_t offset, uint32_t len, std::string &out) const
     return RC::UNIMPLEMENTED;
   }
   string lob_file = table_text_lob_file(db_->path().c_str(), table_meta_.name());
-  int fd = ::open(lob_file.c_str(), O_RDONLY);
+  int    fd       = ::open(lob_file.c_str(), O_RDONLY);
   if (fd < 0) {
     return RC::IOERR_OPEN;
   }
@@ -304,11 +313,14 @@ RC Table::read_text_lob(uint64_t offset, uint32_t len, std::string &out) const
     return RC::IOERR_SEEK;
   }
   uint32_t stored_len = 0;
-  size_t got = 0;
-  char *hp = reinterpret_cast<char *>(&stored_len);
+  size_t   got        = 0;
+  char    *hp         = reinterpret_cast<char *>(&stored_len);
   while (got < sizeof(uint32_t)) {
     ssize_t r = ::read(fd, hp + got, sizeof(uint32_t) - got);
-    if (r <= 0) { ::close(fd); return RC::IOERR_READ; }
+    if (r <= 0) {
+      ::close(fd);
+      return RC::IOERR_READ;
+    }
     got += (size_t)r;
   }
   // Always use stored length to read full payload for robustness
@@ -316,7 +328,10 @@ RC Table::read_text_lob(uint64_t offset, uint32_t len, std::string &out) const
   size_t have = 0;
   while (have < stored_len) {
     ssize_t r = ::read(fd, out.data() + have, stored_len - have);
-    if (r <= 0) { ::close(fd); return RC::IOERR_READ; }
+    if (r <= 0) {
+      ::close(fd);
+      return RC::IOERR_READ;
+    }
     have += (size_t)r;
   }
   ::close(fd);
@@ -341,16 +356,13 @@ RC Table::visit_record(const RID &rid, function<bool(Record &)> visitor)
   return engine_->visit_record(rid, visitor);
 }
 
-RC Table::insert_record_with_trx(Record &record, Trx *trx)
-{
-  return engine_->insert_record_with_trx(record, trx);
-}
+RC Table::insert_record_with_trx(Record &record, Trx *trx) { return engine_->insert_record_with_trx(record, trx); }
 RC Table::delete_record_with_trx(const Record &record, Trx *trx)
 {
   return engine_->delete_record_with_trx(record, trx);
 }
 
-RC Table::update_record_with_trx(const Record &old_record, const Record &new_record, Trx* trx)
+RC Table::update_record_with_trx(const Record &old_record, const Record &new_record, Trx *trx)
 {
   return engine_->update_record_with_trx(old_record, new_record, trx);
 }
@@ -387,7 +399,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   int i = 0;
   for (; i < value_num && OB_SUCC(rc); i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
-    const Value &    value = values[i];
+    const Value     &value = values[i];
 
     // Handle NULL values
     if (value.attr_type() == AttrType::UNDEFINED) {
@@ -415,7 +427,9 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   // 填充缺省字段为 NULL
   for (; i < expected_user_cols && OB_SUCC(rc); i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
-    Value nullv; nullv.set_type(AttrType::UNDEFINED); nullv.set_null(true);
+    Value            nullv;
+    nullv.set_type(AttrType::UNDEFINED);
+    nullv.set_null(true);
     if (!field->nullable()) {
       LOG_WARN("Missing value for NOT NULL field. table=%s, field=%s", table_meta_.name(), field->name());
       rc = RC::INVALID_ARGUMENT;
@@ -448,8 +462,8 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
     return RC::INVALID_ARGUMENT;
   }
 
-  size_t       copy_len = field->len();
-  size_t       data_len = value.length();
+  size_t copy_len = field->len();
+  size_t data_len = value.length();
 
   if (field->type() == AttrType::CHARS) {
     if (field->nullable()) {
@@ -467,7 +481,9 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
       // handled by NULL path above
     } else {
       printf("DEBUG: [TEXT] write begin field=%s raw_len=%zu ptr_null=%d\n",
-             field->name(), data_len, value.data() == nullptr);
+          field->name(),
+          data_len,
+          value.data() == nullptr);
       // Fallback: some UPDATE constant folding可能未正确设置 Value.length()
       if (value.attr_type() == AttrType::CHARS && data_len == 0 && value.data() != nullptr) {
         data_len = strlen(value.data());
@@ -478,7 +494,7 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
         return RC::INVALID_ARGUMENT;
       }
       uint64_t lob_off = 0;
-      RC lrc = append_text_lob(value.data(), static_cast<uint32_t>(data_len), lob_off);
+      RC       lrc     = append_text_lob(value.data(), static_cast<uint32_t>(data_len), lob_off);
       if (lrc != RC::SUCCESS) {
         return lrc;
       }
@@ -493,7 +509,10 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
         record_data[field->offset() + field->len() - 1] = '0';
       }
       printf("DEBUG: [TEXT] write done field=%s off=%llu len=%u nullflag_set=%d\n",
-             field->name(), (unsigned long long)lob_off, ulen, with_null_flag ? 1 : 0);
+          field->name(),
+          (unsigned long long)lob_off,
+          ulen,
+          with_null_flag ? 1 : 0);
       return RC::SUCCESS;
     }
   } else if (field->type() == AttrType::VECTORS) {
@@ -518,7 +537,7 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
         LOG_WARN("Invalid vector payload for field %s", field->name());
         return RC::INVALID_ARGUMENT;
       }
-      int actual_dim = *(const int *)(value.data());
+      int actual_dim      = *(const int *)(value.data());
       int actual_data_len = static_cast<int>(sizeof(int) + actual_dim * sizeof(float));
       if (actual_data_len != expected_data_len) {
         LOG_WARN("Vector dimension mismatch for field %s: expected %d, got %d", field->name(), expected_dim, actual_dim);
@@ -592,24 +611,12 @@ RC Table::create_index(Trx *trx, const vector<const FieldMeta *> &field_metas, c
   return engine_->create_index(trx, field_metas, index_name, is_unique);
 }
 
-RC Table::drop_index(Trx *trx, const char *index_name)
-{
-  return engine_->drop_index(trx, index_name);
-}
+RC Table::drop_index(Trx *trx, const char *index_name) { return engine_->drop_index(trx, index_name); }
 
-RC Table::delete_record(const Record &record)
-{
-  return engine_->delete_record(record);
-}
+RC Table::delete_record(const Record &record) { return engine_->delete_record(record); }
 
-Index *Table::find_index(const char *index_name) const
-{
-  return engine_->find_index(index_name);
-}
-Index *Table::find_index_by_field(const char *field_name) const
-{
-  return engine_->find_index_by_field(field_name);
-}
+Index *Table::find_index(const char *index_name) const { return engine_->find_index(index_name); }
+Index *Table::find_index_by_field(const char *field_name) const { return engine_->find_index_by_field(field_name); }
 
 RC Table::sync()
 {
@@ -622,20 +629,24 @@ RC Table::sync()
 
 RC Table::alter_change_column_rename(const char *old_name, const char *new_name)
 {
-  if (is_view()) return RC::UNIMPLEMENTED;
-  if (common::is_blank(old_name) || common::is_blank(new_name)) return RC::INVALID_ARGUMENT;
+  if (is_view())
+    return RC::UNIMPLEMENTED;
+  if (common::is_blank(old_name) || common::is_blank(new_name))
+    return RC::INVALID_ARGUMENT;
 
   // build new meta and atomically persist
   TableMeta new_meta(table_meta_);
-  RC rc = new_meta.rename_column(old_name, new_name);
-  if (rc != RC::SUCCESS) return rc;
+  RC        rc = new_meta.rename_column(old_name, new_name);
+  if (rc != RC::SUCCESS)
+    return rc;
 
-  string base = db_->path();
+  string base     = db_->path();
   string tmp_file = table_meta_file(base.c_str(), table_meta_.name()) + ".tmp";
   {
     fstream fs;
     fs.open(tmp_file, ios_base::out | ios_base::binary | ios_base::trunc);
-    if (!fs.is_open()) return RC::IOERR_OPEN;
+    if (!fs.is_open())
+      return RC::IOERR_OPEN;
     new_meta.serialize(fs);
     fs.close();
   }
@@ -650,8 +661,10 @@ RC Table::alter_change_column_rename(const char *old_name, const char *new_name)
 
 RC Table::alter_add_column_int(const char *new_name)
 {
-  if (is_view()) return RC::UNIMPLEMENTED;
-  if (common::is_blank(new_name)) return RC::INVALID_ARGUMENT;
+  if (is_view())
+    return RC::UNIMPLEMENTED;
+  if (common::is_blank(new_name))
+    return RC::INVALID_ARGUMENT;
 
   // 仅支持在现有全部用户字段均为 INT 的前提下重写
   for (int i = table_meta_.sys_field_num(); i < table_meta_.field_num(); ++i) {
@@ -674,15 +687,18 @@ RC Table::alter_add_column_int(const char *new_name)
   vector<vector<Value>> rows;
   {
     RecordScanner *scanner = nullptr;
-    RC rc = engine_->get_record_scanner(scanner, nullptr, ReadWriteMode::READ_ONLY);
-    if (rc != RC::SUCCESS) return rc;
+    RC             rc      = engine_->get_record_scanner(scanner, nullptr, ReadWriteMode::READ_ONLY);
+    if (rc != RC::SUCCESS)
+      return rc;
     Record record;
     while (OB_SUCC(scanner->next(record))) {
       vector<Value> row;
       for (int i = table_meta_.sys_field_num(); i < table_meta_.field_num(); ++i) {
         const FieldMeta *f = table_meta_.field(i);
         if (f->nullable() && f->len() > 4 && record.data()[f->offset() + f->len() - 1] == '1') {
-          Value nullv; nullv.set_type(AttrType::UNDEFINED); nullv.set_null(true);
+          Value nullv;
+          nullv.set_type(AttrType::UNDEFINED);
+          nullv.set_null(true);
           row.push_back(nullv);
         } else {
           int v = 0;
@@ -699,19 +715,34 @@ RC Table::alter_add_column_int(const char *new_name)
   vector<AttrInfoSqlNode> attrs;
   for (int i = table_meta_.sys_field_num(); i < table_meta_.field_num(); ++i) {
     const FieldMeta *f = table_meta_.field(i);
-    AttrInfoSqlNode a; a.name = f->name(); a.type = f->type(); a.length = f->len(); a.nullable = f->nullable();
+    AttrInfoSqlNode  a;
+    a.name     = f->name();
+    a.type     = f->type();
+    a.length   = f->len();
+    a.nullable = f->nullable();
     attrs.push_back(a);
   }
   {
     // INT 可空：长度按现有规范需额外 1 字节 NULL 标志
-    AttrInfoSqlNode a; a.name = new_name; a.type = AttrType::INTS; a.length = 5; a.nullable = true;
+    AttrInfoSqlNode a;
+    a.name     = new_name;
+    a.type     = AttrType::INTS;
+    a.length   = 5;
+    a.nullable = true;
     attrs.push_back(a);
   }
 
   vector<FieldMeta> trx_copy(table_meta_.trx_fields().begin(), table_meta_.trx_fields().end());
-  TableMeta new_meta;
-  RC rc = new_meta.init(table_meta_.table_id(), table_meta_.name(), &trx_copy, attrs, table_meta_.primary_keys(), table_meta_.storage_format(), table_meta_.storage_engine());
-  if (rc != RC::SUCCESS) return rc;
+  TableMeta         new_meta;
+  RC                rc = new_meta.init(table_meta_.table_id(),
+      table_meta_.name(),
+      &trx_copy,
+      attrs,
+      table_meta_.primary_keys(),
+      table_meta_.storage_format(),
+      table_meta_.storage_engine());
+  if (rc != RC::SUCCESS)
+    return rc;
 
   // 复制旧索引元数据（所有老列仍然存在，索引仍然有效）
   for (const auto &im : preserved_indexes) {
@@ -719,27 +750,30 @@ RC Table::alter_add_column_int(const char *new_name)
   }
 
   // 3) 原子写入新元数据
-  string base = db_->path();
+  string base     = db_->path();
   string tmp_meta = table_meta_file(base.c_str(), table_meta_.name()) + ".tmp";
   {
     fstream fs;
     fs.open(tmp_meta, ios_base::out | ios_base::binary | ios_base::trunc);
-    if (!fs.is_open()) return RC::IOERR_OPEN;
+    if (!fs.is_open())
+      return RC::IOERR_OPEN;
     new_meta.serialize(fs);
     fs.close();
   }
   string meta_file_path = table_meta_file(base.c_str(), table_meta_.name());
-  if (std::rename(tmp_meta.c_str(), meta_file_path.c_str()) != 0) return RC::IOERR_WRITE;
+  if (std::rename(tmp_meta.c_str(), meta_file_path.c_str()) != 0)
+    return RC::IOERR_WRITE;
 
   // 4) 重建数据文件
   // 关闭现引擎，删除旧数据文件，创建新文件
   engine_.reset();
-  string data_file = table_data_file(base.c_str(), table_meta_.name());
+  string          data_file = table_data_file(base.c_str(), table_meta_.name());
   std::error_code fec;
   std::filesystem::remove(data_file, fec);
   BufferPoolManager &bpm = db_->buffer_pool_manager();
-  rc = bpm.create_file(data_file.c_str());
-  if (rc != RC::SUCCESS) return rc;
+  rc                     = bpm.create_file(data_file.c_str());
+  if (rc != RC::SUCCESS)
+    return rc;
 
   // 切换内存中的元数据
   table_meta_.swap(new_meta);
@@ -753,20 +787,27 @@ RC Table::alter_add_column_int(const char *new_name)
     return RC::UNSUPPORTED;
   }
   rc = engine_->open();
-  if (rc != RC::SUCCESS) return rc;
+  if (rc != RC::SUCCESS)
+    return rc;
 
   // 插入数据（新增列默认 NULL）
   for (const auto &row : rows) {
     vector<Value> vals;
     vals.reserve(row.size() + 1);
-    for (const Value &cell : row) { vals.emplace_back(cell); }
-    Value nullv; nullv.set_type(AttrType::UNDEFINED); nullv.set_null(true);
+    for (const Value &cell : row) {
+      vals.emplace_back(cell);
+    }
+    Value nullv;
+    nullv.set_type(AttrType::UNDEFINED);
+    nullv.set_null(true);
     vals.emplace_back(nullv);
     Record rec;
     rc = make_record(static_cast<int>(vals.size()), vals.data(), rec);
-    if (rc != RC::SUCCESS) return rc;
+    if (rc != RC::SUCCESS)
+      return rc;
     rc = insert_record(rec);
-    if (rc != RC::SUCCESS) return rc;
+    if (rc != RC::SUCCESS)
+      return rc;
   }
 
   return RC::SUCCESS;
@@ -774,8 +815,10 @@ RC Table::alter_add_column_int(const char *new_name)
 
 RC Table::alter_drop_column(const char *name)
 {
-  if (is_view()) return RC::UNIMPLEMENTED;
-  if (common::is_blank(name)) return RC::INVALID_ARGUMENT;
+  if (is_view())
+    return RC::UNIMPLEMENTED;
+  if (common::is_blank(name))
+    return RC::INVALID_ARGUMENT;
 
   // 仅支持所有用户字段为 INT
   for (int i = table_meta_.sys_field_num(); i < table_meta_.field_num(); ++i) {
@@ -788,9 +831,13 @@ RC Table::alter_drop_column(const char *name)
   // 找到要删除的列序
   int drop_idx = -1;
   for (int i = table_meta_.sys_field_num(); i < table_meta_.field_num(); ++i) {
-    if (0 == strcmp(table_meta_.field(i)->name(), name)) { drop_idx = i; break; }
+    if (0 == strcmp(table_meta_.field(i)->name(), name)) {
+      drop_idx = i;
+      break;
+    }
   }
-  if (drop_idx < 0) return RC::SCHEMA_FIELD_NOT_EXIST;
+  if (drop_idx < 0)
+    return RC::SCHEMA_FIELD_NOT_EXIST;
 
   // 处理索引：
   // 1) 删除所有引用该列的索引文件（包含多列索引）
@@ -798,14 +845,19 @@ RC Table::alter_drop_column(const char *name)
   vector<IndexMeta> preserved_indexes;
   for (int i = 0; i < table_meta_.index_num(); ++i) {
     const IndexMeta *im = table_meta_.index(i);
-    if (im == nullptr) continue;
+    if (im == nullptr)
+      continue;
     bool uses_dropped = false;
     if (!im->fields().empty()) {
       for (const auto &fn : im->fields()) {
-        if (fn == string(name)) { uses_dropped = true; break; }
+        if (fn == string(name)) {
+          uses_dropped = true;
+          break;
+        }
       }
     } else if (im->field() != nullptr) {
-      if (0 == strcmp(im->field(), name)) uses_dropped = true;
+      if (0 == strcmp(im->field(), name))
+        uses_dropped = true;
     }
     if (uses_dropped) {
       (void)drop_index(nullptr, im->name());
@@ -818,15 +870,18 @@ RC Table::alter_drop_column(const char *name)
   vector<vector<Value>> rows;
   {
     RecordScanner *scanner = nullptr;
-    RC rc = engine_->get_record_scanner(scanner, nullptr, ReadWriteMode::READ_ONLY);
-    if (rc != RC::SUCCESS) return rc;
+    RC             rc      = engine_->get_record_scanner(scanner, nullptr, ReadWriteMode::READ_ONLY);
+    if (rc != RC::SUCCESS)
+      return rc;
     Record record;
     while (OB_SUCC(scanner->next(record))) {
       vector<Value> row;
       for (int i = table_meta_.sys_field_num(); i < table_meta_.field_num(); ++i) {
         const FieldMeta *f = table_meta_.field(i);
         if (f->nullable() && f->len() > 4 && record.data()[f->offset() + f->len() - 1] == '1') {
-          Value nullv; nullv.set_type(AttrType::UNDEFINED); nullv.set_null(true);
+          Value nullv;
+          nullv.set_type(AttrType::UNDEFINED);
+          nullv.set_null(true);
           row.push_back(nullv);
         } else {
           int v = 0;
@@ -843,14 +898,26 @@ RC Table::alter_drop_column(const char *name)
   vector<AttrInfoSqlNode> attrs;
   for (int i = table_meta_.sys_field_num(); i < table_meta_.field_num(); ++i) {
     const FieldMeta *f = table_meta_.field(i);
-    if (0 == strcmp(f->name(), name)) continue;
-    AttrInfoSqlNode a; a.name = f->name(); a.type = f->type(); a.length = f->len(); a.nullable = f->nullable();
+    if (0 == strcmp(f->name(), name))
+      continue;
+    AttrInfoSqlNode a;
+    a.name     = f->name();
+    a.type     = f->type();
+    a.length   = f->len();
+    a.nullable = f->nullable();
     attrs.push_back(a);
   }
   vector<FieldMeta> trx_copy(table_meta_.trx_fields().begin(), table_meta_.trx_fields().end());
-  TableMeta new_meta;
-  RC rc = new_meta.init(table_meta_.table_id(), table_meta_.name(), &trx_copy, attrs, table_meta_.primary_keys(), table_meta_.storage_format(), table_meta_.storage_engine());
-  if (rc != RC::SUCCESS) return rc;
+  TableMeta         new_meta;
+  RC                rc = new_meta.init(table_meta_.table_id(),
+      table_meta_.name(),
+      &trx_copy,
+      attrs,
+      table_meta_.primary_keys(),
+      table_meta_.storage_format(),
+      table_meta_.storage_engine());
+  if (rc != RC::SUCCESS)
+    return rc;
 
   // 恢复仍然有效的索引元数据
   for (const auto &im : preserved_indexes) {
@@ -858,26 +925,29 @@ RC Table::alter_drop_column(const char *name)
   }
 
   // 3) 原子写入新元数据
-  string base = db_->path();
+  string base     = db_->path();
   string tmp_meta = table_meta_file(base.c_str(), table_meta_.name()) + ".tmp";
   {
     fstream fs;
     fs.open(tmp_meta, ios_base::out | ios_base::binary | ios_base::trunc);
-    if (!fs.is_open()) return RC::IOERR_OPEN;
+    if (!fs.is_open())
+      return RC::IOERR_OPEN;
     new_meta.serialize(fs);
     fs.close();
   }
   string meta_file_path = table_meta_file(base.c_str(), table_meta_.name());
-  if (std::rename(tmp_meta.c_str(), meta_file_path.c_str()) != 0) return RC::IOERR_WRITE;
+  if (std::rename(tmp_meta.c_str(), meta_file_path.c_str()) != 0)
+    return RC::IOERR_WRITE;
 
   // 4) 重建数据文件
   engine_.reset();
-  string data_file = table_data_file(base.c_str(), table_meta_.name());
+  string          data_file = table_data_file(base.c_str(), table_meta_.name());
   std::error_code fec;
   std::filesystem::remove(data_file, fec);
   BufferPoolManager &bpm = db_->buffer_pool_manager();
-  rc = bpm.create_file(data_file.c_str());
-  if (rc != RC::SUCCESS) return rc;
+  rc                     = bpm.create_file(data_file.c_str());
+  if (rc != RC::SUCCESS)
+    return rc;
 
   table_meta_.swap(new_meta);
 
@@ -889,7 +959,8 @@ RC Table::alter_drop_column(const char *name)
     return RC::UNSUPPORTED;
   }
   rc = engine_->open();
-  if (rc != RC::SUCCESS) return rc;
+  if (rc != RC::SUCCESS)
+    return rc;
 
   // 插入数据（跳过该列）
   int drop_user_idx = drop_idx - table_meta_.sys_field_num();
@@ -897,14 +968,17 @@ RC Table::alter_drop_column(const char *name)
     vector<Value> vals;
     vals.reserve(row.size() - 1);
     for (size_t j = 0; j < row.size(); ++j) {
-      if ((int)j == drop_user_idx) continue;
+      if ((int)j == drop_user_idx)
+        continue;
       vals.emplace_back(row[j]);
     }
     Record rec;
     rc = make_record(static_cast<int>(vals.size()), vals.data(), rec);
-    if (rc != RC::SUCCESS) return rc;
+    if (rc != RC::SUCCESS)
+      return rc;
     rc = insert_record(rec);
-    if (rc != RC::SUCCESS) return rc;
+    if (rc != RC::SUCCESS)
+      return rc;
   }
 
   return RC::SUCCESS;

@@ -44,7 +44,13 @@ public:
     name_to_table_[name] = table;
     return RC::SUCCESS;
   }
-
+  RC add_table_with_name(Table *table, const char *name)
+  {
+    if (name == nullptr) {
+      return RC::SUCCESS;
+    }
+    return add_table_with_name(table, (string)name);
+  }
   // Add outer query context for correlated subqueries
   void add_outer_context(const BinderContext *outer_context)
   {

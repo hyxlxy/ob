@@ -51,8 +51,7 @@ public:
   /**
    * @brief 初始化视图元数据
    */
-  RC init_view(int32_t table_id, const char *name, const vector<string> &attr_names,
-               const string &select_sql);
+  RC init_view(int32_t table_id, const char *name, const vector<string> &attr_names, const string &select_sql);
 
   RC add_index(const IndexMeta &index);
   RC drop_index(const char *index_name);
@@ -86,7 +85,8 @@ public:
 
   // 视图相关方法
   TableType table_type() const { return table_type_; }
-  bool is_view() const { return table_type_ == TableType::VIEW; }
+  // bool          is_view() const { return table_type_ == TableType::VIEW; }
+  bool          is_view() const { return false; }
   const string &select_sql() const { return select_sql_; }
 
 public:
@@ -106,7 +106,7 @@ protected:
   StorageFormat     storage_format_;
   StorageEngine     storage_engine_;
   TableType         table_type_ = TableType::TABLE;  ///< 表类型
-  string            select_sql_;                      ///< 视图的SELECT语句（仅视图使用）
+  string            select_sql_;                     ///< 视图的SELECT语句（仅视图使用）
 
   int record_size_ = 0;
 };

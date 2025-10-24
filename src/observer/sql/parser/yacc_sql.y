@@ -167,6 +167,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   Expression *                               expression;
   vector<unique_ptr<Expression>> *           expression_list;
   vector<Value> *                            value_list;
+  
   vector<ConditionSqlNode> *                 condition_list;
   vector<RelAttrSqlNode> *                   rel_attr_list;
   vector<string> *                           relation_list;
@@ -209,6 +210,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <cstring>             storage_format
 %type <key_list>            primary_key
 %type <key_list>            attr_list
+%type <key_list>            id_list
 %type <relation_with_alias_list>       rel_list
 %type <expression>          expression
 %type <expression_list>     projection_list
@@ -531,25 +533,49 @@ create_table_stmt:    /*create table 语句的语法解析树*/
     ;
 
 create_view_stmt:
-    CREATE VIEW ID AS select_stmt
+    CREATE VIEW ID AS select_stmt 
     {
       $$ = new ParsedSqlNode(SCF_CREATE_VIEW);
-      CreateViewSqlNode &create_view = $$->create_view;
+      CreateViewSqlNode & create_view = $$->create_view;
+
       create_view.relation_name = $3;
-      create_view.create_view_select = std::make_unique<SelectSqlNode>(std::move($5->selection));
-      delete $5;
+
+      create_view.selection.reset($5);
+      $5 = nullptr;
+
+       // 获取 select_stmt 的原始 SQL 字符串
+      YYLTYPE select_loc = @5;
+      int start = select_loc.first_column;
+      int end = select_loc.last_column;
+      int length = end - start + 1;
+
+      create_view.definition = std::string(sql_string + start, length);
     }
-    | CREATE VIEW ID LBRACE attr_list RBRACE AS select_stmt
+    | CREATE VIEW ID LBRACE id_list RBRACE AS select_stmt 
     {
       $$ = new ParsedSqlNode(SCF_CREATE_VIEW);
-      CreateViewSqlNode &create_view = $$->create_view;
+      CreateViewSqlNode & create_view = $$->create_view;
+
       create_view.relation_name = $3;
-      create_view.attribute_names = std::move(*$5);
-      create_view.create_view_select = std::make_unique<SelectSqlNode>(std::move($8->selection));
-      delete $5;
-      delete $8;
+
+      create_view.selection.reset($8);
+      $8 = nullptr;
+
+      //比上一个，多了一个处理attr_names的内容。
+      //上一个，是直接在创建stmt的时候去搞出来attr_names
+      if ($5 != nullptr) {
+        create_view.attr_names.swap(*$5);
+        delete $5;
+      }
+
+       // 获取 select_stmt 的原始 SQL 字符串
+      YYLTYPE select_loc = @8;
+      int start = select_loc.first_column;
+      int end = select_loc.last_column;
+      int length = end - start + 1;
+
+      create_view.definition = std::string(sql_string + start, length);
     }
-    ;
 
 drop_view_stmt:
     DROP VIEW ID
@@ -997,6 +1023,18 @@ update_kv_list:
       delete $5;
     }
     ;
+
+id_list:
+    ID
+    {
+      $$ = new vector<string>;
+      $$->push_back($1);
+    }
+    | id_list COMMA ID
+    {
+      $$ = $1;
+      $$->push_back($3);
+    }
 
 select_stmt:        /*  select 语句的语法解析树*/
     SELECT projection_list FROM rel_list join_list where group_by having order_by limit_clause

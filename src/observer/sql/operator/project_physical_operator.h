@@ -45,7 +45,8 @@ public:
 
   Tuple *current_tuple() override;
 
-  RC tuple_schema(TupleSchema &schema) const override;
+  RC                                       tuple_schema(TupleSchema &schema) const override;
+  ExpressionTuple<unique_ptr<Expression>> &tuple() { return tuple_; }
 
 private:
   // When there is no child (SELECT constant expressions without FROM),

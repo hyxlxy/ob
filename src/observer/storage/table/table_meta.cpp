@@ -48,8 +48,8 @@ void TableMeta::swap(TableMeta &other) noexcept
 }
 
 RC TableMeta::init(int32_t table_id, const char *name, const vector<FieldMeta> *trx_fields,
-                   span<const AttrInfoSqlNode> attributes, const vector<string> &primary_keys, StorageFormat storage_format,
-                   StorageEngine storage_engine)
+    span<const AttrInfoSqlNode> attributes, const vector<string> &primary_keys, StorageFormat storage_format,
+    StorageEngine storage_engine)
 {
   if (common::is_blank(name)) {
     LOG_ERROR("Name cannot be empty");
@@ -69,7 +69,12 @@ RC TableMeta::init(int32_t table_id, const char *name, const vector<FieldMeta> *
     fields_.resize(attributes.size() + trx_fields->size());
     for (size_t i = 0; i < trx_fields->size(); i++) {
       const FieldMeta &field_meta = (*trx_fields)[i];
-      fields_[i] = FieldMeta(field_meta.name(), field_meta.type(), field_offset, field_meta.len(), false /*visible*/, field_meta.field_id());
+      fields_[i]                  = FieldMeta(field_meta.name(),
+          field_meta.type(),
+          field_offset,
+          field_meta.len(),
+          false /*visible*/,
+          field_meta.field_id());
       field_offset += field_meta.len();
     }
 
@@ -84,11 +89,11 @@ RC TableMeta::init(int32_t table_id, const char *name, const vector<FieldMeta> *
     int col_len = attr_info.length;
     if (attr_info.type == AttrType::TEXTS) {
       const int inline_len = static_cast<int>(sizeof(uint64_t) + sizeof(uint32_t));
-      col_len = inline_len + (attr_info.nullable ? 1 : 0);
+      col_len              = inline_len + (attr_info.nullable ? 1 : 0);
     }
     // `i` is the col_id of fields[i]
     rc = fields_[i + trx_field_num].init(
-      attr_info.name.c_str(), attr_info.type, field_offset, col_len, true /*visible*/, i, attr_info.nullable);
+        attr_info.name.c_str(), attr_info.type, field_offset, col_len, true /*visible*/, i, attr_info.nullable);
     if (OB_FAIL(rc)) {
       LOG_ERROR("Failed to init field meta. table name=%s, field name: %s", name, attr_info.name.c_str());
       return rc;
@@ -98,18 +103,17 @@ RC TableMeta::init(int32_t table_id, const char *name, const vector<FieldMeta> *
   }
 
   primary_keys_ = primary_keys;
-  record_size_ = field_offset;
+  record_size_  = field_offset;
 
-  table_id_ = table_id;
-  name_     = name;
+  table_id_       = table_id;
+  name_           = name;
   storage_format_ = storage_format;
   storage_engine_ = storage_engine;
   LOG_INFO("Sussessfully initialized table meta. table id=%d, name=%s", table_id, name);
   return RC::SUCCESS;
 }
 
-RC TableMeta::init_view(int32_t table_id, const char *name, const vector<string> &attr_names,
-                        const string &select_sql)
+RC TableMeta::init_view(int32_t table_id, const char *name, const vector<string> &attr_names, const string &select_sql)
 {
   if (table_id < 0) {
     LOG_WARN("invalid table id. table id = %d, table name = %s", table_id, name);
@@ -121,8 +125,8 @@ RC TableMeta::init_view(int32_t table_id, const char *name, const vector<string>
     return RC::INVALID_ARGUMENT;
   }
 
-  table_id_ = table_id;
-  name_ = name;
+  table_id_   = table_id;
+  name_       = name;
   table_type_ = TableType::VIEW;
   select_sql_ = select_sql;
 
@@ -130,7 +134,7 @@ RC TableMeta::init_view(int32_t table_id, const char *name, const vector<string>
   // 注意：这里简化处理，实际应该从SELECT语句中推导字段类型
   for (size_t i = 0; i < attr_names.size(); i++) {
     FieldMeta field_meta;
-    RC rc = field_meta.init(attr_names[i].c_str(), AttrType::CHARS, 0, 255, true, false);
+    RC        rc = field_meta.init(attr_names[i].c_str(), AttrType::CHARS, 0, 255, true, false);
     if (rc != RC::SUCCESS) {
       LOG_ERROR("Failed to init field meta. field name=%s", attr_names[i].c_str());
       return rc;
@@ -161,7 +165,7 @@ RC TableMeta::drop_index(const char *index_name)
   }
 
   LOG_INFO("Trying to drop index: %s, total indexes: %d", index_name, (int)indexes_.size());
-  
+
   for (auto it = indexes_.begin(); it != indexes_.end(); ++it) {
     LOG_INFO("Checking index: %s vs %s", it->name(), index_name);
     if (strcmp(it->name(), index_name) == 0) {
@@ -183,17 +187,22 @@ RC TableMeta::rename_column(const char *old_name, const char *new_name)
 
   bool found = false;
   for (auto &field : fields_) {
-    if (!field.visible()) { continue; }
+    if (!field.visible()) {
+      continue;
+    }
     if (0 == strcmp(field.name(), old_name)) {
       FieldMeta repl;
-      RC rc = repl.init(new_name, field.type(), field.offset(), field.len(), field.visible(), field.field_id(), field.nullable());
-      if (rc != RC::SUCCESS) return rc;
+      RC        rc = repl.init(
+          new_name, field.type(), field.offset(), field.len(), field.visible(), field.field_id(), field.nullable());
+      if (rc != RC::SUCCESS)
+        return rc;
       field = repl;
       found = true;
       break;
     }
   }
-  if (!found) return RC::SCHEMA_FIELD_NOT_EXIST;
+  if (!found)
+    return RC::SCHEMA_FIELD_NOT_EXIST;
 
   // update single-field index meta if any
   for (auto &idx : indexes_) {
@@ -201,21 +210,27 @@ RC TableMeta::rename_column(const char *old_name, const char *new_name)
       // multi-field index: try to replace matching component
       auto names = idx.fields();
       for (auto &n : names) {
-        if (n == old_name) { n = new_name; }
+        if (n == old_name) {
+          n = new_name;
+        }
       }
       // rebuild IndexMeta
       vector<FieldMeta> fms;
       for (const auto &nm : names) {
         const FieldMeta *fm = field(nm.c_str());
-        if (fm == nullptr) return RC::SCHEMA_FIELD_NOT_EXIST;
+        if (fm == nullptr)
+          return RC::SCHEMA_FIELD_NOT_EXIST;
         fms.push_back(*fm);
       }
-      IndexMeta rebuilt; rebuilt.init(idx.name(), fms, idx.is_unique());
+      IndexMeta rebuilt;
+      rebuilt.init(idx.name(), fms, idx.is_unique());
       idx = rebuilt;
     } else if (idx.field() && 0 == strcmp(idx.field(), old_name)) {
       const FieldMeta *fm = field(new_name);
-      if (fm == nullptr) return RC::SCHEMA_FIELD_NOT_EXIST;
-      IndexMeta rebuilt; rebuilt.init(idx.name(), *fm, idx.is_unique());
+      if (fm == nullptr)
+        return RC::SCHEMA_FIELD_NOT_EXIST;
+      IndexMeta rebuilt;
+      rebuilt.init(idx.name(), *fm, idx.is_unique());
       idx = rebuilt;
     }
   }
@@ -227,10 +242,7 @@ const char *TableMeta::name() const { return name_.c_str(); }
 
 const FieldMeta *TableMeta::trx_field() const { return &fields_[0]; }
 
-span<const FieldMeta> TableMeta::trx_fields() const
-{
-  return span<const FieldMeta>(fields_.data(), sys_field_num());
-}
+span<const FieldMeta> TableMeta::trx_fields() const { return span<const FieldMeta>(fields_.data(), sys_field_num()); }
 
 const FieldMeta *TableMeta::field(int index) const { return &fields_[index]; }
 const FieldMeta *TableMeta::field(const char *name) const
@@ -288,8 +300,8 @@ int TableMeta::record_size() const { return record_size_; }
 int TableMeta::serialize(ostream &ss) const
 {
   Json::Value table_value;
-  table_value[FIELD_TABLE_ID]   = table_id_;
-  table_value[FIELD_TABLE_NAME] = name_;
+  table_value[FIELD_TABLE_ID]       = table_id_;
+  table_value[FIELD_TABLE_NAME]     = name_;
   table_value[FIELD_STORAGE_FORMAT] = static_cast<int>(storage_format_);
   table_value[FIELD_STORAGE_ENGINE] = static_cast<int>(storage_engine_);
 
@@ -337,7 +349,7 @@ int TableMeta::deserialize(istream &is)
 {
   Json::Value             table_value;
   Json::CharReaderBuilder builder;
-  string             errors;
+  string                  errors;
 
   streampos old_pos = is.tellg();
   if (!Json::parseFromStream(builder, is, &table_value, &errors)) {
@@ -364,10 +376,10 @@ int TableMeta::deserialize(istream &is)
   const Json::Value &fields_value = table_value[FIELD_FIELDS];
   // 检查是否为视图，视图可能没有字段信息
   const Json::Value &table_type_value = table_value[FIELD_TABLE_TYPE];
-  bool is_view = false;
-  if (!table_type_value.empty() && table_type_value.isInt()) {
-    is_view = (static_cast<TableType>(table_type_value.asInt()) == TableType::VIEW);
-  }
+  bool               is_view          = false;
+  // if (!table_type_value.empty() && table_type_value.isInt()) {
+  //   is_view = (static_cast<TableType>(table_type_value.asInt()) == TableType::VIEW);
+  // }
 
   if (!is_view && (!fields_value.isArray() || fields_value.size() <= 0)) {
     LOG_ERROR("Invalid table meta. fields is not array, json value=%s", fields_value.toStyledString().c_str());
@@ -408,7 +420,7 @@ int TableMeta::deserialize(istream &is)
   auto comparator = [](const FieldMeta &f1, const FieldMeta &f2) { return f1.offset() < f2.offset(); };
   sort(fields.begin(), fields.end(), comparator);
 
-  table_id_ = table_id;
+  table_id_       = table_id;
   storage_format_ = static_cast<StorageFormat>(storage_format);
   storage_engine_ = static_cast<StorageEngine>(storage_engine);
   name_.swap(table_name);
@@ -423,7 +435,7 @@ int TableMeta::deserialize(istream &is)
 
   for (const FieldMeta &field_meta : fields_) {
     if (!field_meta.visible()) {
-      trx_fields_.push_back(field_meta); // 字段加上trx标识更好
+      trx_fields_.push_back(field_meta);  // 字段加上trx标识更好
     }
   }
 
@@ -433,7 +445,7 @@ int TableMeta::deserialize(istream &is)
       LOG_ERROR("Invalid table meta. indexes is not array, json value=%s", fields_value.toStyledString().c_str());
       return -1;
     }
-    const int              index_num = indexes_value.size();
+    const int         index_num = indexes_value.size();
     vector<IndexMeta> indexes(index_num);
     for (int i = 0; i < index_num; i++) {
       IndexMeta &index = indexes[i];
@@ -454,7 +466,7 @@ int TableMeta::deserialize(istream &is)
       LOG_ERROR("Invalid table meta. primary keys is not array, json value=%s", fields_value.toStyledString().c_str());
       return -1;
     }
-    const int              primary_key_num = primary_keys_value.size();
+    const int      primary_key_num = primary_keys_value.size();
     vector<string> primary_keys(primary_key_num);
     for (int i = 0; i < primary_key_num; i++) {
       const Json::Value &field_name_value = primary_keys_value[i];
@@ -477,7 +489,7 @@ int TableMeta::deserialize(istream &is)
     }
     table_type_ = static_cast<TableType>(table_type_value.asInt());
   } else {
-    table_type_ = TableType::TABLE; // 默认为普通表
+    table_type_ = TableType::TABLE;  // 默认为普通表
   }
 
   if (table_type_ == TableType::VIEW) {

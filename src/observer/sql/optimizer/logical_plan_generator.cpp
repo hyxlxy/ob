@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/parser/expression_binder.h"
 #include <unordered_set>
 #include <functional>
+#include "sql/stmt/create_view_stmt.h"
 #include "storage/db/db.h"
 
 #include "sql/operator/calc_logical_operator.h"
@@ -45,6 +46,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/stmt.h"
 
 #include "sql/expr/expression_iterator.h"
+#include "storage/table/view.h"
 
 using namespace std;
 using namespace common;
@@ -91,6 +93,18 @@ RC LogicalPlanGenerator::create(Stmt *stmt, unique_ptr<LogicalOperator> &logical
       }
 
       rc = create_plan(union_stmt, logical_operator);
+    } break;
+
+    case StmtType::CREATE_VIEW: {
+      CreateViewStmt *create_view_stmt = static_cast<CreateViewStmt *>(stmt);
+      if (create_view_stmt->select_stmt()) {
+        auto &&select_stmt = create_view_stmt->select_stmt().get();
+        rc                 = create_plan(select_stmt, logical_operator);
+        // cout << "create view in select finish" << endl;
+
+      } else {
+        rc = RC::UNIMPLEMENTED;
+      }
     } break;
 
     default: {
@@ -173,7 +187,28 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
   for (Table *table : plan_tables) {
 
-    unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY));
+    unique_ptr<LogicalOperator> table_get_oper;
+
+    if (auto &&view = dynamic_cast<View *>(table)) {
+      //这个表其实是view
+      unique_ptr<LogicalOperator> view_oper;
+      SelectStmt                 *view_select_view = dynamic_cast<SelectStmt *>(view->stmt());
+      RC                          rc               = create_plan(view_select_view, view_oper);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to create view logical plan: %s", view->name());
+        return rc;
+      }
+      {
+        auto &&project_oper = dynamic_cast<ProjectLogicalOperator *>(view_oper.get());
+        project_oper->set_view(view);
+      }
+      // 将视图计划作为当前表操作符
+      table_get_oper = std::move(view_oper);
+    } else {
+      auto &&table_get_tem = std::make_unique<TableGetLogicalOperator>(table, ReadWriteMode::READ_ONLY);
+      table_get_oper       = std::move(table_get_tem);
+    }
+    // (new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY));
     if (table_oper == nullptr) {
       table_oper = std::move(table_get_oper);
     } else {

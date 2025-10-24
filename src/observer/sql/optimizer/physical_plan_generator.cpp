@@ -548,6 +548,11 @@ RC PhysicalPlanGenerator::create_plan(
     project_operator->add_child(std::move(child_phy_oper));
   }
 
+  if (project_oper.view_ != nullptr) {
+    // cout << "物理操作符: view 传过去了" << endl;
+    project_operator->tuple().set_view(project_oper.view_);
+  }
+
   oper = std::move(project_operator);
 
   LOG_TRACE("create a project physical operator");

@@ -1,54 +1,161 @@
-/* Copyright (c) 2021 OceanBase and/or its affiliates. All rights reserved.
-miniob is licensed under Mulan PSL v2.
-You can use this software according to the terms and conditions of the Mulan PSL v2.
-You may obtain a copy of Mulan PSL v2 at:
-         http://license.coscl.org.cn/MulanPSL2
-THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
-EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
-MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
-See the Mulan PSL v2 for more details. */
 
 #include "storage/table/view.h"
-#include "common/log/log.h"
+#include "sql/stmt/select_stmt.h"
+#include "sql/expr/expression.h"
 #include "storage/db/db.h"
-#include <fstream>
 
-RC View::create(Db *db, int32_t table_id, const char *path, const char *name, const char *base_dir,
-                std::vector<std::string> attr_names, std::string select_sql, SelectStmt *select_stmt,
-                StorageFormat storage_format)
+View::~View()
 {
-  if (db == nullptr || path == nullptr || name == nullptr || base_dir == nullptr) {
-    LOG_WARN("invalid arguments. db=%p, path=%s, name=%s, base_dir=%s", db, path, name, base_dir);
-    return RC::INVALID_ARGUMENT;
+
+  if (stmt_) {
+    delete stmt_;
+  }
+}
+
+struct SaveFieldMeta
+{
+  set<FieldMeta *> S;
+  ~SaveFieldMeta()
+  {
+    for (auto &&x : S) {
+      delete x;
+    }
+  }
+  void add_fieldmeta(FieldMeta *one) { S.insert(one); }
+};
+static SaveFieldMeta save_fieldmeta;
+
+//第一个是Field，第二个是列的别名
+/*
+首先先捋清楚：
+对于view需要先提取踹select_stmt里面的查询的对应的字段field有哪些
+得到他们的（字段+别名)的组合
+
+
+但是这里一个view里的
+*/
+vector<pair<Field, string>> View::get_fields(Db *db, SelectStmt *stmt_)
+{
+  vector<pair<Field, string>> fields;
+  auto                      &&select_stmt = dynamic_cast<SelectStmt *>(stmt_);
+  for (auto &&expr : select_stmt->query_expressions()) {
+    if (expr->type() == ExprType::FIELD) {
+      // 此时已经将所有的 UnboundFieldExpr 转换为 FieldExpr
+      auto   field_expr = static_cast<FieldExpr *>(expr.get());
+      Table *table      = db->find_table(field_expr->table_name());
+      if (table != nullptr) {
+        Field field{table, field_expr->field().meta()};
+
+        fields.push_back({field, ""});
+        if (strlen(expr->alias()) != 0) {
+          fields.back().second = expr->alias();
+        } else {
+          //这里不是expr的name，而是field的name，因为这里的expr本身就是field
+          fields.back().second = field.field_name();
+        }
+      } else {
+        //代表目前处于select view的嵌套
+        View *view = db->find_view(field_expr->table_name());
+        ASSERT(view != nullptr,"no way here view.cpp: get_fields");
+        cout << "view.cpp: here view" << endl;
+        Field field{view, field_expr->field().meta()};
+        fields.push_back({field, ""});
+        if (strlen(expr->alias()) != 0) {
+          fields.back().second = string{expr->alias()};
+        } else {
+          fields.back().second = field.field_name();
+        }
+      }
+
+      continue;
+    }
+    std::string field_name = expr->name();
+    // static map<FieldMeta, bool> mp;
+    FieldMeta *filed_meta = new FieldMeta();
+    save_fieldmeta.add_fieldmeta(filed_meta);
+    filed_meta->init(field_name.c_str(), expr->value_type(), 0, expr->value_length(), true, 0);
+    Field field{filed_meta};
+    fields.push_back({field, ""});
+    if (strlen(expr->alias()) != 0) {
+      fields.back().second = expr->alias();
+    } else {
+      fields.back().second = expr->name();
+    }
+  }
+  return fields;
+}
+
+void View::set_table_field_name(Db *db)
+{
+  // attr_from_table_and_field
+  auto &&select_stmt = dynamic_cast<SelectStmt *>(stmt_);
+  auto &&fields      = View::get_fields(db, select_stmt);
+  for (size_t i = 0; i < fields.size(); i++) {
+    auto &&field = fields[i].first;
+    if (field.table() == nullptr) {
+      attr_from_table_and_field_[attr_names_[i]] = {"", field.field_name()};
+
+    } else {
+      attr_from_table_and_field_[attr_names_[i]] = {field.table_name(), field.field_name()};
+    }
   }
 
-  // 简化实现：暂时只保存基本信息
-  name_ = name;
-  select_sql_ = select_sql;
-  select_stmt_ = select_stmt;
-  
-  LOG_INFO("successfully create view %s", name);
-  return RC::SUCCESS;
+  //   for (auto &&expr : select_stmt->query_expressions()) {
+  // if (expr->type() == ExprType::FIELD) {
+  // 此时已经将所有的 UnboundFieldExpr 转换为 FieldExpr
+  //   auto field_expr = static_cast<FieldExpr *>(expr.get());
+  //   Field field(db->find_table(field_expr->table_name()), field_expr->field().meta());
+  // 记录表名
+  //   if (strlen(expr->alias()) != 0) {
+  // 别名覆盖字段名
+  // attr_from_table_and_field_[expr->alias()] = {field_expr->field().table_name(), field_expr->field_name()};
+  //   } else {
+  // attr_from_table_and_field_[expr->name()] = {field_expr->field().table_name(), field_expr->field_name()};
+  //   }
+
+  //   continue;
+  // }
+  //   }
 }
 
-RC View::drop()
+void View::set_table_meta(Db *db)
 {
-  LOG_INFO("successfully drop view %s", name_.c_str());
-  return RC::SUCCESS;
-}
 
-RC View::open(Db *db, const char *meta_file, const char *base_dir)
-{
-  if (db == nullptr || meta_file == nullptr || base_dir == nullptr) {
-    LOG_WARN("invalid arguments. db=%p, meta_file=%s, base_dir=%s", db, meta_file, base_dir);
-    return RC::INVALID_ARGUMENT;
+  auto                      &&select_stmt = dynamic_cast<SelectStmt *>(stmt_);
+  vector<pair<Field, string>> fields      = View::get_fields(db, select_stmt);
+
+  //   vector<Field> fields;
+
+  //   auto &&select_stmt = dynamic_cast<SelectStmt *>(stmt_);
+  //   for (auto &&expr : select_stmt->query_expressions()) {
+  //     if (expr->type() == ExprType::FIELD) {
+  //       // 此时已经将所有的 UnboundFieldExpr 转换为 FieldExpr
+  //       auto  field_expr = static_cast<FieldExpr *>(expr.get());
+  //       Field field(db->find_table(field_expr->table_name()), field_expr->field().meta());
+  //       fields.push_back(field);
+  //       continue;
+  //     }
+  //     std::string field_name;
+  //     field_name = expr->name();
+  //     FieldMeta filed_meta;
+  //     filed_meta.init(field_name.c_str(), expr->value_type(), 0, expr->value_length(), true, 0);
+  //     Field field{&filed_meta};
+  //     fields.push_back(field);
+  //   }
+
+  std::vector<AttrInfoSqlNode> attr_infos;
+
+  for (size_t i = 0; i < fields.size(); i++) {
+    auto &&field = fields[i].first;
+    //这里应该是second才对，因为是别名
+    AttrInfoSqlNode one{fields[i].second, field.attr_type()};
+    attr_infos.push_back(std::move(one));
+    if (attr_names_.empty()) {
+      continue;
+    }
+    attr_infos.back().name = attr_names_[i];
   }
 
-  LOG_INFO("successfully open view from %s", meta_file);
-  return RC::SUCCESS;
-}
-
-const char *View::name() const
-{
-  return name_.c_str();
+  table_meta_.init(
+      view_id_, view_name_.c_str(), nullptr, attr_infos, {}, StorageFormat::ROW_FORMAT, StorageEngine::HEAP);
 }

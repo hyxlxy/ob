@@ -42,12 +42,12 @@ class Table
 {
 public:
   Table() = default;
-  ~Table();
+  virtual ~Table();
 
   // TODO: use TableEngine replace Table
   friend class TableEngine;
   friend class HeapTableEngine;
-  friend class UpdatePhysicalOperator; // allow update operator to reuse record write helper
+  friend class UpdatePhysicalOperator;  // allow update operator to reuse record write helper
 
   /**
    * 创建一个表
@@ -70,8 +70,8 @@ public:
    * @param attr_names 属性名列表
    * @param select_sql SELECT语句的SQL文本
    */
-  RC create_view(Db *db, int32_t table_id, const char *path, const char *name,
-                 const vector<string> &attr_names, const string &select_sql);
+  RC create_view(Db *db, int32_t table_id, const char *path, const char *name, const vector<string> &attr_names,
+      const string &select_sql);
 
   /**
    * 打开一个表
@@ -134,7 +134,7 @@ public:
   RC sync();
 
   // 视图相关方法
-  bool is_view() const { return table_meta_.is_view(); }
+  bool          is_view() const { return table_meta_.is_view(); }
   const string &select_sql() const { return table_meta_.select_sql(); }
 
   // TEXT LOB helpers
@@ -155,9 +155,10 @@ public:
   RC alter_add_column_int(const char *new_name);
   RC alter_drop_column(const char *name);
 
-private:
-  Db       *db_ = nullptr;
   TableMeta table_meta_;
+
+private:
+  Db *db_ = nullptr;
   // DiskBufferPool    *data_buffer_pool_ = nullptr;  /// 数据文件关联的buffer pool
   // RecordFileHandler *record_handler_   = nullptr;  /// 记录操作
   // vector<Index *>    indexes_;
