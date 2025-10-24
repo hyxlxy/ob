@@ -86,7 +86,7 @@ RC TableMeta::init(int32_t table_id, const char *name, const vector<FieldMeta> *
   for (size_t i = 0; i < attributes.size(); i++) {
     const AttrInfoSqlNode &attr_info = attributes[i];
     // 统一规范 TEXT 字段的行内长度：offset(8)+length(4)+可空标志(可选1)
-    int col_len = attr_info.length;
+    int col_len = attr_info.length + (attr_info.nullable ? 1 : 0);
     if (attr_info.type == AttrType::TEXTS) {
       const int inline_len = static_cast<int>(sizeof(uint64_t) + sizeof(uint32_t));
       col_len              = inline_len + (attr_info.nullable ? 1 : 0);
