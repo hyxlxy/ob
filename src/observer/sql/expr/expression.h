@@ -244,12 +244,13 @@ public:
   FieldExpr() = default;
   FieldExpr(const Table *table, const FieldMeta *field) : field_(table, field) {}
   FieldExpr(const Field &field) : field_(field) {}
+  FieldExpr(const Field &field, const std::string alias) : field_(field), table_alias_(alias) {}
 
   virtual ~FieldExpr() = default;
 
   bool equal(const Expression &other) const override;
 
-  unique_ptr<Expression> copy() const override { return make_unique<FieldExpr>(field_); }
+  unique_ptr<Expression> copy() const override { return make_unique<FieldExpr>(field_, table_alias_); }
 
   ExprType type() const override { return ExprType::FIELD; }
   AttrType value_type() const override { return field_.attr_type(); }

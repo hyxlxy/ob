@@ -198,7 +198,7 @@ public:
     cell.reset();
 
     // Use NULL flag bit system like reference code
-      if (field_meta->nullable()) {
+    if (field_meta->nullable()) {
       // Check NULL flag in the last byte of the field
       bool is_null = this->record_->data()[field_meta->offset() + field_meta->len() - 1] == '1';
       if (is_null) {
@@ -212,10 +212,15 @@ public:
         if (field_meta->type() == AttrType::TEXTS) {
           // read offset+len and fetch payload
           const char *ptr = this->record_->data() + field_meta->offset();
-          uint64_t off = 0; memcpy(&off, ptr, sizeof(uint64_t));
-          uint32_t len = 0; memcpy(&len, ptr + sizeof(uint64_t), sizeof(uint32_t));
+          uint64_t    off = 0;
+          memcpy(&off, ptr, sizeof(uint64_t));
+          uint32_t len = 0;
+          memcpy(&len, ptr + sizeof(uint64_t), sizeof(uint32_t));
           printf("DEBUG: [TEXT] read field=%s off=%llu len=%u nullable=%d\n",
-                 field_meta->name(), (unsigned long long)off, len, field_meta->nullable());
+              field_meta->name(),
+              (unsigned long long)off,
+              len,
+              field_meta->nullable());
           std::string content;
           // need table to read; here we only have record_ and table_ stored in RowTuple
           const Table *tbl = table_;
@@ -248,9 +253,11 @@ public:
 
       if (field_meta->type() == AttrType::TEXTS) {
         const char *ptr = this->record_->data() + field_meta->offset();
-        uint64_t off = 0; memcpy(&off, ptr, sizeof(uint64_t));
-        uint32_t len = 0; memcpy(&len, ptr + sizeof(uint64_t), sizeof(uint32_t));
-        std::string content;
+        uint64_t    off = 0;
+        memcpy(&off, ptr, sizeof(uint64_t));
+        uint32_t len = 0;
+        memcpy(&len, ptr + sizeof(uint64_t), sizeof(uint32_t));
+        std::string  content;
         const Table *tbl = table_;
         if (tbl) {
           Table *nonconst_tbl = const_cast<Table *>(tbl);
@@ -280,12 +287,22 @@ public:
     return RC::SUCCESS;
   }
 
+  const string &table_alias() { return table_alias_; }
+  void          set_table_alias(string name) { table_alias_ = std::move(name); }
+
   RC find_cell(const TupleCellSpec &spec, Value &cell) const override
   {
     const char *table_name = spec.table_name();
     const char *field_name = spec.field_name();
     if (0 != strcmp(table_name, table_->name())) {
       return RC::NOTFOUND;
+    }
+
+    //如果rowtuple对应的table是有别名的，并且我们在查询的时候的spec也是需要有别名的
+    if (!table_alias_.empty() and strlen(spec.table_alias())) {
+      if (string(spec.table_alias()) != table_alias_) {
+        return RC::NOTFOUND;
+      }
     }
 
     for (size_t i = 0; i < speces_.size(); ++i) {
@@ -318,6 +335,7 @@ private:
   Record             *record_ = nullptr;
   const Table        *table_  = nullptr;
   vector<FieldExpr *> speces_;
+  string              table_alias_;
 };
 
 /**
@@ -387,12 +405,8 @@ public:
   ValueListTuple()          = default;
   virtual ~ValueListTuple() = default;
 
-  void set_names(const vector<TupleCellSpec> &specs) {
-    specs_ = specs;
-  }
-  void set_cells(const vector<Value> &cells) {
-    cells_ = cells;
-  }
+  void set_names(const vector<TupleCellSpec> &specs) { specs_ = specs; }
+  void set_cells(const vector<Value> &cells) { cells_ = cells; }
 
   virtual int cell_num() const override { return static_cast<int>(cells_.size()); }
 
@@ -472,8 +486,8 @@ public:
   void set_left(Tuple *left) { left_ = left; }
   void set_right(Tuple *right) { right_ = right; }
 
-  int cell_num() const override 
-  { 
+  int cell_num() const override
+  {
     int count = 0;
     if (left_ != nullptr) {
       count += left_->cell_num();
@@ -491,7 +505,7 @@ public:
     }
 
     const int left_cell_num = (left_ != nullptr) ? left_->cell_num() : 0;
-    
+
     if (index >= 0 && index < left_cell_num) {
       return left_->cell_at(index, value);
     }
@@ -510,7 +524,7 @@ public:
     }
 
     const int left_cell_num = (left_ != nullptr) ? left_->cell_num() : 0;
-    
+
     if (index >= 0 && index < left_cell_num) {
       return left_->spec_at(index, spec);
     }

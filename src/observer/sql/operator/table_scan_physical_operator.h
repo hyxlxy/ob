@@ -76,10 +76,15 @@ public:
 
   void set_predicates(vector<unique_ptr<Expression>> &&exprs);
 
+  const string &table_alias() const { return table_alias_; }
+  void          set_table_alias(string name) { table_alias_ = std::move(name); }
+
 private:
   RC filter(RowTuple &tuple, bool &result);
 
 private:
+  string table_alias_;
+
   Table                         *table_          = nullptr;
   Trx                           *trx_            = nullptr;
   ReadWriteMode                  mode_           = ReadWriteMode::READ_WRITE;

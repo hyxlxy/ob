@@ -57,12 +57,23 @@ public:
   void set_predicates(vector<unique_ptr<Expression>> &&exprs);
   auto predicates() -> vector<unique_ptr<Expression>> & { return predicates_; }
 
-  void add_subquery_filter_unit(class FilterUnit *filter_unit);
+  void                              add_subquery_filter_unit(class FilterUnit *filter_unit);
   const vector<class FilterUnit *> &subquery_filter_units() const { return subquery_filter_units_; }
 
+  const string &table_alias() const { return table_alias_; }
+  void          set_table_alias(string name)
+  {
+
+    if (name.empty())
+      return;
+    table_alias_ = std::move(name);
+  }
+
 private:
-  Table        *table_ = nullptr;
-  ReadWriteMode mode_  = ReadWriteMode::READ_WRITE;
+  Table *table_ = nullptr;
+  string table_alias_;
+
+  ReadWriteMode mode_ = ReadWriteMode::READ_WRITE;
 
   // 与当前表相关的过滤操作，可以尝试在遍历数据时执行
   // 这里的表达式都是比较简单的比较运算，并且左右两边都是取字段表达式或值表达式

@@ -23,6 +23,9 @@ RC TableScanPhysicalOperator::open(Trx *trx)
   RC rc = table_->get_record_scanner(record_scanner_, trx, mode_);
   if (rc == RC::SUCCESS) {
     tuple_.set_schema(table_, table_->table_meta().field_metas());
+    if (!table_alias_.empty()) {
+      tuple_.set_table_alias(table_alias_);
+    }
   }
   trx_ = trx;
   return rc;
@@ -32,8 +35,8 @@ RC TableScanPhysicalOperator::next()
 {
   RC rc = RC::SUCCESS;
 
-  bool filter_result = false;
-  static int scan_counter = 0;
+  bool       filter_result = false;
+  static int scan_counter  = 0;
 
   while (OB_SUCC(rc = record_scanner_->next(current_record_))) {
     scan_counter++;
@@ -78,7 +81,8 @@ RC TableScanPhysicalOperator::next()
   return rc;
 }
 
-RC TableScanPhysicalOperator::close() {
+RC TableScanPhysicalOperator::close()
+{
   RC rc = RC::SUCCESS;
   if (record_scanner_ != nullptr) {
     rc = record_scanner_->close_scan();
@@ -89,7 +93,6 @@ RC TableScanPhysicalOperator::close() {
     record_scanner_ = nullptr;
   }
   return rc;
-
 }
 
 Tuple *TableScanPhysicalOperator::current_tuple()
@@ -103,7 +106,7 @@ string TableScanPhysicalOperator::param() const { return table_->name(); }
 RC TableScanPhysicalOperator::tuple_schema(TupleSchema &schema) const
 {
   const TableMeta &table_meta = table_->table_meta();
-  const int field_num = table_meta.field_num();
+  const int        field_num  = table_meta.field_num();
   for (int i = table_meta.sys_field_num(); i < field_num; i++) {
     const FieldMeta *field_meta = table_meta.field(i);
     schema.append_cell(TupleCellSpec(table_->name(), field_meta->name(), field_meta->name()));
@@ -135,7 +138,8 @@ RC TableScanPhysicalOperator::filter(RowTuple &tuple, bool &result)
     // 每1000次调用输出一次调试信息
     if (filter_counter % 1000 == 0) {
       printf("DEBUG: TableScanPhysicalOperator::filter called %d times, result=%s\n",
-             filter_counter, tmp_result ? "true" : "false");
+          filter_counter,
+          tmp_result ? "true" : "false");
       fflush(stdout);
     }
 

@@ -619,6 +619,10 @@ attr_def:
       } else {
         $$->length = $4;
       }
+      // Add extra byte for NULL flag for nullable fields
+      if ($$->nullable) {
+        $$->length++;
+      }
     }
     | ID type LBRACE number RBRACE NULL_T
     {
@@ -669,6 +673,10 @@ attr_def:
         $$->length = static_cast<int>(8 + 4);
       } else {
         $$->length = 4;
+      }
+      // Add extra byte for NULL flag for nullable fields
+      if ($$->nullable) {
+        $$->length++;
       }
     }
     | ID type NULL_T

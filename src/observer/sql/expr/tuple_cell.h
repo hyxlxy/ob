@@ -27,6 +27,10 @@ public:
   const char *table_name() const { return table_name_.c_str(); }
   const char *field_name() const { return field_name_.c_str(); }
   const char *alias() const { return alias_.c_str(); }
+  const char *table_alias() const { return table_alias_.c_str(); }
+  void        set_field_name(string name) { field_name_ = std::move(name); }
+  void        set_table_name(string name) { table_name_ = std::move(name); }
+  void        set_table_alias(string name) { table_alias_ = std::move(name); }
 
   bool equals(const TupleCellSpec &other) const
   {
@@ -50,7 +54,8 @@ public:
     // 如果一个有表名一个没有，但字段名相同，也认为匹配
     // 这种情况适用于单表查询时的字段引用
     // 但是如果两个字段名都为空（如聚合表达式），则不应该匹配
-    if ((table_name_.empty() || other.table_name_.empty()) && field_name_ == other.field_name_ && !field_name_.empty()) {
+    if ((table_name_.empty() || other.table_name_.empty()) && field_name_ == other.field_name_ &&
+        !field_name_.empty()) {
       return true;
     }
 
@@ -61,4 +66,5 @@ private:
   string table_name_;
   string field_name_;
   string alias_;
+  string table_alias_;
 };

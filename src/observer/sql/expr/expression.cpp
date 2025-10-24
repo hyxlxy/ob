@@ -103,7 +103,11 @@ RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
     return RC::INTERNAL;
   }
 
-  RC rc = tuple.find_cell(TupleCellSpec(table_name(), field_name()), value);
+  //去设置表的alias
+  TupleCellSpec spec{table_name(), field_name()};
+  spec.set_table_alias(table_alias_);
+
+  RC rc = tuple.find_cell(spec, value);
 
   printf("DEBUG: [FIELD] FieldExpr find_cell result: rc=%s\n", strrc(rc));
 
@@ -1812,8 +1816,9 @@ RC FunctionExpr::try_get_value_with_args(const vector<Value> &arg_values, Value 
     if (__builtin_mul_overflow(each, static_cast<size_t>(times), &total)) {
       return RC::INVALID_ARGUMENT;
     }
-    out.reserve(std::min(total, static_cast<size_t>(1<<20))); // soft cap reserve
-    for (int i = 0; i < times; i++) out += src;
+    out.reserve(std::min(total, static_cast<size_t>(1 << 20)));  // soft cap reserve
+    for (int i = 0; i < times; i++)
+      out += src;
     value.set_string(out.c_str());
     return RC::SUCCESS;
   }
@@ -1946,7 +1951,7 @@ RC FunctionExpr::try_get_value_with_args(const vector<Value> &arg_values, Value 
             // Unknown placeholder like %z: output the letter only and consume it
             // so "%z" becomes "z" per expected behavior
             out.push_back(t);
-            i++; // consume t
+            i++;  // consume t
             break;
         }
       } else {

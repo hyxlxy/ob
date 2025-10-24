@@ -138,12 +138,21 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   }
 
   // Augment plan tables with any tables referenced by bound expressions in SELECT/GB/HAVING
-  vector<Table *> plan_tables = tables;
+  struct TableNode
+  {
+    Table *table;
+    string table_alias;
+  };
+  vector<TableNode> plan_tables;
+  for (size_t i = 0; i < tables.size(); i++) {
+    plan_tables.push_back({tables[i], aliases[i]});
+  }
+
   {
     std::unordered_set<const Table *> present;
     present.reserve(plan_tables.size());
-    for (Table *t : plan_tables) {
-      present.insert(t);
+    for (TableNode &t : plan_tables) {
+      present.insert(t.table);
     }
 
     std::function<void(Expression *)> collect_tables_from_expr;
@@ -157,7 +166,7 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
           if (tbl != nullptr && present.find(tbl) == present.end()) {
             // Only augment the physical join table chain; DO NOT mutate binder_context_
             // to avoid changing expression binding/ambiguity for unqualified columns.
-            plan_tables.push_back(const_cast<Table *>(tbl));
+            plan_tables.push_back({const_cast<Table *>(tbl), ""});
             present.insert(tbl);
           }
         }
@@ -185,8 +194,9 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   unique_ptr<LogicalOperator> predicate_oper;
   RC                          rc = RC::SUCCESS;
 
-  for (Table *table : plan_tables) {
-
+  for (TableNode &table_node : plan_tables) {
+    Table                      *table = table_node.table;
+    string                      alias = table_node.table_alias;
     unique_ptr<LogicalOperator> table_get_oper;
 
     if (auto &&view = dynamic_cast<View *>(table)) {
@@ -206,7 +216,9 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
       table_get_oper = std::move(view_oper);
     } else {
       auto &&table_get_tem = std::make_unique<TableGetLogicalOperator>(table, ReadWriteMode::READ_ONLY);
-      table_get_oper       = std::move(table_get_tem);
+      table_get_tem->set_table_alias(alias);
+
+      table_get_oper = std::move(table_get_tem);
     }
     // (new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY));
     if (table_oper == nullptr) {
