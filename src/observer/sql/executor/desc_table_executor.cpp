@@ -30,6 +30,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 #include "storage/record/record_scanner.h"
+#include "storage/table/view.h"
 
 using namespace std;
 
@@ -116,6 +117,10 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
   UpdateStmt *update_stmt = static_cast<UpdateStmt *>(stmt);
   Table      *table       = update_stmt->table();
   Trx        *trx         = session->current_trx();
+
+  if (auto &&view = dynamic_cast<View *>(table)) {
+    table = view->base_tables().front();
+  }
 
   // 获取scanner
   RecordScanner *scanner = nullptr;

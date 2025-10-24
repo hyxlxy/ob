@@ -85,15 +85,14 @@ RC CreateViewStmt::create(Db *db, const CreateViewSqlNode &create_view, Stmt *&s
           table_set.insert(one);
           continue;
         }
-
-        View *view_one = db->find_view(table_name);
-        if (view_one != nullptr) {
-          for (auto &&table_one : view_one->base_tables()) {
-            // tables.push_back(table_one);
-            table_set.insert(table_one);
-          }
-          continue;
+      }
+      View *view_one = db->find_view(table_name);
+      if (view_one != nullptr) {
+        for (auto &&table_one : view_one->base_tables()) {
+          // tables.push_back(table_one);
+          table_set.insert(table_one);
         }
+        continue;
       }
     }
     // cout << "view_base_tables:names:";
