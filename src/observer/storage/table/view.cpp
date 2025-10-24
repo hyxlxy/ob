@@ -8,7 +8,7 @@ View::~View()
 {
 
   if (stmt_) {
-    delete stmt_;
+    // delete stmt_;
   }
 }
 
@@ -150,7 +150,8 @@ void View::set_table_meta(Db *db)
     //这里应该是second才对，因为是别名
     AttrInfoSqlNode one{fields[i].second, field.attr_type()};
     // if (field.attr_type() == AttrType::CHARS) {
-    one.length = field.meta()->len();
+    one.length   = field.meta()->len();
+    one.nullable = field.meta()->nullable();
     cout << "make_field: name: " << fields[i].second << " len: " << field.meta()->len() << endl;
     // }
     // if (one.nullable)

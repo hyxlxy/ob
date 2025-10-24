@@ -314,6 +314,7 @@ struct AttrInfoSqlNode
       length = 4;
     }
     nullable = true;
+    length++;
   }
 };
 
