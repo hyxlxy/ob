@@ -1,4 +1,4 @@
-[2025-10-25 17:18:16.244210 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: init@init.cpp:214] >> Output configuration 
+[2025-10-25 17:33:45.219513 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: init@init.cpp:214] >> Output configuration 
 Begin dump configuration
 []
 
@@ -22,350 +22,67 @@ PORT=6789
 
 Finish dump configuration 
 
-[2025-10-25 17:18:16.245419 pid:154803 tid:72d9b45ff6c0 ctx:0 INFO: thread_func@thread_pool_executor.cpp:118] >> [ObLsmBackground] thread started
-[2025-10-25 17:18:16.246563 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:128, item_num_per_pool:128, this->name:BufPool.
-[2025-10-25 17:18:16.247398 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:256, item_num_per_pool:128, this->name:BufPool.
-[2025-10-25 17:18:16.248157 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:384, item_num_per_pool:128, this->name:BufPool.
-[2025-10-25 17:18:16.248776 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:512, item_num_per_pool:128, this->name:BufPool.
-[2025-10-25 17:18:16.249534 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:640, item_num_per_pool:128, this->name:BufPool.
-[2025-10-25 17:18:16.250232 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:768, item_num_per_pool:128, this->name:BufPool.
-[2025-10-25 17:18:16.250934 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:896, item_num_per_pool:128, this->name:BufPool.
-[2025-10-25 17:18:16.251537 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1024, item_num_per_pool:128, this->name:BufPool.
-[2025-10-25 17:18:16.252159 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1152, item_num_per_pool:128, this->name:BufPool.
-[2025-10-25 17:18:16.252772 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1280, item_num_per_pool:128, this->name:BufPool.
-[2025-10-25 17:18:16.253359 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1408, item_num_per_pool:128, this->name:BufPool.
-[2025-10-25 17:18:16.254037 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1536, item_num_per_pool:128, this->name:BufPool.
-[2025-10-25 17:18:16.254629 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1664, item_num_per_pool:128, this->name:BufPool.
-[2025-10-25 17:18:16.255237 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1792, item_num_per_pool:128, this->name:BufPool.
-[2025-10-25 17:18:16.255853 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1920, item_num_per_pool:128, this->name:BufPool.
-[2025-10-25 17:18:16.256460 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2048, item_num_per_pool:128, this->name:BufPool.
-[2025-10-25 17:18:16.257181 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2176, item_num_per_pool:128, this->name:BufPool.
-[2025-10-25 17:18:16.257891 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2304, item_num_per_pool:128, this->name:BufPool.
-[2025-10-25 17:18:16.258526 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2432, item_num_per_pool:128, this->name:BufPool.
-[2025-10-25 17:18:16.259173 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2560, item_num_per_pool:128, this->name:BufPool.
-[2025-10-25 17:18:16.259195 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: init@mem_pool.h:197] >> Extend one pool, this->size:2560, item_num_per_pool:128, this->name:BufPool.
-[2025-10-25 17:18:16.259224 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: BufferPoolManager@disk_buffer_pool.cpp:775] >> buffer pool manager init with memory size 41943040, page num: 2560, pool num: 20
-[2025-10-25 17:18:16.259386 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: load_pages@double_write_buffer.cpp:287] >> double write buffer load pages done. page num=0
-[2025-10-25 17:18:16.259518 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: init_meta@db.cpp:575] >> Db meta file not exist. db=sys, file=miniob/db/sys/sys.db
-[2025-10-25 17:18:16.259947 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: open_all_tables@db.cpp:485] >> All table have been opened. num=0
-[2025-10-25 17:18:16.336998 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: recover@db.cpp:566] >> Successfully recover db. db=sys checkpoint_lsn=0
-[2025-10-25 17:18:16.337175 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: init@default_handler.cpp:67] >> Default handler init with miniob success
-[2025-10-25 17:18:22.288638 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: init_global_objects@init.cpp:159] >> cppjieba warmed up. tokens=1
-[2025-10-25 17:18:22.288717 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: init@init.cpp:229] >> Successfully init utility
-[2025-10-25 17:18:22.288867 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: start_unix_socket_server@server.cpp:235] >> Listen on unix socket: /home/hxl/Desktop/oceambase/miniob-competition-2025/data/miniob.sock
-[2025-10-25 17:18:22.288885 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: start_unix_socket_server@server.cpp:238] >> Observer start success
-[2025-10-25 17:18:22.429448 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: accept@server.cpp:127] >> Accepted connection from 0.0.0.0:0
+[2025-10-25 17:33:45.221664 pid:158649 tid:7ca0683ff6c0 ctx:0 INFO: thread_func@thread_pool_executor.cpp:118] >> [ObLsmBackground] thread started
+[2025-10-25 17:33:45.224030 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:128, item_num_per_pool:128, this->name:BufPool.
+[2025-10-25 17:33:45.224812 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:256, item_num_per_pool:128, this->name:BufPool.
+[2025-10-25 17:33:45.225520 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:384, item_num_per_pool:128, this->name:BufPool.
+[2025-10-25 17:33:45.226169 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:512, item_num_per_pool:128, this->name:BufPool.
+[2025-10-25 17:33:45.226825 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:640, item_num_per_pool:128, this->name:BufPool.
+[2025-10-25 17:33:45.227395 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:768, item_num_per_pool:128, this->name:BufPool.
+[2025-10-25 17:33:45.227998 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:896, item_num_per_pool:128, this->name:BufPool.
+[2025-10-25 17:33:45.228570 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1024, item_num_per_pool:128, this->name:BufPool.
+[2025-10-25 17:33:45.229184 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1152, item_num_per_pool:128, this->name:BufPool.
+[2025-10-25 17:33:45.229780 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1280, item_num_per_pool:128, this->name:BufPool.
+[2025-10-25 17:33:45.230355 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1408, item_num_per_pool:128, this->name:BufPool.
+[2025-10-25 17:33:45.230965 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1536, item_num_per_pool:128, this->name:BufPool.
+[2025-10-25 17:33:45.231590 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1664, item_num_per_pool:128, this->name:BufPool.
+[2025-10-25 17:33:45.232267 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1792, item_num_per_pool:128, this->name:BufPool.
+[2025-10-25 17:33:45.232882 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:1920, item_num_per_pool:128, this->name:BufPool.
+[2025-10-25 17:33:45.233481 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2048, item_num_per_pool:128, this->name:BufPool.
+[2025-10-25 17:33:45.234205 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2176, item_num_per_pool:128, this->name:BufPool.
+[2025-10-25 17:33:45.234844 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2304, item_num_per_pool:128, this->name:BufPool.
+[2025-10-25 17:33:45.235441 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2432, item_num_per_pool:128, this->name:BufPool.
+[2025-10-25 17:33:45.236081 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: extend@mem_pool.h:251] >> Extend one pool, this->size:2560, item_num_per_pool:128, this->name:BufPool.
+[2025-10-25 17:33:45.236102 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: init@mem_pool.h:197] >> Extend one pool, this->size:2560, item_num_per_pool:128, this->name:BufPool.
+[2025-10-25 17:33:45.236127 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: BufferPoolManager@disk_buffer_pool.cpp:775] >> buffer pool manager init with memory size 41943040, page num: 2560, pool num: 20
+[2025-10-25 17:33:45.236284 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: load_pages@double_write_buffer.cpp:287] >> double write buffer load pages done. page num=0
+[2025-10-25 17:33:45.236399 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: init_meta@db.cpp:575] >> Db meta file not exist. db=sys, file=miniob/db/sys/sys.db
+[2025-10-25 17:33:45.236888 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: open_all_tables@db.cpp:485] >> All table have been opened. num=0
+[2025-10-25 17:33:45.306134 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: recover@db.cpp:566] >> Successfully recover db. db=sys checkpoint_lsn=0
+[2025-10-25 17:33:45.306340 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: init@default_handler.cpp:67] >> Default handler init with miniob success
+[2025-10-25 17:33:51.411763 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: init_global_objects@init.cpp:159] >> cppjieba warmed up. tokens=1
+[2025-10-25 17:33:51.411861 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: init@init.cpp:229] >> Successfully init utility
+[2025-10-25 17:33:51.412089 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: start_unix_socket_server@server.cpp:235] >> Listen on unix socket: /home/hxl/Desktop/oceambase/miniob-competition-2025/data/miniob.sock
+[2025-10-25 17:33:51.412110 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: start_unix_socket_server@server.cpp:238] >> Observer start success
+[2025-10-25 17:33:51.901565 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: accept@server.cpp:127] >> Accepted connection from 0.0.0.0:0
 
-[2025-10-25 17:18:22.430131 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: accept@server.cpp:127] >> Accepted connection from 0.0.0.0:0
+[2025-10-25 17:33:51.902338 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: accept@server.cpp:127] >> Accepted connection from 0.0.0.0:0
 
-[2025-10-25 17:18:22.430473 pid:154803 tid:72d9b06656c0 ctx:0 INFO: operator()@one_thread_per_connection_thread_handler.cpp:70] >> worker thread start. communicator = 0x50b0021c3650
-[2025-10-25 17:18:22.430540 pid:154803 tid:72d9b06656c0 ctx:0 WARN: operator()@one_thread_per_connection_thread_handler.cpp:92] >> poll error. fd = 9, revents = 17
-[2025-10-25 17:18:22.430556 pid:154803 tid:72d9b06656c0 ctx:0 INFO: operator()@one_thread_per_connection_thread_handler.cpp:103] >> worker thread stop. communicator = 0x50b0021c3650
-[2025-10-25 17:18:22.430709 pid:154803 tid:72d9b06656c0 ctx:0 INFO: close_connection@one_thread_per_connection_thread_handler.cpp:154] >> close connection. communicator = 0x50b0021c3650
-[2025-10-25 17:18:22.430854 pid:154803 tid:72d9af35b6c0 ctx:0 INFO: operator()@one_thread_per_connection_thread_handler.cpp:70] >> worker thread start. communicator = 0x50b0021c37b0
-[2025-10-25 17:18:22.436350 pid:154803 tid:72d9af35b6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=59): SELECT TOKENIZE('你好，世界','jieba') AS text_tokens;
-[2025-10-25 17:18:22.438499 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create@select_stmt.cpp:210] >> [SELECT_STMT_DEBUG] Binding 0 ORDER BY expressions
-[2025-10-25 17:18:22.438576 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create@select_stmt.cpp:238] >> [SELECT_STMT_DEBUG] ORDER BY binding completed: 0 expressions bound
-[2025-10-25 17:18:22.438973 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create_plan@logical_plan_generator.cpp:289] >> [LOGICAL_PLAN_DEBUG] Skipping ORDER BY: expressions_empty=1, has_last_oper=0
-[2025-10-25 17:18:22.447239 pid:154803 tid:72d9af35b6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=43): CREATE TABLE texts (id INT, content TEXT);
-[2025-10-25 17:18:22.448593 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create@table.cpp:56] >> Begin to create table miniob/db/sys:texts
-[2025-10-25 17:18:22.448756 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: init@field_meta.cpp:59] >> Init a field with name=id
-[2025-10-25 17:18:22.448779 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: init@field_meta.cpp:59] >> Init a field with name=content
-[2025-10-25 17:18:22.448799 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: init@table_meta.cpp:107] >> Sussessfully initialized table meta. table id=0, name=texts
-[2025-10-25 17:18:22.449165 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create_file@disk_buffer_pool.cpp:837] >> Successfully create miniob/db/sys/texts.data.
-[2025-10-25 17:18:22.449307 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: open_file@disk_buffer_pool.cpp:236] >> Successfully open buffer pool file miniob/db/sys/texts.data.
-[2025-10-25 17:18:22.449400 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: open_file@disk_buffer_pool.cpp:274] >> Successfully open miniob/db/sys/texts.data. file_desc=9, hdr_frame=0x72d9b30f0808, file header=pageCount:1, allocatedCount:1
-[2025-10-25 17:18:22.449489 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: init_free_pages@record_manager.cpp:644] >> record file handler init free pages done. free page num=0, rc=SUCCESS
-[2025-10-25 17:18:22.449504 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: init@record_manager.cpp:603] >> open record file handle done. rc=SUCCESS
-[2025-10-25 17:18:22.449523 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create@table.cpp:145] >> Successfully create table miniob/db/sys:texts
-[2025-10-25 17:18:22.449548 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create_table@db.cpp:176] >> Create table success. table name=texts, table_id:0
-[2025-10-25 17:18:22.449799 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: sync@heap_table_engine.cpp:512] >> Sync table over. table=texts
-[2025-10-25 17:18:22.449819 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: sync@db.cpp:509] >> Successfully sync table db:sys, table:texts.
-[2025-10-25 17:18:22.461261 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: sync@db.cpp:514] >> double write buffer flush pages ret=SUCCESS
-[2025-10-25 17:18:22.461457 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: flush_meta@db.cpp:647] >> Successfully write db meta file. db=sys, file=miniob/db/sys/sys.db.tmp, check_point_lsn=0
-[2025-10-25 17:18:22.461494 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: sync@db.cpp:533] >> Successfully sync db. db=sys
-[2025-10-25 17:18:22.461511 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: execute@command_executor.cpp:140] >> sync db after ddl. rc=0
-[2025-10-25 17:18:22.464055 pid:154803 tid:72d9af35b6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=79): INSERT INTO texts VALUES (0, 'SQL调优的基本流程包括哪些步骤？');
-[2025-10-25 17:18:22.466108 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: allocate_page@disk_buffer_pool.cpp:408] >> allocate new page by extending bufferpool. buffer_pool_id=1, pageNum=1, pin=1
-[2025-10-25 17:18:22.468815 pid:154803 tid:72d9af35b6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=97): INSERT INTO texts VALUES (1, 'OB_VERSION()函数返回的版本信息的字符集是什么？');
-[2025-10-25 17:18:22.472737 pid:154803 tid:72d9af35b6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=97): INSERT INTO texts VALUES (2, 'NTH_VALUE函数的主要功能是什么？它返回什么值？');
-[2025-10-25 17:18:22.476860 pid:154803 tid:72d9af35b6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=126): INSERT INTO texts VALUES (3, 'location_cache_refresh_min_interval的默认值是多少？它属于什么类型的数据？');
-[2025-10-25 17:18:22.481023 pid:154803 tid:72d9af35b6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=124): INSERT INTO texts VALUES (4, 'V$SQL_WORKAREA_HISTOGRAM表的功能是什么？它记录了哪些类型的执行模式？');
-[2025-10-25 17:18:22.485317 pid:154803 tid:72d9af35b6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=123): INSERT INTO texts VALUES (5, '如何通过METHOD_TYPE字段判断一个方法的具体类型？有哪些可能的值？');
-[2025-10-25 17:18:22.489397 pid:154803 tid:72d9af35b6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=106): INSERT INTO texts VALUES (5, '在DBA_TRIGGER_ORDERING视图中，哪些字段是不允许为NULL的？');
-[2025-10-25 17:18:22.493642 pid:154803 tid:72d9af35b6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=117): SELECT TOKENIZE('在DBA_TRIGGER_ORDERING视图中，哪些字段是不允许为NULL的？', 'jieba') as text_tokens;
-[2025-10-25 17:18:22.494352 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create@select_stmt.cpp:210] >> [SELECT_STMT_DEBUG] Binding 0 ORDER BY expressions
-[2025-10-25 17:18:22.494388 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create@select_stmt.cpp:238] >> [SELECT_STMT_DEBUG] ORDER BY binding completed: 0 expressions bound
-[2025-10-25 17:18:22.494513 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create_plan@logical_plan_generator.cpp:289] >> [LOGICAL_PLAN_DEBUG] Skipping ORDER BY: expressions_empty=1, has_last_oper=0
-[2025-10-25 17:18:22.498264 pid:154803 tid:72d9af35b6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=82): ALTER TABLE texts ADD FULLTEXT INDEX idx_texts_jieba (content) WITH PARSER jieba;
-[2025-10-25 17:18:22.502310 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create_index@heap_table_engine.cpp:231] >> inserted all records into new index. table=texts, index=idx_texts_jieba
-[2025-10-25 17:18:22.502817 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create_index@heap_table_engine.cpp:272] >> Successfully added a new index (idx_texts_jieba) on the table (texts)
-[2025-10-25 17:18:22.503116 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: sync@heap_table_engine.cpp:512] >> Sync table over. table=texts
-[2025-10-25 17:18:22.503131 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: sync@db.cpp:509] >> Successfully sync table db:sys, table:texts.
-[2025-10-25 17:18:22.504329 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: sync@db.cpp:514] >> double write buffer flush pages ret=SUCCESS
-[2025-10-25 17:18:22.504479 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: flush_meta@db.cpp:647] >> Successfully write db meta file. db=sys, file=miniob/db/sys/sys.db.tmp, check_point_lsn=0
-[2025-10-25 17:18:22.504513 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: sync@db.cpp:533] >> Successfully sync db. db=sys
-[2025-10-25 17:18:22.504524 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: execute@command_executor.cpp:140] >> sync db after ddl. rc=0
-[2025-10-25 17:18:22.506844 pid:154803 tid:72d9af35b6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=190): SELECT id, content, MATCH(content) AGAINST('返回类型') AS score FROM texts WHERE MATCH(content) AGAINST('返回类型') > 0 ORDER BY MATCH(content) AGAINST('返回类型') DESC, id ASC;
-[2025-10-25 17:18:22.514401 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create@select_stmt.cpp:210] >> [SELECT_STMT_DEBUG] Binding 2 ORDER BY expressions
-[2025-10-25 17:18:22.514472 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create@select_stmt.cpp:217] >> [SELECT_STMT_DEBUG] ORDER BY item 0: expr_type=11, direction=1
-[2025-10-25 17:18:22.514559 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create@select_stmt.cpp:229] >> [SELECT_STMT_DEBUG] ORDER BY expression 0 bound: result_type=11
-[2025-10-25 17:18:22.514586 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create@select_stmt.cpp:217] >> [SELECT_STMT_DEBUG] ORDER BY item 1: expr_type=2, direction=0
-[2025-10-25 17:18:22.514623 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create@select_stmt.cpp:229] >> [SELECT_STMT_DEBUG] ORDER BY expression 1 bound: result_type=4
-[2025-10-25 17:18:22.514684 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create@select_stmt.cpp:238] >> [SELECT_STMT_DEBUG] ORDER BY binding completed: 2 expressions bound
-[2025-10-25 17:18:22.514973 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create_plan@logical_plan_generator.cpp:248] >> [LOGICAL_PLAN_DEBUG] Creating ORDER BY operator with 2 expressions
-[2025-10-25 17:18:22.515003 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create_plan@logical_plan_generator.cpp:255] >> [LOGICAL_PLAN_DEBUG] ORDER BY expression 0: type=11, name=''
-[2025-10-25 17:18:22.515062 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create_plan@logical_plan_generator.cpp:255] >> [LOGICAL_PLAN_DEBUG] ORDER BY expression 1: type=4, name='id'
-[2025-10-25 17:18:22.515113 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create_plan@logical_plan_generator.cpp:279] >> [LOGICAL_PLAN_DEBUG] Creating OrderByLogicalOperator
-[2025-10-25 17:18:22.515150 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: create_plan@logical_plan_generator.cpp:287] >> [LOGICAL_PLAN_DEBUG] ORDER BY operator created successfully
-[2025-10-25 17:18:22.515889 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.515947 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.516019 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='SQL调优的基本流程包括哪些步骤？'
-[2025-10-25 17:18:22.516045 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.516058 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.516451 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.516486 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.516547 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='OB_VERSION()函数返回的版本信息的字符集是什么？'
-[2025-10-25 17:18:22.516567 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.516580 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.516770 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: precompute_sort_indices@sort_physical_operator.cpp:208] >> Complex sort expression detected (type=11), falling back to generic comparison mode
-[2025-10-25 17:18:22.516992 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.517022 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.517084 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='NTH_VALUE函数的主要功能是什么？它返回什么值？'
-[2025-10-25 17:18:22.517112 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.517130 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.517488 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.517528 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.517596 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='location_cache_refresh_min_interval的默认值是多少？它属于什么类型的数据？'
-[2025-10-25 17:18:22.517632 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.517672 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.517989 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.518031 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.518088 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='V$SQL_WORKAREA_HISTOGRAM表的功能是什么？它记录了哪些类型的执行模式？'
-[2025-10-25 17:18:22.518109 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.518126 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.518411 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.518442 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.518498 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='如何通过METHOD_TYPE字段判断一个方法的具体类型？有哪些可能的值？'
-[2025-10-25 17:18:22.518523 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.518540 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.518837 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.518868 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.518924 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='在DBA_TRIGGER_ORDERING视图中，哪些字段是不允许为NULL的？'
-[2025-10-25 17:18:22.518951 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.518966 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.519130 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: open_multi_sort@sort_physical_operator.cpp:469] >> === FINAL CHUNK ===
-[2025-10-25 17:18:22.519157 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: open_multi_sort@sort_physical_operator.cpp:470] >> Final chunk has 5 tuples (chunk_size=40000)
-[2025-10-25 17:18:22.519173 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: open_multi_sort@sort_physical_operator.cpp:471] >> Writing final chunk to temporary file...
-[2025-10-25 17:18:22.519232 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:119] >> [LIGHTTUPLE_DEBUG] Complex expression detected: type=11, name=''
-[2025-10-25 17:18:22.519282 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:133] >> [LIGHTTUPLE_DEBUG] Calling expr->get_value() for complex expression
-[2025-10-25 17:18:22.519302 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.519324 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.519365 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='NTH_VALUE函数的主要功能是什么？它返回什么值？'
-[2025-10-25 17:18:22.519389 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.519403 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.519852 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:139] >> [LIGHTTUPLE_DEBUG] Complex expression evaluated: value_type=3, value='0.83'
-[2025-10-25 17:18:22.519904 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:119] >> [LIGHTTUPLE_DEBUG] Complex expression detected: type=11, name=''
-[2025-10-25 17:18:22.519950 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:133] >> [LIGHTTUPLE_DEBUG] Calling expr->get_value() for complex expression
-[2025-10-25 17:18:22.519966 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.519982 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.520011 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='OB_VERSION()函数返回的版本信息的字符集是什么？'
-[2025-10-25 17:18:22.520034 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.520055 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.520386 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:139] >> [LIGHTTUPLE_DEBUG] Complex expression evaluated: value_type=3, value='0.85'
-[2025-10-25 17:18:22.520442 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:119] >> [LIGHTTUPLE_DEBUG] Complex expression detected: type=11, name=''
-[2025-10-25 17:18:22.520483 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:133] >> [LIGHTTUPLE_DEBUG] Calling expr->get_value() for complex expression
-[2025-10-25 17:18:22.520506 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.520525 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.520567 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='NTH_VALUE函数的主要功能是什么？它返回什么值？'
-[2025-10-25 17:18:22.520603 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.520619 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.520989 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:139] >> [LIGHTTUPLE_DEBUG] Complex expression evaluated: value_type=3, value='0.83'
-[2025-10-25 17:18:22.521051 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:119] >> [LIGHTTUPLE_DEBUG] Complex expression detected: type=11, name=''
-[2025-10-25 17:18:22.521102 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:133] >> [LIGHTTUPLE_DEBUG] Calling expr->get_value() for complex expression
-[2025-10-25 17:18:22.521125 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.521154 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.521193 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='OB_VERSION()函数返回的版本信息的字符集是什么？'
-[2025-10-25 17:18:22.521217 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.521238 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.521625 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:139] >> [LIGHTTUPLE_DEBUG] Complex expression evaluated: value_type=3, value='0.85'
-[2025-10-25 17:18:22.521734 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:119] >> [LIGHTTUPLE_DEBUG] Complex expression detected: type=11, name=''
-[2025-10-25 17:18:22.521769 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:133] >> [LIGHTTUPLE_DEBUG] Calling expr->get_value() for complex expression
-[2025-10-25 17:18:22.521789 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.521805 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.521840 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='location_cache_refresh_min_interval的默认值是多少？它属于什么类型的数据？'
-[2025-10-25 17:18:22.521863 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.521887 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.522315 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:139] >> [LIGHTTUPLE_DEBUG] Complex expression evaluated: value_type=3, value='0.23'
-[2025-10-25 17:18:22.522396 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:119] >> [LIGHTTUPLE_DEBUG] Complex expression detected: type=11, name=''
-[2025-10-25 17:18:22.522464 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:133] >> [LIGHTTUPLE_DEBUG] Calling expr->get_value() for complex expression
-[2025-10-25 17:18:22.522481 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.522510 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.522554 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='OB_VERSION()函数返回的版本信息的字符集是什么？'
-[2025-10-25 17:18:22.522576 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.522590 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.522952 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:139] >> [LIGHTTUPLE_DEBUG] Complex expression evaluated: value_type=3, value='0.85'
-[2025-10-25 17:18:22.523043 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:119] >> [LIGHTTUPLE_DEBUG] Complex expression detected: type=11, name=''
-[2025-10-25 17:18:22.523082 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:133] >> [LIGHTTUPLE_DEBUG] Calling expr->get_value() for complex expression
-[2025-10-25 17:18:22.523106 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.523127 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.523173 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='location_cache_refresh_min_interval的默认值是多少？它属于什么类型的数据？'
-[2025-10-25 17:18:22.523201 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.523225 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.523640 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:139] >> [LIGHTTUPLE_DEBUG] Complex expression evaluated: value_type=3, value='0.23'
-[2025-10-25 17:18:22.523717 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:119] >> [LIGHTTUPLE_DEBUG] Complex expression detected: type=11, name=''
-[2025-10-25 17:18:22.523753 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:133] >> [LIGHTTUPLE_DEBUG] Calling expr->get_value() for complex expression
-[2025-10-25 17:18:22.523768 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.523789 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.523821 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='NTH_VALUE函数的主要功能是什么？它返回什么值？'
-[2025-10-25 17:18:22.523854 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.523873 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.524184 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:139] >> [LIGHTTUPLE_DEBUG] Complex expression evaluated: value_type=3, value='0.83'
-[2025-10-25 17:18:22.524250 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:119] >> [LIGHTTUPLE_DEBUG] Complex expression detected: type=11, name=''
-[2025-10-25 17:18:22.524289 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:133] >> [LIGHTTUPLE_DEBUG] Calling expr->get_value() for complex expression
-[2025-10-25 17:18:22.524303 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.524325 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.524360 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='V$SQL_WORKAREA_HISTOGRAM表的功能是什么？它记录了哪些类型的执行模式？'
-[2025-10-25 17:18:22.524389 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.524406 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.524830 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:139] >> [LIGHTTUPLE_DEBUG] Complex expression evaluated: value_type=3, value='0.22'
-[2025-10-25 17:18:22.524894 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:119] >> [LIGHTTUPLE_DEBUG] Complex expression detected: type=11, name=''
-[2025-10-25 17:18:22.524930 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:133] >> [LIGHTTUPLE_DEBUG] Calling expr->get_value() for complex expression
-[2025-10-25 17:18:22.524945 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.524963 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.524997 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='OB_VERSION()函数返回的版本信息的字符集是什么？'
-[2025-10-25 17:18:22.525023 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.525038 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.525429 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:139] >> [LIGHTTUPLE_DEBUG] Complex expression evaluated: value_type=3, value='0.85'
-[2025-10-25 17:18:22.525494 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:119] >> [LIGHTTUPLE_DEBUG] Complex expression detected: type=11, name=''
-[2025-10-25 17:18:22.525553 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:133] >> [LIGHTTUPLE_DEBUG] Calling expr->get_value() for complex expression
-[2025-10-25 17:18:22.525573 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.525588 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.525620 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='V$SQL_WORKAREA_HISTOGRAM表的功能是什么？它记录了哪些类型的执行模式？'
-[2025-10-25 17:18:22.525642 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.525677 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.526053 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:139] >> [LIGHTTUPLE_DEBUG] Complex expression evaluated: value_type=3, value='0.22'
-[2025-10-25 17:18:22.526109 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:119] >> [LIGHTTUPLE_DEBUG] Complex expression detected: type=11, name=''
-[2025-10-25 17:18:22.526148 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:133] >> [LIGHTTUPLE_DEBUG] Calling expr->get_value() for complex expression
-[2025-10-25 17:18:22.526163 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.526181 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.526216 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='location_cache_refresh_min_interval的默认值是多少？它属于什么类型的数据？'
-[2025-10-25 17:18:22.526236 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.526252 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.526712 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:139] >> [LIGHTTUPLE_DEBUG] Complex expression evaluated: value_type=3, value='0.23'
-[2025-10-25 17:18:22.526809 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:119] >> [LIGHTTUPLE_DEBUG] Complex expression detected: type=11, name=''
-[2025-10-25 17:18:22.526845 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:133] >> [LIGHTTUPLE_DEBUG] Calling expr->get_value() for complex expression
-[2025-10-25 17:18:22.526859 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.526890 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.526933 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='如何通过METHOD_TYPE字段判断一个方法的具体类型？有哪些可能的值？'
-[2025-10-25 17:18:22.526967 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.526984 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.527354 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:139] >> [LIGHTTUPLE_DEBUG] Complex expression evaluated: value_type=3, value='0.24'
-[2025-10-25 17:18:22.527421 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:119] >> [LIGHTTUPLE_DEBUG] Complex expression detected: type=11, name=''
-[2025-10-25 17:18:22.527455 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:133] >> [LIGHTTUPLE_DEBUG] Calling expr->get_value() for complex expression
-[2025-10-25 17:18:22.527471 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.527487 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.527521 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='OB_VERSION()函数返回的版本信息的字符集是什么？'
-[2025-10-25 17:18:22.527542 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.527558 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.527887 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:139] >> [LIGHTTUPLE_DEBUG] Complex expression evaluated: value_type=3, value='0.85'
-[2025-10-25 17:18:22.527953 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:119] >> [LIGHTTUPLE_DEBUG] Complex expression detected: type=11, name=''
-[2025-10-25 17:18:22.527988 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:133] >> [LIGHTTUPLE_DEBUG] Calling expr->get_value() for complex expression
-[2025-10-25 17:18:22.528003 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.528025 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.528056 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='如何通过METHOD_TYPE字段判断一个方法的具体类型？有哪些可能的值？'
-[2025-10-25 17:18:22.528076 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.528093 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.528456 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:139] >> [LIGHTTUPLE_DEBUG] Complex expression evaluated: value_type=3, value='0.24'
-[2025-10-25 17:18:22.528524 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:119] >> [LIGHTTUPLE_DEBUG] Complex expression detected: type=11, name=''
-[2025-10-25 17:18:22.528579 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:133] >> [LIGHTTUPLE_DEBUG] Calling expr->get_value() for complex expression
-[2025-10-25 17:18:22.528596 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.528634 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.528688 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='V$SQL_WORKAREA_HISTOGRAM表的功能是什么？它记录了哪些类型的执行模式？'
-[2025-10-25 17:18:22.528712 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.528728 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.529107 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:139] >> [LIGHTTUPLE_DEBUG] Complex expression evaluated: value_type=3, value='0.22'
-[2025-10-25 17:18:22.529177 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:119] >> [LIGHTTUPLE_DEBUG] Complex expression detected: type=11, name=''
-[2025-10-25 17:18:22.529214 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:133] >> [LIGHTTUPLE_DEBUG] Calling expr->get_value() for complex expression
-[2025-10-25 17:18:22.529230 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.529245 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.529280 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='如何通过METHOD_TYPE字段判断一个方法的具体类型？有哪些可能的值？'
-[2025-10-25 17:18:22.529302 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.529317 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.529728 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:139] >> [LIGHTTUPLE_DEBUG] Complex expression evaluated: value_type=3, value='0.24'
-[2025-10-25 17:18:22.529827 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:119] >> [LIGHTTUPLE_DEBUG] Complex expression detected: type=11, name=''
-[2025-10-25 17:18:22.529864 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:133] >> [LIGHTTUPLE_DEBUG] Calling expr->get_value() for complex expression
-[2025-10-25 17:18:22.529876 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.529894 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.529927 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='location_cache_refresh_min_interval的默认值是多少？它属于什么类型的数据？'
-[2025-10-25 17:18:22.529965 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.529981 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.530425 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:139] >> [LIGHTTUPLE_DEBUG] Complex expression evaluated: value_type=3, value='0.23'
-[2025-10-25 17:18:22.530490 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:119] >> [LIGHTTUPLE_DEBUG] Complex expression detected: type=11, name=''
-[2025-10-25 17:18:22.530530 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:133] >> [LIGHTTUPLE_DEBUG] Calling expr->get_value() for complex expression
-[2025-10-25 17:18:22.530546 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.530566 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.530602 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='如何通过METHOD_TYPE字段判断一个方法的具体类型？有哪些可能的值？'
-[2025-10-25 17:18:22.530623 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.530637 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.531097 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:139] >> [LIGHTTUPLE_DEBUG] Complex expression evaluated: value_type=3, value='0.24'
-[2025-10-25 17:18:22.531184 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:119] >> [LIGHTTUPLE_DEBUG] Complex expression detected: type=11, name=''
-[2025-10-25 17:18:22.531228 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:133] >> [LIGHTTUPLE_DEBUG] Calling expr->get_value() for complex expression
-[2025-10-25 17:18:22.531243 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.531260 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name=''
-[2025-10-25 17:18:22.531291 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='NTH_VALUE函数的主要功能是什么？它返回什么值？'
-[2025-10-25 17:18:22.531315 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.531330 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.531688 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_sort_value_from_schema@sort_physical_operator.cpp:139] >> [LIGHTTUPLE_DEBUG] Complex expression evaluated: value_type=3, value='0.83'
-[2025-10-25 17:18:22.532048 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: open_multi_sort@sort_physical_operator.cpp:482] >> Final chunk written to file: /tmp/sort_chunk_154803_0
-[2025-10-25 17:18:22.532083 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: open_multi_sort@sort_physical_operator.cpp:483] >> === FINAL CHUNK WRITTEN ===
-[2025-10-25 17:18:22.532415 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.532465 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name='content'
-[2025-10-25 17:18:22.532490 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='OB_VERSION()函数返回的版本信息的字符集是什么？'
-[2025-10-25 17:18:22.532511 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.532524 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.533167 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.533255 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name='content'
-[2025-10-25 17:18:22.533283 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='NTH_VALUE函数的主要功能是什么？它返回什么值？'
-[2025-10-25 17:18:22.533303 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.533317 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.533768 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.533815 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name='content'
-[2025-10-25 17:18:22.533842 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='如何通过METHOD_TYPE字段判断一个方法的具体类型？有哪些可能的值？'
-[2025-10-25 17:18:22.533862 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.533876 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.534398 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.534466 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name='content'
-[2025-10-25 17:18:22.534493 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='location_cache_refresh_min_interval的默认值是多少？它属于什么类型的数据？'
-[2025-10-25 17:18:22.534555 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.534578 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.535109 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1624] >> [FUNCTION_DEBUG] Evaluating function 'MATCH_AGAINST' with 2 arguments
-[2025-10-25 17:18:22.535152 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0: type=4, name='content'
-[2025-10-25 17:18:22.535178 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 0 value: type=1, value='V$SQL_WORKAREA_HISTOGRAM表的功能是什么？它记录了哪些类型的执行模式？'
-[2025-10-25 17:18:22.535196 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1635] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1: type=5, name=''
-[2025-10-25 17:18:22.535210 pid:154803 tid:72d9af35b6c0 ctx:50400001acd0 INFO: get_value@expression.cpp:1645] >> [FUNCTION_DEBUG] Function 'MATCH_AGAINST' arg 1 value: type=1, value='返回类型'
-[2025-10-25 17:18:22.536011 pid:154803 tid:72d9af35b6c0 ctx:0 WARN: operator()@one_thread_per_connection_thread_handler.cpp:92] >> poll error. fd = 10, revents = 17
-[2025-10-25 17:18:22.536059 pid:154803 tid:72d9af35b6c0 ctx:0 INFO: operator()@one_thread_per_connection_thread_handler.cpp:103] >> worker thread stop. communicator = 0x50b0021c37b0
-[2025-10-25 17:18:22.536113 pid:154803 tid:72d9af35b6c0 ctx:0 INFO: close_connection@one_thread_per_connection_thread_handler.cpp:154] >> close connection. communicator = 0x50b0021c37b0
-[2025-10-25 17:18:22.537572 pid:154803 tid:72d9b8eee7c0 ctx:0 WARN: serve@server.cpp:271] >> [listen socket] poll error. fd = 8, ret = -1, error=Interrupted system call
-[2025-10-25 17:18:22.537692 pid:154803 tid:72d9af35b6c0 ctx:0 INFO: quit_thread_func@main.cpp:156] >> Receive signal: 15
-[2025-10-25 17:18:22.537735 pid:154803 tid:72d9af35b6c0 ctx:0 INFO: shutdown@server.cpp:299] >> NetServer shutting down
-[2025-10-25 17:18:22.537710 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:170] >> begin to await stop one thread per connection thread handler
-[2025-10-25 17:18:22.537795 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:174] >> end to await stop one thread per connection thread handler
-[2025-10-25 17:18:22.537839 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:170] >> begin to await stop one thread per connection thread handler
-[2025-10-25 17:18:22.537869 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:174] >> end to await stop one thread per connection thread handler
-[2025-10-25 17:18:22.537898 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: serve@server.cpp:293] >> NetServer quit
-[2025-10-25 17:18:22.537934 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: main@main.cpp:203] >> Server stopped
-[2025-10-25 17:18:22.538619 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: sync@heap_table_engine.cpp:512] >> Sync table over. table=texts
-[2025-10-25 17:18:22.538682 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: sync@db.cpp:509] >> Successfully sync table db:sys, table:texts.
-[2025-10-25 17:18:22.540272 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: sync@db.cpp:514] >> double write buffer flush pages ret=SUCCESS
-[2025-10-25 17:18:22.540700 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: flush_meta@db.cpp:647] >> Successfully write db meta file. db=sys, file=miniob/db/sys/sys.db.tmp, check_point_lsn=0
-[2025-10-25 17:18:22.540801 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: sync@db.cpp:533] >> Successfully sync db. db=sys
-[2025-10-25 17:18:22.541088 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: clear_pages@double_write_buffer.cpp:210] >> clear pages in double write buffer. file name=miniob/db/sys/texts.data, page count=0
-[2025-10-25 17:18:22.541164 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: close_file@disk_buffer_pool.cpp:307] >> Successfully close file 9:miniob/db/sys/texts.data.
-[2025-10-25 17:18:22.541264 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: ~DiskBufferPool@disk_buffer_pool.cpp:226] >> disk buffer pool exit
-[2025-10-25 17:18:22.541673 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: ~HeapTableEngine@heap_table_engine.cpp:40] >> Table has been closed: texts
-[2025-10-25 17:18:22.545759 pid:154803 tid:72d9b45ff6c0 ctx:0 INFO: thread_func@thread_pool_executor.cpp:176] >> [ObLsmBackground] thread exit
-[2025-10-25 17:18:22.742053 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: ~Db@db.cpp:50] >> Db has been closed: sys
-[2025-10-25 17:18:22.769357 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: cleanup@mem_pool.h:223] >> Successfully do cleanup, this->name:BufPool.
-[2025-10-25 17:18:22.769579 pid:154803 tid:72d9b8eee7c0 ctx:0 INFO: cleanup_util@init.cpp:243] >> Shutdown Cleanly!
+[2025-10-25 17:33:51.902690 pid:158649 tid:7ca0644656c0 ctx:0 INFO: operator()@one_thread_per_connection_thread_handler.cpp:70] >> worker thread start. communicator = 0x50b0021c3a70
+[2025-10-25 17:33:51.902866 pid:158649 tid:7ca0644656c0 ctx:0 WARN: operator()@one_thread_per_connection_thread_handler.cpp:92] >> poll error. fd = 9, revents = 17
+[2025-10-25 17:33:51.902912 pid:158649 tid:7ca0644656c0 ctx:0 INFO: operator()@one_thread_per_connection_thread_handler.cpp:103] >> worker thread stop. communicator = 0x50b0021c3a70
+[2025-10-25 17:33:51.903083 pid:158649 tid:7ca06315b6c0 ctx:0 INFO: operator()@one_thread_per_connection_thread_handler.cpp:70] >> worker thread start. communicator = 0x50b0021c3bd0
+[2025-10-25 17:33:51.903307 pid:158649 tid:7ca0644656c0 ctx:0 INFO: close_connection@one_thread_per_connection_thread_handler.cpp:154] >> close connection. communicator = 0x50b0021c3a70
+[2025-10-25 17:33:51.909796 pid:158649 tid:7ca06315b6c0 ctx:0 INFO: read_event@plain_communicator.cpp:89] >> receive command(size=95): SELECT TOKENIZE('log_archive_concurrency参数的功能是什么？', 'jieba') as text_tokens;
+[2025-10-25 17:33:51.912339 pid:158649 tid:7ca06315b6c0 ctx:50400002ed10 INFO: create@select_stmt.cpp:210] >> [SELECT_STMT_DEBUG] Binding 0 ORDER BY expressions
+[2025-10-25 17:33:51.912433 pid:158649 tid:7ca06315b6c0 ctx:50400002ed10 INFO: create@select_stmt.cpp:238] >> [SELECT_STMT_DEBUG] ORDER BY binding completed: 0 expressions bound
+[2025-10-25 17:33:51.912874 pid:158649 tid:7ca06315b6c0 ctx:50400002ed10 INFO: create_plan@logical_plan_generator.cpp:289] >> [LOGICAL_PLAN_DEBUG] Skipping ORDER BY: expressions_empty=1, has_last_oper=0
+[2025-10-25 17:33:51.916070 pid:158649 tid:7ca06315b6c0 ctx:0 WARN: operator()@one_thread_per_connection_thread_handler.cpp:92] >> poll error. fd = 10, revents = 17
+[2025-10-25 17:33:51.916149 pid:158649 tid:7ca06315b6c0 ctx:0 INFO: operator()@one_thread_per_connection_thread_handler.cpp:103] >> worker thread stop. communicator = 0x50b0021c3bd0
+[2025-10-25 17:33:51.916249 pid:158649 tid:7ca06315b6c0 ctx:0 INFO: close_connection@one_thread_per_connection_thread_handler.cpp:154] >> close connection. communicator = 0x50b0021c3bd0
+[2025-10-25 17:33:51.917102 pid:158649 tid:7ca06cd117c0 ctx:0 WARN: serve@server.cpp:271] >> [listen socket] poll error. fd = 8, ret = -1, error=Interrupted system call
+[2025-10-25 17:33:51.917205 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:170] >> begin to await stop one thread per connection thread handler
+[2025-10-25 17:33:51.917219 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:174] >> end to await stop one thread per connection thread handler
+[2025-10-25 17:33:51.917234 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:170] >> begin to await stop one thread per connection thread handler
+[2025-10-25 17:33:51.917243 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: await_stop@one_thread_per_connection_thread_handler.cpp:174] >> end to await stop one thread per connection thread handler
+[2025-10-25 17:33:51.917259 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: serve@server.cpp:293] >> NetServer quit
+[2025-10-25 17:33:51.917269 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: main@main.cpp:203] >> Server stopped
+[2025-10-25 17:33:51.917298 pid:158649 tid:7ca0644656c0 ctx:0 INFO: quit_thread_func@main.cpp:156] >> Receive signal: 15
+[2025-10-25 17:33:51.917367 pid:158649 tid:7ca0644656c0 ctx:0 INFO: shutdown@server.cpp:299] >> NetServer shutting down
+[2025-10-25 17:33:51.928104 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: sync@db.cpp:514] >> double write buffer flush pages ret=SUCCESS
+[2025-10-25 17:33:51.928463 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: flush_meta@db.cpp:647] >> Successfully write db meta file. db=sys, file=miniob/db/sys/sys.db.tmp, check_point_lsn=0
+[2025-10-25 17:33:51.928552 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: sync@db.cpp:533] >> Successfully sync db. db=sys
+[2025-10-25 17:33:51.934629 pid:158649 tid:7ca0683ff6c0 ctx:0 INFO: thread_func@thread_pool_executor.cpp:176] >> [ObLsmBackground] thread exit
+[2025-10-25 17:33:52.128914 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: ~Db@db.cpp:50] >> Db has been closed: sys
+[2025-10-25 17:33:52.133989 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: cleanup@mem_pool.h:223] >> Successfully do cleanup, this->name:BufPool.
+[2025-10-25 17:33:52.134273 pid:158649 tid:7ca06cd117c0 ctx:0 INFO: cleanup_util@init.cpp:243] >> Shutdown Cleanly!

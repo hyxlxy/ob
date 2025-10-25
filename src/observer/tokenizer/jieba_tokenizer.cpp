@@ -11,6 +11,9 @@ See the Mulan PSL v2 for more details. */
 #include "tokenizer/jieba_tokenizer.h"
 #include <filesystem>
 #include <vector>
+#include <unordered_set>
+#include <fstream>
+#include <cctype>
 
 // 简化：直接通过公开API调用，不再访问私有成员
 
@@ -52,10 +55,57 @@ cppjieba::Jieba &JiebaTokenizer::get_instance()
 
 RC JiebaTokenizer::cut(std::string &text, std::vector<std::string> &tokens)
 {
-    // Implement Jieba tokenizer logic here
-    // 使用全局单例，避免每次创建加载词典
+    // 使用全局单例，避免重复加载词典
     auto &jieba = get_instance();
-    jieba.Cut(text, tokens);
-    // 简化：不做停用词过滤（题目未强制，保持最小可行）
+    std::vector<std::string> raw;
+    jieba.Cut(text, raw);
+
+    // 加载/缓存停用词
+    auto get_stopwords = []() -> std::unordered_set<std::string>& {
+        static std::unordered_set<std::string> stopset;
+        static bool loaded = false;
+        if (!loaded) {
+            std::string dict_dir = [](){
+                // 重用 pick_jieba_dict_dir 的逻辑
+                return pick_jieba_dict_dir();
+            }();
+            std::ifstream fin(dict_dir + "/stop_words.utf8");
+            std::string w;
+            if (fin.is_open()) {
+                while (std::getline(fin, w)) {
+                    if (!w.empty()) stopset.insert(w);
+                }
+                fin.close();
+            }
+            // 额外按期望添加
+            stopset.insert("_");
+            stopset.insert("是");
+            stopset.insert("什么");
+            loaded = true;
+        }
+        return stopset;
+    };
+
+    auto &stopset = get_stopwords();
+
+    auto is_punct_or_space = [](const std::string &w) -> bool {
+        if (w.empty()) return true;
+        static const char *puncts = ",.!?;:()[]{}<>\"'`;|/\\_"; // 下划线视为标点
+        static const std::vector<std::string> zh = {"，","。","！","？","；","：","、","（","）","【","】","《","》","“","”","‘","’","—","…","·"};
+        for (const auto &z : zh) if (w == z) return true;
+        bool all_space_or_punct = true;
+        for (unsigned char ch : w) {
+            if (!std::isspace(ch) && std::strchr(puncts, ch) == nullptr) { all_space_or_punct = false; break; }
+        }
+        return all_space_or_punct;
+    };
+
+    tokens.clear();
+    tokens.reserve(raw.size());
+    for (auto &t : raw) {
+        if (is_punct_or_space(t)) continue;
+        if (stopset.find(t) != stopset.end()) continue;
+        tokens.push_back(std::move(t));
+    }
     return RC::SUCCESS;
 }

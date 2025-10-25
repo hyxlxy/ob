@@ -1,12 +1,1 @@
-SELECT TOKENIZE('你好，世界','jieba') AS text_tokens;
-CREATE TABLE texts (id INT, content TEXT);
-INSERT INTO texts VALUES (0, 'SQL调优的基本流程包括哪些步骤？');
-INSERT INTO texts VALUES (1, 'OB_VERSION()函数返回的版本信息的字符集是什么？');
-INSERT INTO texts VALUES (2, 'NTH_VALUE函数的主要功能是什么？它返回什么值？');
-INSERT INTO texts VALUES (3, 'location_cache_refresh_min_interval的默认值是多少？它属于什么类型的数据？');
-INSERT INTO texts VALUES (4, 'V$SQL_WORKAREA_HISTOGRAM表的功能是什么？它记录了哪些类型的执行模式？');
-INSERT INTO texts VALUES (5, '如何通过METHOD_TYPE字段判断一个方法的具体类型？有哪些可能的值？');
-INSERT INTO texts VALUES (5, '在DBA_TRIGGER_ORDERING视图中，哪些字段是不允许为NULL的？');
-SELECT TOKENIZE('在DBA_TRIGGER_ORDERING视图中，哪些字段是不允许为NULL的？', 'jieba') as text_tokens;
-ALTER TABLE texts ADD FULLTEXT INDEX idx_texts_jieba (content) WITH PARSER jieba;
-SELECT id, content, MATCH(content) AGAINST('返回类型') AS score FROM texts WHERE MATCH(content) AGAINST('返回类型') > 0 ORDER BY MATCH(content) AGAINST('返回类型') DESC, id ASC;
+SELECT TOKENIZE('log_archive_concurrency参数的功能是什么？', 'jieba') as text_tokens;
