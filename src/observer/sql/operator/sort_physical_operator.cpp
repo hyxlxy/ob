@@ -40,7 +40,8 @@ bool LightTuple::compare_with_schema(const LightTuple& other,
       return true;
     }
     
-    rc = get_sort_value_from_schema(right_value, schema, order_by_expressions[i]);
+    // 🐾 修复：应该使用 other 的数据来获取右侧值
+    rc = other.get_sort_value_from_schema(right_value, schema, order_by_expressions[i]);
     if (rc != RC::SUCCESS) {
       LOG_WARN("Failed to get right sort value for expression %zu: %s", i, strrc(rc));
       return false;
