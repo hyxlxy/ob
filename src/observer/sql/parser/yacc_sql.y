@@ -84,12 +84,14 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         TABLE
         TABLES
         INDEX
+        FULLTEXT
         ALTER
         ADD
         CHANGE
         COLUMN
         RENAME
         TO
+        PARSER
         /* allow 'CREATE VECTOR INDEX' */
         /* reuse VECTOR_T token for keyword VECTOR before INDEX */
         IF
@@ -187,7 +189,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %token <number> NUMBER
 %token <floats> FLOAT_LITERAL
 %token <cstring> ID
-%token <cstring> SSS
+%token <cstring> SSS MATCH AGAINST
 //非终结符
 
 /** type 定义了各种解析后的结果输出的是什么类型。类型对应了 union 中的定义的成员变量名称 **/
@@ -334,6 +336,14 @@ alter_table_stmt:
       $$->alter_table.op_type = ParsedSqlNode::AlterOpType::RENAME_TABLE;
       $$->alter_table.table_name = $3;
       $$->alter_table.new_table_name = $6;
+    }
+  | ALTER TABLE ID ADD FULLTEXT INDEX ID LBRACE ID RBRACE WITH PARSER ID {
+      $$ = new ParsedSqlNode(SCF_ALTER_TABLE);
+      $$->alter_table.op_type = ParsedSqlNode::AlterOpType::ADD_FULLTEXT_INDEX;
+      $$->alter_table.table_name = $3;
+      $$->alter_table.index_name = $7;
+      $$->alter_table.target_field_name = $9; /* only single column supported */
+      $$->alter_table.parser_name = $13;
     }
   ;
 
@@ -1239,6 +1249,14 @@ expression:
         }
       }
       $$ = new FunctionExpr($1, std::move(args));
+      $$->set_name(token_name(sql_string, &@$));
+    }
+    // MATCH(content) AGAINST('q') 解析为函数 MATCH_AGAINST(col, 'q')
+    | MATCH LBRACE expression RBRACE AGAINST LBRACE expression RBRACE {
+      std::vector<std::unique_ptr<Expression>> args;
+      if ($3) args.emplace_back($3);
+      if ($7) args.emplace_back($7);
+      $$ = new FunctionExpr("MATCH_AGAINST", std::move(args));
       $$->set_name(token_name(sql_string, &@$));
     }
     | rel_attr {

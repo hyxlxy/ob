@@ -491,6 +491,7 @@ enum SqlCommandFlag
   SCF_SHOW_INDEX,    ///< 显示索引
   SCF_UNION,         ///< UNION语句
   SCF_ALTER_TABLE,   ///< ALTER TABLE
+  SCF_MATCH_AGAINST, ///< MATCH AGAINST 函数（作为表达式存在，不单独语句）
 };
 /**
  * @brief 表示一个SQL语句
@@ -521,7 +522,7 @@ public:
   UnionSqlNode        union_stmt;
   
   // ALTER TABLE
-  enum class AlterOpType { ADD_COLUMN, DROP_COLUMN, CHANGE_COLUMN_RENAME, RENAME_TABLE };
+  enum class AlterOpType { ADD_COLUMN, DROP_COLUMN, CHANGE_COLUMN_RENAME, RENAME_TABLE, ADD_FULLTEXT_INDEX };
   struct AlterTableSqlNode {
     AlterOpType op_type = AlterOpType::ADD_COLUMN;
     // 目标表
@@ -531,6 +532,10 @@ public:
     string column_name;        // for ADD/DROP/CHANGE old name
     string new_column_name;    // for CHANGE new name
     AttrType data_type = AttrType::UNDEFINED; // simplified: only INTS used in grammar
+    // 全文索引：ALTER TABLE ... ADD FULLTEXT INDEX idx (column) WITH PARSER jieba
+    string index_name;         // index name for fulltext
+    string target_field_name;  // target column for fulltext index
+    string parser_name;        // parser name (only 'jieba' supported)
   } alter_table;
 
 public:

@@ -31,6 +31,18 @@ RC AlterTableStmt::create(Db *db, const ParsedSqlNode::AlterTableSqlNode &node, 
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
+  // FULLTEXT：直接组装 Stmt，其他校验放执行期
+  if (node.op_type == ParsedSqlNode::AlterOpType::ADD_FULLTEXT_INDEX) {
+    auto *s = new AlterTableStmt();
+    s->op_type = node.op_type;
+    s->table_name = node.table_name;
+    s->index_name = node.index_name;
+    s->target_field_name = node.target_field_name;
+    s->parser_name = node.parser_name;
+    stmt = s;
+    return RC::SUCCESS;
+  }
+
   // 简化校验：仅支持 INT 类型新增/改名语句中给出的类型位，挑战声明不涉及类型修改
   // 变更列名/删除列时校验列是否存在
   if (node.op_type == ParsedSqlNode::AlterOpType::DROP_COLUMN || node.op_type == ParsedSqlNode::AlterOpType::CHANGE_COLUMN_RENAME) {
