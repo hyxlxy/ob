@@ -8,7 +8,7 @@ rm -f /tmp/miniob_gdb.log
 rm -rf /tmp/miniob/miniob
 
 # 编译
-cd /home/hxl/Desktop/oceambase/miniob-competition-2025
+cd /home/advise/TMP/MINIOB/ob
 bash build.sh
 
 # 创建测试环境

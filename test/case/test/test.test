@@ -1,22 +1,13 @@
-
-create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
-create table exp_table2(id int, col1 int);
-insert into exp_table VALUES (2, 4, 6, 8.85, 7.21);
-insert into exp_table VALUES (8, 4, 6, 9.31, 6.95);
-insert into exp_table VALUES (1, 6, 3, 2.12, 9.02);
-select exp_table.id,6*exp_table2.col1/(exp_table.col2+2) from exp_table,exp_table2 where exp_table2.col1/(1-exp_table.col2)*2>9;
-select exp_table.id,7*exp_table2.col1/(exp_table.col2+5) from exp_table,exp_table2 where 4+exp_table2.col1/(4-exp_table.col2)*2>=7;
-
-
-CREATE TABLE aggregation_func(id int, num int, price float, addr char(4), birthday date);
-create table t_group_by (id int not null, score int not null, name char(1) null);
-create table t_group_by_2 (id int not null, age int not null);
-insert into t_group_by VALUES (4, 3, '3');
-insert into t_group_by VALUES (1, 2, 'K');
-
-INSERT INTO aggregation_func VALUES (20, 1, 6.0, 'NC', '2014-04-18');
-INSERT INTO aggregation_func VALUES (10, 1, 11.0, '79', '2018-06-17');
-INSERT INTO aggregation_func VALUES (70, 1, 16.0, 'WGWU', '2027-06-20');
-INSERT INTO aggregation_func VALUES (80, 1, 11.0, 'Y69', '2015-07-11');
-INSERT INTO aggregation_func VALUES (80, 1, 1.0, 'UC0', '2025-05-14');
-SELECT avg(price) FROM aggregation_func WHERE birthday != '2005-11-10';
+create table q1(id int,age int,name char(10));
+create table q2(id int,age int,name char(10));
+insert into q1 values(1,20,'AliceAlice');
+insert into q1 values(2,25,'BobAliceAS');
+insert into q1 values(3,30,'CharliesaQ');
+insert into q2 values(1,20,'AliceAlice');
+insert into q2 values(2,25,'BobASFAWAW');
+insert into q2 values(4,40,'DavidASFWA');
+update q1 set id=99 where name='AliceAlice';
+update q1 set age=99 where id=2;
+update q1 set name='Eve' where id=3;
+create view qq1 as select t1.id as id, t1.age as age, t2.name as name from q1 t1, q2 t2 where t1.id=t2.id;
+select count(*) from qq1;

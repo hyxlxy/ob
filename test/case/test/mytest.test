@@ -1,155 +1,48 @@
-DROP TABLE IF EXISTS null_test;
-CREATE TABLE null_test(id int, num int null, name char(10) null);
-INSERT INTO null_test VALUES (1, 1, 'N1');
-INSERT INTO null_test VALUES (2, null, 'N2');
-INSERT INTO null_test VALUES (3, 3, 'N3');
-UPDATE null_test SET name=null WHERE num is null;
-SELECT * FROM null_test;
 
-DROP TABLE IF EXISTS text_test;
-CREATE TABLE text_test(id int, info text);
-INSERT INTO text_test VALUES (1, 'original text 1');
-INSERT INTO text_test VALUES (2, 'original text 2 very long');
-INSERT INTO text_test VALUES (3, 'original text 3');
-UPDATE text_test SET info='new short' WHERE id=2;
-SELECT * FROM text_test;
-
-DROP TABLE IF EXISTS update_test;
-CREATE TABLE update_test(id int, name char(10), score int);
-INSERT INTO update_test VALUES (1, 'AAA', 10);
-INSERT INTO update_test VALUES (2, 'BBB', 20);
-INSERT INTO update_test VALUES (3, 'CCC', 30);
-INSERT INTO update_test VALUES (6, 'FFF', 60);
-INSERT INTO update_test VALUES (6, 'FFF2', 61);
-UPDATE update_test SET name='UPDATED' WHERE id=6;
-SELECT * FROM update_test;
-
-DROP TABLE IF EXISTS alias_t1;
-DROP TABLE IF EXISTS alias_t2;
-CREATE TABLE alias_t1(id int, col1 int);
-CREATE TABLE alias_t2(id int, col2 int);
-INSERT INTO alias_t1 VALUES (1, 10);
-INSERT INTO alias_t1 VALUES (2, 20);
-INSERT INTO alias_t2 VALUES (1, 100);
-INSERT INTO alias_t2 VALUES (3, 300);
-SELECT * FROM alias_t1 t1, alias_t2 t2 WHERE t1.id = t2.id;
-
-DROP TABLE IF EXISTS source_table;
-DROP TABLE IF EXISTS target_table;
-CREATE TABLE source_table(id int, age int, name char(10));
-INSERT INTO source_table VALUES (1, 20, 'Alice');
-INSERT INTO source_table VALUES (2, 25, 'Bob');
-INSERT INTO source_table VALUES (3, 30, 'Charlie');
-CREATE TABLE target_table(id int, age int) SELECT id, age FROM source_table;
-SELECT * FROM target_table;
-SELECT COUNT(*) FROM target_table;
-
-DROP TABLE IF EXISTS sub_t1;
-DROP TABLE IF EXISTS sub_t2;
-CREATE TABLE sub_t1(id int, col1 int);
-CREATE TABLE sub_t2(id int, col2 int);
-INSERT INTO sub_t1 VALUES (1, 10);
-INSERT INTO sub_t1 VALUES (2, 20);
-INSERT INTO sub_t1 VALUES (3, 30);
-INSERT INTO sub_t2 VALUES (1, 100);
-INSERT INTO sub_t2 VALUES (2, 20);
-SELECT * FROM sub_t1 WHERE col1 IN (SELECT col2 FROM sub_t2);
-SELECT * FROM sub_t1 WHERE id = (SELECT id FROM sub_t2 WHERE id=1);
-
-DROP TABLE null_test;
-DROP TABLE text_test;
-DROP TABLE update_test;
-DROP TABLE alias_t1;
-DROP TABLE alias_t2;
-DROP TABLE source_table;
-DROP TABLE target_table;
-DROP TABLE sub_t1;
-DROP TABLE sub_t2;
+CREATE TABLE q1 (id INT, age INT, name CHAR(10));
+CREATE TABLE q2 (id INT, age INT, name CHAR(10));
 
 
-DELETE FROM unique_table4;
-INSERT INTO unique_table4 VALUES(1,'aaaa');
-INSERT INTO unique_table4 VALUES(2,'bbbb');
-INSERT INTO unique_table4 VALUES(3,'cccc');
-...
-SELECT * FROM unique_table4;
-- 1 | aaaa
-  2 | Yuan
-  3 | cccc
-+ 4 | aaaa
-  4 | Linn
-  5 | eeee
--- below are some requests executed before(partial) --
--- init
-CREATE TABLE unique_table1(id int, col1 int, col2 int);
-CREATE TABLE unique_table2(id1 int, id2 int, col1 int, col2 int);
-CREATE TABLE unique_table3(id1 int, id2 int, col1 float, col2 char(4));
-CREATE TABLE unique_table4 (id INT, name CHAR(4));
-INSERT INTO unique_table1 VALUES (1,1,1);
-...
+INSERT INTO q1 VALUES (1, 20, 'AliceAlice'); 
+INSERT INTO q1 VALUES (2, 25, 'BobAliceAS');  
+INSERT INTO q1 VALUES (3, 30, 'CharliesaQ'); 
+INSERT INTO q2 VALUES (1, 20, 'AliceAlice'); 
+INSERT INTO q2 VALUES (2, 25, 'BobASFAWAW'); 
+INSERT INTO q2 VALUES (4, 40, 'DavidASFWA'); 
 
 
-create table t2(id int,age int);
-insert into t2 values(1,1);
-insert into t2 values(2,2);
-create table t3(id int,age int):
-insert into t3 values(3,3);
-insert into t3 values(4,4);
-select * from t2 union select * from t3;
+UPDATE q1 SET id = 99 WHERE name = 'AliceAlice';
+UPDATE q1 SET age = 99 WHERE id = 2;
+UPDATE q1 SET name = 'Eve' WHERE id = 3; 
 
-select * from union_table_1 where id < 50 union select * from union_table_2 where id > 10 union select * from union_table_3 where id >= 20 and id <=30;
-select * from union_table_1 where id < 50 union all select * from union_table_2 where id > 10 union all select * from union_table_3 where id >= 20 and id <=30;
-select * from union_table_1 where id < 50 union select * from union_table_2 where id > 10 union all select * from union_table_3 where id >= 20 and id <=30;
-  14 | 17
-+ 20 | 20
-  20 | 20
-  29 | 29
-  29 | 87
--- below are some requests executed before(partial) --
--- init data
-CREATE TABLE union_table_1(id int, col1 int);
-INSERT INTO union_table_1 VALUES (84, 65);
-INSERT INTO union_table_1 VALUES (54, 50);
-INSERT INTO union_table_1 VALUES (70, 52);
-INSERT INTO union_table_1 VALUES (35, 65);
-...
--- create table
-CREATE TABLE union_table_2(id int, col2 int);
-INSERT INTO union_table_2 VALUES (29, 87);
-INSERT INTO union_table_2 VALUES (99, 53);
-INSERT INTO union_table_2 VALUES (81, 19);
-INSERT INTO union_table_2 VALUES (99, 65);
-...
--- create table
-CREATE TABLE union_table_3(id int, col2 int);
-INSERT INTO union_table_3 VALUES (61, 79);
-INSERT INTO union_table_3 VALUES (68, 20);
-INSERT INTO union_table_3 VALUES (80, 89);
-INSERT INTO union_table_3 VALUES (9, 73);
-...
 
-create table t1(id int,age int);
-create table t2(id int,age int);
-create table t3(id int,age int);
-insert into t1 values(1,1);
-insert into t1 values(2,2);
-insert into t2 values(2,2);
-insert into t2 values(3,3);
-insert into t3 values(3,3);
-insert into t3 values(4,4);
-select * from t1 union select * from t2 union all select * from t3;
+INSERT INTO q1 VALUES (5, 35, 'FrankFrank');     
+INSERT INTO q1 VALUES (6, 45, 'GraceGrace');    
+INSERT INTO q1 VALUES (7, 55, 'HenryHenry');     
+INSERT INTO q2 VALUES (5, 35, 'FrankFrank');     
+INSERT INTO q2 VALUES (6, 45, 'GraceGrace');     
+INSERT INTO q2 VALUES (8, 60, 'FrankFrank');        
 
-create table t1(id int,age int);
-create table t2(id int,age int);
-create table t3(id int,age int);
-insert into t1 values(1,1);
-insert into t1 values(1,1);
-insert into t1 values(2,2);
-insert into t2 values(2,2);
-insert into t2 values(3,3);
-insert into t2 values(3,3);
-insert into t3 values(3,3);
-insert into t3 values(4,4);
-insert into t3 values(4,4);
 
-select * from t1 union all select * from t2 union select * from t3;
+UPDATE q1 SET id = 100 WHERE id = 5;
+UPDATE q2 SET name = 'FrankFrank' WHERE id = 6; 
+UPDATE q1 SET age = 100 WHERE id = 7;
+
+INSERT INTO q1 VALUES (9, 65, 'FrankFrank'); 
+INSERT INTO q1 VALUES (10, 70, 'FrankFrank');  
+INSERT INTO q1 VALUES (11, 75, 'FrankFrank'); 
+INSERT INTO q2 VALUES (9, 65, 'FrankFrank');  
+INSERT INTO q2 VALUES (10, 70, 'FrankFrank'); 
+INSERT INTO q2 VALUES (12, 80, 'FrankFrank'); 
+
+
+UPDATE q1 SET name = 'FrankFrank' WHERE id = 9; 
+UPDATE q2 SET name = 'FrankFrank' WHERE id = 10;
+UPDATE q1 SET id = 12 WHERE id = 10; 
+UPDATE q2 SET age = 85 WHERE id = 12;
+
+CREATE VIEW qq1 AS SELECT t1.id AS id, t1.age AS age, t2.name AS name FROM q1 t1, q2 t2 WHERE t1.id = t2.id;
+
+SELECT * FROM qq1;
+
+SELECT COUNT(*) FROM qq1;

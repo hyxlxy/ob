@@ -470,11 +470,11 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
       copy_len = field->len() - 1;
     }
     if (copy_len > data_len) {
-      copy_len = data_len + 1;
+      copy_len = data_len;
     }
     // 清理 CHAR 字段剩余区域，防止更新为更短字符串时残留旧字符
-    size_t chars_area_len = field->len();
-    // size_t chars_area_len = field->len() - (field->nullable() ? 1 : 0);
+    // size_t chars_area_len = field->len();
+    size_t chars_area_len = field->len() - (field->nullable() ? 1 : 0);
     memset(record_data + field->offset(), 0, chars_area_len);
     // if (field->nullable()) {
     //   record_data[field->offset() + field->len() - 1] = '0';  // Set NOT NULL flag
