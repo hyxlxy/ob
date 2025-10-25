@@ -462,25 +462,9 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
     return RC::INVALID_ARGUMENT;
   }
 
-  // 非null的话，就先清零整个字段空间
-  memset(record_data + field->offset(), 0, field->len());
-
   size_t copy_len = field->len();
   size_t data_len = value.length();
-  // if (field->nullable()) {
-  //   copy_len = field->len() - 1;
-  // }
-  switch (value.attr_type()) {
-    case AttrType::INTS:
-    case AttrType::FLOATS:
-    case AttrType::DATES: {
-      if (data_len != 4) {
-        ASSERT(0, "no way");
-      }
-      break;
-    }
-    default: break;
-  }
+
   if (field->type() == AttrType::CHARS) {
     if (field->nullable()) {
       copy_len = field->len() - 1;
@@ -488,7 +472,9 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
     if (copy_len > data_len) {
       copy_len = data_len;
     }
-
+    // 清理 CHAR 字段剩余区域，防止更新为更短字符串时残留旧字符
+    size_t chars_area_len = field->len() - (field->nullable() ? 1 : 0);
+    memset(record_data + field->offset(), 0, chars_area_len);
   } else if (field->type() == AttrType::TEXTS) {
     // For TEXT: write to LOB and store offset+length
     if (value.is_null()) {
@@ -535,11 +521,11 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
       copy_len = field->len() - 1;  // Reserve last byte for NULL flag
     }
     LOG_INFO("DEBUG: set_value_to_record VECTOR field=%s value_len=%zu field_len=%d copy_limit=%zu",
-             field->name(), data_len, field->len(), copy_len);
+           field->name(), data_len, field->len(), copy_len);
     // 对于向量类型，需要检查数据长度是否超过字段定义的长度
     if (data_len > copy_len) {
       LOG_WARN("Vector data length (%zu) exceeds field length (%zu) for field %s",
-               data_len, copy_len, field->name());
+             data_len, copy_len, field->name());
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
     // 当模式为显式 VECTOR(n) 时，字段长度(扣除可空标志位)应为 sizeof(int)+n*sizeof(float)
@@ -558,7 +544,7 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
       LOG_INFO("DEBUG: VECTOR dim ok field=%s expected_dim=%d actual_dim=%d out_len=%d",
-               field->name(), expected_dim, actual_dim, (int)data_len);
+             field->name(), expected_dim, actual_dim, (int)data_len);
     }
     // 对于向量类型，使用实际数据长度
     copy_len = data_len;
@@ -570,8 +556,18 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
 
   memcpy(record_data + field->offset(), value.data(), copy_len);
 
+  // For nullable fields, set NULL flag to '0' (not NULL)
   if (field->nullable()) {
-    record_data[field->offset() + field->len() - 1] = '0';
+    if (field->type() == AttrType::CHARS || field->type() == AttrType::TEXTS || field->type() == AttrType::VECTORS) {
+      // For variable-length types, NULL flag is at the end
+      record_data[field->offset() + field->len() - 1] = '0';
+    } else {
+      // For fixed-length types, we need to place NULL flag after the data
+      // but within the field's allocated space
+      if (copy_len < field->len()) {
+        record_data[field->offset() + field->len() - 1] = '0';
+      }
+    }
   }
 
   return RC::SUCCESS;

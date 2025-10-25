@@ -136,8 +136,10 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
   bool           has_where = (fs && !fs->filter_units().empty());
 
   while (scanner->next(rec) == RC::SUCCESS) {
+    cout << "update sccanner: rec: ownner: " << rec.owner_ << endl;
     if (!has_where) {
-      records.emplace_back(std::move(rec));
+      // records.emplace_back(rec);
+      records.emplace_back(Record::copy_record(rec));
       continue;
     }
 
@@ -208,9 +210,8 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
     }
 
     if (match) {
-      // Record one;
-      // one.copy_data(rec.data(), rec.len());
-      records.emplace_back(std::move(rec));
+      // records.emplace_back(rec);
+      records.emplace_back(Record::copy_record(rec));
     }
   }
   scanner->close_scan();
@@ -220,6 +221,8 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
   if (update_stmt->is_multi_field()) {
     // 多字段UPDATE
     for (Record &old_rec : records) {
+      cout << "update sccanner: make old_rec: ownner: " << old_rec.owner_ << endl;
+
       Record new_rec;
       new_rec.copy_data(old_rec.data(), old_rec.len());
       new_rec.set_rid(old_rec.rid());
@@ -281,6 +284,8 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
     }
 
     for (Record &old_rec : records) {
+      cout << "update sccanner: make old_rec: ownner: " << old_rec.owner_ << endl;
+
       Record new_rec;
       new_rec.copy_data(old_rec.data(), old_rec.len());
       new_rec.set_rid(old_rec.rid());

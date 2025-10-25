@@ -243,6 +243,15 @@ public:
     return RC::SUCCESS;
   }
 
+  static Record copy_record(const Record &one)
+  {
+    Record copy;
+    copy.copy_data(one.data(), one.len());
+    copy.set_rid(one.rid());
+    copy.set_key(one.key());
+    return copy;
+  }
+
   char       *data() { return this->data_; }
   const char *data() const { return this->data_; }
   int         len() const { return this->len_; }
@@ -259,10 +268,10 @@ public:
   void          set_key(const string &key) { key_ = key; }
   const string &key() const { return key_; }
 
+  bool owner_ = false;  /// 表示当前是否由record来管理内存
 private:
   RID    rid_;
   string key_;  //// 记录的主键，用于 lsm-tree 引擎，需要考虑重构 Record
-  char  *data_  = nullptr;
-  int    len_   = 0;      /// 如果不是record自己来管理内存，这个字段可能是无效的
-  bool   owner_ = false;  /// 表示当前是否由record来管理内存
+  char  *data_ = nullptr;
+  int    len_  = 0;  /// 如果不是record自己来管理内存，这个字段可能是无效的
 };
