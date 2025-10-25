@@ -6,40 +6,86 @@ CREATE TABLE q2 (id INT, age INT, name CHAR(10));
 INSERT INTO q1 VALUES (1, 20, 'AliceAlice'); 
 INSERT INTO q1 VALUES (2, 25, 'BobAliceAS');  
 INSERT INTO q1 VALUES (3, 30, 'CharliesaQ'); 
-INSERT INTO q2 VALUES (1, 20, 'AliceAlice'); 
-INSERT INTO q2 VALUES (2, 25, 'BobASFAWAW'); 
-INSERT INTO q2 VALUES (4, 40, 'DavidASFWA'); 
-
+INSERT INTO q1 VALUES (4, 20, 'AliceAlice'); 
+INSERT INTO q1 VALUES (5, 25, 'BobAliceAS');  
+INSERT INTO q1 VALUES (6, 30, 'CharliesaQ'); 
+INSERT INTO q1 VALUES (7, 20, 'AliceAlice'); 
+INSERT INTO q1 VALUES (8, 25, 'FrankFrank');  
+INSERT INTO q1 VALUES (9, 30, 'CharliesaQ'); 
+INSERT INTO q1 VALUES (10, 30, 'CharliesaQ'); 
+INSERT INTO q1 VALUES (1, 20, 'AliceAlice'); 
+INSERT INTO q1 VALUES (2, 25, 'BobAliceAS');  
+INSERT INTO q1 VALUES (3, 30, 'CharliesaQ'); 
+INSERT INTO q1 VALUES (4, 20, 'AliceAlice'); 
+INSERT INTO q1 VALUES (5, 25, 'BobAliceAS');  
+INSERT INTO q1 VALUES (6, 30, 'CharliesaQ'); 
+INSERT INTO q1 VALUES (7, 20, 'AliceAlice'); 
+INSERT INTO q1 VALUES (8, 25, 'FrankFrank');  
+INSERT INTO q1 VALUES (9, 30, 'CharliesaQ'); 
+INSERT INTO q1 VALUES (10, 30, 'CharliesaQ');
+INSERT INTO q1 VALUES (1, 20, 'AliceAlice'); 
+INSERT INTO q1 VALUES (2, 25, 'BobAliceAS');  
+INSERT INTO q1 VALUES (3, 30, 'CharliesaQ'); 
+INSERT INTO q1 VALUES (4, 20, 'AliceAlice'); 
+INSERT INTO q1 VALUES (5, 25, 'BobAliceAS');  
+INSERT INTO q1 VALUES (6, 30, 'CharliesaQ'); 
+INSERT INTO q1 VALUES (7, 20, 'AliceAlice'); 
+INSERT INTO q1 VALUES (8, 25, 'FrankFrank');  
+INSERT INTO q1 VALUES (9, 30, 'CharliesaQ'); 
+INSERT INTO q1 VALUES (10, 30, 'CharliesaQ'); 
 
 UPDATE q1 SET id = 99 WHERE name = 'AliceAlice';
 UPDATE q1 SET age = 99 WHERE id = 2;
 UPDATE q1 SET name = 'Eve' WHERE id = 3; 
-
-
-INSERT INTO q1 VALUES (5, 35, 'FrankFrank');     
-INSERT INTO q1 VALUES (6, 45, 'GraceGrace');    
-INSERT INTO q1 VALUES (7, 55, 'HenryHenry');     
-INSERT INTO q2 VALUES (5, 35, 'FrankFrank');     
-INSERT INTO q2 VALUES (6, 45, 'GraceGrace');     
-INSERT INTO q2 VALUES (8, 60, 'FrankFrank');        
-
-
 UPDATE q1 SET id = 100 WHERE id = 5;
 UPDATE q2 SET name = 'FrankFrank' WHERE id = 6; 
 UPDATE q1 SET age = 100 WHERE id = 7;
 
-INSERT INTO q1 VALUES (9, 65, 'FrankFrank'); 
-INSERT INTO q1 VALUES (10, 70, 'FrankFrank');  
-INSERT INTO q1 VALUES (11, 75, 'FrankFrank'); 
-INSERT INTO q2 VALUES (9, 65, 'FrankFrank');  
-INSERT INTO q2 VALUES (10, 70, 'FrankFrank'); 
-INSERT INTO q2 VALUES (12, 80, 'FrankFrank'); 
+delete from q1 where id = 1;
+delete from q1 where id = 2;
+delete from q1 where id = 3;
 
+INSERT INTO q2 VALUES (1, 20, 'AliceAlice'); 
+INSERT INTO q2 VALUES (2, 25, 'BobAliceAS');  
+INSERT INTO q2 VALUES (3, 30, 'CharliesaQ'); 
+INSERT INTO q2 VALUES (4, 20, 'AliceAlice'); 
+INSERT INTO q2 VALUES (5, 25, 'BobAliceAS');  
+INSERT INTO q2 VALUES (6, 30, 'CharliesaQ'); 
+INSERT INTO q2 VALUES (7, 20, 'AliceAlice'); 
+INSERT INTO q2 VALUES (8, 25, 'FrankFrank');  
+INSERT INTO q2 VALUES (9, 30, 'CharliesaQ'); 
+INSERT INTO q2 VALUES (10, 30, 'CharliesaQ'); 
+INSERT INTO q2 VALUES (1, 20, 'AliceAlice'); 
+INSERT INTO q2 VALUES (2, 25, 'BobAliceAS');  
+INSERT INTO q2 VALUES (3, 30, 'CharliesaQ'); 
+INSERT INTO q2 VALUES (4, 20, 'AliceAlice'); 
+INSERT INTO q2 VALUES (5, 25, 'BobAliceAS');  
+INSERT INTO q2 VALUES (6, 30, 'CharliesaQ'); 
+INSERT INTO q2 VALUES (7, 20, 'AliceAlice'); 
+INSERT INTO q2 VALUES (8, 25, 'FrankFrank');  
+INSERT INTO q2 VALUES (9, 30, 'CharliesaQ'); 
+INSERT INTO q2 VALUES (10, 30, 'CharliesaQ');
+INSERT INTO q2 VALUES (1, 20, 'AliceAlice'); 
+INSERT INTO q2 VALUES (2, 25, 'BobAliceAS');  
+INSERT INTO q2 VALUES (3, 30, 'CharliesaQ'); 
+INSERT INTO q2 VALUES (4, 20, 'AliceAlice'); 
+INSERT INTO q2 VALUES (5, 25, 'BobAliceAS');  
+INSERT INTO q2 VALUES (6, 30, 'CharliesaQ'); 
+INSERT INTO q2 VALUES (7, 20, 'AliceAlice'); 
+INSERT INTO q2 VALUES (8, 25, 'FrankFrank');  
+INSERT INTO q2 VALUES (9, 30, 'CharliesaQ'); 
+INSERT INTO q2 VALUES (10, 30, 'CharliesaQ'); 
 
-UPDATE q1 SET name = 'FrankFrank' WHERE id = 9; 
-UPDATE q2 SET name = 'FrankFrank' WHERE id = 10;
-UPDATE q1 SET id = 12 WHERE id = 10; 
-UPDATE q2 SET age = 85 WHERE id = 12;
+UPDATE q2 SET id = 99 WHERE name = 'AliceAlice';
+UPDATE q2 SET age = 99 WHERE id = 2;
+UPDATE q2 SET name = 'Eve' WHERE id = 3; 
+UPDATE q2 SET id = 100 WHERE id = 5;
+UPDATE q2 SET name = 'FrankFrank' WHERE id = 6; 
+UPDATE q2 SET age = 100 WHERE id = 7;
+
+delete from q2 where id = 2;
+delete from q2 where id = 3;
+delete from q2 where id = 4;
 
 CREATE VIEW qq1 AS SELECT t1.id AS id, t1.age AS age, t2.name AS name FROM q1 t1, q2 t2 WHERE t1.id = t2.id;
 

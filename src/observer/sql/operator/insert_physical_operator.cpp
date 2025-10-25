@@ -88,6 +88,7 @@ RC InsertPhysicalOperator::open(Trx *trx)
   }
 
   rc = trx->insert_record(table_, record);
+  // rc = table_->insert_record_with_trx(record, trx);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to insert record by transaction. rc=%s", strrc(rc));
   }
