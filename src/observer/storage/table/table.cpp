@@ -464,8 +464,21 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
     return RC::INVALID_ARGUMENT;
   }
 
-  size_t copy_len = field->len();
-  size_t data_len = value.length();
+  int copy_len = field->len();
+  int data_len = value.length();
+
+  switch (value.attr_type()) {
+    case AttrType::INTS:
+    case AttrType::FLOATS:
+    case AttrType::DATES: {
+      if (data_len != 4) {
+        assert(0);
+      }
+      data_len = 4;
+      break;
+    }
+    default: break;
+  }
 
   if (field->type() == AttrType::CHARS) {
     if (field->nullable()) {
@@ -482,14 +495,14 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
     if (value.is_null()) {
       // handled by NULL path above
     } else {
-      printf("DEBUG: [TEXT] write begin field=%s raw_len=%zu ptr_null=%d\n",
-          field->name(),
-          data_len,
-          value.data() == nullptr);
+      // printf("DEBUG: [TEXT] write begin field=%s raw_len=%zu ptr_null=%d\n",
+      //     field->name(),
+      //     data_len,
+      //     value.data() == nullptr);
       // Fallback: some UPDATE constant folding可能未正确设置 Value.length()
       if (value.attr_type() == AttrType::CHARS && data_len == 0 && value.data() != nullptr) {
         data_len = strlen(value.data());
-        printf("DEBUG: [TEXT] write corrected_len via strlen=%zu\n", data_len);
+        // printf("DEBUG: [TEXT] write corrected_len via strlen=%zu\n", data_len);
       }
       if (data_len > 65535) {
         LOG_WARN("TEXT too long: %zu > 65535", data_len);
