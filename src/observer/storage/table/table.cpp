@@ -565,17 +565,22 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
   // }
 
   // For nullable fields, set NULL flag to '0' (not NULL)
+  // if (field->nullable()) {
+  //   if (field->type() == AttrType::CHARS || field->type() == AttrType::TEXTS || field->type() == AttrType::VECTORS) {
+  //     // For variable-length types, NULL flag is at the end
+  //     record_data[field->offset() + field->len() - 1] = '0';
+  //   } else {
+  //     // For fixed-length types, we need to place NULL flag after the data
+  //     // but within the field's allocated space
+  //     // if (copy_len < field->len()) {
+  //     //   record_data[field->offset() + field->len() - 1] = '0';
+  //     // }
+
+  //   }
+  // }
+
   if (field->nullable()) {
-    if (field->type() == AttrType::CHARS || field->type() == AttrType::TEXTS || field->type() == AttrType::VECTORS) {
-      // For variable-length types, NULL flag is at the end
-      record_data[field->offset() + field->len() - 1] = '0';
-    } else {
-      // For fixed-length types, we need to place NULL flag after the data
-      // but within the field's allocated space
-      if (copy_len < field->len()) {
-        record_data[field->offset() + field->len() - 1] = '0';
-      }
-    }
+    record_data[field->offset() + field->len() - 1] = '0';
   }
 
   return RC::SUCCESS;

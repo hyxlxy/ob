@@ -73,7 +73,7 @@ vector<pair<Field, string>> View::get_fields(Db *db, SelectStmt *stmt_)
     // static map<FieldMeta, bool> mp;
     FieldMeta *filed_meta = new FieldMeta();
     save_fieldmeta.add_fieldmeta(filed_meta);
-    filed_meta->init(field_name.c_str(), expr->value_type(), 0, expr->value_length(), true, 0);
+    filed_meta->init(field_name.c_str(), expr->value_type(), 0, expr->value_length() + 1, true, 0);
     Field field{filed_meta};
     fields.push_back({field, ""});
     if (strlen(expr->alias()) != 0) {
