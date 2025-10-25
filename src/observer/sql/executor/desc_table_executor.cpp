@@ -137,7 +137,7 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
 
   while (scanner->next(rec) == RC::SUCCESS) {
     if (!has_where) {
-      records.push_back(std::move(rec));
+      records.emplace_back(std::move(rec));
       continue;
     }
 
@@ -210,7 +210,7 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
     if (match) {
       // Record one;
       // one.copy_data(rec.data(), rec.len());
-      records.push_back(std::move(rec));
+      records.emplace_back(std::move(rec));
     }
   }
   scanner->close_scan();
@@ -223,7 +223,7 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
       Record new_rec;
       new_rec.copy_data(old_rec.data(), old_rec.len());
       new_rec.set_rid(old_rec.rid());
-
+      new_rec.set_key(old_rec.key());
       for (size_t i = 0; i < update_stmt->field_metas().size(); i++) {
         const FieldMeta *fm   = update_stmt->field_metas()[i];
         Value            val  = update_stmt->multi_values()[i];
