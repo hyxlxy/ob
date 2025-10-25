@@ -449,6 +449,8 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
 
 RC Table::set_value_to_record(char *record_data, const Value &value, const FieldMeta *field)
 {
+  memset(record_data + field->offset(), 0, field->len());
+
   // Handle NULL values
   if (value.attr_type() == AttrType::UNDEFINED || value.is_null()) {
     if (field->nullable()) {
@@ -470,7 +472,7 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
       copy_len = field->len() - 1;
     }
     if (copy_len > data_len) {
-      copy_len = data_len;
+      copy_len = data_len + 1;
     }
     // 清理 CHAR 字段剩余区域，防止更新为更短字符串时残留旧字符
     size_t chars_area_len = field->len() - (field->nullable() ? 1 : 0);

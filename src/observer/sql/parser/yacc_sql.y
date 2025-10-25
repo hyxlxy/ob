@@ -605,7 +605,6 @@ attr_def:
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
-      // $$->nullable = false;  // default NOT NULL
       $$->nullable = true;  // 貌似默认的应该是NULL才对
       // For VECTOR(n), store bytes for [dimension(int32) + n float32 values]
       if ($$->type == AttrType::VECTORS) {
@@ -661,7 +660,6 @@ attr_def:
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
-       //$$->nullable = false;  // default NOT NULL
       $$->nullable = true;  // default  NULL
       // Default length: INT/FLOAT/DATE/STRING fallback 4; VECTOR default header size (dimension); TEXT header 12
       if ($$->type == AttrType::VECTORS) {

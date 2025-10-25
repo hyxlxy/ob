@@ -99,23 +99,6 @@ void View::set_table_field_name(Db *db)
       attr_from_table_and_field_[attr_names_[i]] = {field.table_name(), field.field_name()};
     }
   }
-
-  //   for (auto &&expr : select_stmt->query_expressions()) {
-  // if (expr->type() == ExprType::FIELD) {
-  // 此时已经将所有的 UnboundFieldExpr 转换为 FieldExpr
-  //   auto field_expr = static_cast<FieldExpr *>(expr.get());
-  //   Field field(db->find_table(field_expr->table_name()), field_expr->field().meta());
-  // 记录表名
-  //   if (strlen(expr->alias()) != 0) {
-  // 别名覆盖字段名
-  // attr_from_table_and_field_[expr->alias()] = {field_expr->field().table_name(), field_expr->field_name()};
-  //   } else {
-  // attr_from_table_and_field_[expr->name()] = {field_expr->field().table_name(), field_expr->field_name()};
-  //   }
-
-  //   continue;
-  // }
-  //   }
 }
 
 void View::set_table_meta(Db *db)
@@ -124,38 +107,17 @@ void View::set_table_meta(Db *db)
   auto                      &&select_stmt = dynamic_cast<SelectStmt *>(stmt_);
   vector<pair<Field, string>> fields      = View::get_fields(db, select_stmt);
 
-  //   vector<Field> fields;
-
-  //   auto &&select_stmt = dynamic_cast<SelectStmt *>(stmt_);
-  //   for (auto &&expr : select_stmt->query_expressions()) {
-  //     if (expr->type() == ExprType::FIELD) {
-  //       // 此时已经将所有的 UnboundFieldExpr 转换为 FieldExpr
-  //       auto  field_expr = static_cast<FieldExpr *>(expr.get());
-  //       Field field(db->find_table(field_expr->table_name()), field_expr->field().meta());
-  //       fields.push_back(field);
-  //       continue;
-  //     }
-  //     std::string field_name;
-  //     field_name = expr->name();
-  //     FieldMeta filed_meta;
-  //     filed_meta.init(field_name.c_str(), expr->value_type(), 0, expr->value_length(), true, 0);
-  //     Field field{&filed_meta};
-  //     fields.push_back(field);
-  //   }
-
   std::vector<AttrInfoSqlNode> attr_infos;
 
   for (size_t i = 0; i < fields.size(); i++) {
     auto &&field = fields[i].first;
     //这里应该是second才对，因为是别名
     AttrInfoSqlNode one{fields[i].second, field.attr_type()};
-    // if (field.attr_type() == AttrType::CHARS) {
+
     one.length   = field.meta()->len();
     one.nullable = field.meta()->nullable();
     cout << "make_field: name: " << fields[i].second << " len: " << field.meta()->len() << endl;
-    // }
-    // if (one.nullable)
-    //   one.length++;
+
     attr_infos.push_back(std::move(one));
     if (attr_names_.empty()) {
       continue;
