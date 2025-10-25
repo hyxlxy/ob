@@ -467,9 +467,9 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
 
   size_t copy_len = field->len();
   size_t data_len = value.length();
-  if (field->nullable()) {
-    copy_len = field->len() - 1;
-  }
+  // if (field->nullable()) {
+  //   copy_len = field->len() - 1;
+  // }
   switch (value.attr_type()) {
     case AttrType::INTS:
     case AttrType::FLOATS:
