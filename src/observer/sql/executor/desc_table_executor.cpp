@@ -288,6 +288,7 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
 
       Record new_rec;
       new_rec.copy_data(old_rec.data(), old_rec.len());
+      new_rec.set_key(old_rec.key());
       new_rec.set_rid(old_rec.rid());
 
       char *data = new_rec.data();
