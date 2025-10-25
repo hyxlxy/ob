@@ -462,6 +462,9 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
     return RC::INVALID_ARGUMENT;
   }
 
+  // 非null的话，就先清零整个字段空间
+  memset(record_data + field->offset(), 0, field->len());
+
   size_t copy_len = field->len();
   size_t data_len = value.length();
 
@@ -470,15 +473,8 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
       copy_len = field->len() - 1;
     }
     if (copy_len > data_len) {
-      copy_len = data_len;
+      copy_len = data_len + 1;
     }
-    // 清理 CHAR 字段剩余区域，防止更新为更短字符串时残留旧字符
-    // size_t chars_area_len = field->len();
-    size_t chars_area_len = field->len() - (field->nullable() ? 1 : 0);
-    memset(record_data + field->offset(), 0, chars_area_len);
-    // if (field->nullable()) {
-    //   record_data[field->offset() + field->len() - 1] = '0';  // Set NOT NULL flag
-    // }
 
   } else if (field->type() == AttrType::TEXTS) {
     // For TEXT: write to LOB and store offset+length
@@ -560,24 +556,6 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
   }
 
   memcpy(record_data + field->offset(), value.data(), copy_len);
-  // if (field->nullable()) {
-  //   record_data[field->offset() + field->len() - 1] = '0';  // Set NOT NULL flag
-  // }
-
-  // For nullable fields, set NULL flag to '0' (not NULL)
-  // if (field->nullable()) {
-  //   if (field->type() == AttrType::CHARS || field->type() == AttrType::TEXTS || field->type() == AttrType::VECTORS) {
-  //     // For variable-length types, NULL flag is at the end
-  //     record_data[field->offset() + field->len() - 1] = '0';
-  //   } else {
-  //     // For fixed-length types, we need to place NULL flag after the data
-  //     // but within the field's allocated space
-  //     // if (copy_len < field->len()) {
-  //     //   record_data[field->offset() + field->len() - 1] = '0';
-  //     // }
-
-  //   }
-  // }
 
   if (field->nullable()) {
     record_data[field->offset() + field->len() - 1] = '0';

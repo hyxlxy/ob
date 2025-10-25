@@ -22,12 +22,12 @@ int IntegerType::compare(const Value &left, const Value &right) const
   if (right.attr_type() == AttrType::INTS) {
     return common::compare_int((void *)&left.value_.int_value_, (void *)&right.value_.int_value_);
   } else if (right.attr_type() == AttrType::FLOATS) {
-    float left_val  = left.get_float();
+    float left_val  = left.get_int();
     float right_val = right.get_float();
     return common::compare_float((void *)&left_val, (void *)&right_val);
   } else if (right.attr_type() == AttrType::CHARS) {
     // 将字符串转换为整数进行比较
-    int left_val = left.get_int();
+    int left_val  = left.get_int();
     int right_val = right.get_int();
     return common::compare_int((void *)&left_val, (void *)&right_val);
   }
@@ -37,14 +37,12 @@ int IntegerType::compare(const Value &left, const Value &right) const
 RC IntegerType::cast_to(const Value &val, AttrType type, Value &result) const
 {
   switch (type) {
-  case AttrType::FLOATS: {
-    float float_value = val.get_int();
-    result.set_float(float_value);
-    return RC::SUCCESS;
-  }
-  default:
-    LOG_WARN("unsupported type %d", type);
-    return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    case AttrType::FLOATS: {
+      float float_value = val.get_int();
+      result.set_float(float_value);
+      return RC::SUCCESS;
+    }
+    default: LOG_WARN("unsupported type %d", type); return RC::SCHEMA_FIELD_TYPE_MISMATCH;
   }
 }
 
@@ -53,6 +51,7 @@ RC IntegerType::add(const Value &left, const Value &right, Value &result) const
   // 如果任一操作数为NULL，结果为NULL
   if (left.attr_type() == AttrType::UNDEFINED || right.attr_type() == AttrType::UNDEFINED) {
     result.reset();
+    result.is_null_ = true;
     return RC::SUCCESS;
   }
   result.set_int(left.get_int() + right.get_int());
@@ -64,6 +63,7 @@ RC IntegerType::subtract(const Value &left, const Value &right, Value &result) c
   // 如果任一操作数为NULL，结果为NULL
   if (left.attr_type() == AttrType::UNDEFINED || right.attr_type() == AttrType::UNDEFINED) {
     result.reset();
+    result.is_null_ = true;
     return RC::SUCCESS;
   }
   result.set_int(left.get_int() - right.get_int());
@@ -75,6 +75,8 @@ RC IntegerType::multiply(const Value &left, const Value &right, Value &result) c
   // 如果任一操作数为NULL，结果为NULL
   if (left.attr_type() == AttrType::UNDEFINED || right.attr_type() == AttrType::UNDEFINED) {
     result.reset();
+    result.is_null_ = true;
+
     return RC::SUCCESS;
   }
   result.set_int(left.get_int() * right.get_int());
@@ -87,6 +89,8 @@ RC IntegerType::divide(const Value &left, const Value &right, Value &result) con
   if (right_val == 0) {
     // 除零情况，返回NULL（UNDEFINED类型）
     result.reset();  // 这会将类型设置为 AttrType::UNDEFINED
+    result.is_null_ = true;
+
     return RC::SUCCESS;
   }
   result.set_int(left.get_int() / right_val);
@@ -101,7 +105,7 @@ RC IntegerType::negative(const Value &val, Value &result) const
 
 RC IntegerType::set_value_from_str(Value &val, const string &data) const
 {
-  RC                rc = RC::SUCCESS;
+  RC           rc = RC::SUCCESS;
   stringstream deserialize_stream;
   deserialize_stream.clear();  // 清理stream的状态，防止多次解析出现异常
   deserialize_stream.str(data);
