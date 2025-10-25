@@ -474,7 +474,9 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
     case AttrType::INTS:
     case AttrType::FLOATS:
     case AttrType::DATES: {
-      data_len = 4;
+      if (data_len != 4) {
+        ASSERT(0, "no way");
+      }
       break;
     }
     default: break;
@@ -484,7 +486,7 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
       copy_len = field->len() - 1;
     }
     if (copy_len > data_len) {
-      copy_len = data_len + 1;
+      copy_len = data_len;
     }
 
   } else if (field->type() == AttrType::TEXTS) {

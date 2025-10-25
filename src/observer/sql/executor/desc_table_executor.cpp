@@ -137,7 +137,7 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
 
   while (scanner->next(rec) == RC::SUCCESS) {
     if (!has_where) {
-      records.push_back(rec);
+      records.push_back(std::move(rec));
       continue;
     }
 
@@ -208,7 +208,9 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
     }
 
     if (match) {
-      records.push_back(rec);
+      // Record one;
+      // one.copy_data(rec.data(), rec.len());
+      records.push_back(std::move(rec));
     }
   }
   scanner->close_scan();

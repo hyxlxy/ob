@@ -30,24 +30,27 @@ using namespace common;
  * @param pattern 模式字符串，支持%和_通配符
  * @return 是否匹配
  */
-static bool like_match(const char *text, const char *pattern) {
+static bool like_match(const char *text, const char *pattern)
+{
   if (!text || !pattern) {
     return false;
   }
 
-  const char *t = text;
-  const char *p = pattern;
-  const char *star_text = nullptr;
+  const char *t            = text;
+  const char *p            = pattern;
+  const char *star_text    = nullptr;
   const char *star_pattern = nullptr;
 
   while (*t) {
     if (*p == '%') {
       // 遇到%，记录当前位置，跳过连续的%
-      while (*p == '%') p++;
-      if (!*p) return true; // 模式以%结尾，匹配成功
+      while (*p == '%')
+        p++;
+      if (!*p)
+        return true;  // 模式以%结尾，匹配成功
 
       star_pattern = p;
-      star_text = t;
+      star_text    = t;
     } else if (*p == '_' || *p == *t) {
       // _匹配任意单个字符，或者字符完全匹配
       p++;
@@ -63,9 +66,10 @@ static bool like_match(const char *text, const char *pattern) {
   }
 
   // 跳过模式末尾的%
-  while (*p == '%') p++;
+  while (*p == '%')
+    p++;
 
-  return !*p; // 模式完全消耗则匹配成功
+  return !*p;  // 模式完全消耗则匹配成功
 }
 
 ConditionFilter::~ConditionFilter() {}
@@ -169,19 +173,22 @@ bool DefaultConditionFilter::filter(const Record &rec) const
   Value right_value;
 
   if (left_.is_attr) {  // value
-    const char *base = rec.data() + left_.attr_offset;
-    int len = left_.attr_length;
-    bool is_null = false;
+    const char *base    = rec.data() + left_.attr_offset;
+    int         len     = left_.attr_length;
+    bool        is_null = false;
     // Heuristic: for fixed-length types, last byte stores NULL flag when nullable
     switch (attr_type_) {
       case AttrType::INTS:
-        if (len > (int)sizeof(int) && base[len-1] == '1') is_null = true;
+        if (len > (int)sizeof(int) && base[len - 1] == '1')
+          is_null = true;
         break;
       case AttrType::FLOATS:
-        if (len > (int)sizeof(float) && base[len-1] == '1') is_null = true;
+        if (len > (int)sizeof(float) && base[len - 1] == '1')
+          is_null = true;
         break;
       case AttrType::DATES:
-        if (len > (int)sizeof(int) && base[len-1] == '1') is_null = true;
+        if (len > (int)sizeof(int) && base[len - 1] == '1')
+          is_null = true;
         break;
       default:
         // leave is_null=false for non-fixed types
@@ -194,9 +201,12 @@ bool DefaultConditionFilter::filter(const Record &rec) const
       left_value.set_type(attr_type_);
       // for fixed types, pass payload size; for others, pass full len
       int payload_len = len;
-      if (attr_type_ == AttrType::INTS) payload_len = sizeof(int);
-      else if (attr_type_ == AttrType::FLOATS) payload_len = sizeof(float);
-      else if (attr_type_ == AttrType::DATES) payload_len = sizeof(int);
+      if (attr_type_ == AttrType::INTS)
+        payload_len = sizeof(int);
+      else if (attr_type_ == AttrType::FLOATS)
+        payload_len = sizeof(float);
+      else if (attr_type_ == AttrType::DATES)
+        payload_len = sizeof(int);
       left_value.set_data(const_cast<char *>(base), payload_len);
     }
   } else {
@@ -204,21 +214,23 @@ bool DefaultConditionFilter::filter(const Record &rec) const
   }
 
   if (right_.is_attr) {
-    const char *base = rec.data() + right_.attr_offset;
-    int len = right_.attr_length;
-    bool is_null = false;
+    const char *base    = rec.data() + right_.attr_offset;
+    int         len     = right_.attr_length;
+    bool        is_null = false;
     switch (attr_type_) {
       case AttrType::INTS:
-        if (len > (int)sizeof(int) && base[len-1] == '1') is_null = true;
+        if (len > (int)sizeof(int) && base[len - 1] == '1')
+          is_null = true;
         break;
       case AttrType::FLOATS:
-        if (len > (int)sizeof(float) && base[len-1] == '1') is_null = true;
+        if (len > (int)sizeof(float) && base[len - 1] == '1')
+          is_null = true;
         break;
       case AttrType::DATES:
-        if (len > (int)sizeof(int) && base[len-1] == '1') is_null = true;
+        if (len > (int)sizeof(int) && base[len - 1] == '1')
+          is_null = true;
         break;
-      default:
-        break;
+      default: break;
     }
     if (is_null) {
       right_value.set_type(AttrType::UNDEFINED);
@@ -226,9 +238,12 @@ bool DefaultConditionFilter::filter(const Record &rec) const
     } else {
       right_value.set_type(attr_type_);
       int payload_len = len;
-      if (attr_type_ == AttrType::INTS) payload_len = sizeof(int);
-      else if (attr_type_ == AttrType::FLOATS) payload_len = sizeof(float);
-      else if (attr_type_ == AttrType::DATES) payload_len = sizeof(int);
+      if (attr_type_ == AttrType::INTS)
+        payload_len = sizeof(int);
+      else if (attr_type_ == AttrType::FLOATS)
+        payload_len = sizeof(float);
+      else if (attr_type_ == AttrType::DATES)
+        payload_len = sizeof(int);
       right_value.set_data(const_cast<char *>(base), payload_len);
     }
   } else {
