@@ -143,13 +143,25 @@ RC OrderByPhysicalOperator::fetch_and_sort_tuples()
 
     // 计算排序键值
     std::vector<Value> sort_keys;
-    for (const auto &order_expr : order_by_expressions_) {
+    for (size_t i = 0; i < order_by_expressions_.size(); i++) {
+      const auto &order_expr = order_by_expressions_[i];
       Value sort_value;
+      
+      // 添加调试信息：表达式类型和名称
+      LOG_INFO("[ORDER_BY_DEBUG] Evaluating order expression %zu: type=%d, name='%s'", 
+               i, static_cast<int>(order_expr->type()), order_expr->name());
+      
       rc = order_expr->get_value(*tuple, sort_value);
       if (rc != RC::SUCCESS) {
-        LOG_WARN("failed to evaluate order by expression: %s", strrc(rc));
+        LOG_WARN("[ORDER_BY_DEBUG] Failed to evaluate order by expression %zu: %s, expr_type=%d", 
+                 i, strrc(rc), static_cast<int>(order_expr->type()));
         return rc;
       }
+      
+      // 添加调试信息：求值结果
+      LOG_INFO("[ORDER_BY_DEBUG] Order expression %zu evaluated successfully: value_type=%d, value='%s'", 
+               i, static_cast<int>(sort_value.attr_type()), sort_value.to_string().c_str());
+      
       sort_keys.push_back(sort_value);
     }
 

@@ -106,6 +106,10 @@ RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
   RC rc = tuple.find_cell(TupleCellSpec(table_name(), field_name()), value);
 
   printf("DEBUG: [FIELD] FieldExpr find_cell result: rc=%s\n", strrc(rc));
+  if (rc == RC::SUCCESS) {
+    printf("DEBUG: [FIELD] FieldExpr value type=%d, length=%d, value='%s'\n", 
+           static_cast<int>(value.attr_type()), value.length(), value.to_string().c_str());
+  }
 
   // 如果在当前元组中找不到字段，且存在父级元组（相关子查询），尝试从父级元组中查找
   if (rc != RC::SUCCESS && current_parent_tuple_ != nullptr) {
@@ -1606,21 +1610,44 @@ int FunctionExpr::value_length() const
 
 RC FunctionExpr::get_value(const Tuple &tuple, Value &value) const
 {
+  LOG_INFO("[FUNCTION_DEBUG] Evaluating function '%s' with %zu arguments", 
+           function_name_.c_str(), args_.size());
+  
   // 获取所有参数的值
   vector<Value> arg_values;
   arg_values.reserve(args_.size());
 
-  for (const auto &arg : args_) {
+  for (size_t i = 0; i < args_.size(); i++) {
+    const auto &arg = args_[i];
     Value arg_value;
-    RC    rc = arg->get_value(tuple, arg_value);
+    
+    LOG_INFO("[FUNCTION_DEBUG] Function '%s' arg %zu: type=%d, name='%s'", 
+             function_name_.c_str(), i, static_cast<int>(arg->type()), arg->name());
+    
+    RC rc = arg->get_value(tuple, arg_value);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to get argument value for function %s", function_name_.c_str());
+      LOG_WARN("[FUNCTION_DEBUG] Failed to get argument %zu value for function %s: %s", 
+               i, function_name_.c_str(), strrc(rc));
       return rc;
     }
+    
+    LOG_INFO("[FUNCTION_DEBUG] Function '%s' arg %zu value: type=%d, value='%s'", 
+             function_name_.c_str(), i, static_cast<int>(arg_value.attr_type()), 
+             arg_value.to_string().c_str());
+    
     arg_values.emplace_back(arg_value);
   }
 
-  return try_get_value_with_args(arg_values, value);
+  RC rc = try_get_value_with_args(arg_values, value);
+  if (rc == RC::SUCCESS) {
+    LOG_INFO("[FUNCTION_DEBUG] Function '%s' evaluated successfully: result_type=%d, result='%s'", 
+             function_name_.c_str(), static_cast<int>(value.attr_type()), value.to_string().c_str());
+  } else {
+    LOG_WARN("[FUNCTION_DEBUG] Function '%s' evaluation failed: %s", 
+             function_name_.c_str(), strrc(rc));
+  }
+  
+  return rc;
 }
 
 RC FunctionExpr::get_column(Chunk &chunk, Column &column)
@@ -2033,6 +2060,8 @@ RC FunctionExpr::try_get_value_with_args(const vector<Value> &arg_values, Value 
 
   // DISTANCE(vec1, vec2, metric)
   if (strcasecmp(function_name_.c_str(), "DISTANCE") == 0) {
+    LOG_INFO("[DISTANCE_DEBUG] DISTANCE function called with %zu arguments", arg_values.size());
+    
     if (arg_values.size() != 3) {
       LOG_WARN("DISTANCE function requires exactly 3 arguments, got %zu", arg_values.size());
       return RC::INVALID_ARGUMENT;
@@ -2040,30 +2069,52 @@ RC FunctionExpr::try_get_value_with_args(const vector<Value> &arg_values, Value 
     const Value &left       = arg_values[0];
     const Value &right      = arg_values[1];
     const Value &metric_val = arg_values[2];
+    
+    LOG_INFO("[DISTANCE_DEBUG] Arg types: left=%d, right=%d, metric=%d", 
+             static_cast<int>(left.attr_type()), 
+             static_cast<int>(right.attr_type()), 
+             static_cast<int>(metric_val.attr_type()));
+    
     if (metric_val.attr_type() != AttrType::CHARS) {
-      LOG_WARN("DISTANCE third argument must be string metric");
+      LOG_WARN("DISTANCE third argument must be string metric, got type %d", 
+               static_cast<int>(metric_val.attr_type()));
       return RC::INVALID_ARGUMENT;
     }
+    
     // 如果两个参数都是常量向量，提前进行维度校验，维度不一致直接返回错误以触发 FAILURE
     if (left.attr_type() == AttrType::VECTORS && right.attr_type() == AttrType::VECTORS) {
       if (left.length() >= (int)sizeof(int) && right.length() >= (int)sizeof(int)) {
         int ldim = *(const int *)left.data();
         int rdim = *(const int *)right.data();
+        LOG_INFO("[DISTANCE_DEBUG] Vector dimensions: left=%d, right=%d", ldim, rdim);
         if (ldim != rdim) {
           LOG_WARN("DISTANCE constant-fold dim mismatch: %d vs %d", ldim, rdim);
           return RC::INVALID_ARGUMENT;
         }
       }
+    } else {
+      LOG_WARN("[DISTANCE_DEBUG] Not both vectors: left_type=%d, right_type=%d", 
+               static_cast<int>(left.attr_type()), 
+               static_cast<int>(right.attr_type()));
     }
+    
     std::string metric = metric_val.get_string();
+    LOG_INFO("[DISTANCE_DEBUG] Metric string: '%s'", metric.c_str());
+    
     // uppercase
     for (auto &c : metric)
       c = (char)toupper((unsigned char)c);
+    
+    LOG_INFO("[DISTANCE_DEBUG] Metric uppercase: '%s'", metric.c_str());
+    
     if (metric == "EUCLIDEAN" || metric == "L2" || metric == "L2_DISTANCE") {
+      LOG_INFO("[DISTANCE_DEBUG] Using L2 distance");
       return VectorType::l2_distance(left, right, value);
     } else if (metric == "COSINE" || metric == "COSINE_DISTANCE") {
+      LOG_INFO("[DISTANCE_DEBUG] Using COSINE distance");
       return VectorType::cosine_distance(left, right, value);
     } else if (metric == "INNER" || metric == "INNER_PRODUCT" || metric == "IP" || metric == "DOT") {
+      LOG_INFO("[DISTANCE_DEBUG] Using INNER_PRODUCT");
       return VectorType::inner_product(left, right, value);
     } else {
       LOG_WARN("Unknown DISTANCE metric: %s", metric.c_str());

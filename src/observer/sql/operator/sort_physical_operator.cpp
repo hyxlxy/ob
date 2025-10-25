@@ -115,6 +115,9 @@ RC LightTuple::get_sort_value_from_schema(Value& value,
     
   } else {
     // 复杂表达式：需要计算
+    LOG_INFO("[LIGHTTUPLE_DEBUG] Complex expression detected: type=%d, name='%s'", 
+             static_cast<int>(expr->type()), expr->name());
+    
     // 这里需要创建一个临时的ValueListTuple来支持表达式计算
     ValueListTuple temp_tuple;
     temp_tuple.set_cells(cells_);
@@ -126,8 +129,19 @@ RC LightTuple::get_sort_value_from_schema(Value& value,
     }
     temp_tuple.set_names(specs);
     
+    LOG_INFO("[LIGHTTUPLE_DEBUG] Calling expr->get_value() for complex expression");
+    
     // 使用表达式计算值
-    return expr->get_value(temp_tuple, value);
+    RC rc = expr->get_value(temp_tuple, value);
+    
+    if (rc == RC::SUCCESS) {
+      LOG_INFO("[LIGHTTUPLE_DEBUG] Complex expression evaluated: value_type=%d, value='%s'", 
+               static_cast<int>(value.attr_type()), value.to_string().c_str());
+    } else {
+      LOG_WARN("[LIGHTTUPLE_DEBUG] Complex expression evaluation failed: %s", strrc(rc));
+    }
+    
+    return rc;
   }
 }
 
@@ -189,8 +203,11 @@ RC SortPhysicalOperator::precompute_sort_indices() {
       }
       sort_field_indices_.push_back(index);
     } else {
-      LOG_WARN("Complex sort expressions not supported in optimized mode");
-      return RC::INTERNAL;
+      // 遇到复杂表达式（如函数调用），清空索引列表，回退到通用比较模式
+      LOG_INFO("Complex sort expression detected (type=%d), falling back to generic comparison mode", 
+               static_cast<int>(expr->type()));
+      sort_field_indices_.clear();
+      return RC::SUCCESS;  // 返回成功，但索引列表为空，会使用通用比较
     }
   }
   
@@ -312,17 +329,28 @@ bool SortPhysicalOperator::compare_value_tuples(const ValueListTuple &left, cons
     Value left_value;
     Value right_value;
 
+    LOG_INFO("[SORT_DEBUG] Evaluating order expression %zu for left tuple: type=%d, name='%s'", 
+             i, static_cast<int>(order_by_expressions_[i]->type()), order_by_expressions_[i]->name());
+
     RC rc = order_by_expressions_[i]->get_value(left, left_value);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to get value from left tuple for order by expression %zu: %s", i, strrc(rc));
+      LOG_WARN("[SORT_DEBUG] Failed to get value from left tuple for order by expression %zu: %s", i, strrc(rc));
       return true;
     }
+    
+    LOG_INFO("[SORT_DEBUG] Left value: type=%d, value='%s'", 
+             static_cast<int>(left_value.attr_type()), left_value.to_string().c_str());
 
+    LOG_INFO("[SORT_DEBUG] Evaluating order expression %zu for right tuple", i);
+    
     rc = order_by_expressions_[i]->get_value(right, right_value);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to get value from right tuple for order by expression %zu: %s", i, strrc(rc));
+      LOG_WARN("[SORT_DEBUG] Failed to get value from right tuple for order by expression %zu: %s", i, strrc(rc));
       return false;
     }
+    
+    LOG_INFO("[SORT_DEBUG] Right value: type=%d, value='%s'", 
+             static_cast<int>(right_value.attr_type()), right_value.to_string().c_str());
 
     int cmp_result = left_value.compare(right_value);
     if (cmp_result != 0) {
