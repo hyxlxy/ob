@@ -391,3 +391,7 @@ deps/3rd
 ############# test #############
 test/tmp
 test/var
+*.md
+*.txt
+
+miniob/
