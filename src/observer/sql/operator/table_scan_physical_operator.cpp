@@ -38,18 +38,11 @@ RC TableScanPhysicalOperator::next()
   while (OB_SUCC(rc = record_scanner_->next(current_record_))) {
     scan_counter++;
 
-    // 防止无限循环，每10000次扫描输出调试信息
-    if (scan_counter % 10000 == 0) {
-      printf("DEBUG: TableScanPhysicalOperator::next scanned %d records\n", scan_counter);
-      fflush(stdout);
+    // 每20000次扫描输出调试信息
+    if (scan_counter % 20000 == 0) {
+      LOG_INFO("TableScanPhysicalOperator::next scanned %d records from table %s", scan_counter, table_->name());
     }
 
-    // 如果扫描次数过多，强制退出
-    if (scan_counter > 100000) {
-      printf("DEBUG: TableScanPhysicalOperator::next exceeded maximum scan limit, breaking\n");
-      fflush(stdout);
-      return RC::RECORD_EOF;
-    }
 
     LOG_TRACE("got a record. rid=%s", current_record_.rid().to_string().c_str());
 
