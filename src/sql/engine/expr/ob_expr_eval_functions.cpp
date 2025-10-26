@@ -38,6 +38,7 @@
 #include "ob_expr_host_ip.h"
 #include "ob_expr_trim.h"
 #include "ob_expr_tokenize.h"
+#include "ob_expr_whitespace_tokenize.h"
 #include "ob_expr_insert.h"
 #include "ob_expr_int2ip.h"
 #include "ob_expr_int_div.h"
@@ -1444,6 +1445,7 @@ static ObExpr::EvalFunc g_expr_eval_functions[] = {
   NULL, // ObExprVectorIPSimilarity::calc_ip_similarity               /* 873 */
   NULL, // ObExprVectorSimilarity::calc_similarity                    /* 874 */
   NULL, // ObExprVecVisible::generate_vec_visible                     /* 875 */
+  ObExprWhitespaceTokenize::eval_whitespace_tokenize,                   /* 876 */
 };
 
 static ObExpr::EvalBatchFunc g_expr_eval_batch_functions[] = {
