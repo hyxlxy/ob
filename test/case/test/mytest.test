@@ -21,6 +21,8 @@ SELECT COUNT(*) FROM qq1;
 
 INSERT INTO qq1(id, age) values(999,999);
 
+SELECT * FROM q1;
+
 SELECT * FROM qq1;
 
 INSERT INTO qq1 values(100,100,'aaa');
