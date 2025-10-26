@@ -81,7 +81,7 @@ public:
   // RC create_view(const char *view_name, const vector<string> &attr_names,
   //                const string &select_sql, class SelectStmt *select_stmt);
   RC create_view(const string &view_name, bool can_be_update, const vector<string> &attr_names, string def,
-      const vector<Table *> tables);
+      const vector<Table *> tables, bool have_agg_or_ma = false, bool only_one_table = true);
   RC create_view(View *view_one);
   RC drop_view(const char *view_name);
 

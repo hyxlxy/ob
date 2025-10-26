@@ -73,6 +73,9 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
     view->set_table_field_name(db);
 
     if (!view->can_update()) {
+      if (view->have_agg_or_ma_) {
+        return RC::ERROR;
+      }
       //此刻我们需要检测一下，插入的列是否都是来自一个表的，如果是的话，那么就可以update
       auto &&opt = view->check_is_update(inserts.attribute_names);
       if (!opt.has_value()) {

@@ -50,7 +50,7 @@ RC ScalarGroupByPhysicalOperator::open(Trx *trx)
   ValueListTuple group_by_evaluated_tuple;
 
   int       processed_rows     = 0;
-  const int MAX_ROWS_PER_QUERY = 1000000;  // 防止处理过多行
+  const int MAX_ROWS_PER_QUERY = 1000000000;  // 防止处理过多行
 
   while (OB_SUCC(rc = child.next())) {
     // 防止处理过多行导致内存问题

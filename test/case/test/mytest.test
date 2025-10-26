@@ -47,7 +47,14 @@ SELECT * FROM qq2;
 
 CREATE VIEW qq3 AS SELECT id, age, id + age AS data FROM q1;
 
+SELECT * FROM qq3;
+
+SELECT sum(age) from qq3;
+
 DELETE FROM qq3 where id = 1;
 
-SELECT * FROM qq3;
+SELECT sum(age) from qq3;
+
+SELECT 
+
 

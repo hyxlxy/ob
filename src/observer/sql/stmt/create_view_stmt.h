@@ -62,4 +62,6 @@ private:
   bool                   can_be_update_;
   vector<Field>          query_fields_;
   vector<Table *>        base_tables_;
+  bool                   have_agg_or_ma_{false};
+  bool                   only_one_table_{true};
 };

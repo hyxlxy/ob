@@ -42,10 +42,10 @@ RC TableScanPhysicalOperator::next()
     scan_counter++;
 
     // 防止无限循环，每10000次扫描输出调试信息
-    if (scan_counter % 10000 == 0) {
-      printf("DEBUG: TableScanPhysicalOperator::next scanned %d records\n", scan_counter);
-      fflush(stdout);
-    }
+    // if (scan_counter % 10000 == 0) {
+    //   printf("DEBUG: TableScanPhysicalOperator::next scanned %d records\n", scan_counter);
+    //   fflush(stdout);
+    // }
 
     // 如果扫描次数过多，强制退出
     // if (scan_counter > 100000) {
@@ -136,12 +136,12 @@ RC TableScanPhysicalOperator::filter(RowTuple &tuple, bool &result)
     bool tmp_result = value.get_boolean();
 
     // 每1000次调用输出一次调试信息
-    if (filter_counter % 1000 == 0) {
-      printf("DEBUG: TableScanPhysicalOperator::filter called %d times, result=%s\n",
-          filter_counter,
-          tmp_result ? "true" : "false");
-      fflush(stdout);
-    }
+    // if (filter_counter % 1000 == 0) {
+    //   printf("DEBUG: TableScanPhysicalOperator::filter called %d times, result=%s\n",
+    //       filter_counter,
+    //       tmp_result ? "true" : "false");
+    //   fflush(stdout);
+    // }
 
     if (!tmp_result) {
       result = false;

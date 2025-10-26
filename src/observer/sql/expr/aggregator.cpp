@@ -34,7 +34,7 @@ RC SumAggregator::accumulate(const Value &value)
   return RC::SUCCESS;
 }
 
-RC SumAggregator::evaluate(Value& result)
+RC SumAggregator::evaluate(Value &result)
 {
   result = value_;
   return RC::SUCCESS;
@@ -51,7 +51,7 @@ RC CountAggregator::accumulate(const Value &value)
   return RC::SUCCESS;
 }
 
-RC CountAggregator::evaluate(Value& result)
+RC CountAggregator::evaluate(Value &result)
 {
   // 安全地设置结果
   result.set_int(static_cast<int>(count_));
@@ -76,7 +76,7 @@ RC MaxAggregator::accumulate(const Value &value)
   return RC::SUCCESS;
 }
 
-RC MaxAggregator::evaluate(Value& result)
+RC MaxAggregator::evaluate(Value &result)
 {
   if (first_) {
     // 没有任何非NULL输入，返回 SQL NULL
@@ -106,7 +106,7 @@ RC MinAggregator::accumulate(const Value &value)
   return RC::SUCCESS;
 }
 
-RC MinAggregator::evaluate(Value& result)
+RC MinAggregator::evaluate(Value &result)
 {
   if (first_) {
     // 没有任何非NULL输入，返回 SQL NULL
@@ -130,7 +130,7 @@ RC AvgAggregator::accumulate(const Value &value)
   return RC::SUCCESS;
 }
 
-RC AvgAggregator::evaluate(Value& result)
+RC AvgAggregator::evaluate(Value &result)
 {
   if (count_ == 0) {
     // MySQL 8.0标准：当所有值都是NULL时，AVG返回NULL

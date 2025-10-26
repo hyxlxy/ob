@@ -103,19 +103,23 @@ RC CreateViewStmt::create(Db *db, const CreateViewSqlNode &create_view, Stmt *&s
     cout << endl;
   }
 
-  bool can_be_update = true;
+  bool can_be_update  = true;
+  bool have_agg_or_ma = false;
+  bool only_one_table = true;
   do {
     //如果多个表，或者有一些特殊的表达式，聚合，算数之类的，就不可以
 
     if (select_stmt->tables().size() > 1 or tables.size() > 1) {
       //因为有可能tables里面是view，而这个view是非修改的。 所以这里还需要check一下这个base_tables的size
-      can_be_update = false;
+      can_be_update  = false;
+      only_one_table = false;
       break;
     }
 
     for (auto &&one : select_stmt->query_expressions()) {
       if (one->type() == ExprType::AGGREGATION or one->type() == ExprType::ARITHMETIC) {
-        can_be_update = false;
+        can_be_update  = false;
+        have_agg_or_ma = true;
         break;
       }
     }
@@ -148,6 +152,8 @@ RC CreateViewStmt::create(Db *db, const CreateViewSqlNode &create_view, Stmt *&s
   view_stmt->set_select_stmt(std::move(select_stmt));
   view_stmt->set_can_be_update(can_be_update);
   view_stmt->set_base_tables(std::move(tables));
+  view_stmt->have_agg_or_ma_ = have_agg_or_ma;
+  view_stmt->only_one_table_ = only_one_table;
   // if (view_stmt->attr_names().empty()) {
   //   vector<string> names;
   //   for (auto &&one : fields) {

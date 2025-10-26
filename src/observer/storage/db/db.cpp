@@ -769,7 +769,7 @@ void Db::all_views(vector<string> &view_names) const
 // 表里添加已经在算子里搞过了
 // 这里的创建主要就是在opened_views里面添加进去。
 RC Db::create_view(const string &view_name, bool can_be_update, const vector<string> &attr_names, string def,
-    const vector<Table *> tables)
+    const vector<Table *> tables, bool have_agg_or_ma, bool only_one_table)
 {
 
   if (view_name.empty() or attr_names.empty() or def.empty()) {
@@ -777,6 +777,8 @@ RC Db::create_view(const string &view_name, bool can_be_update, const vector<str
   }
   View *view = new View(view_name, attr_names, can_be_update, next_view_id_++, def);
   view->set_base_tables(tables);
+  view->have_agg_or_ma_    = have_agg_or_ma;
+  view->only_one_table_    = only_one_table;
   opened_views_[view_name] = view;
   return RC::SUCCESS;
 }

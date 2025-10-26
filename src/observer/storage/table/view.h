@@ -61,6 +61,9 @@ public:
     return default_base_table_;
   }
 
+  bool have_agg_or_ma_;
+  bool only_one_table_;
+
 private:
   string          view_name_;
   vector<Table *> base_tables_;

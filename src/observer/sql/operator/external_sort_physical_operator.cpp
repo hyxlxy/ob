@@ -439,8 +439,8 @@ RC ExternalSortPhysicalOperator::produce_all()
   buffer_.clear();
   buffer_bytes_used_ = 0;
 
-  RC     rc       = RC::SUCCESS;
-  size_t produced = 0;
+  RC rc = RC::SUCCESS;
+  // size_t produced = 0;
   while ((rc = children_[0]->next()) == RC::SUCCESS) {
     Tuple *t = children_[0]->current_tuple();
     if (t == nullptr)
@@ -472,9 +472,9 @@ RC ExternalSortPhysicalOperator::produce_all()
       if (fr != RC::SUCCESS)
         return fr;
     }
-    if ((++produced % 10000) == 0) {
-      sql_debug("EXTSORT fetched=%zu mem_bytes=%zu", produced, buffer_bytes_used_);
-    }
+    // if ((++produced % 10000) == 0) {
+    //   sql_debug("EXTSORT fetched=%zu mem_bytes=%zu", produced, buffer_bytes_used_);
+    // }
   }
 
   if (rc != RC::RECORD_EOF) {
