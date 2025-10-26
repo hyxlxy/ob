@@ -54,6 +54,9 @@ public:
   void      set_base_tables(vector<Table *> tables) { base_tables_ = std::move(tables); }
   static RC create(Db *db, const CreateViewSqlNode &create_view, Stmt *&stmt);
 
+  bool have_agg_or_ma_{false};
+  bool only_one_table_{true};
+
 private:
   string                 view_name_;
   vector<string>         attr_names_;
@@ -62,6 +65,4 @@ private:
   bool                   can_be_update_;
   vector<Field>          query_fields_;
   vector<Table *>        base_tables_;
-  bool                   have_agg_or_ma_{false};
-  bool                   only_one_table_{true};
 };

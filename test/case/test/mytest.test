@@ -55,6 +55,5 @@ DELETE FROM qq3 where id = 1;
 
 SELECT sum(age) from qq3;
 
-SELECT 
 
 

@@ -89,8 +89,13 @@ RC CreateViewExecutor::execute(SQLStageEvent *sql_event)
     rc = session->current_trx()->insert_record(table, record);
     CHECK_RETURN_RC(rc);
     // View *new_view = new View();
-    rc = session->get_current_db()->create_view(
-        stmt->view_name(), stmt->can_be_update(), stmt->attr_names(), stmt->def(), stmt->base_tables());
+    rc = session->get_current_db()->create_view(stmt->view_name(),
+        stmt->can_be_update(),
+        stmt->attr_names(),
+        stmt->def(),
+        stmt->base_tables(),
+        stmt->have_agg_or_ma_,
+        stmt->only_one_table_);
     CHECK_RETURN_RC(rc);
   }
 

@@ -113,14 +113,12 @@ RC CreateViewStmt::create(Db *db, const CreateViewSqlNode &create_view, Stmt *&s
       //因为有可能tables里面是view，而这个view是非修改的。 所以这里还需要check一下这个base_tables的size
       can_be_update  = false;
       only_one_table = false;
-      break;
     }
 
     for (auto &&one : select_stmt->query_expressions()) {
       if (one->type() == ExprType::AGGREGATION or one->type() == ExprType::ARITHMETIC) {
         can_be_update  = false;
         have_agg_or_ma = true;
-        break;
       }
     }
 
