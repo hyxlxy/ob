@@ -62,9 +62,10 @@ public:
     return false;
   }
 
+  string table_alias_;
+
 private:
   string table_name_;
   string field_name_;
   string alias_;
-  string table_alias_;
 };

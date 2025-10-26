@@ -56,6 +56,13 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
     if (i < select_sql.relation_aliases.size() && !select_sql.relation_aliases[i].empty()) {
       alias_name = select_sql.relation_aliases[i].c_str();
     }
+
+    if (outer_context != nullptr) {
+      if (outer_context->out_view_alias != "no_exist") {
+        alias_name = outer_context->out_view_alias.c_str();
+      }
+    }
+
     if (nullptr == table_name) {
       LOG_WARN("invalid argument. relation name is null. index=%d", i);
       return RC::INVALID_ARGUMENT;
@@ -71,21 +78,9 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
         return RC::SCHEMA_TABLE_NOT_EXIST;
       }
 
-      ///////以下内容我们需要把他当做view来处理了。
-      unique_ptr<ParsedSqlNode> node;
-      view->get_sql(node);
-      Stmt *child_stmt = nullptr;
-      RC    rc         = create(db, node->selection, child_stmt);
-      if (rc != RC::SUCCESS) {
-        return RC::ERROR;
-      }
-      view->set_stmt(child_stmt);
-      view->set_table_meta(db);
-      view->set_table_field_name(db);
-      // auto &&view_select = dynamic_cast<SelectStmt *>(child_stmt);
       table = dynamic_cast<Table *>(view);
-      binder_context.add_table(table);
-      rc = binder_context.add_table_with_name(table, alias_name);
+      binder_context.add_table(table, alias_name);
+      RC rc = binder_context.add_table_with_name(table, alias_name);
       if (rc == RC::ERROR) {
         return rc;
       }
@@ -93,10 +88,27 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
       table_map.emplace(select_sql.relations[i], table);
       aliases_for_tables.emplace_back(alias_name != nullptr ? alias_name : "");
 
+      ///////以下内容我们需要把他当做view来处理了。
+      unique_ptr<ParsedSqlNode> node;
+      view->get_sql(node);
+      Stmt *child_stmt = nullptr;
+      if (alias_name != nullptr) {
+        binder_context.out_view_alias = (string)alias_name;
+      }
+      rc                            = create(db, node->selection, child_stmt, &binder_context);
+      binder_context.out_view_alias = "no_exist";
+      if (rc != RC::SUCCESS) {
+        return RC::ERROR;
+      }
+      view->set_stmt(child_stmt);
+      view->set_table_meta(db);
+      view->set_table_field_name(db);
+      // auto &&view_select = dynamic_cast<SelectStmt *>(child_stmt);
+
       continue;
     }
 
-    binder_context.add_table(table);
+    binder_context.add_table(table, alias_name);
     if (alias_name != nullptr) {
       RC rc = binder_context.add_table_with_name(table, alias_name);
       if (rc != RC::SUCCESS) {
@@ -147,7 +159,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
       view->set_table_field_name(db);
       // auto &&view_select = dynamic_cast<SelectStmt *>(child_stmt);
       table = dynamic_cast<Table *>(view);
-      binder_context.add_table(table);
+      binder_context.add_table(table, alias_name);
       rc = binder_context.add_table_with_name(table, alias_name);
       if (rc == RC::ERROR) {
         return rc;
@@ -158,7 +170,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
       continue;
     }
 
-    binder_context.add_table(table);
+    binder_context.add_table(table, alias_name);
     if (alias_name != nullptr) {
       RC rc = binder_context.add_table_with_name(table, alias_name);
       if (rc != RC::SUCCESS) {

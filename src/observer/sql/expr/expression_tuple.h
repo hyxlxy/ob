@@ -112,6 +112,8 @@ public:
 
         } else {
           TupleCellSpec new_spec{it->second.first.c_str(), it->second.second.c_str()};
+          new_spec.set_table_alias(spec.table_alias());
+          // new_spec.set_alias(spec.alias());
           rc = child_tuple_->find_cell(new_spec, cell);
           if (OB_SUCC(rc)) {
             return rc;
@@ -120,7 +122,11 @@ public:
       }
     }
 
+    if (rc == RC::NOT_FOUND_MA) {
+      return RC::NOTFOUND;
+    }
     rc = RC::NOTFOUND;
+
     for (const ExprPointerType &expression : expressions_) {
 
       if (0 == strcmp(spec.alias(), expression->name())) {

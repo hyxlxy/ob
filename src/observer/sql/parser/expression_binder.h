@@ -24,9 +24,14 @@ public:
   virtual ~BinderContext() = default;
 
   // Add a table into current query context and register its real name
-  void add_table(Table *table)
+  void add_table(Table *table, const char *alias = nullptr)
   {
     query_tables_.push_back(table);
+    if (alias != nullptr) {
+      table_aliases_.push_back((string)alias);
+    } else {
+      table_aliases_.push_back("");
+    }
     // if (table != nullptr) {
     //   name_to_table_[table->name()] = table;
     // }
@@ -62,9 +67,12 @@ public:
   Table *find_table(const char *table_name) const;
 
   const vector<Table *> &query_tables() const { return query_tables_; }
+  const vector<string>  &table_aliases() const { return table_aliases_; }
+  string                 out_view_alias = "no_exist";
 
 private:
   vector<Table *>                     query_tables_;
+  vector<string>                      table_aliases_;
   std::unordered_map<string, Table *> name_to_table_;
   vector<const BinderContext *>       outer_contexts_;  // 外层查询上下文
 };

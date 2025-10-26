@@ -61,6 +61,8 @@ static void wildcard_fields(Table *table, const char *table_name_or_alias, vecto
     FieldExpr *field_expr = new FieldExpr(field);
     // Set field name without table prefix (MySQL behavior for wildcard expansion)
     field_expr->set_name(field.field_name());
+    if (table_name_or_alias != nullptr)
+      field_expr->set_table_alias(table_name_or_alias);
     expressions.emplace_back(field_expr);
   }
 }
@@ -181,10 +183,16 @@ RC ExpressionBinder::bind_star_expression(
   } else {
     // Expand all tables (SELECT *)
     const vector<Table *> &all_tables = context_.query_tables();
-    for (Table *table : all_tables) {
-      // Use actual table name for wildcard expansion
-      wildcard_fields(table, table->name(), bound_expressions);
+    for (size_t idx = 0; idx < all_tables.size(); ++idx) {
+      Table        *table               = all_tables[idx];
+      const string &table_alias         = context_.table_aliases()[idx];
+      const char   *table_name_or_alias = table_alias.empty() ? nullptr : table_alias.c_str();
+      wildcard_fields(table, table_name_or_alias, bound_expressions);
     }
+    // for (Table *table : all_tables) {
+    //   // Use actual table name for wildcard expansion
+    //   wildcard_fields(table, table->name(), bound_expressions);
+    // }
   }
 
   return RC::SUCCESS;

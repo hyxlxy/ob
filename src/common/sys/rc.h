@@ -87,7 +87,8 @@ See the Mulan PSL v2 for more details. */
   DEFINE_RC(SYNTAX_ERROR)                  \
   DEFINE_RC(UNSUPPORTED)                   \
   DEFINE_RC(SCALAR_SUBQUERY_MULTIPLE_ROWS) \
-  DEFINE_RC(ERROR)
+  DEFINE_RC(ERROR)                         \
+  DEFINE_RC(NOT_FOUND_MA)
 enum class RC
 {
 #define DEFINE_RC(name) name,

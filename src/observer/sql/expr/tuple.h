@@ -294,14 +294,14 @@ public:
   {
     const char *table_name = spec.table_name();
     const char *field_name = spec.field_name();
-    if (0 != strcmp(table_name, table_->name())) {
+    if (0 != strcmp(table_name, table_->name()) and strlen(table_name) != 0) {
       return RC::NOTFOUND;
     }
 
     //如果rowtuple对应的table是有别名的，并且我们在查询的时候的spec也是需要有别名的
     if (!table_alias_.empty() and strlen(spec.table_alias())) {
       if (string(spec.table_alias()) != table_alias_) {
-        return RC::NOTFOUND;
+        return RC::NOT_FOUND_MA;
       }
     }
 

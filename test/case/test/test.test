@@ -1,10 +1,29 @@
-create table q1(id int,age int,name char(10));
-create table q2(id int,age int,name char(10));
-insert into q1 values(1,20,'AliceAlice');
-insert into q1 values(2,25,'BobAliceAS');
-insert into q1 values(3,30,'CharliesaQ');
-insert into q2 values(1,20,'AliceAlice');
-insert into q2 values(2,25,'BobASFAWAW');
-insert into q2 values(3,40,'DavidASFWA');
-create view qq1 as select * from q1;
-select count(*) from qq1;
+
+CREATE TABLE q1 (id INT, age INT, name CHAR(10));
+CREATE TABLE q2 (id INT, age INT, name CHAR(10));
+
+
+INSERT INTO q1 VALUES (1, 20, 'AliceAlice'); 
+INSERT INTO q1 VALUES (2, 25, 'BobAliceAS');  
+INSERT INTO q1 VALUES (3, 30, 'CharliesaQ'); 
+INSERT INTO q2 VALUES (1, 20, 'AAAAA'); 
+INSERT INTO q2 VALUES (2, 25, 'BBBBB');  
+INSERT INTO q2 VALUES (3, 30, 'CCCCC'); 
+
+
+
+CREATE VIEW qq1 AS SELECT id, age, id + age AS data FROM q1;
+
+SELECT * FROM qq1;
+
+SELECT * FROM qq1 t1, q1 t2;
+
+SELECT * FROM qq1 t1, q1 t2 WHERE t1.id = t2.id;
+
+CREATE VIEW qq2 AS SELECT t2.name, t1.data FROM qq1 t1, q1 t2 WHERE t1.id = t2.id;
+
+SELECT * FROM qq2;
+
+
+
+
