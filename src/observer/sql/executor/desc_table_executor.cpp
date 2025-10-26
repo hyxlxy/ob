@@ -119,7 +119,7 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
   Trx        *trx         = session->current_trx();
 
   if (auto &&view = dynamic_cast<View *>(table)) {
-    table = view->base_tables().front();
+    table = view->get_default_base_table();
   }
 
   // 获取scanner

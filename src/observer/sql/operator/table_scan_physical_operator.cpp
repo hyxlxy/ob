@@ -48,11 +48,11 @@ RC TableScanPhysicalOperator::next()
     }
 
     // 如果扫描次数过多，强制退出
-    if (scan_counter > 100000) {
-      printf("DEBUG: TableScanPhysicalOperator::next exceeded maximum scan limit, breaking\n");
-      fflush(stdout);
-      return RC::RECORD_EOF;
-    }
+    // if (scan_counter > 100000) {
+    //   printf("DEBUG: TableScanPhysicalOperator::next exceeded maximum scan limit, breaking\n");
+    //   fflush(stdout);
+    //   return RC::RECORD_EOF;
+    // }
 
     LOG_TRACE("got a record. rid=%s", current_record_.rid().to_string().c_str());
 

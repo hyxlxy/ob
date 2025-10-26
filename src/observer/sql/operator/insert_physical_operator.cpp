@@ -33,7 +33,7 @@ RC InsertPhysicalOperator::open(Trx *trx)
     //当前的table其实是view
     //那么就把base_table里的table取出来。
     //但是里面有一些列是不存在的，是null，所以这里需要特殊处理一下values。
-    table_ = view->base_tables().front();
+    table_ = view->get_default_base_table();
     Db *db = table_->db();
 
     vector<pair<Field, string>> fields = view->get_fields(db, dynamic_cast<SelectStmt *>(view->stmt()));

@@ -36,7 +36,7 @@ InsertStmt::InsertStmt(Table *table, const vector<string> &attr_names, const vec
   value_amount_ = static_cast<int>(holder.size());
 }
 
-RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
+RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
 {
   const char *table_name = inserts.relation_name.c_str();
   if (nullptr == db || nullptr == table_name || inserts.values.empty()) {
@@ -58,9 +58,7 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
 
     //说明当前的是view
     is_view = true;
-    if (!view->can_update()) {
-      return RC::ERROR;
-    }
+
     // ASSERT(view->base_tables().size()==1, "view base_table_size!=1");
 
     unique_ptr<ParsedSqlNode> node;
@@ -73,6 +71,20 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
     view->set_stmt(child_stmt);
     view->set_table_meta(db);
     view->set_table_field_name(db);
+
+    if (!view->can_update()) {
+      //此刻我们需要检测一下，插入的列是否都是来自一个表的，如果是的话，那么就可以update
+      auto &&opt = view->check_is_update(inserts.attribute_names);
+      if (!opt.has_value()) {
+        return RC::ERROR;
+      }
+      string table_name_in_view = opt.value();
+      Table *base_one_table     = db->find_table(table_name_in_view.c_str());
+      if (base_one_table == nullptr) {
+        return RC::ERROR;
+      }
+      view->set_default_base_table(base_one_table);
+    }
 
     table           = view;
     view_field_size = view->attr_names().size();
@@ -89,7 +101,43 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
   }
 
   if (value_num != view_field_size and is_view) {
-    return RC::ERROR;
+
+    //先做一下检测，判断插入的列是否都存在
+    for (const string &attr_name : inserts.attribute_names) {
+      bool found_flag = false;
+      for (int i = 0; i < view_field_size; i++) {
+        const FieldMeta *f = table_meta.field(i + table_meta.sys_field_num());
+        if (attr_name == f->name()) {
+          found_flag = true;
+          break;
+        }
+      }
+      if (!found_flag) {
+        return RC::SCHEMA_FIELD_NOT_EXIST;
+      }
+    }
+
+    //把node里面的内容重新搞一下
+    vector<Value> real_values;
+    for (int i = 0; i < field_num; i++) {
+      const FieldMeta *f     = table_meta.field(i + table_meta.sys_field_num());
+      bool             found = false;
+      for (size_t j = 0; j < inserts.attribute_names.size(); j++) {
+        if (inserts.attribute_names[j] == f->name()) {
+          real_values.push_back(inserts.values[j]);
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        Value nullv;
+        nullv.set_type(AttrType::UNDEFINED);
+        nullv.set_null(true);
+        real_values.push_back(nullv);
+      }
+    }
+    inserts.values = std::move(real_values);
+    inserts.attribute_names.clear();
   }
 
   if (!inserts.attribute_names.empty()) {

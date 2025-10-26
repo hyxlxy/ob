@@ -75,13 +75,23 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
     //说明当前的是view
 
     if (!view->can_update()) {
-      return RC::ERROR;
+      //此刻我们需要检测一下，插入的列是否都是来自一个表的，如果是的话，那么就可以update
+      auto &&opt = view->check_is_update(update.attribute_names);
+      if (!opt.has_value()) {
+        return RC::ERROR;
+      }
+      string table_name_in_view = opt.value();
+      Table *base_one_table     = db->find_table(table_name_in_view.c_str());
+      if (base_one_table == nullptr) {
+        return RC::ERROR;
+      }
+      view->set_default_base_table(base_one_table);
     }
     // ASSERT(view->base_tables().size()==1, "view base_table_size!=1");
 
     do {
 
-      table = view->base_tables().front();
+      table = view->get_default_base_table();
       break;
 
       unique_ptr<ParsedSqlNode> node;

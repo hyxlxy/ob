@@ -3,6 +3,7 @@
 #include "sql/parser/parse.h"
 #include "storage/field/field.h"
 #include "storage/table/table.h"
+#include <optional>
 
 class Stmt;
 class SelectStmt;
@@ -50,13 +51,18 @@ public:
   void set_table_meta(Db *db);
   void set_table_field_name(Db *db);
 
+  std::optional<string> check_is_update(vector<string> attr_names);
+  void                  set_default_base_table(Table *table) { default_base_table_ = table; }
+  Table                *get_default_base_table() const { return default_base_table_; }
+
 private:
-  string                                                view_name_;
-  vector<Table *>                                       base_tables_;
-  vector<string>                                        attr_names_;
-  bool                                                  can_update_;
-  int                                                   view_id_;
-  string                                                def_;
-  Stmt                                                 *stmt_;
+  string          view_name_;
+  vector<Table *> base_tables_;
+  Table          *default_base_table_{nullptr};
+  vector<string>  attr_names_;
+  bool            can_update_;  //这里的判断并不完全，需要再加上一些特殊判断
+  int             view_id_;
+  string          def_;
+  Stmt           *stmt_;
   std::unordered_map<string, std::pair<string, string>> attr_from_table_and_field_;
 };

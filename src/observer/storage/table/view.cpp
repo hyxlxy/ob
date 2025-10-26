@@ -128,3 +128,24 @@ void View::set_table_meta(Db *db)
   table_meta_.init(
       view_id_, view_name_.c_str(), nullptr, attr_infos, {}, StorageFormat::ROW_FORMAT, StorageEngine::HEAP);
 }
+
+std::optional<string> View::check_is_update(vector<string> attr_names)
+{
+  //检测attr_names里面的列，是否都来自同一个table
+  map<string, bool> exist_table_names;
+  for (auto &&one : attr_names) {
+    auto &&it = attr_from_table_and_field_.find(one);
+    if (it == attr_from_table_and_field_.end()) {
+      return std::nullopt;
+    }
+    exist_table_names[it->second.first] = true;
+    if (exist_table_names.size() > 1) {
+      return std::nullopt;
+    }
+  }
+
+  //说明都是来自同一个table
+  string table_name = exist_table_names.begin()->first;
+
+  return table_name;
+}
