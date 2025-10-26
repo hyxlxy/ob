@@ -65,44 +65,7 @@ RC DeleteStmt::create(Db *db, DeleteSqlNode &delete_sql, Stmt *&stmt)
     view->set_table_field_name(db);
 
     if (!view->can_update()) {
-
-      vector<string> all_names;
-
-      for (ConditionSqlNode &one : delete_sql.conditions) {
-        if (one.left_expr != nullptr && one.left_expr->name() != nullptr) {
-          Value val;
-          if (one.left_expr->try_get_value(val) != RC::SUCCESS) {
-            string expr_name = one.left_expr->name();
-            if (expr_name.find('.') != string::npos) {
-              expr_name = expr_name.substr(expr_name.find('.') + 1);
-            }
-            all_names.push_back(expr_name);
-          }
-        }
-        if (one.right_expr != nullptr && one.right_expr->name() != nullptr) {
-          Value val;
-          if (one.right_expr->try_get_value(val) != RC::SUCCESS) {
-
-            string expr_name = one.right_expr->name();
-            if (expr_name.find('.') != string::npos) {
-              expr_name = expr_name.substr(expr_name.find('.') + 1);
-            }
-            all_names.push_back(expr_name);
-          }
-        }
-      }
-
-      //此刻我们需要检测一下，插入的列是否都是来自一个表的，如果是的话，那么就可以update
-      auto &&opt = view->check_is_update(all_names);
-      if (!opt.has_value()) {
-        return RC::ERROR;
-      }
-      string table_name_in_view = opt.value();
-      Table *base_one_table     = db->find_table(table_name_in_view.c_str());
-      if (base_one_table == nullptr) {
-        return RC::ERROR;
-      }
-      view->set_default_base_table(base_one_table);
+      return RC::ERROR;
     }
 
     table = view->get_default_base_table();
