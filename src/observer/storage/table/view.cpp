@@ -132,6 +132,11 @@ void View::set_table_meta(Db *db)
 std::optional<string> View::check_is_update(vector<string> attr_names)
 {
   //检测attr_names里面的列，是否都来自同一个table
+
+  if (attr_names.empty()) {
+    return std::nullopt;
+  }
+
   map<string, bool> exist_table_names;
   for (auto &&one : attr_names) {
     auto &&it = attr_from_table_and_field_.find(one);

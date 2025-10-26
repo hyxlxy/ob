@@ -53,7 +53,13 @@ public:
 
   std::optional<string> check_is_update(vector<string> attr_names);
   void                  set_default_base_table(Table *table) { default_base_table_ = table; }
-  Table                *get_default_base_table() const { return default_base_table_; }
+  Table                *get_default_base_table() const
+  {
+    if (default_base_table_ == nullptr && !base_tables_.empty()) {
+      return base_tables_.front();
+    }
+    return default_base_table_;
+  }
 
 private:
   string          view_name_;
