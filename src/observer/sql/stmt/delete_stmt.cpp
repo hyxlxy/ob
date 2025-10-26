@@ -64,7 +64,7 @@ RC DeleteStmt::create(Db *db, DeleteSqlNode &delete_sql, Stmt *&stmt)
     view->set_table_meta(db);
     view->set_table_field_name(db);
 
-    if (!view->can_update()) {
+    if (!view->can_update() and view->base_tables().size() > 1) {
       return RC::ERROR;
     }
 

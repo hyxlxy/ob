@@ -27,6 +27,10 @@ SELECT * FROM qq1;
 
 INSERT INTO qq1 values(100,100,'aaa');
 
+DELETE FROM qq1 WHERE id = 1;
+
+SELECT * FROM qq1;
+
 CREATE VIEW qq2 AS SELECT t1.id AS id, t1.age AS age, t1.name AS name FROM q1 t1;
 
 SELECT * FROM qq2;
@@ -36,4 +40,14 @@ SELECT COUNT(*) FROM qq2;
 INSERT INTO qq2 values(99,99,'AACC');
 
 SELECT * FROM qq2;
+
+DELETE FROM qq2 WHERE id = 1;
+
+SELECT * FROM qq2;
+
+CREATE VIEW qq3 AS SELECT id, age, id + age AS data FROM q1;
+
+DELETE FROM qq3 where id = 1;
+
+SELECT * FROM qq3;
 
