@@ -80,6 +80,24 @@ function do_init
 
   MAKE_COMMAND="make --silent"
 
+  # ensure required third-party sources exist (auto-clone if missing)
+  [ -d ${TOPDIR}/deps/3rd ] || mkdir -p ${TOPDIR}/deps/3rd
+  if [ ! -d ${TOPDIR}/deps/3rd/libevent ]; then
+    git clone --depth 1 -b release-2.1.12-stable https://github.com/libevent/libevent ${TOPDIR}/deps/3rd/libevent || return
+  fi
+  if [ ! -d ${TOPDIR}/deps/3rd/googletest ]; then
+    git clone --depth 1 -b v1.14.0 https://github.com/google/googletest ${TOPDIR}/deps/3rd/googletest || return
+  fi
+  if [ ! -d ${TOPDIR}/deps/3rd/benchmark ]; then
+    git clone --depth 1 https://github.com/google/benchmark ${TOPDIR}/deps/3rd/benchmark || return
+  fi
+  if [ ! -d ${TOPDIR}/deps/3rd/jsoncpp ]; then
+    git clone --depth 1 -b 1.9.7 https://github.com/open-source-parsers/jsoncpp ${TOPDIR}/deps/3rd/jsoncpp || return
+  fi
+  if [ ! -d ${TOPDIR}/deps/3rd/replxx ]; then
+    git clone --depth 1 https://github.com/AmokHuginnsson/replxx ${TOPDIR}/deps/3rd/replxx || return
+  fi
+
   # build libevent
   cd ${TOPDIR}/deps/3rd/libevent && \
     mkdir -p build && \
@@ -108,7 +126,7 @@ function do_init
   cd ${TOPDIR}/deps/3rd/jsoncpp && \
     mkdir -p build && \
     cd build && \
-    ${CMAKE_COMMAND_THIRD_PARTY} -DJSONCPP_WITH_TESTS=OFF -DJSONCPP_WITH_POST_BUILD_UNITTEST=OFF .. && \
+    ${CMAKE_COMMAND_THIRD_PARTY} -DJSONCPP_WITH_TESTS=OFF -DJSONCPP_WITH_POST_BUILD_UNITTEST=OFF -DCMAKE_CXX_STANDARD=20 .. && \
     ${MAKE_COMMAND} -j4 && \
     ${MAKE_COMMAND} install
 
