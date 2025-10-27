@@ -75,12 +75,28 @@ function prepare_build_dir
 function do_init
 {
   git submodule update --init || return
-  git -C "deps/3rd/libevent" checkout 112421c8fa4840acd73502f2ab6a674fc025de37 || return
-  # git submodule update --remote "deps/3rd/libevent" || return
-  git -C "deps/3rd/jsoncpp" checkout 1.9.6 || return
+
   current_dir=$PWD
 
   MAKE_COMMAND="make --silent"
+
+  # ensure required third-party sources exist (auto-clone if missing)
+  [ -d ${TOPDIR}/deps/3rd ] || mkdir -p ${TOPDIR}/deps/3rd
+  if [ ! -d ${TOPDIR}/deps/3rd/libevent ]; then
+    git clone --depth 1 -b release-2.1.12-stable https://github.com/libevent/libevent ${TOPDIR}/deps/3rd/libevent || return
+  fi
+  if [ ! -d ${TOPDIR}/deps/3rd/googletest ]; then
+    git clone --depth 1 -b v1.14.0 https://github.com/google/googletest ${TOPDIR}/deps/3rd/googletest || return
+  fi
+  if [ ! -d ${TOPDIR}/deps/3rd/benchmark ]; then
+    git clone --depth 1 https://github.com/google/benchmark ${TOPDIR}/deps/3rd/benchmark || return
+  fi
+  if [ ! -d ${TOPDIR}/deps/3rd/jsoncpp ]; then
+    git clone --depth 1 -b 1.9.7 https://github.com/open-source-parsers/jsoncpp ${TOPDIR}/deps/3rd/jsoncpp || return
+  fi
+  if [ ! -d ${TOPDIR}/deps/3rd/replxx ]; then
+    git clone --depth 1 https://github.com/AmokHuginnsson/replxx ${TOPDIR}/deps/3rd/replxx || return
+  fi
 
   # build libevent
   cd ${TOPDIR}/deps/3rd/libevent && \
@@ -110,7 +126,7 @@ function do_init
   cd ${TOPDIR}/deps/3rd/jsoncpp && \
     mkdir -p build && \
     cd build && \
-    ${CMAKE_COMMAND_THIRD_PARTY} -DJSONCPP_WITH_TESTS=OFF -DJSONCPP_WITH_POST_BUILD_UNITTEST=OFF .. && \
+    ${CMAKE_COMMAND_THIRD_PARTY} -DJSONCPP_WITH_TESTS=OFF -DJSONCPP_WITH_POST_BUILD_UNITTEST=OFF -DCMAKE_CXX_STANDARD=20 .. && \
     ${MAKE_COMMAND} -j4 && \
     ${MAKE_COMMAND} install
 
@@ -121,6 +137,35 @@ function do_init
     ${CMAKE_COMMAND_THIRD_PARTY} .. -DCMAKE_BUILD_TYPE=Release -DREPLXX_BUILD_EXAMPLES=OFF -DREPLXX_BUILD_PACKAGE=OFF && \
     ${MAKE_COMMAND} -j4 && \
     ${MAKE_COMMAND} install
+  # build limonp
+  # ensure cppjieba exists (clone if submodule not initialized)
+  if [ ! -f ${TOPDIR}/deps/3rd/cppjieba/CMakeLists.txt ]; then \
+    rm -rf ${TOPDIR}/deps/3rd/cppjieba; \
+    git clone https://github.com/yanyiwu/cppjieba ${TOPDIR}/deps/3rd/cppjieba; \
+  fi && \
+  cd ${TOPDIR}/deps/3rd/cppjieba && \
+    git submodule update --init --recursive || true && \
+    if [ ! -d deps/limonp ]; then \
+      cd deps && git clone https://github.com/yanyiwu/limonp limonp && cd ..; \
+    fi && \
+    cd deps/limonp && \
+    mkdir -p build && cd build && \
+    ${CMAKE_COMMAND_THIRD_PARTY} .. -DCMAKE_BUILD_TYPE=Release -DINSTALL_GTEST=OFF -DBUILD_GMOCK=OFF -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=${TOPDIR}/deps/3rd/googletest && \
+    ${MAKE_COMMAND} -j4 && \
+    ${MAKE_COMMAND} install
+  
+  # build cppjieba
+  cd ${TOPDIR}/deps/3rd/cppjieba && \
+    mkdir -p build && \
+    cd build && \
+    ${CMAKE_COMMAND_THIRD_PARTY} .. -DCMAKE_BUILD_TYPE=Release -DINSTALL_GTEST=OFF -DBUILD_GMOCK=OFF -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=${TOPDIR}/deps/3rd/googletest && \
+    ${MAKE_COMMAND} -j4 && \
+    ${MAKE_COMMAND} install && \
+
+  # create soft link for cppjieba dict
+  cd ${TOPDIR}/deps/3rd/usr/local && \
+    [ ! -e dict ] && \
+    ln -s share/cppjieba/dict .
 
   cd $current_dir
 }

@@ -37,6 +37,11 @@ public:
   string column_name;      // for ADD/DROP/CHANGE old
   string new_column_name;  // for CHANGE new
   AttrType data_type = AttrType::UNDEFINED; // simplified in this challenge
+
+  // FULLTEXT fields
+  string index_name;        // index name for ADD FULLTEXT INDEX
+  string target_field_name; // column to build fulltext on
+  string parser_name;       // parser, only 'jieba' supported
 };
 
 

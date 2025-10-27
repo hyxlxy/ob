@@ -180,8 +180,7 @@ RC PhysicalPlanGenerator::create_plan(
   return rc;
 }
 
-RC PhysicalPlanGenerator::create_plan(
-    OrderByLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper, Session *session)
+RC PhysicalPlanGenerator::create_plan(OrderByLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper, Session *session)
 {
   RC rc = RC::SUCCESS;
 
@@ -189,6 +188,10 @@ RC PhysicalPlanGenerator::create_plan(
   for (auto &expr : logical_oper.order_by_expressions()) {
     order_by_expressions.emplace_back(expr->copy());
   }
+
+  // 使用SortPhysicalOperator替代OrderByPhysicalOperator以支持多路排序
+  auto order_by_oper = make_unique<SortPhysicalOperator>(std::move(order_by_expressions),
+                                                         logical_oper.order_by_directions());
 
   ASSERT(logical_oper.children().size() == 1, "order by operator should have 1 child");
 
@@ -200,27 +203,8 @@ RC PhysicalPlanGenerator::create_plan(
     return rc;
   }
 
-  // Heuristic: use external sort only for single-source scans; otherwise fallback to in-memory ORDER BY
-  bool use_external = false;
-  if (child_physical_oper) {
-    auto t = child_physical_oper->type();
-    if (t == PhysicalOperatorType::TABLE_SCAN || t == PhysicalOperatorType::INDEX_SCAN ||
-        t == PhysicalOperatorType::TABLE_SCAN_VEC) {
-      use_external = true;
-    }
-  }
-
-  unique_ptr<PhysicalOperator> order_by_oper;
-  if (use_external) {
-    order_by_oper.reset(new ExternalSortPhysicalOperator(
-        std::move(order_by_expressions), logical_oper.order_by_directions(), 300ULL * 1024ULL * 1024ULL));
-  } else {
-    order_by_oper.reset(
-        new OrderByPhysicalOperator(std::move(order_by_expressions), logical_oper.order_by_directions()));
-  }
-
   order_by_oper->add_child(std::move(child_physical_oper));
-  sql_debug("PLAN ORDER_BY use_external=%d", use_external ? 1 : 0);
+
   oper = std::move(order_by_oper);
   return rc;
 }

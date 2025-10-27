@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "common/init.h"
+#include "tokenizer/jieba_tokenizer.h"
 
 #include "common/conf/ini.h"
 #include "common/lang/string.h"
@@ -147,6 +148,18 @@ int init_global_objects(ProcessParam *process_param, Ini &properties)
   if (OB_FAIL(rc)) {
     LOG_ERROR("failed to init handler. rc=%s", strrc(rc));
     return -1;
+  }
+  // JIEBA warm-up: load dict once to avoid first query latency
+  {
+    try {
+      std::string __warm = "预热";
+      std::vector<std::string> __tokens;
+      JiebaTokenizer __tok;
+      __tok.cut(__warm, __tokens);
+      LOG_INFO("cppjieba warmed up. tokens=%zu", __tokens.size());
+    } catch (...) {
+      LOG_WARN("cppjieba warm-up skipped");
+    }
   }
   return ret;
 }

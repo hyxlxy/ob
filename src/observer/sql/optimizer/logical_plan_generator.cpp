@@ -292,28 +292,49 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   // 创建ORDER BY算子（只有在有子算子的情况下才创建）
   unique_ptr<LogicalOperator> sort_oper;
   if (!select_stmt->order_by_expressions().empty() && *last_oper) {
+    LOG_INFO("[LOGICAL_PLAN_DEBUG] Creating ORDER BY operator with %zu expressions", 
+             select_stmt->order_by_expressions().size());
+    
     vector<unique_ptr<Expression>> order_by_expressions;
-    for (auto &expr : select_stmt->order_by_expressions()) {
+    for (size_t i = 0; i < select_stmt->order_by_expressions().size(); i++) {
+      auto &expr = select_stmt->order_by_expressions()[i];
+      
+      LOG_INFO("[LOGICAL_PLAN_DEBUG] ORDER BY expression %zu: type=%d, name='%s'", 
+               i, static_cast<int>(expr->type()), expr->name());
+      
       unique_ptr<Expression> ob = expr->copy();
       if (binder_ctx_initialized_) {
         ExpressionBinder               binder(binder_context_);
         vector<unique_ptr<Expression>> bound;
-        RC                             brc = binder.bind_expression(ob, bound);
+        
+        LOG_INFO("[LOGICAL_PLAN_DEBUG] Binding ORDER BY expression %zu", i);
+        
+        RC brc = binder.bind_expression(ob, bound);
         if (OB_FAIL(brc)) {
+          LOG_WARN("[LOGICAL_PLAN_DEBUG] Failed to bind ORDER BY expression %zu: %s", i, strrc(brc));
           return brc;
         }
         if (bound.size() == 1) {
           ob = std::move(bound[0]);
+          LOG_INFO("[LOGICAL_PLAN_DEBUG] ORDER BY expression %zu bound successfully: type=%d", 
+                   i, static_cast<int>(ob->type()));
         }
       }
       order_by_expressions.emplace_back(std::move(ob));
     }
 
+    LOG_INFO("[LOGICAL_PLAN_DEBUG] Creating OrderByLogicalOperator");
+    
     sort_oper =
         make_unique<OrderByLogicalOperator>(std::move(order_by_expressions), select_stmt->order_by_directions());
     sort_oper->add_child(std::move(*last_oper));
 
     last_oper = &sort_oper;
+    
+    LOG_INFO("[LOGICAL_PLAN_DEBUG] ORDER BY operator created successfully");
+  } else {
+    LOG_INFO("[LOGICAL_PLAN_DEBUG] Skipping ORDER BY: expressions_empty=%d, has_last_oper=%d",
+             select_stmt->order_by_expressions().empty(), *last_oper != nullptr);
   }
 
   // LIMIT: 如果解析阶段提供了 limit_count，则叠加 LIMIT 算子（在 ORDER BY 之后）

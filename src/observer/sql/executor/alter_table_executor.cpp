@@ -17,7 +17,6 @@ See the Mulan PSL v2 for more details. */
 #include "storage/db/db.h"
 #include "storage/common/meta_util.h"
 #include "storage/table/table.h"
-#include <filesystem>
 
 RC AlterTableExecutor::execute(SQLStageEvent *sql_event)
 {
@@ -53,6 +52,27 @@ RC AlterTableExecutor::execute(SQLStageEvent *sql_event)
     if (field == nullptr) return RC::SCHEMA_FIELD_MISSING;
 
     return table->alter_change_column_rename(alter_stmt->column_name.c_str(), alter_stmt->new_column_name.c_str());
+  }
+
+  if (alter_stmt->op_type == ParsedSqlNode::AlterOpType::ADD_FULLTEXT_INDEX) {
+    // 只支持单列 FULLTEXT，且解析器仅允许 jieba
+    const std::string &field_name = alter_stmt->target_field_name;
+    const std::string &index_name = alter_stmt->index_name;
+    std::string parser = alter_stmt->parser_name;
+    for (auto &c : parser) c = (char)tolower((unsigned char)c);
+    if (parser != "jieba") {
+      return RC::UNSUPPORTED;
+    }
+    const FieldMeta *fm = table->table_meta().field(field_name.c_str());
+    if (fm == nullptr) {
+      return RC::SCHEMA_FIELD_MISSING;
+    }
+    // 仅允许 TEXT 列建全文索引
+    if (fm->type() != AttrType::TEXTS) {
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
+    Trx *trx = session->current_trx();
+    return table->create_index(trx, fm, index_name.c_str(), /*is_unique*/ false);
   }
 
   if (alter_stmt->op_type == ParsedSqlNode::AlterOpType::ADD_COLUMN || alter_stmt->op_type == ParsedSqlNode::AlterOpType::DROP_COLUMN) {

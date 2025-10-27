@@ -278,22 +278,36 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const Bind
   }
 
   // bind order by expressions
+  LOG_INFO("[SELECT_STMT_DEBUG] Binding %zu ORDER BY expressions", select_sql.order_by.size());
+  
   vector<unique_ptr<Expression>> order_by_expressions;
   vector<OrderDirection>         order_by_directions;
-  for (const auto &order_by_item : select_sql.order_by) {
+  for (size_t i = 0; i < select_sql.order_by.size(); i++) {
+    const auto &order_by_item = select_sql.order_by[i];
+    
+    LOG_INFO("[SELECT_STMT_DEBUG] ORDER BY item %zu: expr_type=%d, direction=%d", 
+             i, static_cast<int>(order_by_item.expression->type()), order_by_item.direction);
+    
     unique_ptr<Expression>         order_by_expr = order_by_item.expression->copy();
     vector<unique_ptr<Expression>> temp_bound_expressions;
     rc = expression_binder.bind_expression(order_by_expr, temp_bound_expressions);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to bind order by expression. rc=%s", strrc(rc));
+      LOG_WARN("[SELECT_STMT_DEBUG] Failed to bind order by expression %zu: %s", i, strrc(rc));
       return rc;
     }
     // 通常bind_expression会产生一个表达式，我们取第一个
     if (!temp_bound_expressions.empty()) {
+      LOG_INFO("[SELECT_STMT_DEBUG] ORDER BY expression %zu bound: result_type=%d", 
+               i, static_cast<int>(temp_bound_expressions[0]->type()));
       order_by_expressions.emplace_back(std::move(temp_bound_expressions[0]));
+    } else {
+      LOG_WARN("[SELECT_STMT_DEBUG] ORDER BY expression %zu binding produced no results", i);
     }
     order_by_directions.emplace_back(order_by_item.direction);
   }
+  
+  LOG_INFO("[SELECT_STMT_DEBUG] ORDER BY binding completed: %zu expressions bound", 
+           order_by_expressions.size());
 
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();

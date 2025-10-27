@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "storage/index/bplus_tree_index.h"
 #include "storage/index/ivfflat_index.h"
+#include "storage/index/full_text_index.h"
 #include "storage/common/meta_util.h"
 #include "storage/db/db.h"
 #include <filesystem>
@@ -182,10 +183,12 @@ RC HeapTableEngine::create_index(Trx *trx, const FieldMeta *field_meta, const ch
     return rc;
   }
 
-  // 创建索引相关数据：向量字段使用 IvfflatIndex，其它使用 BplusTreeIndex
+  // 创建索引相关数据：向量用IVF，文本用全文，其它用B+树
   Index          *index      = nullptr;
   if (field_meta->type() == AttrType::VECTORS) {
     index = new IvfflatIndex();
+  } else if (field_meta->type() == AttrType::TEXTS) {
+    index = new FullTextIndex();
   } else {
     index = new BplusTreeIndex();
   }
@@ -573,6 +576,8 @@ RC HeapTableEngine::open()
 
     if (field_meta->type() == AttrType::VECTORS) {
       index = new IvfflatIndex();
+    } else if (field_meta->type() == AttrType::TEXTS) {
+      index = new FullTextIndex();
     } else {
       index = new BplusTreeIndex();
     }
