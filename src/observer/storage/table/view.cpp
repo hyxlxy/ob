@@ -8,7 +8,7 @@ View::~View()
 {
 
   if (stmt_) {
-    // delete stmt_;
+    delete stmt_;
   }
 }
 

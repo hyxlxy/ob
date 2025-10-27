@@ -343,6 +343,8 @@ int LoggerFactory::init(
 int LoggerFactory::init_default(
     const string &log_file, LOG_LEVEL log_level, LOG_LEVEL console_level, LOG_ROTATE rotate_type)
 {
+  log_level = LOG_LEVEL_WARN;
+  console_level = LOG_LEVEL_WARN;
   if (g_log != nullptr) {
     LOG_INFO("Default logger has been initialized");
     return 0;
