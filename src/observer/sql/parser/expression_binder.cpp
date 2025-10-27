@@ -14,7 +14,6 @@ See the Mulan PSL v2 for more details. */
 
 #include "common/log/log.h"
 #include "common/lang/string.h"
-#include "common/lang/ranges.h"
 #include "sql/parser/expression_binder.h"
 #include "sql/expr/expression_iterator.h"
 #include "observer/session/session.h"
@@ -37,6 +36,12 @@ Table *BinderContext::find_table(const char *table_name) const
   for (const auto &kv : name_to_table_) {
     if (0 == strcasecmp(table_name, kv.first.c_str())) {
       return kv.second;
+    }
+  }
+  // Fallback: search by real table names in query tables
+  for (Table *table : query_tables_) {
+    if (0 == strcasecmp(table_name, table->name())) {
+      return table;
     }
   }
 

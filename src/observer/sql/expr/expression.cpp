@@ -15,15 +15,14 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 #include "sql/expr/tuple.h"
 #include "sql/expr/arithmetic_operator.hpp"
-#include <set>
-#include <limits>
+// keep <limits> for numeric_limits usage elsewhere in this TU
 #include "common/type/vector_type.h"
 #include "common/log/log.h"
 #include "sql/stmt/select_stmt.h"
 #include "sql/stmt/filter_stmt.h"
 #include "sql/optimizer/logical_plan_generator.h"
 #include "sql/optimizer/physical_plan_generator.h"
-// #include "sql/operator/project_physical_operator.h"
+#include "sql/operator/project_physical_operator.h"
 #include "session/session.h"
 
 // 前向声明
@@ -1550,22 +1549,6 @@ AttrType FunctionExpr::value_type() const
   if (strcasecmp(function_name_.c_str(), "VECTOR_TO_STRING") == 0) {
     return AttrType::CHARS;
   }
-  // LENGTH returns INT
-  if (strcasecmp(function_name_.c_str(), "LENGTH") == 0) {
-    return AttrType::INTS;
-  }
-  // REPEAT returns string
-  if (strcasecmp(function_name_.c_str(), "REPEAT") == 0) {
-    return AttrType::CHARS;
-  }
-  // ROUND returns FLOAT
-  if (strcasecmp(function_name_.c_str(), "ROUND") == 0) {
-    return AttrType::FLOATS;
-  }
-  // DATE_FORMAT returns string
-  if (strcasecmp(function_name_.c_str(), "DATE_FORMAT") == 0) {
-    return AttrType::CHARS;
-  }
   // 距离/相似度类函数返回 float
   if (strcasecmp(function_name_.c_str(), "L2_DISTANCE") == 0 ||
       strcasecmp(function_name_.c_str(), "COSINE_DISTANCE") == 0 ||
@@ -1776,194 +1759,6 @@ RC FunctionExpr::try_get_value(Value &value) const
 
 RC FunctionExpr::try_get_value_with_args(const vector<Value> &arg_values, Value &value) const
 {
-  // LENGTH(char)
-  if (strcasecmp(function_name_.c_str(), "LENGTH") == 0) {
-    if (arg_values.size() != 1) {
-      return RC::INVALID_ARGUMENT;
-    }
-    const Value &arg = arg_values[0];
-    if (arg.attr_type() != AttrType::CHARS) {
-      return RC::UNSUPPORTED;  // per assignment: only char supported
-    }
-    std::string s = arg.get_string();
-    value.set_int(static_cast<int>(s.size()));
-    return RC::SUCCESS;
-  }
-
-  // REPEAT(str, count)
-  if (strcasecmp(function_name_.c_str(), "REPEAT") == 0) {
-    if (arg_values.size() != 2) {
-      return RC::INVALID_ARGUMENT;
-    }
-    const Value &s = arg_values[0];
-    const Value &n = arg_values[1];
-    if (s.attr_type() != AttrType::CHARS || n.attr_type() != AttrType::INTS) {
-      return RC::UNSUPPORTED;
-    }
-    int times = n.get_int();
-    if (times <= 0) {
-      value.set_string("");
-      return RC::SUCCESS;
-    }
-    std::string src = s.get_string();
-    if (src.empty()) {
-      value.set_string("");
-      return RC::SUCCESS;
-    }
-    // construct repeated string (may be large; caller may reject later)
-    std::string out;
-    // cautious reserve to avoid overflow
-    size_t each = src.size();
-    size_t total;
-    if (__builtin_mul_overflow(each, static_cast<size_t>(times), &total)) {
-      return RC::INVALID_ARGUMENT;
-    }
-    out.reserve(std::min(total, static_cast<size_t>(1 << 20)));  // soft cap reserve
-    for (int i = 0; i < times; i++)
-      out += src;
-    value.set_string(out.c_str());
-    return RC::SUCCESS;
-  }
-
-  // ROUND(float)
-  if (strcasecmp(function_name_.c_str(), "ROUND") == 0) {
-    if (arg_values.size() != 1 && arg_values.size() != 2) {
-      return RC::INVALID_ARGUMENT;
-    }
-    const Value &arg = arg_values[0];
-    if (arg.attr_type() != AttrType::FLOATS) {
-      return RC::UNSUPPORTED;  // per assignment: only float supported
-    }
-    float f        = arg.get_float();
-    int   decimals = 0;
-    if (arg_values.size() == 2) {
-      if (arg_values[1].attr_type() != AttrType::INTS) {
-        return RC::UNSUPPORTED;
-      }
-      decimals = arg_values[1].get_int();
-      if (decimals < 0)
-        decimals = 0;
-    }
-    if (decimals == 0) {
-      float r = std::round(f);
-      value.set_float(r);
-      return RC::SUCCESS;
-    } else {
-      double p = std::pow(10.0, static_cast<double>(decimals));
-      double r = std::round(static_cast<double>(f) * p) / p;
-      value.set_float(static_cast<float>(r));
-      return RC::SUCCESS;
-    }
-  }
-
-  // DATE_FORMAT(date, format)
-  if (strcasecmp(function_name_.c_str(), "DATE_FORMAT") == 0) {
-    if (arg_values.size() != 2) {
-      return RC::INVALID_ARGUMENT;
-    }
-    const Value &datev = arg_values[0];
-    const Value &fmtv  = arg_values[1];
-    if (datev.attr_type() != AttrType::DATES || fmtv.attr_type() != AttrType::CHARS) {
-      return RC::UNSUPPORTED;  // per assignment: only date + char
-    }
-    // extract y,m,d
-    int date_int = datev.get_date();
-    int year     = date_int / 10000;
-    int month    = (date_int % 10000) / 100;
-    int day      = date_int % 100;
-
-    auto ordinal_suffix = [](int d) -> const char * {
-      int mod100 = d % 100;
-      if (mod100 >= 11 && mod100 <= 13)
-        return "th";
-      switch (d % 10) {
-        case 1: return "st";
-        case 2: return "nd";
-        case 3: return "rd";
-        default: return "th";
-      }
-    };
-
-    static const char *MONTH_NAMES[13] = {"",
-        "January",
-        "February",
-        "March",
-        "April",
-        "May",
-        "June",
-        "July",
-        "August",
-        "September",
-        "October",
-        "November",
-        "December"};
-
-    const std::string fmt = fmtv.get_string();
-    std::string       out;
-    out.reserve(fmt.size() + 16);
-    for (size_t i = 0; i < fmt.size(); i++) {
-      char c = fmt[i];
-      if (c == '%' && i + 1 < fmt.size()) {
-        char t = fmt[i + 1];
-        switch (t) {
-          case 'Y': {  // 4-digit year
-            char buf[8];
-            std::snprintf(buf, sizeof(buf), "%04d", year);
-            out += buf;
-            i++;
-            break;
-          }
-          case 'y': {  // 2-digit year
-            int  yy = year % 100;
-            char buf[4];
-            std::snprintf(buf, sizeof(buf), "%02d", yy);
-            out += buf;
-            i++;
-            break;
-          }
-          case 'm': {  // month 01-12
-            char buf[4];
-            std::snprintf(buf, sizeof(buf), "%02d", month);
-            out += buf;
-            i++;
-            break;
-          }
-          case 'd': {  // day 01-31
-            char buf[4];
-            std::snprintf(buf, sizeof(buf), "%02d", day);
-            out += buf;
-            i++;
-            break;
-          }
-          case 'D': {  // day with suffix (English)
-            char        buf[16];
-            const char *suf = ordinal_suffix(day);
-            std::snprintf(buf, sizeof(buf), "%d%s", day, suf);
-            out += buf;
-            i++;
-            break;
-          }
-          case 'M': {  // full month name (English)
-            if (month >= 1 && month <= 12)
-              out += MONTH_NAMES[month];
-            i++;
-            break;
-          }
-          default:
-            // Unknown placeholder like %z: output the letter only and consume it
-            // so "%z" becomes "z" per expected behavior
-            out.push_back(t);
-            i++;  // consume t
-            break;
-        }
-      } else {
-        out.push_back(c);
-      }
-    }
-    value.set_string(out.c_str());
-    return RC::SUCCESS;
-  }
-
   // STRING_TO_VECTOR: 将字符串解析为向量；若已是向量则直接返回
   if (strcasecmp(function_name_.c_str(), "STRING_TO_VECTOR") == 0) {
     if (arg_values.size() != 1) {
