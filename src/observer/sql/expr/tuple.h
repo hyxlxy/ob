@@ -540,7 +540,7 @@ public:
   {
     if (left_ != nullptr) {
       RC rc = left_->find_cell(spec, value);
-      if (rc == RC::SUCCESS || rc != RC::NOTFOUND) {
+      if (rc == RC::SUCCESS || (rc != RC::NOTFOUND and rc != RC::NOT_FOUND_MA)) {
         return rc;
       }
     }
