@@ -25,6 +25,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/buffer/disk_buffer_pool.h"
 #include "storage/common/condition_filter.h"
 #include "storage/common/meta_util.h"
+#include "storage/index/bplus_tree_index.h"
 #include "storage/index/index.h"
 #include "storage/record/record_manager.h"
 #include "storage/record/heap_record_scanner.h"
@@ -365,6 +366,16 @@ RC Table::delete_record_with_trx(const Record &record, Trx *trx)
 RC Table::update_record_with_trx(const Record &old_record, const Record &new_record, Trx *trx)
 {
   return engine_->update_record_with_trx(old_record, new_record, trx);
+}
+
+RC Table::delete_index_entries(const Record &record)
+{
+  return engine_->delete_index_entries(record);
+}
+
+RC Table::insert_index_entries(const Record &record)
+{
+  return engine_->insert_index_entries(record);
 }
 
 RC Table::get_record(const RID &rid, Record &record)

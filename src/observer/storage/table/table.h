@@ -102,6 +102,10 @@ public:
   RC update_record_with_trx(const Record &old_record, const Record &new_record, Trx *trx);
   RC get_record(const RID &rid, Record &record);
 
+  // 索引操作
+  RC delete_index_entries(const Record &record);
+  RC insert_index_entries(const Record &record);  // 用于回滚
+
   // TODO refactor
   RC create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name);
   RC create_index(Trx *trx, const vector<const FieldMeta *> &field_metas, const char *index_name);

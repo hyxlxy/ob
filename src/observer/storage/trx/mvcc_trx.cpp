@@ -152,16 +152,25 @@ RC MvccTrx::delete_record(Table *table, Record &record)
     end_field.set_int(inplace_record, -trx_id_);
     return true;
   });
-
+  
   if (OB_FAIL(rc)) {
-    LOG_WARN("failed to visit record. rc=%s", strrc(rc));
+    LOG_WARN("table->visit_record failed. rc=%s", strrc(rc));
     return rc;
   }
 
   if (OB_FAIL(delete_result)) {
-    LOG_TRACE("record is not visible. rid=%s, rc=%s", record.rid().to_string().c_str(), strrc(delete_result));
+    LOG_TRACE("Delete failed due to visibility check. rid=%s, rc=%s", record.rid().to_string().c_str(), strrc(delete_result));
     return delete_result;
   }
+
+  // 删除记录的索引条目
+  rc = table->delete_index_entries(record);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to delete index entries during delete. table=%s, rid=%s, rc=%s",
+             table->name(), record.rid().to_string().c_str(), strrc(rc));
+    return rc;
+  }
+
 
   rc = log_handler_.delete_record(trx_id_, table, record.rid());
   ASSERT(rc == RC::SUCCESS, "failed to append delete record log. trx id=%d, table id=%d, rid=%s, record len=%d, rc=%s",
@@ -169,6 +178,73 @@ RC MvccTrx::delete_record(Table *table, Record &record)
 
   operations_.push_back(Operation(Operation::Type::DELETE, table, record.rid()));
 
+  return RC::SUCCESS;
+}
+
+RC MvccTrx::update_record(Table *table, Record &old_record, Record &new_record)
+{
+  // UPDATE = DELETE + INSERT 模式
+  // 步骤1：先检查旧记录的可见性和冲突
+  RC rc = visit_record(table, old_record, ReadWriteMode::READ_WRITE);
+  if (rc != RC::SUCCESS) {
+    LOG_TRACE("old record is not visible or has conflict. rid=%s, rc=%s", 
+              old_record.rid().to_string().c_str(), strrc(rc));
+    return rc;
+  }
+
+  // 步骤2：先执行DELETE操作（删除索引 + 设置end_xid）
+  // 这样INSERT时就不会有唯一索引冲突
+  rc = delete_record(table, old_record);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to delete old record during update. table=%s, old_rid=%s, rc=%s",
+             table->name(), old_record.rid().to_string().c_str(), strrc(rc));
+    return rc;
+  }
+
+  // 步骤3：再执行INSERT操作
+  rc = insert_record(table, new_record);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to insert new record during update. table=%s, new_rid=%s, rc=%s",
+             table->name(), new_record.rid().to_string().c_str(), strrc(rc));
+    
+    // 回滚：对DELETE进行反操作，恢复到DELETE执行前的状态
+    // 反操作1：从operations_中移除DELETE操作
+    if (!operations_.empty()) {
+      operations_.pop_back();
+    }
+    
+    // 反操作2：恢复旧记录的end_xid（撤销"设置end_xid=-trx_id_"）
+    RC rollback_rc1 = table->visit_record(old_record.rid(), [this, table](Record &inplace_record) -> bool {
+      Field begin_xid_field, end_xid_field;
+      trx_fields(table, begin_xid_field, end_xid_field);
+      
+      // 检查确实是当前事务删除的记录
+      if (end_xid_field.get_int(inplace_record) == -trx_id_) {
+        end_xid_field.set_int(inplace_record, trx_kit_.max_trx_id());
+        return true;
+      }
+      return false;
+    });
+    if (rollback_rc1 != RC::SUCCESS) {
+      LOG_ERROR("failed to rollback: restore end_xid. table=%s, old_rid=%s, rc=%s",
+                table->name(), old_record.rid().to_string().c_str(), strrc(rollback_rc1));
+    }
+    
+    // 反操作3：恢复旧记录的索引（撤销"删除索引"）
+    RC rollback_rc2 = table->insert_index_entries(old_record);
+    if (rollback_rc2 != RC::SUCCESS) {
+      LOG_ERROR("failed to rollback: restore old index entries. table=%s, old_rid=%s, rc=%s",
+                table->name(), old_record.rid().to_string().c_str(), strrc(rollback_rc2));
+    }
+    
+    // 注意：DELETE的日志不处理，保留在磁盘上作为历史记录
+    return rc;
+  }
+
+  // UPDATE操作由DELETE+INSERT两个独立操作组成
+  // DELETE和INSERT已经各自记录了日志和操作
+  // 不需要额外的UPDATE日志记录
+  
   return RC::SUCCESS;
 }
 
@@ -214,6 +290,7 @@ RC MvccTrx::visit_record(Table *table, Record &record, ReadWriteMode mode)
       // 这是事务并发处理的一种方式，非常简单粗暴。其它的并发处理方法，可以等待，或者让客户端重试
       // 或者等事务结束后，再检测修改的数据是否有冲突
       if (-end_xid != trx_id_) {
+        LOG_INFO("*** CONFLICT DETECTED! *** Other trx %d is deleting, current trx %d", -end_xid, trx_id_);
         LOG_TRACE("concurrency conflit. someone is deleting this record right now. trx id=%d, begin xid=%d, end xid=%d",
                   trx_id_, begin_xid, end_xid);
         rc = RC::LOCKED_CONCURRENCY_CONFLICT;

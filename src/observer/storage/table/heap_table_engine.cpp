@@ -493,6 +493,20 @@ RC HeapTableEngine::delete_entry_of_indexes(const char *record, const RID &rid, 
   return rc;
 }
 
+RC HeapTableEngine::delete_index_entries(const Record &record)
+{
+  // 只删除索引条目，不删除记录本身
+  // 用于UPDATE操作中避免唯一索引冲突
+  return delete_entry_of_indexes(record.data(), record.rid(), true /*error_on_not_exists*/);
+}
+
+RC HeapTableEngine::insert_index_entries(const Record &record)
+{
+  // 只插入索引条目，不插入记录本身
+  // 用于UPDATE操作的回滚
+  return insert_entry_of_indexes(record.data(), record.rid());
+}
+
 RC HeapTableEngine::sync()
 {
   RC rc = RC::SUCCESS;

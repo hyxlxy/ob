@@ -47,6 +47,15 @@ RC DeletePhysicalOperator::open(Trx *trx)
 
   child->close();
 
+  LOG_INFO("=== DELETE OPERATOR DEBUG ===");
+  LOG_INFO("Scan completed with rc=%s, collected %zu records", strrc(rc), records_.size());
+
+  // 检查扫描阶段的冲突错误
+  if (rc == RC::LOCKED_CONCURRENCY_CONFLICT) {
+    LOG_WARN("scan detected concurrency conflict: %s", strrc(rc));
+    return rc;  // 返回冲突错误码
+  }
+
   // 先收集记录再删除
   // 记录的有效性由事务来保证，如果事务不保证删除的有效性，那说明此事务类型不支持并发控制，比如VacuousTrx
   for (Record &record : records_) {
@@ -57,6 +66,7 @@ RC DeletePhysicalOperator::open(Trx *trx)
     }
   }
 
+  LOG_INFO("DELETE OPERATOR returning SUCCESS");
   return RC::SUCCESS;
 }
 

@@ -58,6 +58,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/union_physical_operator.h"
 #include "sql/optimizer/physical_plan_generator.h"
 #include "event/sql_debug.h"
+#include "storage/trx/trx.h"
 
 using namespace std;
 
@@ -405,7 +406,14 @@ RC PhysicalPlanGenerator::create_plan(
     }
   }
 
-  if (index != nullptr) {
+  // 检查事务类型，MVCC模式下使用table scan以正确检测冲突
+  Trx *trx = session->current_trx();
+  bool use_table_scan_for_mvcc = false;
+  if (trx && trx->type() == TrxKit::Type::MVCC) {
+    use_table_scan_for_mvcc = true;
+  }
+
+  if (index != nullptr && !use_table_scan_for_mvcc) {
     ASSERT(value_expr != nullptr, "got an index but value expr is null ?");
 
     const Value               &value           = value_expr->get_value();

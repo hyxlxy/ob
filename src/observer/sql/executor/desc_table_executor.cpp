@@ -27,8 +27,10 @@ See the Mulan PSL v2 for more details. */
 #include "sql/optimizer/logical_plan_generator.h"
 #include "sql/optimizer/physical_plan_generator.h"
 #include "sql/operator/physical_operator.h"
+#include "sql/operator/index_scan_physical_operator.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
+#include "storage/trx/trx.h"
 #include "storage/record/record_scanner.h"
 #include "storage/table/view.h"
 
@@ -115,138 +117,183 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
 
   // ========== 完全重写简化的UpdateExecutor ==========
   UpdateStmt *update_stmt = static_cast<UpdateStmt *>(stmt);
-  Table      *table       = update_stmt->table();
-  Trx        *trx         = session->current_trx();
+  Table *table = update_stmt->table();
+  Trx *trx = session->current_trx();
 
-  if (auto &&view = dynamic_cast<View *>(table)) {
-    table = view->get_default_base_table();
-  }
-
-  // 获取scanner
-  RecordScanner *scanner = nullptr;
-  RC             rc      = table->get_record_scanner(scanner, trx, ReadWriteMode::READ_WRITE);
+  // 启动MVCC事务（模仿INSERT/DELETE算子的流程）
+  RC rc = trx->start_if_need();
   if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to start transaction: %s", strrc(rc));
     return rc;
   }
 
-  // 收集要更新的记录
+  // 收集要更新的记录：优先使用索引扫描（READ_WRITE）避免全表冲突；否则退化为全表扫描（READ_WRITE）
   vector<Record> records;
-  Record         rec;
-  FilterStmt    *fs        = update_stmt->filter_stmt();
-  bool           has_where = (fs && !fs->filter_units().empty());
+  FilterStmt *fs = update_stmt->filter_stmt();
+  bool has_where = (fs && !fs->filter_units().empty());
 
-  while (scanner->next(rec) == RC::SUCCESS) {
-    cout << "update sccanner: rec: ownner: " << rec.owner_ << endl;
-    if (!has_where) {
-      // records.emplace_back(rec);
-      records.emplace_back(Record::copy_record(rec));
-      continue;
-    }
-
-    // 评估WHERE条件
-    bool match = true;
-    for (const FilterUnit *fu : fs->filter_units()) {
-      Value lv, rv;
-
-      // 获取左值（检查NULL标志）
-      if (fu->left().is_attr()) {
-        const FieldMeta *fm = fu->left().field.meta();
-        if (fm->nullable() && rec.data()[fm->offset() + fm->len() - 1] == '1') {
-          lv.set_type(AttrType::UNDEFINED);
-          lv.set_null(true);
-        } else {
-          lv.set_type(fm->type());
-          size_t len = fm->nullable() ? fm->len() - 1 : fm->len();
-          lv.set_data(rec.data() + fm->offset(), len);
-        }
-      } else if (fu->left().is_value()) {
-        lv = fu->left().value;
+  bool used_index_scan = false;
+  if (has_where && fs->filter_units().size() == 1) {
+    const FilterUnit *fu = fs->filter_units().front();
+    if (fu->comp() == EQUAL_TO) {
+      const FieldMeta *attr_fm = nullptr;
+      const Value     *val_ptr = nullptr;
+      if (fu->left().is_attr() && fu->right().is_value()) {
+        attr_fm = fu->left().field.meta();
+        val_ptr = &fu->right().value;
+      } else if (fu->right().is_attr() && fu->left().is_value()) {
+        attr_fm = fu->right().field.meta();
+        val_ptr = &fu->left().value;
       }
+      if (attr_fm != nullptr && val_ptr != nullptr) {
+        Index *idx = table->find_index_by_field(attr_fm->name());
+        if (idx != nullptr) {
+          IndexScanPhysicalOperator *index_scan_oper = new IndexScanPhysicalOperator(
+              table,
+              idx,
+              ReadWriteMode::READ_WRITE,
+              val_ptr,
+              true,
+              val_ptr,
+              true);
 
-      // 获取右值（检查NULL标志）
-      if (fu->right().is_attr()) {
-        const FieldMeta *fm = fu->right().field.meta();
-        if (fm->nullable() && rec.data()[fm->offset() + fm->len() - 1] == '1') {
-          rv.set_type(AttrType::UNDEFINED);
-          rv.set_null(true);
-        } else {
-          rv.set_type(fm->type());
-          size_t len = fm->nullable() ? fm->len() - 1 : fm->len();
-          rv.set_data(rec.data() + fm->offset(), len);
-        }
-      } else if (fu->right().is_value()) {
-        rv = fu->right().value;
-      }
-
-      // 比较（处理NULL）
-      bool cond_match = false;
-      if (fu->comp() == IS_NULL_OP) {
-        cond_match = (lv.attr_type() == AttrType::UNDEFINED || lv.is_null());
-      } else if (fu->comp() == IS_NOT_NULL_OP) {
-        cond_match = !(lv.attr_type() == AttrType::UNDEFINED || lv.is_null());
-      } else {
-        // 其他比较：NULL参与返回false
-        if (lv.attr_type() == AttrType::UNDEFINED || lv.is_null() || rv.attr_type() == AttrType::UNDEFINED ||
-            rv.is_null()) {
-          cond_match = false;
-        } else {
-          int cmp = lv.compare(rv);
-          switch (fu->comp()) {
-            case EQUAL_TO: cond_match = (cmp == 0); break;
-            case LESS_THAN: cond_match = (cmp < 0); break;
-            case GREAT_THAN: cond_match = (cmp > 0); break;
-            case LESS_EQUAL: cond_match = (cmp <= 0); break;
-            case GREAT_EQUAL: cond_match = (cmp >= 0); break;
-            case NOT_EQUAL: cond_match = (cmp != 0); break;
-            default: cond_match = false;
+          unique_ptr<PhysicalOperator> scan_guard(index_scan_oper);
+          rc = index_scan_oper->open(trx);
+          if (rc == RC::SUCCESS) {
+            while (OB_SUCC(rc = index_scan_oper->next())) {
+              Tuple *tuple = index_scan_oper->current_tuple();
+              if (tuple == nullptr) {
+                rc = RC::INTERNAL;
+                break;
+              }
+              RowTuple *row_tuple = static_cast<RowTuple *>(tuple);
+              records.emplace_back(row_tuple->record());
+            }
+            index_scan_oper->close();
+            if (rc == RC::RECORD_EOF) {
+              rc = RC::SUCCESS;
+            }
+            used_index_scan = true;
           }
         }
       }
-
-      if (!cond_match) {
-        match = false;
-        break;
-      }
-    }
-
-    if (match) {
-      // records.emplace_back(rec);
-      records.emplace_back(Record::copy_record(rec));
     }
   }
-  scanner->close_scan();
-  delete scanner;
+
+  if (!used_index_scan) {
+    // 回退：全表扫描（READ_WRITE），并逐条评估 WHERE
+    RecordScanner *scanner = nullptr;
+    rc = table->get_record_scanner(scanner, trx, ReadWriteMode::READ_WRITE);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+    Record rec;
+    while (OB_SUCC(rc = scanner->next(rec))) {
+      if (!has_where) {
+        records.push_back(rec);
+        continue;
+      }
+
+      // 评估WHERE条件
+      bool match = true;
+      for (const FilterUnit *fu2 : fs->filter_units()) {
+        Value lv, rv;
+        if (fu2->left().is_attr()) {
+          const FieldMeta *fm = fu2->left().field.meta();
+          if (fm->nullable() && rec.data()[fm->offset() + fm->len() - 1] == '1') {
+            lv.set_type(AttrType::UNDEFINED);
+            lv.set_null(true);
+          } else {
+            lv.set_type(fm->type());
+            size_t len = fm->nullable() ? fm->len() - 1 : fm->len();
+            lv.set_data(rec.data() + fm->offset(), len);
+          }
+        } else if (fu2->left().is_value()) {
+          lv = fu2->left().value;
+        }
+
+        if (fu2->right().is_attr()) {
+          const FieldMeta *fm = fu2->right().field.meta();
+          if (fm->nullable() && rec.data()[fm->offset() + fm->len() - 1] == '1') {
+            rv.set_type(AttrType::UNDEFINED);
+            rv.set_null(true);
+          } else {
+            rv.set_type(fm->type());
+            size_t len = fm->nullable() ? fm->len() - 1 : fm->len();
+            rv.set_data(rec.data() + fm->offset(), len);
+          }
+        } else if (fu2->right().is_value()) {
+          rv = fu2->right().value;
+        }
+
+        bool cond_match = false;
+        if (fu2->comp() == IS_NULL_OP) {
+          cond_match = (lv.attr_type() == AttrType::UNDEFINED || lv.is_null());
+        } else if (fu2->comp() == IS_NOT_NULL_OP) {
+          cond_match = !(lv.attr_type() == AttrType::UNDEFINED || lv.is_null());
+        } else {
+          if (lv.attr_type() == AttrType::UNDEFINED || lv.is_null() ||
+              rv.attr_type() == AttrType::UNDEFINED || rv.is_null()) {
+            cond_match = false;
+          } else {
+            int cmp = lv.compare(rv);
+            switch (fu2->comp()) {
+              case EQUAL_TO: cond_match = (cmp == 0); break;
+              case LESS_THAN: cond_match = (cmp < 0); break;
+              case GREAT_THAN: cond_match = (cmp > 0); break;
+              case LESS_EQUAL: cond_match = (cmp <= 0); break;
+              case GREAT_EQUAL: cond_match = (cmp >= 0); break;
+              case NOT_EQUAL: cond_match = (cmp != 0); break;
+              default: cond_match = false;
+            }
+          }
+        }
+
+        if (!cond_match) {
+          match = false;
+          break;
+        }
+      }
+
+      if (match) {
+        records.push_back(rec);
+      }
+    }
+    scanner->close_scan();
+    delete scanner;
+  }
+
+  // 检查扫描阶段的冲突错误（和DELETE operator一样）
+  if (rc == RC::LOCKED_CONCURRENCY_CONFLICT) {
+    LOG_WARN("scan detected concurrency conflict: %s", strrc(rc));
+    return rc;  // 返回冲突错误码
+  }
 
   // 执行更新
   if (update_stmt->is_multi_field()) {
     // 多字段UPDATE
     for (Record &old_rec : records) {
-      cout << "update sccanner: make old_rec: ownner: " << old_rec.owner_ << endl;
-
       Record new_rec;
       new_rec.copy_data(old_rec.data(), old_rec.len());
       new_rec.set_rid(old_rec.rid());
-      new_rec.set_key(old_rec.key());
+      
       for (size_t i = 0; i < update_stmt->field_metas().size(); i++) {
-        const FieldMeta *fm   = update_stmt->field_metas()[i];
-        Value            val  = update_stmt->multi_values()[i];
-        char            *data = new_rec.data();
-
-        // 如果该列来自子查询，则在此执行标量子查询
-        if (i < update_stmt->multi_is_sub_query().size() && update_stmt->multi_is_sub_query()[i]) {
-          Stmt *subq = nullptr;
-          if (i < update_stmt->multi_sub_queries().size())
-            subq = update_stmt->multi_sub_queries()[i];
-          if (subq != nullptr) {
-            Value sub_val;
-            rc = execute_sub_query(subq, session, sub_val);
-            if (rc != RC::SUCCESS)
-              return rc;
-            val = sub_val;  // 0 行 -> NULL；>1 行 -> 首行
-          } else {
-            // 无法获取到子查询实现，退化为 NULL（与占位一致）
-            val.set_type(AttrType::UNDEFINED);
-            val.set_null(true);
+        const FieldMeta *fm = update_stmt->field_metas()[i];
+        const Value &val = update_stmt->multi_values()[i];
+        char *data = new_rec.data();
+        
+        // 处理NULL值
+        if (val.attr_type() == AttrType::UNDEFINED || val.is_null()) {
+          if (!fm->nullable()) return RC::INVALID_ARGUMENT;
+          memset(data + fm->offset(), 0, fm->len());
+          data[fm->offset() + fm->len() - 1] = '1';  // 设置NULL标志
+        } else {
+          // 非NULL值
+          memset(data + fm->offset(), 0, fm->len());
+          size_t len = std::min((size_t)val.length(), (size_t)(fm->len() - (fm->nullable() ? 1 : 0)));
+          memcpy(data + fm->offset(), val.data(), len);
+          if (fm->nullable()) {
+            data[fm->offset() + fm->len() - 1] = '0';  // 设置非NULL标志
           }
         }
 
@@ -264,52 +311,46 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
         if (rc != RC::SUCCESS)
           return rc;
       }
-
-      rc = table->update_record_with_trx(old_rec, new_rec, trx);
-      if (rc != RC::SUCCESS)
-        return rc;
+      
+      rc = trx->update_record(table, old_rec, new_rec);
+      if (rc != RC::SUCCESS) return rc;
     }
   } else {
     // 单字段UPDATE
-    const FieldMeta *fm  = update_stmt->field_meta();
-    Value           *val = update_stmt->value();
-
+    const FieldMeta *fm = update_stmt->field_meta();
+    Value *val = update_stmt->value();
+    
     // 如果是子查询UPDATE，先执行子查询
     Value sub_val;
     if (update_stmt->is_sub_query()) {
       rc = execute_sub_query(update_stmt->sub_query_stmt(), session, sub_val);
-      if (rc != RC::SUCCESS)
-        return rc;
+      if (rc != RC::SUCCESS) return rc;
       val = &sub_val;
     }
-
+    
     for (Record &old_rec : records) {
-      cout << "update sccanner: make old_rec: ownner: " << old_rec.owner_ << endl;
-
       Record new_rec;
       new_rec.copy_data(old_rec.data(), old_rec.len());
-      new_rec.set_key(old_rec.key());
       new_rec.set_rid(old_rec.rid());
-
+      
       char *data = new_rec.data();
-
-      // 统一通过表封装进行写入（自动处理 NULL/TEXT LOB/可空位）
-      Value write_val = *val;
-      if (!(write_val.attr_type() == AttrType::UNDEFINED || write_val.is_null()) &&
-          write_val.attr_type() != fm->type()) {
-        Value casted;
-        RC    crc = Value::cast_to(write_val, fm->type(), casted);
-        if (crc != RC::SUCCESS)
-          return crc;
-        write_val = casted;
+      
+      // 处理NULL值
+      if (val->attr_type() == AttrType::UNDEFINED || val->is_null()) {
+        if (!fm->nullable()) return RC::INVALID_ARGUMENT;
+        memset(data + fm->offset(), 0, fm->len());
+        data[fm->offset() + fm->len() - 1] = '1';
+      } else {
+        memset(data + fm->offset(), 0, fm->len());
+        size_t len = std::min((size_t)val->length(), (size_t)(fm->len() - (fm->nullable() ? 1 : 0)));
+        memcpy(data + fm->offset(), val->data(), len);
+        if (fm->nullable()) {
+          data[fm->offset() + fm->len() - 1] = '0';
+        }
       }
-      rc = table->set_value_to_record(data, write_val, fm);
-      if (rc != RC::SUCCESS)
-        return rc;
-
-      rc = table->update_record_with_trx(old_rec, new_rec, trx);
-      if (rc != RC::SUCCESS)
-        return rc;
+      
+      rc = trx->update_record(table, old_rec, new_rec);
+      if (rc != RC::SUCCESS) return rc;
     }
   }
 
