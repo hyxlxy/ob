@@ -1254,7 +1254,7 @@
                 "trace_as_input": true,
                 "trace_as_metadata": true,
                 "type": "str",
-                "value": "bge-m3:latest"
+                "value": ""
               }
             },
             "tool_mode": false
@@ -1664,7 +1664,7 @@
                 "trace_as_input": true,
                 "trace_as_metadata": true,
                 "type": "str",
-                "value": ""
+                "value": "http://localhost:11434"
               },
               "code": {
                 "advanced": true,
@@ -1709,7 +1709,7 @@
                 "tool_mode": false,
                 "trace_as_metadata": true,
                 "type": "str",
-                "value": ""
+                "value": "bge-m3:latest"
               }
             },
             "tool_mode": false
@@ -2629,7 +2629,7 @@
   },
   "description": "Load your data for chat context with Retrieval Augmented Generation.",
   "endpoint_name": null,
-  "id": "ded6cbe9-664b-4b42-a056-51b0b7367712",
+ 
   "is_component": false,
   "last_tested_version": "1.6.0",
   "name": "model (345)",

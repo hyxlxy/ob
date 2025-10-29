@@ -20,12 +20,13 @@ from typing import List, Dict, Any
 
 # 配置
 MINIOB_SOCKET = "/tmp/miniob.sock"
-EMBEDDING_MODEL = "bge-m3"
-EMBEDDING_BASE_URL = "http://localhost:11434"
-DOC_PATH = "/home/hxl/Desktop/oceambase/ob25/ob/oceanbase-doc/zh-CN"
-CHUNK_SIZE = 500  # 每个文本块的字符数
-CHUNK_OVERLAP = 50  # 文本块之间的重叠字符数
-MAX_DOCS = 5  # 最多处理的文档数量 (节约时间)
+EMBEDDING_MODEL = os.getenv("EMBEDDING_NAME", "bge-m3")
+EMBEDDING_BASE_URL = os.getenv("EMBEDDING_BASE_URL", "http://localhost:11434")
+DOC_PATH = os.getenv("OB_DOC_PATH", "/home/hxl/Desktop/oceambase/ob25/ob/oceanbase-doc/zh-CN")
+CHUNK_SIZE = int(os.getenv("SIM_CHUNK_SIZE", "500"))  # 每个文本块的字符数
+CHUNK_OVERLAP = int(os.getenv("SIM_CHUNK_OVERLAP", "50"))  # 文本块之间的重叠字符数
+MAX_DOCS = int(os.getenv("SIM_MAX_DOCS", "2"))  # 最多处理的文档数量 (默认2，快速验证)
+CHUNKS_PER_DOC = int(os.getenv("SIM_CHUNKS_PER_DOC", "1"))  # 每个文档最多插入的块数 (默认1)
 
 class MiniOBClient:
     """MiniOB 客户端"""
@@ -239,9 +240,9 @@ def insert_documents(client: MiniOBClient, embeddings: OllamaEmbeddings, documen
         print(f"  分割为 {len(chunks)} 个文本块")
         
         # 插入每个文本块
-        for i, chunk in enumerate(chunks[:10]):  # 每个文档最多插入 10 个块
+        for i, chunk in enumerate(chunks[:CHUNKS_PER_DOC]):  # 每个文档最多插入指定数量的块
             # 生成嵌入向量
-            print(f"  [{i+1}/{min(len(chunks), 10)}] 生成嵌入向量...", end='', flush=True)
+            print(f"  [{i+1}/{min(len(chunks), CHUNKS_PER_DOC)}] 生成嵌入向量...", end='', flush=True)
             embedding = embeddings.embed_query(chunk)
             
             if not embedding:
