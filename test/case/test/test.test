@@ -1,29 +1,7 @@
 
-CREATE TABLE q1 (id INT, age INT, name CHAR(10));
-CREATE TABLE q2 (id INT, age INT, name CHAR(10));
-
-
-INSERT INTO q1 VALUES (1, 20, 'AliceAlice'); 
-INSERT INTO q1 VALUES (2, 25, 'BobAliceAS');  
-INSERT INTO q1 VALUES (3, 30, 'CharliesaQ'); 
-INSERT INTO q2 VALUES (1, 20, 'AAAAA'); 
-INSERT INTO q2 VALUES (2, 25, 'BBBBB');  
-INSERT INTO q2 VALUES (3, 30, 'CCCCC'); 
-
-
-
-CREATE VIEW qq1 AS SELECT id, age, id + age AS data FROM q1;
-
-SELECT * FROM qq1;
-
-SELECT * FROM qq1 t1, q1 t2;
-
-SELECT * FROM qq1 t1, q1 t2 WHERE t1.id = t2.id;
-
-CREATE VIEW qq2 AS SELECT t2.name, t1.data FROM qq1 t1, q1 t2 WHERE t1.id = t2.id;
-
-SELECT * FROM qq2;
-
-
-
-
+create table exp_table(id int, col1 int, col2 int, col3 float, col4 float);
+create table exp_table2(id int, col1 int);
+insert into exp_table VALUES (3, 1, 4, 8.08, 4.08);
+insert into exp_table VALUES (9, 7, 6, 5.21, 2.03);
+insert into exp_table VALUES (2, 9, 8, 8.01, 6.5);
+select exp_table.id,3*exp_table2.col1/(exp_table.col2+6) from exp_table,exp_table2 where exp_table2.col1/(5-exp_table.col2)*3>2;

@@ -1172,10 +1172,23 @@ AttrType ArithmeticExpr::value_type() const
     return AttrType::VECTORS;
   }
 
-  // Scalar arithmetic: keep INT when both are INT and not division; otherwise FLOAT
-  if (lt == AttrType::INTS && rt == AttrType::INTS && arithmetic_type_ != Type::DIV) {
-    return AttrType::INTS;
+  // Scalar arithmetic promotion policy:
+  // - DIV: always FLOAT
+  // - MUL: promote to FLOAT even if both operands are INT (avoid early truncation)
+  // - ADD/SUB: keep INT only if both operands are INT; otherwise FLOAT
+  if (arithmetic_type_ == Type::DIV) {
+    return AttrType::FLOATS;
   }
+  if (arithmetic_type_ == Type::MUL) {
+    return AttrType::FLOATS;
+  }
+  if ((arithmetic_type_ == Type::ADD || arithmetic_type_ == Type::SUB)) {
+    if (lt == AttrType::INTS && rt == AttrType::INTS) {
+      return AttrType::INTS;
+    }
+    return AttrType::FLOATS;
+  }
+  // Fallback: default to FLOAT to be safe
   return AttrType::FLOATS;
 }
 
