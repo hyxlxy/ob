@@ -1254,7 +1254,7 @@
                 "trace_as_input": true,
                 "trace_as_metadata": true,
                 "type": "str",
-                "value": ""
+                "value": "bge-m3:latest"
               }
             },
             "tool_mode": false
@@ -2627,11 +2627,16 @@
       "zoom": 0.8010698775896216
     }
   },
-  "description": "Powerful Prompts, Perfectly Positioned.",
+  "description": "Load your data for chat context with Retrieval Augmented Generation.",
   "endpoint_name": null,
-  "id": "dd3c9207-fd2b-462e-af36-9e68b535ba69",
+  "id": "ded6cbe9-664b-4b42-a056-51b0b7367712",
   "is_component": false,
-  "last_tested_version": "1.6.5",
-  "name": "end2",
-  "tags": []
+  "last_tested_version": "1.6.0",
+  "name": "model (345)",
+  "tags": [
+    "openai",
+    "astradb",
+    "rag",
+    "q-a"
+  ]
 }
