@@ -1,0 +1,162 @@
+/* Copyright (c) 2021 OceanBase and/or its affiliates. All rights reserved.
+miniob is licensed under Mulan PSL v2.
+You can use this software according to the terms and conditions of the Mulan PSL v2.
+You may obtain a copy of Mulan PSL v2 at:
+         http://license.coscl.org.cn/MulanPSL2
+THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+See the Mulan PSL v2 for more details. */
+
+#include <cmath>
+#include "common/lang/comparator.h"
+#include "common/lang/sstream.h"
+#include "common/log/log.h"
+#include "common/type/float_type.h"
+#include "common/value.h"
+#include "common/lang/limits.h"
+#include "common/value.h"
+
+int FloatType::compare(const Value &left, const Value &right) const
+{
+  ASSERT(left.attr_type() == AttrType::FLOATS, "left type is not integer");
+  ASSERT(right.attr_type() == AttrType::INTS || right.attr_type() == AttrType::FLOATS, "right type is not numeric");
+  float left_val  = left.get_float();
+  float right_val = right.get_float();
+  return common::compare_float((void *)&left_val, (void *)&right_val);
+}
+
+RC FloatType::add(const Value &left, const Value &right, Value &result) const
+{
+  // 如果任一操作数为NULL，结果为NULL
+  if (left.attr_type() == AttrType::UNDEFINED || right.attr_type() == AttrType::UNDEFINED) {
+    result.reset();
+    return RC::SUCCESS;
+  }
+  // 使用双精度计算以提高精度，与MySQL 8.0保持一致
+  double left_val = static_cast<double>(left.get_float());
+  double right_val = static_cast<double>(right.get_float());
+  double add_result = left_val + right_val;
+  result.set_float(static_cast<float>(add_result));
+  return RC::SUCCESS;
+}
+RC FloatType::subtract(const Value &left, const Value &right, Value &result) const
+{
+  // 如果任一操作数为NULL，结果为NULL
+  if (left.attr_type() == AttrType::UNDEFINED || right.attr_type() == AttrType::UNDEFINED) {
+    result.reset();
+    return RC::SUCCESS;
+  }
+  // 使用双精度计算以提高精度，与MySQL 8.0保持一致
+  double left_val = static_cast<double>(left.get_float());
+  double right_val = static_cast<double>(right.get_float());
+  double subtract_result = left_val - right_val;
+  result.set_float(static_cast<float>(subtract_result));
+  return RC::SUCCESS;
+}
+RC FloatType::multiply(const Value &left, const Value &right, Value &result) const
+{
+  // 如果任一操作数为NULL，结果为NULL
+  if (left.attr_type() == AttrType::UNDEFINED || right.attr_type() == AttrType::UNDEFINED) {
+    result.reset();
+    return RC::SUCCESS;
+  }
+  // 使用双精度计算以提高精度，与MySQL 8.0保持一致
+  double left_val = static_cast<double>(left.get_float());
+  double right_val = static_cast<double>(right.get_float());
+  double multiply_result = left_val * right_val;
+  result.set_float(static_cast<float>(multiply_result));
+  return RC::SUCCESS;
+}
+
+RC FloatType::divide(const Value &left, const Value &right, Value &result) const
+{
+  if (right.get_float() > -EPSILON && right.get_float() < EPSILON) {
+    // 除零情况，返回NULL（UNDEFINED类型）
+    result.reset();  // 这会将类型设置为 AttrType::UNDEFINED
+    return RC::SUCCESS;
+  }
+
+  // 使用双精度计算以提高精度，与MySQL 8.0保持一致
+  double left_val = static_cast<double>(left.get_float());
+  double right_val = static_cast<double>(right.get_float());
+  double division_result = left_val / right_val;
+
+  // 检查结果是否为无穷大或NaN，如果是则返回NULL
+  if (std::isinf(division_result) || std::isnan(division_result)) {
+    result.reset();  // 这会将类型设置为 AttrType::UNDEFINED
+    return RC::SUCCESS;
+  }
+
+  result.set_float(static_cast<float>(division_result));
+  return RC::SUCCESS;
+}
+
+RC FloatType::negative(const Value &val, Value &result) const
+{
+  // 使用双精度计算以提高精度，与MySQL 8.0保持一致
+  double val_double = static_cast<double>(val.get_float());
+  double negative_result = -val_double;
+  result.set_float(static_cast<float>(negative_result));
+  return RC::SUCCESS;
+}
+
+RC FloatType::set_value_from_str(Value &val, const string &data) const
+{
+  RC                rc = RC::SUCCESS;
+  stringstream deserialize_stream;
+  deserialize_stream.clear();
+  deserialize_stream.str(data);
+
+  float float_value;
+  deserialize_stream >> float_value;
+  if (!deserialize_stream || !deserialize_stream.eof()) {
+    rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
+  } else {
+    val.set_float(float_value);
+  }
+  return rc;
+}
+
+RC FloatType::to_string(const Value &val, string &result) const
+{
+  // Keep legacy behavior: print raw numeric (rounded to 2 decimals, no trailing zeros)
+  // This ensures numeric_limits<float>::max() prints as
+  // 340282346638528859811704183484516925440 to match test baselines.
+  stringstream ss;
+  ss << common::double_to_str(val.value_.float_value_);
+  result = ss.str();
+  return RC::SUCCESS;
+}
+
+
+RC FloatType::cast_to(const Value &val, AttrType type, Value &result) const
+{
+  switch (type) {
+    case AttrType::FLOATS: {
+      result.set_float(val.get_float());
+      return RC::SUCCESS;
+    }
+    case AttrType::INTS: {
+      // Truncate toward zero (MySQL-style cast)
+      result.set_int(static_cast<int>(val.get_float()));
+      return RC::SUCCESS;
+    }
+    default: {
+      LOG_WARN("unsupported type %d", type);
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
+  }
+}
+
+int FloatType::cast_cost(AttrType type)
+{
+  if (type == AttrType::FLOATS) {
+    return 0;
+  }
+  if (type == AttrType::INTS) {
+    // Prefer promoting INT->FLOAT (1) over demoting FLOAT->INT (2)
+    return 2;
+  }
+  return INT32_MAX;
+}

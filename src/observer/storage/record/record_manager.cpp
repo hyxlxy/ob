@@ -821,10 +821,50 @@ RC RecordFileHandler::update_record(const RID &rid, const char *data, int record
     return rc;
   }
 
+  // DEBUG: dump TEXT header before update
+  {
+    Record before_rec;
+    RC     grc = page_handler->get_record(rid, before_rec);
+    if (grc == RC::SUCCESS) {
+      for (int i = 0; i < table_meta_->field_num(); ++i) {
+        const FieldMeta *fm = table_meta_->field(i);
+        if (fm != nullptr && fm->visible() && fm->type() == AttrType::TEXTS) {
+          const char *hdr = before_rec.data() + fm->offset();
+          uint64_t    off = 0;
+          uint32_t    ln  = 0;
+          memcpy(&off, hdr, sizeof(uint64_t));
+          memcpy(&ln, hdr + sizeof(uint64_t), sizeof(uint32_t));
+          LOG_INFO("DEBUG: [TEXT][BEFORE_UPDATE] table=%s rid=%s field=%s off=%llu len=%u",
+                   table_meta_->name(), rid.to_string().c_str(), fm->name(), (unsigned long long)off, (unsigned int)ln);
+        }
+      }
+    }
+  }
+
   rc = page_handler->update_record(rid, data);
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to update record. rid=%s, rc=%s", rid.to_string().c_str(), strrc(rc));
     return rc;
+  }
+
+  // DEBUG: dump TEXT header after update
+  {
+    Record after_rec;
+    RC     grc = page_handler->get_record(rid, after_rec);
+    if (grc == RC::SUCCESS) {
+      for (int i = 0; i < table_meta_->field_num(); ++i) {
+        const FieldMeta *fm = table_meta_->field(i);
+        if (fm != nullptr && fm->visible() && fm->type() == AttrType::TEXTS) {
+          const char *hdr = after_rec.data() + fm->offset();
+          uint64_t    off = 0;
+          uint32_t    ln  = 0;
+          memcpy(&off, hdr, sizeof(uint64_t));
+          memcpy(&ln, hdr + sizeof(uint64_t), sizeof(uint32_t));
+          LOG_INFO("DEBUG: [TEXT][AFTER_UPDATE] table=%s rid=%s field=%s off=%llu len=%u",
+                   table_meta_->name(), rid.to_string().c_str(), fm->name(), (unsigned long long)off, (unsigned int)ln);
+        }
+      }
+    }
   }
 
   return RC::SUCCESS;

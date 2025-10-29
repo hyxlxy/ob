@@ -1,0 +1,103 @@
+/* Copyright (c) 2021 OceanBase and/or its affiliates. All rights reserved.
+miniob is licensed under Mulan PSL v2.
+You can use this software according to the terms and conditions of the Mulan PSL v2.
+You may obtain a copy of Mulan PSL v2 at:
+         http://license.coscl.org.cn/MulanPSL2
+THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+See the Mulan PSL v2 for more details. */
+
+//
+// Created by WangYunlai on 2022/07/01.
+//
+
+#include "sql/operator/project_physical_operator.h"
+#include "common/log/log.h"
+#include "storage/record/record.h"
+#include "storage/table/table.h"
+
+using namespace std;
+
+ProjectPhysicalOperator::ProjectPhysicalOperator(vector<unique_ptr<Expression>> &&expressions)
+    : expressions_(std::move(expressions)), tuple_(expressions_)
+{}
+
+RC ProjectPhysicalOperator::open(Trx *trx)
+{
+  // Reset one-shot emission flag for SELECT without FROM
+  produced_one_row_without_child_ = false;
+
+  if (children_.empty()) {
+    return RC::SUCCESS;
+  }
+
+  PhysicalOperator *child = children_[0].get();
+  if (parent_tuple_ != nullptr) {
+    cout << "set parent tuple" << endl;
+    child->set_parent_tuple(parent_tuple_);
+  }
+  RC rc = child->open(trx);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to open child operator: %s", strrc(rc));
+    return rc;
+  }
+
+  return RC::SUCCESS;
+}
+
+RC ProjectPhysicalOperator::next()
+{
+  if (children_.empty()) {
+    // Only emit one row when the projection is constant-foldable (SELECT without FROM)
+    if (produced_one_row_without_child_) {
+      return RC::RECORD_EOF;
+    }
+    // Check all expressions are constant-foldable
+    for (const auto &expr : expressions_) {
+      Value v;
+      if (expr->try_get_value(v) != RC::SUCCESS) {
+        // Not a constant-only projection -> no row should be produced
+        return RC::RECORD_EOF;
+      }
+    }
+    produced_one_row_without_child_ = true;
+    return RC::SUCCESS;
+  }
+  return children_[0]->next();
+}
+
+RC ProjectPhysicalOperator::close()
+{
+  if (!children_.empty()) {
+    children_[0]->close();
+  }
+  return RC::SUCCESS;
+}
+Tuple *ProjectPhysicalOperator::current_tuple()
+{
+  if (children_.empty()) {
+    // No child: evaluate expressions against no input tuple (constants only)
+    tuple_.set_tuple(nullptr);
+  } else {
+    tuple_.set_tuple(children_[0]->current_tuple());
+  }
+  return &tuple_;
+}
+
+RC ProjectPhysicalOperator::tuple_schema(TupleSchema &schema) const
+{
+  // for (const unique_ptr<Expression> &expression : expressions_) {
+  //   schema.append_cell(expression->name());
+  // }
+  for (const unique_ptr<Expression> &expression : expressions_) {
+    int len = strlen(expression->alias());
+    if (len != 0) {
+      schema.append_cell(expression->alias());
+      continue;
+    }
+    //这里就是把name当做alias传进去了。
+    schema.append_cell(expression->name());
+  }
+  return RC::SUCCESS;
+}

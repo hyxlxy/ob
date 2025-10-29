@@ -121,12 +121,26 @@ RC UpdatePhysicalOperator::open(Trx *trx)
         rollback();
         return rc;
       }
+
+      // DEBUG: dump TEXT in-row header right after setting value
+      if (real_fm->type() == AttrType::TEXTS) {
+        const char *hdr = new_record.data() + real_fm->offset();
+        uint64_t    off = 0;
+        uint32_t    ln  = 0;
+        memcpy(&off, hdr, sizeof(uint64_t));
+        memcpy(&ln, hdr + sizeof(uint64_t), sizeof(uint32_t));
+        LOG_INFO("DEBUG: [TEXT][UPDATE] after set_value rid=%s field=%s off=%llu len=%u pv_len=%d pv_type=%d",
+            new_record.rid().to_string().c_str(), real_fm->name(),
+            (unsigned long long)off, (unsigned int)ln, pv->length(), (int)pv->attr_type());
+      }
     }
     
     // 保存更新日志
     log_records_.emplace_back(old_record, new_record);
 
     // 执行更新
+    LOG_INFO("DEBUG: [UPDATE] submit to trx: table=%s rid=%s record_len=%d", table_->name(),
+             new_record.rid().to_string().c_str(), new_record.len());
     rc = trx_->update_record(table_, old_record, new_record);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to update record: %s", strrc(rc));

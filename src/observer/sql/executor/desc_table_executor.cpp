@@ -348,6 +348,19 @@ RC UpdateExecutor::execute(SQLStageEvent *sql_event)
           data[fm->offset() + fm->len() - 1] = '0';
         }
       }
+
+      // 关键修复：统一通过表封装进行写入，确保TEXT写入走 LOB 逻辑
+      // 对所有类型调用，set_value_to_record 内部会处理 NULL/可空/TEXT 头（offset+len）
+      RC wrc = table->set_value_to_record(data, *val, fm);
+      if (wrc != RC::SUCCESS) return wrc;
+      if (fm->type() == AttrType::TEXTS) {
+        const char *hdr = data + fm->offset();
+        uint64_t    off = 0; uint32_t ln = 0;
+        memcpy(&off, hdr, sizeof(uint64_t));
+        memcpy(&ln, hdr + sizeof(uint64_t), sizeof(uint32_t));
+        LOG_INFO("DEBUG: [TEXT][EXECUTOR] single-field after set_value field=%s off=%llu len=%u",
+                 fm->name(), (unsigned long long)off, (unsigned int)ln);
+      }
       
       rc = trx->update_record(table, old_rec, new_rec);
       if (rc != RC::SUCCESS) return rc;

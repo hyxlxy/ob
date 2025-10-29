@@ -1,0 +1,50 @@
+/* Copyright (c) 2021 OceanBase and/or its affiliates. All rights reserved.
+miniob is licensed under Mulan PSL v2.
+You can use this software according to the terms and conditions of the Mulan PSL v2.
+You may obtain a copy of Mulan PSL v2 at:
+         http://license.coscl.org.cn/MulanPSL2
+THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+See the Mulan PSL v2 for more details. */
+
+#pragma once
+
+#include "sql/operator/physical_operator.h"
+
+class Trx;
+class UpdateStmt;
+class Table;
+
+/**
+ * @brief 物理算子，更新
+ * @ingroup PhysicalOperator
+ */
+class UpdatePhysicalOperator : public PhysicalOperator
+{
+public:
+  UpdatePhysicalOperator(
+      Table *table, std::vector<FieldMeta> field_metas, std::vector<std::unique_ptr<Expression>> values)
+      : table_(table), field_metas_(std::move(field_metas)), values_(std::move(values))
+  {}
+
+  ~UpdatePhysicalOperator() override = default;
+
+  PhysicalOperatorType type() const override { return PhysicalOperatorType::UPDATE; }
+
+  RC open(Trx *trx) override;
+  RC next() override;
+  RC close() override;
+
+  Tuple *current_tuple() override { return nullptr; }
+
+private:
+  void rollback();
+
+  Trx                                     *trx_   = nullptr;
+  Table                                   *table_ = nullptr;
+  std::vector<FieldMeta>                   field_metas_;
+  std::vector<std::unique_ptr<Expression>> values_;
+  std::vector<Record>                      records_;
+  std::vector<std::pair<Record, Record>>   log_records_;
+};

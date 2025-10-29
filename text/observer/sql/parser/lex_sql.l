@@ -1,0 +1,193 @@
+%top{
+/*
+这里的代码会被复制到lex_sql.cpp的最开始位置
+定义yy_size_t的原因是因为flex生成的代码，会使用yy_size_t与其他类型的数字
+做比较，导致编译报警
+*/
+#define YY_TYPEDEF_YY_SIZE_T
+typedef int yy_size_t;
+
+/* 参考生成的lex_sql.cpp代码，这个宏定义会放在每次运行yylex()最开始的地方 */
+#define YY_USER_INIT                                         \
+  yycolumn = 0;
+
+/* 参考生成的lex_sql.cpp代码，这个宏定义会放在解析一个token之后，也可以在网上找到大量的参考资料 */
+/* 我们在这里设置当前解析的token的位置信息，这样在yacc中就可以使用这些信息了 */
+#define YY_USER_ACTION                                       \
+do {                                                         \
+  yylloc->first_line   = yylloc->last_line = yylineno;       \
+  yylloc->first_column = yycolumn;                           \
+  yylloc->last_column  = yylloc->first_column + yyleng - 1;  \
+  yycolumn += yyleng;                                        \
+}                                                            \
+while (0);
+
+}
+
+%{
+#include<string.h>
+#include<stdio.h>
+#include <vector>
+
+/**
+ * flex 代码包含三个部分，使用 %% 分隔
+ * 第一个部分的代码是C代码，flex会原样复制到目标文件中
+ * 第二个部分是规则部分，使用正则表达式定义一系列规则
+ * 第三个部分还是C代码，flex 会复制此段代码
+ */
+
+#include "sql/parser/parse_defs.h"
+#include "common/log/log.h"
+#include "yacc_sql.hpp"
+
+#ifndef register
+#define register
+#endif // register
+
+extern int atoi();
+extern double atof();
+
+#define RETURN_TOKEN(token) LOG_DEBUG("%s", #token);return token
+%}
+
+/* Prevent the need for linking with -lfl */
+%option noyywrap
+%option nounput
+%option noinput
+%option bison-bridge
+%option reentrant
+/* 不区分大小写 */
+%option case-insensitive
+%option bison-locations
+
+WHITE_SPACE      [\ \t\b\f]
+DIGIT            [0-9]+
+
+ID               [A-Za-z_]+[A-Za-z0-9_]*
+DOT              \.
+QUOTE            [\'\"]
+%x STR
+
+/* 规则匹配的优先级：*/
+/* 1. 匹配的规则长的优先 */
+/* 2. 写在最前面的优先 */
+
+/* yylval 就可以认为是 yacc 中 %union 定义的结构体(union 结构) */
+%%
+
+{WHITE_SPACE}                                        // ignore whitespace
+\n                                                   ;
+
+{DIGIT}+                           yylval->number=atoi(yytext); RETURN_TOKEN(NUMBER);
+{DIGIT}+{DOT}{DIGIT}+              yylval->floats=atof(yytext); RETURN_TOKEN(FLOAT_LITERAL);
+
+";"                                     RETURN_TOKEN(SEMICOLON);
+{DOT}                                   RETURN_TOKEN(DOT);
+EXIT                                    RETURN_TOKEN(EXIT);
+HELP                                    RETURN_TOKEN(HELP);
+DESC                                    RETURN_TOKEN(DESC);
+CREATE                                  RETURN_TOKEN(CREATE);
+DROP                                    RETURN_TOKEN(DROP);
+TABLE                                   RETURN_TOKEN(TABLE);
+TABLES                                  RETURN_TOKEN(TABLES);
+VIEW                                    RETURN_TOKEN(VIEW);
+INDEX                                   RETURN_TOKEN(INDEX);
+ON                                      RETURN_TOKEN(ON);
+IF                                      RETURN_TOKEN(IF);
+EXISTS                                  RETURN_TOKEN(EXISTS);
+SHOW                                    RETURN_TOKEN(SHOW);
+SYNC                                    RETURN_TOKEN(SYNC);
+SELECT                                  RETURN_TOKEN(SELECT);
+UNION                                   RETURN_TOKEN(UNION);
+UNION[ \t]+ALL                          RETURN_TOKEN(UNION_ALL);
+CALC                                    RETURN_TOKEN(CALC);
+FROM                                    RETURN_TOKEN(FROM);
+WHERE                                   RETURN_TOKEN(WHERE);
+AND                                     RETURN_TOKEN(AND);
+OR                                      RETURN_TOKEN(OR);
+JOIN                                    RETURN_TOKEN(JOIN);
+INNER                                   RETURN_TOKEN(INNER);
+ON                                      RETURN_TOKEN(ON);
+NOT                                     RETURN_TOKEN(NOT);
+NULL                                    RETURN_TOKEN(NULL_T);
+LIKE                                    RETURN_TOKEN(LIKE);
+MATCH                                   RETURN_TOKEN(MATCH);
+AGAINST                                 RETURN_TOKEN(AGAINST);
+FULLTEXT                                RETURN_TOKEN(FULLTEXT);
+PARSER                                  RETURN_TOKEN(PARSER);
+INSERT                                  RETURN_TOKEN(INSERT);
+INTO                                    RETURN_TOKEN(INTO);
+VALUES                                  RETURN_TOKEN(VALUES);
+DELETE                                  RETURN_TOKEN(DELETE);
+UPDATE                                  RETURN_TOKEN(UPDATE);
+  ALTER                                   RETURN_TOKEN(ALTER);
+  ADD                                     RETURN_TOKEN(ADD);
+  CHANGE                                  RETURN_TOKEN(CHANGE);
+  COLUMN                                  RETURN_TOKEN(COLUMN);
+  RENAME                                  RETURN_TOKEN(RENAME);
+  TO                                      RETURN_TOKEN(TO);
+SET                                     RETURN_TOKEN(SET);
+BEGIN                                   RETURN_TOKEN(TRX_BEGIN);
+COMMIT                                  RETURN_TOKEN(TRX_COMMIT);
+ROLLBACK                                RETURN_TOKEN(TRX_ROLLBACK);
+INT                                     RETURN_TOKEN(INT_T);
+CHAR                                    RETURN_TOKEN(STRING_T);
+VARCHAR                                 RETURN_TOKEN(STRING_T);
+FLOAT                                   RETURN_TOKEN(FLOAT_T);
+DATE                                    RETURN_TOKEN(DATE_T);
+VECTOR                                  RETURN_TOKEN(VECTOR_T);
+TEXT                                    RETURN_TOKEN(TEXT_T);
+LOAD                                    RETURN_TOKEN(LOAD);
+INFILE                                  RETURN_TOKEN(INFILE);
+EXPLAIN                                 RETURN_TOKEN(EXPLAIN);
+GROUP                                   RETURN_TOKEN(GROUP);
+BY                                      RETURN_TOKEN(BY);
+HAVING                                  RETURN_TOKEN(HAVING);
+ORDER                                   RETURN_TOKEN(ORDER);
+ASC                                     RETURN_TOKEN(ASC);
+AS                                     RETURN_TOKEN(AS);
+WITH                                   RETURN_TOKEN(WITH);
+LIMIT                                  RETURN_TOKEN(LIMIT);
+COUNT                                   RETURN_TOKEN(COUNT);
+SUM                                     RETURN_TOKEN(SUM);
+MAX                                     RETURN_TOKEN(MAX);
+MIN                                     RETURN_TOKEN(MIN);
+AVG                                     RETURN_TOKEN(AVG);
+STORAGE                                 RETURN_TOKEN(STORAGE);
+FORMAT                                  RETURN_TOKEN(FORMAT);
+PRIMARY                                 RETURN_TOKEN(PRIMARY);
+KEY                                     RETURN_TOKEN(KEY);
+ANALYZE                                 RETURN_TOKEN(ANALYZE);
+IS                                      RETURN_TOKEN(IS);
+
+IN                                      RETURN_TOKEN(IN);
+EXISTS                                  RETURN_TOKEN(EXISTS);
+UNIQUE                                  RETURN_TOKEN(UNIQUE);
+{ID}                                    yylval->cstring=strdup(yytext); static_cast<std::vector<char*>*>(yyextra)->push_back(yylval->cstring); RETURN_TOKEN(ID);
+"("                                     RETURN_TOKEN(LBRACE);
+")"                                     RETURN_TOKEN(RBRACE);
+"["                                     RETURN_TOKEN(LSQUARE);
+"]"                                     RETURN_TOKEN(RSQUARE);
+
+","                                     RETURN_TOKEN(COMMA);
+"="                                     RETURN_TOKEN(EQ);
+"<="                                    RETURN_TOKEN(LE);
+"<>"                                    RETURN_TOKEN(NE);
+"!="                                    RETURN_TOKEN(NE);
+"<"                                     RETURN_TOKEN(LT);
+">="                                    RETURN_TOKEN(GE);
+">"                                     RETURN_TOKEN(GT);
+
+"+" |
+"-" |
+"*" |
+"/"                                     { return yytext[0]; }
+\"[^"]*\"                               yylval->cstring = strdup(yytext); static_cast<std::vector<char*>*>(yyextra)->push_back(yylval->cstring); RETURN_TOKEN(SSS);
+'[^']*\'                                yylval->cstring = strdup(yytext); static_cast<std::vector<char*>*>(yyextra)->push_back(yylval->cstring); RETURN_TOKEN(SSS);
+
+.                                       LOG_DEBUG("Unknown character [%c]",yytext[0]); return yytext[0];
+%%
+
+void scan_string(const char *str, yyscan_t scanner) {
+  yy_switch_to_buffer(yy_scan_string(str, scanner), scanner);
+}

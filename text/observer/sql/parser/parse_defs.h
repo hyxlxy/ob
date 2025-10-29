@@ -1,0 +1,575 @@
+/* Copyright (c) 2021 OceanBase and/or its affiliates. All rights reserved.
+miniob is licensed under Mulan PSL v2.
+You can use this software according to the terms and conditions of the Mulan PSL v2.
+You may obtain a copy of Mulan PSL v2 at:
+         http://license.coscl.org.cn/MulanPSL2
+THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+See the Mulan PSL v2 for more details. */
+
+//
+// Created by Meiyi
+//
+
+#pragma once
+
+#include "common/lang/string.h"
+#include "common/lang/vector.h"
+#include "common/lang/memory.h"
+#include "common/value.h"
+
+class Expression;
+struct ParsedSqlNode;
+
+/**
+ * @brief UPDATE 单个赋值项
+ */
+struct UpdateItemSqlNode
+{
+  string                         attr_name;             ///< 列名
+  bool                           is_sub_query = false;  ///< 是否为子查询项
+  Value                          value;                 ///< 常量值（当 is_sub_query=false 时有效）
+  std::unique_ptr<ParsedSqlNode> sub_query;  ///< 子查询（当 is_sub_query=true 时有效，flag=SCF_SELECT）
+};
+
+/**
+ * @defgroup SQLParser SQL Parser
+ */
+
+/**
+ * @brief 描述一个属性
+ * @ingroup SQLParser
+ * @details 属性，或者说字段(column, field)
+ * Rel -> Relation
+ * Attr -> Attribute
+ */
+struct RelAttrSqlNode
+{
+  string relation_name;   ///< relation name (may be NULL) 表名
+  string attribute_name;  ///< attribute name              属性名
+};
+
+/**
+ * @brief 描述比较运算符
+ * @ingroup SQLParser
+ */
+enum CompOp
+{
+  EQUAL_TO,          ///< "="
+  LESS_EQUAL,        ///< "<="
+  NOT_EQUAL,         ///< "<>"
+  LESS_THAN,         ///< "<"
+  GREAT_EQUAL,       ///< ">="
+  GREAT_THAN,        ///< ">"
+  LIKE_OP,           ///< "LIKE"
+  NOT_LIKE_OP,       ///< "NOT LIKE"
+  IN_OP,             ///< "IN"
+  NOT_IN_OP,         ///< "NOT IN"
+  IN_VALUES_OP,      ///< "IN (values)"
+  NOT_IN_VALUES_OP,  ///< "NOT IN (values)"
+  EXISTS_OP,         ///< "EXISTS"
+  NOT_EXISTS_OP,     ///< "NOT EXISTS"
+  IS_NULL_OP,        ///< "IS NULL"
+  IS_NOT_NULL_OP,    ///< "IS NOT NULL"
+  NO_OP
+};
+
+/**
+ * @brief 描述逻辑连接运算符
+ * @ingroup SQLParser
+ */
+enum ConjunctionOp
+{
+  AND_OP,  ///< "AND"
+  OR_OP    ///< "OR"
+};
+
+/**
+ * @brief 描述排序方向
+ * @ingroup SQLParser
+ */
+enum OrderDirection
+{
+  ASC_ORDER,  ///< 升序
+  DESC_ORDER  ///< 降序
+};
+
+/**
+ * @brief 表示一个排序项
+ * @ingroup SQLParser
+ * @details 排序项包含排序表达式和排序方向
+ */
+struct OrderBySqlNode
+{
+  unique_ptr<Expression> expression;  ///< 排序表达式
+  OrderDirection         direction;   ///< 排序方向
+};
+
+/**
+ * @brief 表示一个条件比较
+ * @ingroup SQLParser
+ * @details 条件比较就是SQL查询中的 where a>b 这种。
+ * 一个条件比较是有两部分组成的，称为左边和右边。
+ * 左边和右边理论上都可以是任意的数据，比如是字段（属性，列），也可以是数值常量。
+ * 这个结构中记录的仅仅支持字段和值。
+ */
+struct ConditionSqlNode
+{
+  int left_is_attr;              ///< TRUE if left-hand side is an attribute
+                                 ///< 1时，操作符左边是属性名，0时，是属性值
+  Value          left_value;     ///< left-hand side value if left_is_attr = FALSE
+  RelAttrSqlNode left_attr;      ///< left-hand side attribute
+  CompOp         comp;           ///< comparison operator
+  int            right_is_attr;  ///< TRUE if right-hand side is an attribute
+                                 ///< 1时，操作符右边是属性名，0时，是属性值
+  RelAttrSqlNode right_attr;     ///< right-hand side attribute if right_is_attr = TRUE 右边的属性
+  Value          right_value;    ///< right-hand side value if right_is_attr = FALSE
+
+  // 新增：支持表达式比较
+  std::unique_ptr<Expression> left_expr;   ///< left-hand side expression
+  std::unique_ptr<Expression> right_expr;  ///< right-hand side expression
+
+  // 新增：支持子查询
+  std::unique_ptr<ParsedSqlNode> sub_query;  ///< sub-query for IN/EXISTS operations
+
+  // 新增：支持IN操作的值列表
+  std::vector<Value> right_values;  ///< values for IN/NOT IN operations
+
+  // 新增：支持逻辑连接符
+  ConjunctionOp conjunction_op = ConjunctionOp::AND_OP;  ///< AND or OR operator
+
+  // 添加移动构造函数和移动赋值操作符
+  ConditionSqlNode()                                    = default;
+  ConditionSqlNode(const ConditionSqlNode &)            = delete;
+  ConditionSqlNode &operator=(const ConditionSqlNode &) = delete;
+  ConditionSqlNode(ConditionSqlNode &&)                 = default;
+  ConditionSqlNode &operator=(ConditionSqlNode &&)      = default;
+};
+
+/**
+ * @brief 表示JOIN类型
+ * @ingroup SQLParser
+ */
+enum JoinType
+{
+  INNER_JOIN  ///< 内连接
+};
+
+/**
+ * @brief 表示一个JOIN操作
+ * @ingroup SQLParser
+ * @details JOIN操作包含连接的表和连接条件
+ */
+struct JoinSqlNode
+{
+  string                   table_name;  ///< 要连接的表名
+  string                   alias;       ///< 可选的表别名
+  JoinType                 join_type;   ///< 连接类型
+  vector<ConditionSqlNode> conditions;  ///< 连接条件
+};
+
+/**
+ * @brief 表示表引用（包含表列表和JOIN操作）
+ * @ingroup SQLParser
+ * @details 用于组合传统的表列表和JOIN操作
+ */
+struct TableReferencesSqlNode
+{
+  vector<string>      relations;  ///< 表列表
+  vector<JoinSqlNode> joins;      ///< JOIN操作列表
+};
+
+struct RelationWithAliasSqlNode
+{
+  string table_name;
+  string alias;
+};
+
+/**
+ * @brief 描述一个select语句
+ * @ingroup SQLParser
+ * @details 一个正常的select语句描述起来比这个要复杂很多，这里做了简化。
+ * 一个select语句由三部分组成，分别是select, from, where。
+ * select部分表示要查询的字段，from部分表示要查询的表，where部分表示查询的条件。
+ * 比如 from 中可以是多个表，也可以是另一个查询语句，这里仅仅支持表，也就是 relations。
+ * where 条件 conditions，这里表示使用AND串联起来多个条件。正常的SQL语句会有OR，NOT等，
+ * 甚至可以包含复杂的表达式。
+ */
+
+struct SelectSqlNode
+{
+  vector<unique_ptr<Expression>> expressions;       ///< 查询的表达式
+  vector<string>                 relations;         ///< 查询的表
+  vector<string>                 relation_aliases;  ///< 与relations一一对应的别名，空字符串表示无别名
+  vector<JoinSqlNode>            joins;             ///< join操作
+  vector<ConditionSqlNode>       conditions;        ///< 查询条件，使用AND串联起来多个条件
+  vector<unique_ptr<Expression>> group_by;          ///< group by clause
+  unique_ptr<Expression>         having_expr;       ///< having clause (expression)
+  vector<OrderBySqlNode>         order_by;          ///< order by clause
+  int                            limit_count = 0;   ///< LIMIT 子句（0表示未指定）
+};
+
+/**
+ * @brief 描述一个UNION语句
+ * @ingroup SQLParser
+ * @details UNION操作将多个SELECT语句的结果合并
+ */
+struct UnionSqlNode
+{
+  vector<unique_ptr<SelectSqlNode>> select_statements;  ///< UNION的多个SELECT语句
+  vector<bool>           distinct_flags;   ///< 每个UNION操作的标志位，true表示去重，false表示不去重
+  vector<AttrType>       result_types;     ///< 结果集的列类型（由第一个SELECT决定）
+  vector<string>         result_names;     ///< 结果集的列名（由第一个SELECT决定）
+  vector<OrderBySqlNode> order_by;         ///< UNION结果的ORDER BY子句
+  int                    limit_count = 0;  ///< UNION结果的LIMIT子句（0表示未指定）
+};
+
+/**
+ * @brief 算术表达式计算的语法树
+ * @ingroup SQLParser
+ */
+struct CalcSqlNode
+{
+  vector<unique_ptr<Expression>> expressions;  ///< calc clause
+};
+
+/**
+ * @brief 描述一个insert语句
+ * @ingroup SQLParser
+ * @details 于Selects类似，也做了很多简化
+ */
+struct InsertSqlNode
+{
+  string         relation_name;    ///< Relation to insert into
+  vector<string> attribute_names;  ///< 可选：按列插入时的列名列表
+  vector<Value>  values;           ///< 要插入的值（若提供attribute_names，则与之等长）
+};
+
+/**
+ * @brief 描述一个delete语句
+ * @ingroup SQLParser
+ */
+struct DeleteSqlNode
+{
+  string                   relation_name;  ///< Relation to delete from
+  vector<ConditionSqlNode> conditions;
+};
+
+struct UpdateKvSqlNode
+{
+  // 多字段UPDATE支持
+  string attribute_names;  ///< 更新的字段列表（多字段模式）
+  Value  values;           ///< 更新的值列表（多字段模式）
+  // 多字段扩展：每个位置要么是常量，要么是子查询
+  // 若 value_is_sub_query[i] 为 true，则忽略 values[i]，使用 value_sub_queries[i]
+  bool                      value_is_sub_query;  ///< 与 attribute_names 对齐
+  unique_ptr<ParsedSqlNode> value_sub_queries;   ///< 与 attribute_names
+};
+
+/**
+ * @brief 描述一个update语句
+ * @ingroup SQLParser
+ */
+struct UpdateSqlNode
+{
+  string relation_name;   ///< Relation to update
+  string attribute_name;  ///< 更新的字段\（单字段模式）
+  Value  value;           ///< 更新的值（单字段模式）
+
+  // 多字段UPDATE支持
+  vector<string> attribute_names;  ///< 更新的字段列表（多字段模式）
+  vector<Value>  values;           ///< 更新的值列表（多字段模式）
+  // 多字段扩展：每个位置要么是常量，要么是子查询
+  // 若 value_is_sub_query[i] 为 true，则忽略 values[i]，使用 value_sub_queries[i]
+  vector<bool>                      value_is_sub_query;  ///< 与 attribute_names 对齐
+  vector<unique_ptr<ParsedSqlNode>> value_sub_queries;   ///< 与 attribute_names
+                                                        ///< 对齐（仅当对应为子查询时有效，flag=SCF_SELECT）
+
+  vector<ConditionSqlNode>       conditions;
+  bool                           is_sub_query = false;  ///< 是否使用子查询更新
+  std::unique_ptr<ParsedSqlNode> sub_query;             ///< 子查询节点
+};
+
+/**
+ * @brief 描述一个属性
+ * @ingroa SQLParser
+ * @details 属性，或者说字段(column, field)
+ */
+struct AttrInfoSqlNode
+{
+  AttrType type;             ///< Type of attribute
+  string   name;             ///< Attribute name
+  size_t   length;           ///< Length of attribute
+  bool     nullable = true;  ///< Whether the attribute can be NULL (default: true)
+
+  AttrInfoSqlNode() : type(AttrType::UNDEFINED), length(0), nullable(true) {}
+  AttrInfoSqlNode(std::string name_, AttrType type_) : AttrInfoSqlNode()
+  {
+    name = std::move(name_);
+    type = std::move(type_);
+    if (type == AttrType::DATES) {
+      length = 4;
+    } else {
+      length = 4;
+    }
+    nullable = true;
+    length++;
+  }
+};
+
+/**
+ * @brief 描述一个create table语句
+ * @ingroup SQLParser
+ * @details 这里也做了很多简化。
+ */
+struct CreateTableSqlNode
+{
+  string                  relation_name;  ///< Relation name
+  vector<AttrInfoSqlNode> attr_infos;     ///< attributes
+  vector<string>          primary_keys;   ///< primary keys
+  // TODO: integrate to CreateTableOptions
+  string storage_format;  ///< storage format
+  string storage_engine;  ///< storage engine
+
+  // For CREATE TABLE AS SELECT syntax
+  std::unique_ptr<SelectSqlNode> as_select;  ///< SELECT statement for CREATE TABLE AS SELECT
+};
+
+/**
+ * @brief 描述一个drop table语句
+ * @ingroup SQLParser
+ */
+struct DropTableSqlNode
+{
+  string relation_name;  ///< 要删除的表名
+  bool   if_exists;      ///< 是否使用IF EXISTS
+};
+
+/**
+ * @brief 描述一个analyze table语句
+ * @ingroup SQLParser
+ */
+struct AnalyzeTableSqlNode
+{
+  string relation_name;  ///< 要分析的表名
+};
+
+/**
+ * @brief 描述一个create index语句
+ * @ingroup SQLParser
+ * @details 创建索引时，需要指定索引名，表名，字段名。
+ * 支持多个字段的索引和唯一索引。
+ */
+struct CreateIndexSqlNode
+{
+  string         index_name;         ///< Index name
+  string         relation_name;      ///< Relation name
+  vector<string> attribute_names;    ///< Attribute names (支持多字段)
+  bool           is_unique = false;  ///< 是否为唯一索引
+
+  // 为了向后兼容，保留单字段访问接口
+  string attribute_name() const { return attribute_names.empty() ? "" : attribute_names[0]; }
+};
+
+/**
+ * @brief 描述一个drop index语句
+ * @ingroup SQLParser
+ */
+struct DropIndexSqlNode
+{
+  string index_name;     ///< Index name
+  string relation_name;  ///< Relation name
+};
+
+/**
+ * @brief 描述一个desc table语句
+ * @ingroup SQLParser
+ * @details desc table 是查询表结构信息的语句
+ */
+struct DescTableSqlNode
+{
+  string relation_name;
+};
+
+/**
+ * @brief 描述一个load data语句
+ * @ingroup SQLParser
+ * @details 从文件导入数据到表中。文件中的每一行就是一条数据，每行的数据类型、字段个数都与表保持一致
+ */
+struct LoadDataSqlNode
+{
+  string relation_name;
+  string file_name;
+};
+
+/**
+ * @brief 设置变量的值
+ * @ingroup SQLParser
+ * @note 当前还没有查询变量
+ */
+struct SetVariableSqlNode
+{
+  string name;
+  Value  value;
+};
+
+/**
+ * @brief 描述一个create view语句
+ * @ingroup SQLParser
+ * @details 创建视图语句的解析结果
+ */
+struct CreateViewSqlNode
+{
+  string                    relation_name;
+  string                    definition;
+  unique_ptr<ParsedSqlNode> selection;
+  vector<string>            attr_names;
+};
+
+/**
+ * @brief 描述一个drop view语句
+ * @ingroup SQLParser
+ * @details 删除视图语句的解析结果
+ */
+struct DropViewSqlNode
+{
+  string relation_name;  ///< View name
+};
+
+/**
+ * @brief 描述一个show index语句
+ * @ingroup SQLParser
+ */
+struct ShowIndexSqlNode
+{
+  string relation_name;  ///< Table name
+};
+
+/**
+ * @brief 描述一个explain语句
+ * @ingroup SQLParser
+ * @details 会创建operator的语句，才能用explain输出执行计划。
+ * 一个command就是一个语句，比如select语句，insert语句等。
+ * 可能改成SqlCommand更合适。
+ */
+struct ExplainSqlNode
+{
+  unique_ptr<ParsedSqlNode> sql_node;
+};
+
+/**
+ * @brief 解析SQL语句出现了错误
+ * @ingroup SQLParser
+ * @details 当前解析时并没有处理错误的行号和列号
+ */
+struct ErrorSqlNode
+{
+  string error_msg;
+  int    line;
+  int    column;
+};
+
+/**
+ * @brief 表示一个SQL语句的类型
+ * @ingroup SQLParser
+ */
+enum SqlCommandFlag
+{
+  SCF_ERROR = 0,
+  SCF_CALC,
+  SCF_SELECT,
+  SCF_INSERT,
+  SCF_UPDATE,
+  SCF_DELETE,
+  SCF_CREATE_TABLE,
+  SCF_DROP_TABLE,
+  SCF_ANALYZE_TABLE,
+  SCF_CREATE_INDEX,
+  SCF_DROP_INDEX,
+  SCF_SYNC,
+  SCF_SHOW_TABLES,
+  SCF_DESC_TABLE,
+  SCF_BEGIN,  ///< 事务开始语句，可以在这里扩展只读事务
+  SCF_COMMIT,
+  SCF_CLOG_SYNC,
+  SCF_ROLLBACK,
+  SCF_LOAD_DATA,
+  SCF_HELP,
+  SCF_EXIT,
+  SCF_EXPLAIN,
+  SCF_SET_VARIABLE,  ///< 设置变量
+  SCF_CREATE_VIEW,   ///< 创建视图
+  SCF_DROP_VIEW,     ///< 删除视图
+  SCF_SHOW_INDEX,    ///< 显示索引
+  SCF_UNION,         ///< UNION语句
+  SCF_ALTER_TABLE,   ///< ALTER TABLE
+  SCF_MATCH_AGAINST, ///< MATCH AGAINST 函数（作为表达式存在，不单独语句）
+};
+/**
+ * @brief 表示一个SQL语句
+ * @ingroup SQLParser
+ */
+struct ParsedSqlNode
+{
+public:
+  enum SqlCommandFlag flag;
+  ErrorSqlNode        error;
+  CalcSqlNode         calc;
+  SelectSqlNode       selection;
+  InsertSqlNode       insertion;
+  DeleteSqlNode       deletion;
+  UpdateSqlNode       update;
+  CreateTableSqlNode  create_table;
+  DropTableSqlNode    drop_table;
+  AnalyzeTableSqlNode analyze_table;
+  CreateIndexSqlNode  create_index;
+  DropIndexSqlNode    drop_index;
+  DescTableSqlNode    desc_table;
+  LoadDataSqlNode     load_data;
+  ExplainSqlNode      explain;
+  SetVariableSqlNode  set_variable;
+  CreateViewSqlNode   create_view;
+  DropViewSqlNode     drop_view;
+  ShowIndexSqlNode    show_index;
+  UnionSqlNode        union_stmt;
+
+  // ALTER TABLE
+  enum class AlterOpType { ADD_COLUMN, DROP_COLUMN, CHANGE_COLUMN_RENAME, RENAME_TABLE, ADD_FULLTEXT_INDEX };
+  struct AlterTableSqlNode {
+    AlterOpType op_type = AlterOpType::ADD_COLUMN;
+    // 目标表
+    string table_name;
+    string new_table_name;  // for RENAME TO
+    // 列操作
+    string column_name;        // for ADD/DROP/CHANGE old name
+    string new_column_name;    // for CHANGE new name
+    AttrType data_type = AttrType::UNDEFINED; // simplified: only INTS used in grammar
+    // 全文索引：ALTER TABLE ... ADD FULLTEXT INDEX idx (column) WITH PARSER jieba
+    string index_name;         // index name for fulltext
+    string target_field_name;  // target column for fulltext index
+    string parser_name;        // parser name (only 'jieba' supported)
+  } alter_table;
+
+public:
+  ParsedSqlNode();
+  ParsedSqlNode(ParsedSqlNode &&) = default;
+  explicit ParsedSqlNode(SqlCommandFlag flag);
+  ~ParsedSqlNode() = default;  // 使用默认析构函数，因为成员都是RAII类型
+};
+
+/**
+ * @brief 表示语法解析后的数据
+ * @ingroup SQLParser
+ */
+class ParsedSqlResult
+{
+public:
+  void add_sql_node(unique_ptr<ParsedSqlNode> sql_node);
+  ~ParsedSqlResult() = default;  // 使用默认析构函数，unique_ptr会自动清理
+
+  vector<unique_ptr<ParsedSqlNode>> &sql_nodes() { return sql_nodes_; }
+
+private:
+  vector<unique_ptr<ParsedSqlNode>> sql_nodes_;  ///< 这里记录SQL命令。虽然看起来支持多个，但是当前仅处理一个
+};
