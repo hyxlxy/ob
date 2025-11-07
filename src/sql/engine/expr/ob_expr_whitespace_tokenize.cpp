@@ -62,6 +62,7 @@ int ObExprWhitespaceTokenize::eval_whitespace_tokenize(const ObExpr &expr,
   }
 
   int32_t las_space_pos = -1;
+
   for (int32_t i = 0; i <= len; i++) {
     bool is_space = ((i == len) or ((str[i] == ' ' || str[i] == '\t' ||
                                      str[i] == '\n' || str[i] == '\r')));
@@ -69,7 +70,7 @@ int ObExprWhitespaceTokenize::eval_whitespace_tokenize(const ObExpr &expr,
     if (is_space and i - las_space_pos - 1 > 0) {
       //就代表中间是有值的
       int32_t word_len = i - las_space_pos - 1;
-      if (las_space_pos != -1) {
+      if (buf.length() > 1) { //代表之前放过单词了
         if (OB_FAIL(buf.append(","))) {
           LOG_WARN("append comma failed", K(ret));
         }
