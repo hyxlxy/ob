@@ -63,9 +63,9 @@ int ObExprWhitespaceTokenize::eval_whitespace_tokenize(const ObExpr &expr,
   }
 
   int32_t las_space_pos = -1;
-  for (int32_t i = 0; i < len; i++) {
-    bool is_space =
-        (str[i] == ' ' || str[i] == '\t' || str[i] == '\n' || str[i] == '\r');
+  for (int32_t i = 0; i <= len; i++) {
+    bool is_space = ((i == len) or ((str[i] == ' ' || str[i] == '\t' ||
+                                     str[i] == '\n' || str[i] == '\r')));
     //如果当前i是空格，那么判断一下和上一个空格之间的长度是否是大于0的，（两端点都是开）
     if (is_space and i - las_space_pos - 1 > 0) {
       //就代表中间是有值的
