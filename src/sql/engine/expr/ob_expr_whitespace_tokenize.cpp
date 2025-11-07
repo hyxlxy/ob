@@ -1,120 +1,111 @@
 /**
  * Copyright (c) 2024 OceanBase
  * OceanBase CE is licensed under Mulan PubL v2.
- * You can use this software according to the terms and conditions of the Mulan PubL v2.
- * You may obtain a copy of Mulan PubL v2 at:
+ * You can use this software according to the terms and conditions of the Mulan
+ * PubL v2. You may obtain a copy of Mulan PubL v2 at:
  *          http://license.coscl.org.cn/MulanPubL-2.0
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
- * EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
- * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
- * See the Mulan PubL v2 for more details.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+ * KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+ * NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE. See the
+ * Mulan PubL v2 for more details.
  */
 
+#include "lib/utility/ob_macro_utils.h"
+#include "share/datum/ob_datum.h"
+#include <cstdint>
 #define USING_LOG_PREFIX SQL_ENG
 
 #include "sql/engine/expr/ob_expr_whitespace_tokenize.h"
+
 #include "lib/ob_errno.h"
 #include "lib/oblog/ob_log_module.h"
 #include "lib/string/ob_string.h"
+#include "lib/string/ob_string_buffer.h"
 #include "lib/udt/ob_array_type.h"
 #include "sql/engine/expr/ob_array_expr_utils.h"
 #include "sql/engine/expr/ob_expr_result_type_util.h"
-#include "lib/string/ob_string_buffer.h"
 
-namespace oceanbase
-{
-namespace sql
-{
+namespace oceanbase {
+namespace sql {
 
 ObExprWhitespaceTokenize::ObExprWhitespaceTokenize(common::ObIAllocator &alloc)
-    : ObStringExprOperator(alloc,
-                           T_FUN_WHITESPACE_TOKENIZE,
-                           N_WHITESPACE_TOKENIZE,
-                           1,
-                           VALID_FOR_GENERATED_COL)
-{
-}
+    : ObStringExprOperator(alloc, T_FUN_WHITESPACE_TOKENIZE,
+                           N_WHITESPACE_TOKENIZE, 1, VALID_FOR_GENERATED_COL) {}
 
 ObExprWhitespaceTokenize::~ObExprWhitespaceTokenize() {}
 
 int ObExprWhitespaceTokenize::eval_whitespace_tokenize(const ObExpr &expr,
                                                        ObEvalCtx &ctx,
-                                                       ObDatum &expr_datum)
-{
+                                                       ObDatum &expr_datum) {
   int ret = OB_SUCCESS;
   ObDatum *text_datum = nullptr;
 
   if (OB_FAIL(expr.args_[0]->eval(ctx, text_datum))) {
     LOG_WARN("Failed to eval text argument", K(ret));
-  } else if (text_datum->is_null()) {
+    return ret;
+  }
+  if (text_datum->is_null()) {
     expr_datum.set_null();
-  } else {
-    ObString input_text = text_datum->get_string();
+    return ret;
+  }
+  ObString input_text = text_datum->get_string();
 
-    ObEvalCtx::TempAllocGuard tmp_alloc_g(ctx);
-    common::ObArenaAllocator &tmp_allocator = tmp_alloc_g.get_allocator();
+  ObEvalCtx::TempAllocGuard tmp_alloc_g(ctx);
+  common::ObArenaAllocator &tmp_allocator = tmp_alloc_g.get_allocator();
 
-    const char *str = input_text.ptr();
-    const int32_t len = input_text.length();
-    int32_t start = 0;
-    bool in_word = false;
-    bool first = true;
+  const char *str = input_text.ptr();
+  const int32_t len = input_text.length();
 
-    ObStringBuffer buf(&tmp_allocator);
-    if (OB_FAIL(buf.append("["))) {
-      LOG_WARN("append left bracket failed", K(ret));
-    }
-    for (int32_t i = 0; OB_SUCC(ret) && i <= len; ++i) {
-      const bool is_space = (i < len) && (str[i] == ' ' || str[i] == '\t' || str[i] == '\n' || str[i] == '\r');
-      if (i < len && !is_space) {
-        if (!in_word) {
-          start = i;
-          in_word = true;
-        }
-      } else {
-        if (in_word) {
-          const int32_t word_len = i - start;
-          if (word_len > 0) {
-            if (!first) {
-              if (OB_FAIL(buf.append(","))) {
-                LOG_WARN("append comma failed", K(ret));
-              }
-            }
-            if (OB_SUCC(ret)) {
-              if (OB_FAIL(buf.append(ObString(word_len, str + start)))) {
-                LOG_WARN("append token failed", K(ret));
-              } else {
-                first = false;
-              }
-            }
-          }
-          in_word = false;
+  ObStringBuffer buf(&tmp_allocator);
+
+  if (OB_FAIL(buf.append("["))) {
+    LOG_WARN("append left bracket failed", K(ret));
+  }
+
+  int32_t las_space_pos = -1;
+  for (int32_t i = 0; i < len; i++) {
+    bool is_space =
+        (str[i] == ' ' || str[i] == '\t' || str[i] == '\n' || str[i] == '\r');
+    //如果当前i是空格，那么判断一下和上一个空格之间的长度是否是大于0的，（两端点都是开）
+    if (is_space and i - las_space_pos - 1 > 0) {
+      //就代表中间是有值的
+      int32_t word_len = i - las_space_pos - 1;
+      if (las_space_pos != -1) {
+        if (OB_FAIL(buf.append(","))) {
+          LOG_WARN("append comma failed", K(ret));
         }
       }
-    }
-    if (OB_SUCC(ret) && OB_FAIL(buf.append("]"))) {
-      LOG_WARN("append right bracket failed", K(ret));
+      if (OB_FAIL(buf.append(ObString(word_len, str + las_space_pos + 1)))) {
+        LOG_WARN("append comma failed", K(ret));
+      }
     }
 
-    if (OB_SUCC(ret)) {
-      ObTextStringDatumResult str_result(expr.datum_meta_.type_, &expr, &ctx, &expr_datum);
-      if (OB_FAIL(str_result.init(buf.length()))) {
-        LOG_WARN("failed to init text result", K(ret), K(buf.length()));
-      } else if (OB_FAIL(str_result.append(buf.ptr(), buf.length()))) {
-        LOG_WARN("failed to append result", K(ret));
-      } else {
-        str_result.set_result();
-      }
+    if (is_space) {
+      las_space_pos = i;
+    }
+  }
+  if (OB_FAIL(buf.append("]"))) {
+    LOG_WARN("append right bracket failed", K(ret));
+  }
+
+  if (OB_SUCC(ret)) {
+    ObTextStringDatumResult str_result(expr.datum_meta_.type_, &expr, &ctx,
+                                       &expr_datum);
+    if (OB_FAIL(str_result.init(buf.length()))) {
+      LOG_WARN("failed to init text result", K(ret), K(buf.length()));
+    } else if (OB_FAIL(str_result.append(buf.ptr(), buf.length()))) {
+      LOG_WARN("failed to append result", K(ret));
+    } else {
+      str_result.set_result();
     }
   }
 
   return ret;
 }
 
-int ObExprWhitespaceTokenize::calc_result_type1(ObExprResType &type,
-                                                ObExprResType &text,
-                                                common::ObExprTypeCtx &type_ctx) const
-{
+int ObExprWhitespaceTokenize::calc_result_type1(
+    ObExprResType &type, ObExprResType &text,
+    common::ObExprTypeCtx &type_ctx) const {
   int ret = OB_SUCCESS;
   UNUSED(type_ctx);
 
@@ -124,7 +115,8 @@ int ObExprWhitespaceTokenize::calc_result_type1(ObExprResType &type,
     }
   } else if (!ob_is_null(text.get_type())) {
     ret = OB_ERR_INVALID_TYPE_FOR_OP;
-    LOG_USER_ERROR(OB_ERR_INVALID_TYPE_FOR_OP, "VARCHAR", ob_obj_type_str(text.get_type()));
+    LOG_USER_ERROR(OB_ERR_INVALID_TYPE_FOR_OP, "VARCHAR",
+                   ob_obj_type_str(text.get_type()));
   }
 
   if (OB_SUCC(ret)) {
@@ -138,9 +130,8 @@ int ObExprWhitespaceTokenize::calc_result_type1(ObExprResType &type,
 }
 
 int ObExprWhitespaceTokenize::cg_expr(ObExprCGCtx &op_cg_ctx,
-                                       const ObRawExpr &raw_expr,
-                                       ObExpr &rt_expr) const
-{
+                                      const ObRawExpr &raw_expr,
+                                      ObExpr &rt_expr) const {
   int ret = OB_SUCCESS;
   UNUSED(op_cg_ctx);
   UNUSED(raw_expr);
@@ -157,4 +148,3 @@ int ObExprWhitespaceTokenize::cg_expr(ObExprCGCtx &op_cg_ctx,
 
 } // namespace sql
 } // namespace oceanbase
-
