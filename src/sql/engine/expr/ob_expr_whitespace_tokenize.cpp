@@ -52,7 +52,6 @@ int ObExprWhitespaceTokenize::eval_whitespace_tokenize(const ObExpr &expr,
 
   ObEvalCtx::TempAllocGuard tmp_alloc_g(ctx);
   common::ObArenaAllocator &tmp_allocator = tmp_alloc_g.get_allocator();
-
   const char *str = input_text.ptr();
   const int32_t len = input_text.length();
 
