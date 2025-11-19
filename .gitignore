@@ -396,5 +396,5 @@ run_test_with_perf.sh
 tools/flamegraph/
 
 
-* .md
+*.md
 ob-mldr-test/

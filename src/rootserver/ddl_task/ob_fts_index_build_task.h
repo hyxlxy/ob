@@ -229,6 +229,9 @@ private:
   bool is_retryable_ddl_;
   bool use_doc_id_;
   int64_t rowkey_doc_schema_version_;
+  // Optimization: reduce polling frequency for aux table complement check
+  int64_t last_aux_table_check_time_;  // last check time in microseconds
+  static const int64_t AUX_TABLE_CHECK_INTERVAL_US = 1000000;  // 1 second
 };
 
 } // end namespace rootserver

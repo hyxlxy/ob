@@ -65,7 +65,8 @@ ObFtsIndexBuildTask::ObFtsIndexBuildTask()
     dependent_task_result_map_(),
     is_retryable_ddl_(true),
     use_doc_id_(true),
-    rowkey_doc_schema_version_(0)
+    rowkey_doc_schema_version_(0),
+    last_aux_table_check_time_(0)
 {
 }
 
@@ -950,6 +951,17 @@ int ObFtsIndexBuildTask::wait_aux_table_complement()
     ret = OB_STATE_NOT_MATCH;
     LOG_WARN("task status not match", K(ret), K(task_status_));
   } else {
+    // Optimization: reduce polling frequency to avoid excessive database queries
+    const int64_t current_time = ObTimeUtility::current_time();
+    if (last_aux_table_check_time_ > 0 && 
+        (current_time - last_aux_table_check_time_) < AUX_TABLE_CHECK_INTERVAL_US) {
+      // Skip this check if it's too soon since last check
+      LOG_DEBUG("skip aux table complement check, too soon since last check",
+                K(current_time), K(last_aux_table_check_time_),
+                K(current_time - last_aux_table_check_time_));
+      return OB_SUCCESS;
+    }
+    last_aux_table_check_time_ = current_time;
     int64_t finished_task_cnt = 0;
     for (task_iter iter = dependent_task_result_map_.begin();
         OB_SUCC(ret) && iter != dependent_task_result_map_.end(); ++iter) {
