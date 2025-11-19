@@ -388,5 +388,13 @@ deps/3rd
 test/tmp
 test/var
 
+############# flamegraph and perf files #############
+flamegraph_kernel.svg
+perf.data
+perf.script
+run_test_with_perf.sh
+tools/flamegraph/
+
 
 * .md
+ob-mldr-test/
