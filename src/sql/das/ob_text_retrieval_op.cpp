@@ -286,9 +286,9 @@ int ObTextRetrievalMerge::get_next_rows(int64_t &count, int64_t capacity)
         ? eval_ctx->max_batch_size_ : 1024;
     int64_t batch_capacity = OB_MIN(capacity, max_batch_size);
     
-    // Optimization: Scalar filter pushdown - check filter before BM25 calculation
-    // This allows us to skip BM25 relevance accumulation for filtered documents
-    // Batch process multiple rows using BatchInfoScopeGuard for vectorized evaluation
+    // Optimization B: Batch scalar filtering before BM25 calculation
+    // Strategy: Check scalar filter immediately after getting doc_id from loser tree,
+    //           skip BM25 calculation for filtered documents by popping them from loser tree
     while (OB_SUCC(ret) && count < batch_capacity) {
       // Set BatchInfoScopeGuard before processing to ensure project_result writes to correct batch position
       ObEvalCtx::BatchInfoScopeGuard guard(*eval_ctx);
@@ -302,13 +302,19 @@ int ObTextRetrievalMerge::get_next_rows(int64_t &count, int64_t capacity)
           // No more data, but we may have already got some rows
           break;
         }
+      } else if (iter_row_heap_->empty()) {
+        ret = OB_ITER_END;
+        break;
       } else {
-        // Optimization: Early scalar filtering - check filter before processing document
-        // Get doc_id from loser tree top item to enable early filter evaluation
+        // Optimization: Early scalar filtering - check filter before BM25 calculation
+        const ObIRIterLoserTreeItem *top_item = nullptr;
         bool doc_passed_filter = true;
-        if (OB_NOT_NULL(match_filter) && !iter_row_heap_->empty()) {
-          const ObIRIterLoserTreeItem *top_item = nullptr;
-          if (OB_SUCC(iter_row_heap_->top(top_item))) {
+        
+        if (OB_NOT_NULL(match_filter)) {
+          // Get doc_id from top item to enable early filter evaluation
+          if (OB_FAIL(iter_row_heap_->top(top_item))) {
+            LOG_WARN("failed to get top item from heap", K(ret));
+          } else {
             // Project doc_id first to enable filter evaluation
             ObExpr *doc_id_col = retrieval_param_.get_ir_ctdef()->inv_scan_domain_id_col_;
             if (OB_NOT_NULL(doc_id_col)) {
@@ -317,61 +323,66 @@ int ObTextRetrievalMerge::get_next_rows(int64_t &count, int64_t capacity)
               
               // Clear evaluated flags and evaluate filter early
               clear_evaluated_infos();
+              ObDatum *filter_res = nullptr;
               if (OB_FAIL(match_filter->eval(*eval_ctx, filter_res))) {
                 LOG_WARN("failed to evaluate match filter early", K(ret));
-                // If filter evaluation fails, continue processing (fallback to original behavior)
-                doc_passed_filter = true;
+                // If filter evaluation fails, skip this document
+                doc_passed_filter = false;
               } else {
                 doc_passed_filter = !(filter_res->is_null() || 0 == filter_res->get_int());
+              }
+              
+              if (!doc_passed_filter) {
+                // Document failed filter, skip it by popping all items with the same doc_id
+                ObDocIdExt filter_doc_id = top_item->doc_id_;
+                ObString filter_doc_id_str = filter_doc_id.get_string();
+                
+                // Pop all items with the same doc_id from loser tree
+                while (OB_SUCC(ret) && !iter_row_heap_->empty()) {
+                  if (OB_SUCC(iter_row_heap_->top(top_item))) {
+                    ObString top_doc_id_str = top_item->doc_id_.get_string();
+                    if (filter_doc_id_str == top_doc_id_str) {
+                      next_batch_iter_idxes_[next_batch_cnt_++] = top_item->iter_idx_;
+                      if (OB_FAIL(iter_row_heap_->pop())) {
+                        LOG_WARN("failed to pop filtered item from heap", K(ret));
+                      }
+                    } else {
+                      // Different doc_id, stop popping
+                      break;
+                    }
+                  } else {
+                    break;
+                  }
+                }
+                
+                // Rebuild loser tree after popping filtered items
+                if (OB_SUCC(ret) && next_batch_cnt_ > 0) {
+                  if (OB_FAIL(iter_row_heap_->rebuild())) {
+                    LOG_WARN("failed to rebuild loser tree after filtering", K(ret));
+                  } else {
+                    next_batch_cnt_ = 0;
+                  }
+                }
+                // Continue to next document without calculating BM25
+                continue;
               }
             }
           }
         }
         
-        // Only process document if it passed filter (or no filter)
-        if (OB_ISNULL(match_filter) || doc_passed_filter) {
+        // Document passed filter (or no filter), process it normally
+        if (OB_SUCC(ret) && doc_passed_filter) {
           if (OB_FAIL(next_disjunctive_document())) {
-            LOG_WARN("failed to get next document with disjunctive tokens", K(ret));
+            if (OB_UNLIKELY(OB_ITER_END != ret)) {
+              LOG_WARN("failed to get next document with disjunctive tokens", K(ret));
+            } else {
+              // No more documents
+              break;
+            }
           } else {
             // Document passed filter and was processed, accept it
             count++;
           }
-        } else {
-          // Document failed filter, skip it by clearing loser tree items for this doc_id
-          // We need to pop all items with the same doc_id from loser tree
-          const ObIRIterLoserTreeItem *top_item = nullptr;
-          ObDocIdExt filter_doc_id;
-          if (OB_SUCC(iter_row_heap_->top(top_item))) {
-            filter_doc_id = top_item->doc_id_;
-            // Pop all items with the same doc_id
-            // Use string comparison for doc_id equality check
-            ObString filter_doc_id_str = filter_doc_id.get_string();
-            while (OB_SUCC(ret) && !iter_row_heap_->empty()) {
-              if (OB_SUCC(iter_row_heap_->top(top_item))) {
-                ObString top_doc_id_str = top_item->doc_id_.get_string();
-                if (filter_doc_id_str == top_doc_id_str) {
-                  next_batch_iter_idxes_[next_batch_cnt_++] = top_item->iter_idx_;
-                  if (OB_FAIL(iter_row_heap_->pop())) {
-                    LOG_WARN("failed to pop filtered item from heap", K(ret));
-                  }
-                } else {
-                  // Different doc_id, stop popping
-                  break;
-                }
-              } else {
-                break;
-              }
-            }
-            // Rebuild loser tree after popping filtered items
-            if (OB_SUCC(ret) && next_batch_cnt_ > 0) {
-              if (OB_FAIL(iter_row_heap_->rebuild())) {
-                LOG_WARN("failed to rebuild loser tree after filtering", K(ret));
-              } else {
-                next_batch_cnt_ = 0;
-              }
-            }
-          }
-          // Continue to next document without incrementing count
         }
       }
     }
@@ -561,8 +572,13 @@ void ObTextRetrievalMerge::release_iters()
 
 int ObTextRetrievalMerge::pull_next_batch_rows()
 {
+  // Optimization: Efficient batch processing - minimize function call overhead
+  // Note: Loser tree design requires processing one document at a time,
+  // but we can optimize the loop to reduce overhead
   int ret = OB_SUCCESS;
   ObIRIterLoserTreeItem item;
+  int64_t valid_count = 0;  // Count of successfully pulled items
+  
   for (int64_t i = 0; OB_SUCC(ret) && i < next_batch_cnt_; ++i) {
     const int64_t iter_idx = next_batch_iter_idxes_[i];
     storage::ObTextRetrievalIterator *iter = nullptr;
@@ -573,12 +589,15 @@ int ObTextRetrievalMerge::pull_next_batch_rows()
       if (OB_UNLIKELY(OB_ITER_END != ret)) {
         LOG_WARN("failed to get pull next batch rows from iterator", K(ret));
       } else {
+        // End of this iterator, continue with next iterator
         ret = OB_SUCCESS;
       }
     } else if (OB_FAIL(fill_loser_tree_item(*iter, iter_idx, item))) {
       LOG_WARN("fail to fill loser tree item", K(ret));
     } else if (OB_FAIL(iter_row_heap_->push(item))) {
       LOG_WARN("fail to push item to loser tree", K(ret));
+    } else {
+      valid_count++;
     }
   }
 
@@ -586,7 +605,7 @@ int ObTextRetrievalMerge::pull_next_batch_rows()
     if (iter_row_heap_->empty()) {
       ret = OB_ITER_END;
     } else if (OB_FAIL(iter_row_heap_->rebuild())) {
-      LOG_WARN("fail to rebuild loser tree", K(ret), K_(next_batch_cnt));
+      LOG_WARN("fail to rebuild loser tree", K(ret), K_(next_batch_cnt), K(valid_count));
     } else {
       next_batch_cnt_ = 0;
     }
