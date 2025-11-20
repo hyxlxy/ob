@@ -281,11 +281,13 @@ int ObTextRetrievalMerge::get_next_rows(int64_t &count, int64_t capacity)
         ? retrieval_param_.get_ir_ctdef()->match_filter_ : nullptr;
     ObDatum *filter_res = nullptr;
     ObEvalCtx *eval_ctx = retrieval_param_.get_ir_rtdef()->eval_ctx_;
-    // Use larger default batch size for better performance (increased from 256 to 512)
+    // Use larger default batch size for better performance (increased from 512 to 1024)
     int64_t max_batch_size = (eval_ctx != nullptr && eval_ctx->max_batch_size_ > 0) 
-        ? eval_ctx->max_batch_size_ : 512;
+        ? eval_ctx->max_batch_size_ : 1024;
     int64_t batch_capacity = OB_MIN(capacity, max_batch_size);
     
+    // Optimization: Scalar filter pushdown - check filter before BM25 calculation
+    // This allows us to skip BM25 relevance accumulation for filtered documents
     // Batch process multiple rows using BatchInfoScopeGuard for vectorized evaluation
     while (OB_SUCC(ret) && count < batch_capacity) {
       // Set BatchInfoScopeGuard before processing to ensure project_result writes to correct batch position
@@ -300,22 +302,76 @@ int ObTextRetrievalMerge::get_next_rows(int64_t &count, int64_t capacity)
           // No more data, but we may have already got some rows
           break;
         }
-      } else if (OB_FAIL(next_disjunctive_document())) {
-        LOG_WARN("failed to get next document with disjunctive tokens", K(ret));
       } else {
-        clear_evaluated_infos();
+        // Optimization: Early scalar filtering - check filter before processing document
+        // Get doc_id from loser tree top item to enable early filter evaluation
+        bool doc_passed_filter = true;
+        if (OB_NOT_NULL(match_filter) && !iter_row_heap_->empty()) {
+          const ObIRIterLoserTreeItem *top_item = nullptr;
+          if (OB_SUCC(iter_row_heap_->top(top_item))) {
+            // Project doc_id first to enable filter evaluation
+            ObExpr *doc_id_col = retrieval_param_.get_ir_ctdef()->inv_scan_domain_id_col_;
+            if (OB_NOT_NULL(doc_id_col)) {
+              ObDatum &doc_id_proj_datum = doc_id_col->locate_datum_for_write(*eval_ctx);
+              doc_id_proj_datum.set_string(top_item->doc_id_.get_string());
+              
+              // Clear evaluated flags and evaluate filter early
+              clear_evaluated_infos();
+              if (OB_FAIL(match_filter->eval(*eval_ctx, filter_res))) {
+                LOG_WARN("failed to evaluate match filter early", K(ret));
+                // If filter evaluation fails, continue processing (fallback to original behavior)
+                doc_passed_filter = true;
+              } else {
+                doc_passed_filter = !(filter_res->is_null() || 0 == filter_res->get_int());
+              }
+            }
+          }
+        }
         
-        if (OB_ISNULL(match_filter)) {
-          // No filter, accept this document
-          count++;
-        } else if (OB_FAIL(match_filter->eval(*eval_ctx, filter_res))) {
-          LOG_WARN("failed to evaluate match filter", K(ret));
-        } else {
-          bool filter_valid = !(filter_res->is_null() || 0 == filter_res->get_int());
-          if (filter_valid) {
+        // Only process document if it passed filter (or no filter)
+        if (OB_ISNULL(match_filter) || doc_passed_filter) {
+          if (OB_FAIL(next_disjunctive_document())) {
+            LOG_WARN("failed to get next document with disjunctive tokens", K(ret));
+          } else {
+            // Document passed filter and was processed, accept it
             count++;
           }
-          // If filter fails, continue to next document
+        } else {
+          // Document failed filter, skip it by clearing loser tree items for this doc_id
+          // We need to pop all items with the same doc_id from loser tree
+          const ObIRIterLoserTreeItem *top_item = nullptr;
+          ObDocIdExt filter_doc_id;
+          if (OB_SUCC(iter_row_heap_->top(top_item))) {
+            filter_doc_id = top_item->doc_id_;
+            // Pop all items with the same doc_id
+            // Use string comparison for doc_id equality check
+            ObString filter_doc_id_str = filter_doc_id.get_string();
+            while (OB_SUCC(ret) && !iter_row_heap_->empty()) {
+              if (OB_SUCC(iter_row_heap_->top(top_item))) {
+                ObString top_doc_id_str = top_item->doc_id_.get_string();
+                if (filter_doc_id_str == top_doc_id_str) {
+                  next_batch_iter_idxes_[next_batch_cnt_++] = top_item->iter_idx_;
+                  if (OB_FAIL(iter_row_heap_->pop())) {
+                    LOG_WARN("failed to pop filtered item from heap", K(ret));
+                  }
+                } else {
+                  // Different doc_id, stop popping
+                  break;
+                }
+              } else {
+                break;
+              }
+            }
+            // Rebuild loser tree after popping filtered items
+            if (OB_SUCC(ret) && next_batch_cnt_ > 0) {
+              if (OB_FAIL(iter_row_heap_->rebuild())) {
+                LOG_WARN("failed to rebuild loser tree after filtering", K(ret));
+              } else {
+                next_batch_cnt_ = 0;
+              }
+            }
+          }
+          // Continue to next document without incrementing count
         }
       }
     }
@@ -1120,8 +1176,8 @@ int ObTextRetrievalOp::do_sort()
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("unexpected sort status", K(ret), K_(sort_finished), K_(token_merge), KP_(sort_impl));
   } else {
-    // Use larger batch size for better performance (increased from 256 to 512)
-    const int64_t BATCH_SIZE = 512;
+    // Use larger batch size for better performance (increased from 512 to 1024)
+    const int64_t BATCH_SIZE = 1024;
     int64_t batch_count = 0;
     
     while (OB_SUCC(ret)) {
@@ -1142,16 +1198,16 @@ int ObTextRetrievalOp::do_sort()
         static ObBitVector static_fake_skip;
         static bool skip_initialized = false;
         if (!skip_initialized) {
-          if (OB_FAIL(static_fake_skip.init(256))) {  // Initialize with max expected batch size
+          if (OB_FAIL(static_fake_skip.init(1024))) {  // Initialize with max expected batch size
             LOG_WARN("failed to init static fake skip vector", K(ret));
           } else {
-            static_fake_skip.reset(256);
+            static_fake_skip.reset(1024);
             skip_initialized = true;
           }
         }
         if (OB_SUCC(ret)) {
           // Ensure skip vector is large enough
-          if (batch_count > 256 && OB_FAIL(static_fake_skip.init(batch_count))) {
+          if (batch_count > 1024 && OB_FAIL(static_fake_skip.init(batch_count))) {
             LOG_WARN("failed to resize fake skip vector", K(ret));
           } else {
             static_fake_skip.reset(batch_count);  // Set all bits to 0 (no skip)
