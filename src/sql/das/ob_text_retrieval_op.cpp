@@ -281,8 +281,9 @@ int ObTextRetrievalMerge::get_next_rows(int64_t &count, int64_t capacity)
         ? retrieval_param_.get_ir_ctdef()->match_filter_ : nullptr;
     ObDatum *filter_res = nullptr;
     ObEvalCtx *eval_ctx = retrieval_param_.get_ir_rtdef()->eval_ctx_;
+    // Use larger default batch size for better performance (increased from 256 to 512)
     int64_t max_batch_size = (eval_ctx != nullptr && eval_ctx->max_batch_size_ > 0) 
-        ? eval_ctx->max_batch_size_ : 256;
+        ? eval_ctx->max_batch_size_ : 512;
     int64_t batch_capacity = OB_MIN(capacity, max_batch_size);
     
     // Batch process multiple rows using BatchInfoScopeGuard for vectorized evaluation
@@ -993,20 +994,26 @@ int ObTextRetrievalOp::get_next_rows(int64_t &count, int64_t capacity)
         }
         
         if (OB_SUCC(ret) && batch_count > 0) {
-          // Handle offset filtering
-          int64_t valid_count = 0;
-          for (int64_t i = 0; i < batch_count; i++) {
-            ++input_row_cnt_;
-            if (input_row_cnt_ > limit_param_.offset_) {
-              ++output_row_cnt_;
-              valid_count++;
-            }
-          }
-          count = valid_count;
+          // Handle offset filtering more efficiently
+          int64_t before_offset = input_row_cnt_;
+          input_row_cnt_ += batch_count;
           
-          // If we skipped some rows due to offset, we need to adjust the batch data
-          // For now, we accept that some rows in the batch might be skipped
-          // This is acceptable as the upper layer will handle the offset correctly
+          if (input_row_cnt_ <= limit_param_.offset_) {
+            // All rows are before offset, skip all
+            count = 0;
+          } else if (before_offset >= limit_param_.offset_) {
+            // All rows are after offset, accept all
+            output_row_cnt_ += batch_count;
+            count = batch_count;
+          } else {
+            // Some rows are before offset, some after
+            int64_t skip_count = limit_param_.offset_ - before_offset;
+            int64_t valid_count = batch_count - skip_count;
+            output_row_cnt_ += valid_count;
+            count = valid_count;
+            // Note: The batch data still contains skipped rows, but count reflects only valid rows
+            // Upper layer should handle this correctly based on count
+          }
         }
       }
       
@@ -1113,7 +1120,8 @@ int ObTextRetrievalOp::do_sort()
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("unexpected sort status", K(ret), K_(sort_finished), K_(token_merge), KP_(sort_impl));
   } else {
-    const int64_t BATCH_SIZE = 256;  // Use batch size for better performance
+    // Use larger batch size for better performance (increased from 256 to 512)
+    const int64_t BATCH_SIZE = 512;
     int64_t batch_count = 0;
     
     while (OB_SUCC(ret)) {
@@ -1129,16 +1137,27 @@ int ObTextRetrievalOp::do_sort()
       
       if (OB_SUCC(ret) && batch_count > 0) {
         // Add batch rows to sort_impl_
-        // Create a fake skip vector (all false, meaning no skip)
-        // Note: We need to use a static or member variable for fake_skip to avoid reallocation
-        // For now, we'll create it each time, but this could be optimized
-        ObBitVector fake_skip;
-        if (OB_FAIL(fake_skip.init(batch_count))) {
-          LOG_WARN("failed to init fake skip vector", K(ret));
-        } else {
-          fake_skip.reset(batch_count);  // Set all bits to 0 (no skip)
-          if (OB_FAIL(sort_impl_->add_batch(sort_row_, fake_skip, batch_count, 0, nullptr))) {
-            LOG_WARN("failed to add batch to sort impl", K(ret));
+        // Use a static skip vector to avoid reallocation overhead
+        // Since we never skip rows in this path, we can reuse a pre-initialized skip vector
+        static ObBitVector static_fake_skip;
+        static bool skip_initialized = false;
+        if (!skip_initialized) {
+          if (OB_FAIL(static_fake_skip.init(256))) {  // Initialize with max expected batch size
+            LOG_WARN("failed to init static fake skip vector", K(ret));
+          } else {
+            static_fake_skip.reset(256);
+            skip_initialized = true;
+          }
+        }
+        if (OB_SUCC(ret)) {
+          // Ensure skip vector is large enough
+          if (batch_count > 256 && OB_FAIL(static_fake_skip.init(batch_count))) {
+            LOG_WARN("failed to resize fake skip vector", K(ret));
+          } else {
+            static_fake_skip.reset(batch_count);  // Set all bits to 0 (no skip)
+            if (OB_FAIL(sort_impl_->add_batch(sort_row_, static_fake_skip, batch_count, 0, nullptr))) {
+              LOG_WARN("failed to add batch to sort impl", K(ret));
+            }
           }
         }
         batch_count = 0;  // Reset for next iteration
