@@ -114,7 +114,7 @@ int ObDataAccessService::get_das_task_id(int64_t &das_id)
   int64_t tmp_das_id = 0;
   bool force_renew = false;
   int64_t total_sleep_time = 0;
-  int64_t cur_sleep_time = 1000; // 1ms
+  int64_t cur_sleep_time = 100; // 0.1ms
   int64_t max_sleep_time = ObDASIDCache::OB_DAS_ID_RPC_TIMEOUT_MIN * 2; // 200ms
   do {
     if (OB_SUCC(id_cache_.get_das_id(tmp_das_id, force_renew))) {

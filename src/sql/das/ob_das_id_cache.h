@@ -56,13 +56,13 @@ private:
 public:
   TO_STRING_KV(K_(is_inited), K_(cur_idx), K_(cache_idx), K_(id_service_leader));
 public:
-  static const int64_t MIN_PREALLOCATE_COUNT = 1000000; // 1 million
-  static const int64_t MAX_PREALLOCATE_COUNT = MIN_PREALLOCATE_COUNT * 10;
-  static const int64_t UPDATE_FACTOR = 4;
-  static const int64_t MAX_CACHE_NUM = 16;
-  static const int64_t PRE_CACHE_NUM = MAX_CACHE_NUM / 4;
-  static const int64_t OB_DAS_ID_RPC_TIMEOUT_MIN = 100 * 1000L;       // 100ms
-  static const int64_t OB_DAS_ID_RPC_TIMEOUT_MAX = 2 * 1000L * 1000L; // 2s
+  static const int64_t MIN_PREALLOCATE_COUNT = 10000000; // 10 million
+  static const int64_t MAX_PREALLOCATE_COUNT = MIN_PREALLOCATE_COUNT * 10; // 100 million
+  static const int64_t UPDATE_FACTOR = 8;
+  static const int64_t MAX_CACHE_NUM = 64;
+  static const int64_t PRE_CACHE_NUM = MAX_CACHE_NUM / 4; // 16
+  static const int64_t OB_DAS_ID_RPC_TIMEOUT_MIN = 20 * 1000L;       // 20ms
+  static const int64_t OB_DAS_ID_RPC_TIMEOUT_MAX = 500 * 1000L; // 500ms
   static const int64_t UPDATE_PREALLOCATE_COUNT_INTERVAL = OB_DAS_ID_RPC_TIMEOUT_MIN;
 private:
   bool is_inited_;

@@ -30,7 +30,7 @@ public:
   int init();
   static int mtl_init(ObDASIDService *&das_id_service);
   void destroy() { reset(); }
-  static const int64_t DAS_ID_PREALLOCATED_RANGE = 1000000; // 1 million
+  static const int64_t DAS_ID_PREALLOCATED_RANGE = 10000000; // 10 million
   int handle_request(const ObDASIDRequest &request, obrpc::ObDASIDRpcResult &result);
 };
 } // namespace sql
