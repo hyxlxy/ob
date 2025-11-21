@@ -1409,6 +1409,13 @@ int ObMicroBlockDecoder::compare_rowkey(const ObDatumRowkey &rowkey, const int64
   compare_result = 0;
   int64_t row_len = 0;
   const char *row_data = nullptr;
+
+  // if(index == last_cached_index_){
+  //   compare_result = last_cached_res_;
+  //   return OB_SUCCESS;
+  // }
+
+
   if (OB_UNLIKELY(index  >= row_count_ || nullptr == datum_utils_)) {
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("invalid argument", K(ret), K(index), K_(row_count), KPC_(datum_utils));
@@ -1434,6 +1441,12 @@ int ObMicroBlockDecoder::compare_rowkey(const ObDatumRowkey &rowkey, const int64
       }
     }
   }
+
+  // if(!OB_FAIL(ret)){
+  //   last_cached_index_ = index;
+  //   last_cached_res_ = compare_result;
+  // }
+
   return ret;
 }
 

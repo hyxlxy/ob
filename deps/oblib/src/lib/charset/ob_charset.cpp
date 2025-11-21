@@ -941,6 +941,37 @@ int ObCharset::strcmp(ObCollationType collation_type,
   return result;
 }
 
+
+int fast_unicode_short_strcmp(const char *str1, int64_t str1_len,
+  const char *str2, int64_t str2_len, bool cmp_endspace)
+{
+  // 优化短字符串的 Unicode 比较
+  int64_t i = 0;
+  int64_t min_len = str1_len < str2_len ? str1_len : str2_len;
+
+  // 逐字节比较（对于短字符串足够快）
+  for (; i < min_len; i++) {
+  unsigned char c1 = str1[i];
+  unsigned char c2 = str2[i];
+
+  if (c1 != c2) {
+      // 简单的 Unicode 大小写不敏感比较
+      if (c1 >= 'A' && c1 <= 'Z') c1 += 32; // 转小写
+      if (c2 >= 'A' && c2 <= 'Z') c2 += 32;
+
+      if (c1 != c2) {
+        return c1 - c2;
+      }
+    }
+  }
+
+  // 处理长度差异
+  if (str1_len != str2_len) {
+    return (str1_len < str2_len) ? -1 : 1;
+  }
+  return 0;
+}
+
 int ObCharset::strcmpsp(ObCollationType collation_type,
                         const char *str1,
                         int64_t str1_len,
@@ -950,13 +981,41 @@ int ObCharset::strcmpsp(ObCollationType collation_type,
 {
   int result = 0;
   if (is_argument_valid(collation_type, str1, str1_len, str2, str2_len)) {
+
+
+    if (!str1 || !str2 || str1_len < 0 || str2_len < 0) {
+      return 0;
+    }
+    
+    if (str1 == str2 && str1_len == str2_len) {
+        return 0;
+    }   
+
+    if (!cmp_endspace && str1_len != str2_len) {
+      int64_t min_len = str1_len < str2_len ? str1_len : str2_len;
+      
+      int cmp = memcmp(str1, str2, min_len);
+      if (cmp != 0) {
+          return cmp;
+      }
+      return (str1_len < str2_len) ? -1 : 1;
+    }
+
     const ObCharsetInfo *cs = get_charset(collation_type);
-    result = cs->coll->strnncollsp(cs,
-                                reinterpret_cast<const unsigned char *>(str1),
-                                str1_len,
-                                reinterpret_cast<const unsigned char *>(str2),
-                                str2_len,
-                                cmp_endspace);
+
+    //TODO 后续看能不能用SIMD优化一下
+
+    if(collation_type == CS_TYPE_UTF8MB4_UNICODE_CI and str1_len <= 8 and str2_len <=8 and (!cmp_endspace)) {
+      result = fast_unicode_short_strcmp(str1, str1_len, str2, str2_len, cmp_endspace);
+    }
+    else{
+        result = cs->coll->strnncollsp(cs,
+          reinterpret_cast<const unsigned char *>(str1),
+          str1_len,
+          reinterpret_cast<const unsigned char *>(str2),
+          str2_len,
+          cmp_endspace);
+      }
   }
   return result;
 }

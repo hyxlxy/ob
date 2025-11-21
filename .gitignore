@@ -387,3 +387,10 @@ deps/3rd
 ############# test #############
 test/tmp
 test/var
+
+
+
+
+store/
+perf.data
+perf.script

@@ -83,6 +83,8 @@ public:
     return compare(row_idx, range, true);
   }
 
+
+
 private:
   inline bool compare(const int64_t row_idx, const ObDatumRange &range, const bool lower_bound)
   {
@@ -125,6 +127,8 @@ private:
     return bret;
   }
 
+
+
 private:
   bool compare_with_range_;
   int &ret_;
@@ -151,19 +155,67 @@ int ObIMicroBlockDecoder::find_bound(const ObDatumRowkey &key, const bool lower_
     LOG_WARN("invalid compare column count", K(ret), K(key.get_datum_cnt()),
       K(datum_utils_->get_rowkey_count()));
   } else {
-    EncodingCompareV2 encoding_compare(ret, equal, this);
-    ObRowIndexIterator begin_iter(begin_idx);
-    ObRowIndexIterator end_iter(row_count_);
-    ObRowIndexIterator found_iter;
-    if (lower_bound) {
-      found_iter = std::lower_bound(begin_iter, end_iter, key, encoding_compare);
-    } else {
-      found_iter = std::upper_bound(begin_iter, end_iter, key, encoding_compare);
+
+    const int scan_range = row_count_ - begin_idx;
+    const int binary_lim = 7;
+
+    if(scan_range <= binary_lim) {
+      //我们对于比较小的内容进行判断，就直接找了，不二分了.
+      bool find_flag = false;
+      if(lower_bound) {
+        // 如果是 lower_bound 就要找到第一个大于等于的位置
+        for (int64_t i = begin_idx; i < row_count_; ++i) {
+          int32_t cmp_res = 0;
+          if (OB_FAIL(compare_rowkey(key, i, cmp_res))) {
+            break;
+          }
+          if (cmp_res >= 0) {
+            row_idx = i;
+            equal = (cmp_res == 0);
+            find_flag = true;
+            break;
+          }
+        }
+      }
+      else {
+        // 找第一个大于的行
+        for (int64_t i = begin_idx; i < row_count_; ++i) {
+          int32_t cmp_res = 0;
+          if (OB_FAIL(compare_rowkey(key, i, cmp_res))) {
+            break;
+          }
+          
+          if (cmp_res > 0) {
+            row_idx = i;
+            break;
+          } else if (cmp_res == 0) {
+            equal = true;
+          }
+        }
+      }
+
+        // 如果没找到，设置为末尾吧就
+        if (OB_SUCC(ret) && (!find_flag)) {
+          row_idx = row_count_;
+        }
+
     }
-    if (OB_FAIL(ret)) {
-      LOG_WARN("fail to lower bound rowkey", K(ret));
-    } else {
-      row_idx = *found_iter;
+    else {
+      EncodingCompareV2 encoding_compare(ret, equal, this);
+      ObRowIndexIterator begin_iter(begin_idx);
+      ObRowIndexIterator end_iter(row_count_);
+      ObRowIndexIterator found_iter;
+      
+      if (lower_bound) {
+        found_iter = std::lower_bound(begin_iter, end_iter, key, encoding_compare);
+      } else {
+        found_iter = std::upper_bound(begin_iter, end_iter, key, encoding_compare);
+      }
+      if (OB_FAIL(ret)) {
+        LOG_WARN("fail to lower bound rowkey", K(ret));
+      } else {
+        row_idx = *found_iter;
+      }
     }
   }
   return ret;

@@ -442,6 +442,10 @@ private:
   common::ObArenaAllocator buf_allocator_;
   char *allocated_decoders_buf_;
   int64_t allocated_decoders_buf_size_;
+
+//   int64_t last_cached_index_;      
+//   int32_t last_cached_res_;
+
 };
 
 }
