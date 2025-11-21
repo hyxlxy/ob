@@ -71,6 +71,7 @@ int ObTextRetrievalTokenIter::init(const ObTextRetrievalScanIterParam &iter_para
   relevance_expr_ = iter_param.relevance_expr_;
   inv_scan_doc_length_col_ = iter_param.inv_scan_doc_length_col_;
   inv_scan_domain_id_col_ = iter_param.inv_scan_domain_id_col_;
+  match_filter_ = iter_param.match_filter_;
   max_batch_size_ = OB_MAX(iter_param.eval_ctx_->max_batch_size_, 1);
   inv_idx_agg_cache_mode_ = iter_param.inv_idx_agg_cache_mode_;
 
@@ -337,19 +338,43 @@ int ObTextRetrievalTokenIter::get_next_row()
     LOG_WARN("retrieval token iterator not inited", K(ret));
   } else if (!token_doc_cnt_calculated_ && OB_FAIL(estimate_token_doc_cnt())) {
     LOG_WARN("failed to estimate token doc cnt", K(ret));
-  } else if (OB_FAIL(inv_idx_scan_iter_->get_next_row())) {
-    if (OB_UNLIKELY(OB_ITER_END != ret)) {
-      LOG_WARN("failed to get next row from inverted index", K(ret), K_(inv_idx_scan_param), KPC_(inv_idx_scan_iter));
-    }
   } else {
-    if (need_calc_relevance()) {
-      clear_row_wise_evaluated_flag();
-      if (OB_FAIL(get_next_doc_token_cnt(need_fwd_idx_agg()))) {
-        LOG_WARN("failed to get next doc token count", K(ret));
-      } else if (OB_FAIL(fill_token_doc_cnt())) {
-        LOG_WARN("failed to get token doc cnt", K(ret));
-      } else if (OB_FAIL(eval_relevance_expr())) {
-        LOG_WARN("failed to evaluate simarity expr", K(ret));
+    // 循环拉取，先做标量过滤，过滤不过则跳过BM25计算，继续下一条
+    bool got_valid = false;
+    while (OB_SUCC(ret) && !got_valid) {
+      if (OB_FAIL(inv_idx_scan_iter_->get_next_row())) {
+        if (OB_UNLIKELY(OB_ITER_END != ret)) {
+          LOG_WARN("failed to get next row from inverted index", K(ret), K_(inv_idx_scan_param), KPC_(inv_idx_scan_iter));
+        }
+      } else {
+        // 先评估match_filter_，不过则跳过
+        if (nullptr != match_filter_) {
+          ObDatum *filter_res = nullptr;
+          match_filter_->get_eval_info(*eval_ctx_).clear_evaluated_flag();
+          if (OB_FAIL(match_filter_->eval(*eval_ctx_, filter_res))) {
+            LOG_WARN("failed to evaluate match filter", K(ret));
+          } else {
+            bool pass = !(filter_res->is_null() || 0 == filter_res->get_int());
+            if (!pass) {
+              // 继续拉取下一条
+              continue;
+            }
+          }
+        }
+        // 通过过滤后再做BM25计算
+        if (OB_SUCC(ret) && need_calc_relevance()) {
+          clear_row_wise_evaluated_flag();
+          if (OB_FAIL(get_next_doc_token_cnt(need_fwd_idx_agg()))) {
+            LOG_WARN("failed to get next doc token count", K(ret));
+          } else if (OB_FAIL(fill_token_doc_cnt())) {
+            LOG_WARN("failed to get token doc cnt", K(ret));
+          } else if (OB_FAIL(eval_relevance_expr())) {
+            LOG_WARN("failed to evaluate simarity expr", K(ret));
+          }
+        }
+        if (OB_SUCC(ret)) {
+          got_valid = true;
+        }
       }
     }
   }
@@ -432,8 +457,35 @@ int ObTextRetrievalTokenIter::get_next_batch(const int64_t capacity, int64_t &co
   } else if (need_calc_relevance()) {
     const ObBitVector *skip = NULL;
     PRINT_VECTORIZED_ROWS(SQL, DEBUG, *eval_ctx_, *inv_idx_scan_param_->output_exprs_, count, skip);
+    // 先进行批量标量过滤：对不过滤的行在 skip_ 上置位，后续BM25计算将跳过
+    if (nullptr != match_filter_) {
+      // 确保不跳过任何行进行过滤计算
+      if (nullptr == skip_) {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("unexpected null skip bitvector", K(ret));
+      } else {
+        skip_->reset(count); // 全部0，表示不过滤任何行进行eval
+        // 清理过滤表达式的已评估标记
+        match_filter_->get_evaluated_flags(*eval_ctx_).reset(count);
+        if (OB_FAIL(match_filter_->eval_batch(*eval_ctx_, *skip_, count))) {
+          LOG_WARN("failed to eval match filter batch", K(ret), K(count));
+        } else {
+          const ObDatumVector &filter_vec = match_filter_->locate_expr_datumvector(*eval_ctx_);
+          for (int64_t i = 0; OB_SUCC(ret) && i < count; ++i) {
+            if (!skip_->at(i)) {
+              const ObDatum *d = filter_vec.at(i);
+              if (nullptr == d || d->is_null() || 0 == d->get_int()) {
+                skip_->set(i);
+              }
+            }
+          }
+        }
+      }
+    }
     clear_batch_wise_evaluated_flag(count);
-    if (OB_FAIL(batch_fill_token_cnt_with_doc_len(count))) {
+    if (OB_FAIL(ret)) {
+      // do nothing
+    } else if (OB_FAIL(batch_fill_token_cnt_with_doc_len(count))) {
       LOG_WARN("failed to fill batch token cnt with document length", K(ret));
     } else if (OB_FAIL(fill_token_doc_cnt())) {
       LOG_WARN("failed to get token doc cnt", K(ret));

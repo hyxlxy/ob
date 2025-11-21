@@ -230,8 +230,8 @@ int ObTextRetrievalMerge::get_next_row(ObNewRow *&row)
   }
   
   bool got_valid_document = false;
-  ObExpr *match_filter = retrieval_param_.need_relevance()
-      ? retrieval_param_.get_ir_ctdef()->match_filter_ : nullptr;
+  // 始终尝试进行标量过滤（若存在）
+  ObExpr *match_filter = retrieval_param_.get_ir_ctdef()->match_filter_;
   ObDatum *filter_res = nullptr;
   while (OB_SUCC(ret) && !got_valid_document) {
     clear_evaluated_infos();
@@ -277,8 +277,8 @@ int ObTextRetrievalMerge::get_next_rows(int64_t &count, int64_t capacity)
   if (OB_FAIL(ret)) {
     // do nothing
   } else {
-    ObExpr *match_filter = retrieval_param_.need_relevance()
-        ? retrieval_param_.get_ir_ctdef()->match_filter_ : nullptr;
+    // 标量过滤与是否需要相关性无关，应始终生效
+    ObExpr *match_filter = retrieval_param_.get_ir_ctdef()->match_filter_;
     ObDatum *filter_res = nullptr;
     ObEvalCtx *eval_ctx = retrieval_param_.get_ir_rtdef()->eval_ctx_;
     // Use larger default batch size for better performance (increased from 512 to 1024)
@@ -305,83 +305,26 @@ int ObTextRetrievalMerge::get_next_rows(int64_t &count, int64_t capacity)
       } else if (iter_row_heap_->empty()) {
         ret = OB_ITER_END;
         break;
-      } else {
-        // Optimization: Early scalar filtering - check filter before BM25 calculation
-        const ObIRIterLoserTreeItem *top_item = nullptr;
-        bool doc_passed_filter = true;
-        
-        if (OB_NOT_NULL(match_filter)) {
-          // Get doc_id from top item to enable early filter evaluation
-          if (OB_FAIL(iter_row_heap_->top(top_item))) {
-            LOG_WARN("failed to get top item from heap", K(ret));
-          } else {
-            // Project doc_id first to enable filter evaluation
-            ObExpr *doc_id_col = retrieval_param_.get_ir_ctdef()->inv_scan_domain_id_col_;
-            if (OB_NOT_NULL(doc_id_col)) {
-              ObDatum &doc_id_proj_datum = doc_id_col->locate_datum_for_write(*eval_ctx);
-              doc_id_proj_datum.set_string(top_item->doc_id_.get_string());
-              
-              // Clear evaluated flags and evaluate filter early
-              clear_evaluated_infos();
-              ObDatum *filter_res = nullptr;
-              if (OB_FAIL(match_filter->eval(*eval_ctx, filter_res))) {
-                LOG_WARN("failed to evaluate match filter early", K(ret));
-                // If filter evaluation fails, skip this document
-                doc_passed_filter = false;
-              } else {
-                doc_passed_filter = !(filter_res->is_null() || 0 == filter_res->get_int());
-              }
-              
-              if (!doc_passed_filter) {
-                // Document failed filter, skip it by popping all items with the same doc_id
-                ObDocIdExt filter_doc_id = top_item->doc_id_;
-                ObString filter_doc_id_str = filter_doc_id.get_string();
-                
-                // Pop all items with the same doc_id from loser tree
-                while (OB_SUCC(ret) && !iter_row_heap_->empty()) {
-                  if (OB_SUCC(iter_row_heap_->top(top_item))) {
-                    ObString top_doc_id_str = top_item->doc_id_.get_string();
-                    if (filter_doc_id_str == top_doc_id_str) {
-                      next_batch_iter_idxes_[next_batch_cnt_++] = top_item->iter_idx_;
-                      if (OB_FAIL(iter_row_heap_->pop())) {
-                        LOG_WARN("failed to pop filtered item from heap", K(ret));
-                      }
-                    } else {
-                      // Different doc_id, stop popping
-                      break;
-                    }
-                  } else {
-                    break;
-                  }
-                }
-                
-                // Rebuild loser tree after popping filtered items
-                if (OB_SUCC(ret) && next_batch_cnt_ > 0) {
-                  if (OB_FAIL(iter_row_heap_->rebuild())) {
-                    LOG_WARN("failed to rebuild loser tree after filtering", K(ret));
-                  } else {
-                    next_batch_cnt_ = 0;
-                  }
-                }
-                // Continue to next document without calculating BM25
-                continue;
-              }
-            }
-          }
+      } else if (OB_FAIL(next_disjunctive_document())) {
+        if (OB_UNLIKELY(OB_ITER_END != ret)) {
+          LOG_WARN("failed to get next document with disjunctive tokens", K(ret));
+        } else {
+          // No more documents
+          break;
         }
-        
-        // Document passed filter (or no filter), process it normally
-        if (OB_SUCC(ret) && doc_passed_filter) {
-          if (OB_FAIL(next_disjunctive_document())) {
-            if (OB_UNLIKELY(OB_ITER_END != ret)) {
-              LOG_WARN("failed to get next document with disjunctive tokens", K(ret));
-            } else {
-              // No more documents
-              break;
-            }
-          } else {
-            // Document passed filter and was processed, accept it
+      } else {
+        // 在batch路径下评估标量过滤，过滤失败则丢弃该文档
+        if (OB_ISNULL(match_filter)) {
+          count++;
+        } else {
+          clear_evaluated_infos();
+          ObDatum *filter_res2 = nullptr;
+          if (OB_FAIL(match_filter->eval(*eval_ctx, filter_res2))) {
+            LOG_WARN("failed to evaluate match filter in batch", K(ret));
+          } else if (!(filter_res2->is_null() || 0 == filter_res2->get_int())) {
             count++;
+          } else {
+            // filtered out
           }
         }
       }
@@ -740,7 +683,8 @@ int ObTextRetrievalMerge::init_total_doc_cnt_param(
     scan_param.fb_read_tx_uncommitted_ = rtdef->fb_read_tx_uncommitted_;
     scan_param.ls_id_ = retrieval_param_.get_ls_id();
     scan_param.tablet_id_ = retrieval_param_.get_doc_id_idx_tablet_id();
-    if (ctdef->pd_expr_spec_.pushdown_filters_.empty()) {
+    // 将上层下推的过滤条件(op_filters_)正确传递给存储层
+    if (!ctdef->pd_expr_spec_.pushdown_filters_.empty()) {
       scan_param.op_filters_ = &ctdef->pd_expr_spec_.pushdown_filters_;
     }
     scan_param.pd_storage_filters_ = rtdef->p_pd_expr_op_->pd_storage_filters_;
@@ -771,7 +715,7 @@ int ObTextRetrievalMerge::do_total_doc_cnt()
   if (!retrieval_param_.need_relevance()) {
     // skip
   } else if (retrieval_param_.get_ir_ctdef()->need_calc_relevance()
-    && retrieval_param_.get_ir_ctdef()->!need_estimate_total_doc_cnt()) {
+    && !retrieval_param_.get_ir_ctdef()->need_estimate_total_doc_cnt()) {
     // When estimation info not exist, or we found estimation info not accurate, calculate document count by scan
     ObITabletScan *tsc_service = MTL(ObAccessService *);
     if (OB_ISNULL(tsc_service)) {

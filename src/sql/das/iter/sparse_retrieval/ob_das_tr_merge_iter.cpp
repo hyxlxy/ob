@@ -466,6 +466,8 @@ int ObDASTRMergeIter::init_dim_iter_param(ObTextRetrievalScanIterParam &iter_par
     iter_param.inv_scan_doc_length_col_ = ir_ctdef_->inv_scan_doc_length_col_;
     iter_param.inv_scan_domain_id_col_ = ir_ctdef_->inv_scan_domain_id_col_;
     iter_param.inv_idx_agg_cache_mode_ = function_lookup_mode_ && !taat_mode_;
+    // 传递标量过滤表达式到存储层token迭代器，用于posting级短路
+    iter_param.match_filter_ = ir_ctdef_->match_filter_;
   }
   return ret;
 }

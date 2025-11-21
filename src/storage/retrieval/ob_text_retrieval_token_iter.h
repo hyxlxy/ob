@@ -46,6 +46,7 @@ struct ObTextRetrievalScanIterParam
       relevance_expr_(nullptr),
       inv_scan_doc_length_col_(nullptr),
       inv_scan_domain_id_col_(nullptr),
+      match_filter_(nullptr),
       inv_idx_agg_cache_mode_(false)
   {}
 
@@ -63,6 +64,7 @@ struct ObTextRetrievalScanIterParam
   sql::ObExpr *relevance_expr_;
   sql::ObExpr *inv_scan_doc_length_col_;
   sql::ObExpr *inv_scan_domain_id_col_;
+  sql::ObExpr *match_filter_;
   bool inv_idx_agg_cache_mode_;
 };
 
@@ -125,6 +127,7 @@ private:
   sql::ObExpr *inv_scan_domain_id_col_; // read from inv_scan_table
   sql::ObExpr *doc_token_cnt_expr_; // fill the expr from another expr, and use the expr to calc the relevance_expr_
   common::ObSEArray<sql::ObExpr *, 2> relevance_calc_exprs_;
+  sql::ObExpr *match_filter_; // 标量过滤表达式（可为空）
   sql::ObBitVector *skip_;
   ObObj *fwd_range_objs_;
   int64_t max_batch_size_;
