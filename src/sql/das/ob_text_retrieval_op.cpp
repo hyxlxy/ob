@@ -522,7 +522,13 @@ int ObTextRetrievalMerge::pull_next_batch_rows()
   ObIRIterLoserTreeItem item;
   int64_t valid_count = 0;  // Count of successfully pulled items
   
+  constexpr int64_t PREFETCH_DIST = 4;
   for (int64_t i = 0; OB_SUCC(ret) && i < next_batch_cnt_; ++i) {
+    // Prefetch next iterator pointer to reduce pointer chasing latency
+    if (i + PREFETCH_DIST < next_batch_cnt_) {
+      int64_t pf_idx = next_batch_iter_idxes_[i + PREFETCH_DIST];
+      __builtin_prefetch(&token_iters_[pf_idx], 0, 1);
+    }
     const int64_t iter_idx = next_batch_iter_idxes_[i];
     storage::ObTextRetrievalIterator *iter = nullptr;
     if (OB_ISNULL(iter = token_iters_.at(iter_idx))) {
@@ -1139,8 +1145,14 @@ int ObTextRetrievalOp::do_sort()
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("unexpected sort status", K(ret), K_(sort_finished), K_(token_merge), KP_(sort_impl));
   } else {
-    // Use larger batch size for better performance (increased from 512 to 1024)
-    const int64_t BATCH_SIZE = 1024;
+    // Use adaptive batch size based on LIMIT/OFFSET to balance throughput and latency
+    int64_t desired_batch = 1024;
+    if (limit_param_.is_valid()) {
+      const int64_t hint = limit_param_.limit_ + limit_param_.offset_;
+      // clamp to [512, 2048]
+      desired_batch = std::max<int64_t>(512, std::min<int64_t>(2048, hint * 2));
+    }
+    int64_t BATCH_SIZE = desired_batch;
     int64_t batch_count = 0;
     
     while (OB_SUCC(ret)) {

@@ -406,7 +406,13 @@ int ObTextRetrievalTokenIter::batch_fill_token_cnt_with_doc_len(const int64_t co
   } else {
     const ObDatum *datums = doc_length_expr->locate_batch_datums(*eval_ctx_);
     ObDatum *agg_datum = agg_expr->locate_batch_datums(*eval_ctx_);
+    // Prefetch next items to improve cache locality; rely on compiler auto-vectorization
+    constexpr int64_t PREFETCH_DIST = 16;
     for (int64_t i = 0; OB_SUCC(ret) && i < count; ++i) {
+      if (i + PREFETCH_DIST < count) {
+        __builtin_prefetch(&datums[i + PREFETCH_DIST], 0, 1);
+        __builtin_prefetch(&agg_datum[i + PREFETCH_DIST], 1, 1);
+      }
       if (OB_LIKELY(!skip_->at(i))) {
         if (agg_expr->datum_meta_.get_type() == ObDecimalIntType) {
           if (OB_FAIL(set_decimal_int_by_precision(agg_datum[i], datums[i].get_uint(), agg_expr->datum_meta_.precision_))) {
@@ -811,7 +817,12 @@ int ObTextRetrievalDaaTTokenIter::save_relevances_and_docids()
     cur_idx_ = 0;
     const ObDatumVector &relevance_datum = relevance_expr_->locate_expr_datumvector(*eval_ctx_);
     const ObDatumVector &doc_id_datum = inv_scan_domain_id_col_->locate_expr_datumvector(*eval_ctx_);
+    constexpr int64_t PREFETCH_DIST = 16;
     for (int64_t i = 0; OB_SUCC(ret) && i < count_; ++i) {
+      if (i + PREFETCH_DIST < count_) {
+        __builtin_prefetch(relevance_datum.at(i + PREFETCH_DIST), 0, 1);
+        __builtin_prefetch(doc_id_datum.at(i + PREFETCH_DIST), 0, 1);
+      }
       if (OB_LIKELY(!token_iter_->get_skip()->at(i))) {
         relevance_[i] = relevance_datum.at(i)->get_double();
         if (OB_FAIL(doc_id_[i].from_datum(*doc_id_datum.at(i)))) {
