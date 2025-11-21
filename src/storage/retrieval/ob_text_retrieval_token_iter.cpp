@@ -454,17 +454,17 @@ int ObTextRetrievalTokenIter::get_next_batch(const int64_t capacity, int64_t &co
   }
 
   if (OB_FAIL(ret)) {
-  } else if (need_calc_relevance()) {
+  } else {
     const ObBitVector *skip = NULL;
     PRINT_VECTORIZED_ROWS(SQL, DEBUG, *eval_ctx_, *inv_idx_scan_param_->output_exprs_, count, skip);
-    // 先进行批量标量过滤：对不过滤的行在 skip_ 上置位，后续BM25计算将跳过
-    if (nullptr != match_filter_) {
-      // 确保不跳过任何行进行过滤计算
-      if (nullptr == skip_) {
-        ret = OB_ERR_UNEXPECTED;
-        LOG_WARN("unexpected null skip bitvector", K(ret));
-      } else {
-        skip_->reset(count); // 全部0，表示不过滤任何行进行eval
+    // 无论是否需要BM25计算，先重置并执行批量标量过滤，置位skip_
+    if (nullptr == skip_) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("unexpected null skip bitvector", K(ret));
+    } else {
+      // 先全部清零（表示默认不过滤）
+      skip_->reset(count);
+      if (nullptr != match_filter_) {
         // 清理过滤表达式的已评估标记
         match_filter_->get_evaluated_flags(*eval_ctx_).reset(count);
         if (OB_FAIL(match_filter_->eval_batch(*eval_ctx_, *skip_, count))) {
@@ -482,15 +482,17 @@ int ObTextRetrievalTokenIter::get_next_batch(const int64_t capacity, int64_t &co
         }
       }
     }
-    clear_batch_wise_evaluated_flag(count);
     if (OB_FAIL(ret)) {
       // do nothing
-    } else if (OB_FAIL(batch_fill_token_cnt_with_doc_len(count))) {
-      LOG_WARN("failed to fill batch token cnt with document length", K(ret));
-    } else if (OB_FAIL(fill_token_doc_cnt())) {
-      LOG_WARN("failed to get token doc cnt", K(ret));
-    } else if (OB_FAIL(batch_eval_relevance_expr(count))) {
-      LOG_WARN("failed to evaluate simarity expr", K(ret));
+    } else if (need_calc_relevance()) {
+      clear_batch_wise_evaluated_flag(count);
+      if (OB_FAIL(batch_fill_token_cnt_with_doc_len(count))) {
+        LOG_WARN("failed to fill batch token cnt with document length", K(ret));
+      } else if (OB_FAIL(fill_token_doc_cnt())) {
+        LOG_WARN("failed to get token doc cnt", K(ret));
+      } else if (OB_FAIL(batch_eval_relevance_expr(count))) {
+        LOG_WARN("failed to evaluate simarity expr", K(ret));
+      }
     }
   }
   return ret;

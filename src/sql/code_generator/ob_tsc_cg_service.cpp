@@ -3840,6 +3840,27 @@ int ObTscCgService::generate_text_ir_spec_exprs(const ObTextRetrievalInfo &tr_in
   if (OB_SUCC(ret) && nullptr != tr_info.pushdown_match_filter_) {
     if (OB_FAIL(cg_.generate_rt_expr(*tr_info.pushdown_match_filter_, text_ir_scan_ctdef.match_filter_))) {
       LOG_WARN("cg rt expr for match filter failed", K(ret));
+    } else {
+      const ObDASScanCtDef *inv_scan_ctdef_cptr = text_ir_scan_ctdef.get_inv_idx_scan_ctdef();
+      ObDASScanCtDef *inv_scan_ctdef_ptr = const_cast<ObDASScanCtDef *>(inv_scan_ctdef_cptr);
+      if (OB_ISNULL(inv_scan_ctdef_ptr)) {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("unexpected null inv_idx_scan_ctdef when pushing down match filter", K(ret));
+      } else {
+        bool already_has = false;
+        ObIArray<ObExpr*> &push_filters = inv_scan_ctdef_ptr->pd_expr_spec_.pushdown_filters_;
+        for (int64_t i = 0; i < push_filters.count(); ++i) {
+          if (push_filters.at(i) == text_ir_scan_ctdef.match_filter_) {
+            already_has = true;
+            break;
+          }
+        }
+        if (!already_has) {
+          if (OB_FAIL(push_filters.push_back(text_ir_scan_ctdef.match_filter_))) {
+            LOG_WARN("failed to push match filter into inv_idx_scan_ctdef pushdown filters", K(ret));
+          }
+        }
+      }
     }
   }
 

@@ -103,6 +103,14 @@ public:
     }
     return idx_scan_ctdef;
   }
+  ObDASScanCtDef *get_inv_idx_scan_ctdef()
+  {
+    ObDASScanCtDef *idx_scan_ctdef = nullptr;
+    if (children_cnt_ > 0 && children_ != nullptr) {
+      idx_scan_ctdef = static_cast<ObDASScanCtDef*>(children_[get_inv_scan_idx()]);
+    }
+    return idx_scan_ctdef;
+  }
   const ObDASScanCtDef *get_inv_idx_agg_ctdef() const
   {
     const ObDASScanCtDef *idx_agg_ctdef = nullptr;
