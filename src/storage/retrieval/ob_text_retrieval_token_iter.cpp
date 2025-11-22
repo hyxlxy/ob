@@ -143,8 +143,9 @@ int ObTextRetrievalTokenIter::init_calc_exprs_in_relevance_expr()
     if (OB_SUCC(ret)) {
       sql::ObExpr *doc_token_cnt_param_expr = relevance_expr_->args_[sql::ObExprBM25::DOC_TOKEN_CNT_PARAM_IDX];
       if (T_FUN_SYS_CAST == doc_token_cnt_param_expr->type_) {
-        // 如果外层是 CAST 且目标类型为 DecimalInt，则保留该 CAST，便于运行期走 DecimalInt 快路径；否则展开内部参数
-        if (doc_token_cnt_param_expr->datum_meta_.get_type() != ObDecimalIntType) {
+        // 若外层是 CAST，则优先解开到内部的 SUM 节点，便于在运行期定位并写入聚合结果
+        if (doc_token_cnt_param_expr->arg_cnt_ > 0 && nullptr != doc_token_cnt_param_expr->args_[0]
+            && T_FUN_SUM == doc_token_cnt_param_expr->args_[0]->type_) {
           doc_token_cnt_param_expr = doc_token_cnt_param_expr->args_[0];
         }
       }
