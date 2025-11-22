@@ -1,0 +1,17 @@
+# .clangd 配置文件
+CompileFlags:
+  # 指定 compile_commands.json 的目录
+  CompilationDatabase: ./build_release
+  
+  # 添加额外的编译选项（根据你的项目需要调整）
+  Add: 
+    - "-std=c++17"
+    - "-I${projectdir}/deps/include"
+    - "-I${projectdir}/include"
+    - "-I${projectdir}/src"
+    - "-I./build_release/gen_src"
+  
+  # 移除可能冲突的选项
+  Remove: 
+    - "-fno-exceptions"
+    - "-fno-rtti"

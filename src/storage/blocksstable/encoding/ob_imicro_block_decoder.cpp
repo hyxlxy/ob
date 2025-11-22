@@ -157,7 +157,7 @@ int ObIMicroBlockDecoder::find_bound(const ObDatumRowkey &key, const bool lower_
   } else {
 
     const int scan_range = row_count_ - begin_idx;
-    const int binary_lim = 7;
+    const int binary_lim = -1; //先不使用
 
     if(scan_range <= binary_lim) {
       //我们对于比较小的内容进行判断，就直接找了，不二分了.
