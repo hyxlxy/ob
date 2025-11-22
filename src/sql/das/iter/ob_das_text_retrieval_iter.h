@@ -79,6 +79,8 @@ public:
 
   int set_query_token(const ObString &query_token);
   int set_query_token_and_rangekey(const ObString &query_token, const common::ObIArray<ObDocIdExt> &doc_id, const int64_t &batch_size);
+  // 主动预取并返回该 token 的文档数（若已评估则直接返回缓存）
+  int prefetch_token_doc_cnt(int64_t &doc_cnt);
   void set_ls_tablet_ids(
       const share::ObLSID &ls_id,
       const ObTabletID &inv_tablet_id,
@@ -87,6 +89,12 @@ public:
     ls_id_ = ls_id;
     inv_idx_tablet_id_ = inv_tablet_id;
     fwd_idx_tablet_id_ = fwd_tablet_id;
+  }
+  // 提供token文档数的只读访问（若尚未评估则返回0）
+  inline int get_token_doc_cnt(int64_t &doc_cnt) const
+  {
+    doc_cnt = token_doc_cnt_;
+    return OB_SUCCESS;
   }
   INHERIT_TO_STRING_KV("ObDASIter", ObDASIter, K_(calc_exprs), K_(need_fwd_idx_agg),
       K_(need_inv_idx_agg), K_(inv_idx_agg_evaluated), K_(not_first_fwd_agg), K_(is_inited));

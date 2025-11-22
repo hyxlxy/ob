@@ -343,6 +343,33 @@ int ObDASTextRetrievalIter::do_table_scan()
   return ret;
 }
 
+int ObDASTextRetrievalIter::prefetch_token_doc_cnt(int64_t &doc_cnt)
+{
+  int ret = OB_SUCCESS;
+  doc_cnt = 0;
+  if (IS_NOT_INIT) {
+    ret = OB_NOT_INIT;
+    LOG_WARN("retrieval iterator not inited", K(ret));
+  } else if (!need_inv_idx_agg_) {
+    // 没有倒排聚合时，无法得到准确文档数，这里返回0表示未知
+    doc_cnt = 0;
+  } else if (!inv_idx_agg_evaluated_) {
+    if (OB_FAIL(do_doc_cnt_agg())) {
+      if (OB_UNLIKELY(OB_ITER_END != ret)) {
+        LOG_WARN("prefetch token doc cnt failed", K(ret));
+      } else {
+        ret = OB_SUCCESS; // treat as 0
+      }
+    }
+    if (OB_SUCC(ret)) {
+      doc_cnt = token_doc_cnt_;
+    }
+  } else {
+    doc_cnt = token_doc_cnt_;
+  }
+  return ret;
+}
+
 int ObDASTextRetrievalIter::rescan()
 {
   int ret = OB_SUCCESS;

@@ -134,6 +134,21 @@ int ObDASTextRetrievalMergeIter::rescan()
   } else {
     next_written_idx_ = 0;
     limit_param_ = ir_rtdef_->get_inv_idx_scan_rtdef()->limit_param_;
+    // 自适应批量大小：根据 LIMIT/OFFSET 调整 eval_ctx->max_batch_size_
+    if (nullptr != ir_rtdef_ && nullptr != ir_rtdef_->eval_ctx_) {
+      int64_t desired_batch = 2048; // default
+      if (limit_param_.is_valid() && limit_param_.limit_ > 0) {
+        int64_t hint = limit_param_.limit_ + limit_param_.offset_;
+        // clamp to [512, 4096]
+        if (hint <= 0) {
+          desired_batch = 512;
+        } else {
+          desired_batch = std::max<int64_t>(512, std::min<int64_t>(4096, hint * 2));
+        }
+      }
+      ir_rtdef_->eval_ctx_->max_batch_size_ = desired_batch;
+      LOG_DEBUG("adaptive batch size set", K(desired_batch), K(limit_param_));
+    }
   }
   return ret;
 }
@@ -1882,6 +1897,30 @@ int ObDASTRDaatIter::do_table_scan()
     for (int64_t i = 0; i < next_batch_cnt_; ++i) {
       next_batch_iter_idxes_[i] = i;
     }
+    // 依据token的倒排文档数(低频优先)对迭代器顺序进行重排
+    // 简单选择排序，避免额外依赖
+    for (int64_t j = 0; OB_SUCC(ret) && j < next_batch_cnt_; ++j) {
+      int64_t best = j;
+      int64_t best_cnt = INT64_MAX;
+      for (int64_t i = j; OB_SUCC(ret) && i < next_batch_cnt_; ++i) {
+        int64_t cur_idx = next_batch_iter_idxes_[i];
+        int64_t doc_cnt = 0;
+        if (OB_FAIL(token_iters_.at(cur_idx)->prefetch_token_doc_cnt(doc_cnt))) {
+          LOG_DEBUG("prefetch token doc cnt failed, skip order", K(ret), K(cur_idx));
+          ret = OB_SUCCESS; // 忽略错误，保持原序
+        }
+        if (doc_cnt < best_cnt) {
+          best_cnt = doc_cnt;
+          best = i;
+        }
+      }
+      if (best != j) {
+        int64_t tmp = next_batch_iter_idxes_[j];
+        next_batch_iter_idxes_[j] = next_batch_iter_idxes_[best];
+        next_batch_iter_idxes_[best] = tmp;
+      }
+    }
+    LOG_DEBUG("daat order by token freq ready", K(next_batch_cnt_));
   }
   if (OB_FAIL(ret)) {
   } else if(OB_FAIL(ObDASTextRetrievalMergeIter::do_table_scan())) {
