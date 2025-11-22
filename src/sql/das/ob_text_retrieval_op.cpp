@@ -371,45 +371,14 @@ int ObTextRetrievalMerge::init_query_tokens(const ObDASIRScanCtDef *ir_ctdef, Ob
   } else if (0 == search_text_datum->len_) {
     // empty query text
   } else {
-    // TODO: FTParseHelper currently does not support deduplicate tokens
-    //       We should abstract such universal analyse functors into utility structs
-    const ObString &search_text_string = search_text_datum->get_string();
-    const ObString &parser_name = ir_ctdef->get_inv_idx_scan_ctdef()->table_param_.get_parser_name();
-    const ObCollationType &cs_type = search_text->datum_meta_.cs_type_;
-    int64_t doc_length = 0;
-    storage::ObFTParseHelper tokenize_helper;
-    common::ObSEArray<ObFTWord, 16> tokens;
-    hash::ObHashMap<ObFTWord, int64_t> token_map;
-    const int64_t ft_word_bkt_cnt = MAX(search_text_string.length() / 10, 2);
-    if (OB_FAIL(tokenize_helper.init(allocator_, parser_name))) {
-      LOG_WARN("failed to init tokenize helper", K(ret));
-    } else if (OB_FAIL(token_map.create(ft_word_bkt_cnt, common::ObMemAttr(MTL_ID(), "FTWordMap")))) {
-      LOG_WARN("failed to create token map", K(ret));
-    } else if (OB_FAIL(tokenize_helper.segment(
-        cs_type, search_text_string.ptr(), search_text_string.length(), doc_length, token_map))) {
-      LOG_WARN("failed to segment");
-    } else {
-      for (hash::ObHashMap<ObFTWord, int64_t>::const_iterator iter = token_map.begin();
-          OB_SUCC(ret) && iter != token_map.end();
-          ++iter) {
-        const ObFTWord &token = iter->first;
-        ObString token_string;
-        if (OB_FAIL(ob_write_string(*allocator_, token.get_word(), token_string))) {
-          LOG_WARN("failed to deep copy query token", K(ret));
-        } else if (OB_FAIL(query_tokens_.push_back(token_string))) {
-          LOG_WARN("failed to append query token", K(ret));
-        }
-      }
-    }
-
-// TODO: try use this interface instead
-/*
+    // 使用文本分析器，开启英文停用词过滤与分组去重
     share::ObITokenStream *token_stream = nullptr;
     share::ObTextAnalysisCtx query_analysis_ctx;
-    query_analysis_ctx.need_grouping_ = true;
-    query_analysis_ctx.filter_stopword_ = true;
+    query_analysis_ctx.need_grouping_ = true;       // 合并相同词元
+    query_analysis_ctx.filter_stopword_ = true;     // 过滤停用词（英文）
     query_analysis_ctx.cs_ = common::ObCharset::get_charset(search_text->obj_meta_.get_collation_type());
     share::ObEnglishTextAnalyzer query_analyzer;
+    common::ObArenaAllocator token_analyze_alloc(common::ObMemAttr(MTL_ID(), "FTQueryTok"));
     if (OB_FAIL(query_analyzer.init(query_analysis_ctx, token_analyze_alloc))) {
       LOG_WARN("failed to init query text analyzer", K(ret));
     } else if (OB_FAIL(query_analyzer.analyze(*search_text_datum, token_stream))) {
@@ -422,7 +391,7 @@ int ObTextRetrievalMerge::init_query_tokens(const ObDASIRScanCtDef *ir_ctdef, Ob
         if (OB_UNLIKELY(OB_ITER_END != ret)) {
           LOG_WARN("failed to get next query token", K(ret));
         }
-      } else if (OB_FAIL(ob_write_string(token_analyze_alloc, token.get_string(), token_string))) {
+      } else if (OB_FAIL(ob_write_string(*allocator_, token.get_string(), token_string))) {
         LOG_WARN("failed to deep copy query token", K(ret));
       } else if (OB_FAIL(query_tokens_.push_back(token_string))) {
         LOG_WARN("failed to append query token", K(ret));
@@ -434,9 +403,8 @@ int ObTextRetrievalMerge::init_query_tokens(const ObDASIRScanCtDef *ir_ctdef, Ob
     } else {
       ret = OB_SUCCESS;
     }
-*/
 
-    LOG_DEBUG("tokenized text query:", K(ret), KPC(search_text_datum), K_(query_tokens));
+    LOG_DEBUG("tokenized text query with analyzer:", K(ret), KPC(search_text_datum), K_(query_tokens));
   }
   return ret;
 }

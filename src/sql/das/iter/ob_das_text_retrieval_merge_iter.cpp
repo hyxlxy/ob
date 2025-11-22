@@ -2219,9 +2219,18 @@ int ObDASTRDaatIter::next_disjunctive_document(const bool is_batch, bool &doc_va
         // consider to add an expr for collectiong conjunction result between query tokens here?
         cur_doc_relevance += top_item->relevance_;
       }
+      doc_cnt++;
       if (OB_FAIL(iter_row_heap_->pop())) {
         LOG_WARN("failed to pop top item in heap", K(ret));
       }
+    }
+  }
+
+  // minimum_should_match: require at least N tokens matched
+  if (OB_SUCC(ret)) {
+    const int64_t msm = ir_rtdef_->minimum_should_match_;
+    if (msm > 0 && doc_cnt < msm) {
+      doc_valid = false;
     }
   }
 
@@ -2232,7 +2241,7 @@ int ObDASTRDaatIter::next_disjunctive_document(const bool is_batch, bool &doc_va
   } else if (OB_FAIL(ObFtsEvalNode::fts_boolean_eval(root_node_, boolean_relevances_, cur_doc_relevance))) {
     LOG_WARN("failed to evaluate boolean relevance", K(ret));
   } else {
-    doc_valid = cur_doc_relevance > 0;
+    doc_valid = doc_valid && (cur_doc_relevance > 0);
   }
 
   if (OB_SUCC(ret) && doc_valid) {
