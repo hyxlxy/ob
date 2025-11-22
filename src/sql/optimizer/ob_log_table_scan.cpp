@@ -5022,12 +5022,26 @@ int ObLogTableScan::prepare_text_retrieval_dep_exprs(ObTextRetrievalInfo &tr_inf
       LOG_WARN("failed to build avg doc token count pseudo column expr", K(ret));
     } else if (OB_FAIL(avg_doc_token_cnt_expr->formalize(session_info))) {
       LOG_WARN("failed to formalize avg doc token count expr", K(ret));
-    } else if (OB_FAIL(ObRawExprUtils::build_bm25_expr(*expr_factory, related_doc_cnt,
+    } else {
+      // cast doc_token_cnt (SUM token_cnt) to DecimalInt to avoid runtime ObNumber construction
+      ObSysFunRawExpr *dec_doc_token_cnt = nullptr;
+      ObRawExprResType dec_type;
+      dec_type.set_type(ObDecimalIntType);
+      dec_type.set_precision(128);
+      dec_type.set_scale(0);
+      if (OB_FAIL(ObRawExprUtils::create_cast_expr(*expr_factory, doc_token_cnt, dec_type, dec_doc_token_cnt, session_info))) {
+        LOG_WARN("failed to create cast expr for doc_token_cnt DecimalInt", K(ret));
+      } else if (OB_FAIL(dec_doc_token_cnt->formalize(session_info))) {
+        LOG_WARN("failed to formalize cast expr", K(ret));
+      } else if (OB_FAIL(ObRawExprUtils::build_bm25_expr(*expr_factory, related_doc_cnt,
                                                       token_cnt_column, total_doc_cnt,
-                                                      doc_token_cnt, avg_doc_token_cnt_expr,
+                                                      dec_doc_token_cnt, avg_doc_token_cnt_expr,
                                                       relevance_expr, need_est_avg_doc_token_cnt,
                                                       session_info))) {
-      LOG_WARN("failed to build bm25 expr", K(ret));
+        LOG_WARN("failed to build bm25 expr", K(ret));
+      }
+    }
+    if (OB_FAIL(ret)) {
     } else if (OB_FAIL(relevance_expr->formalize(session_info))) {
       LOG_WARN("failed to formalize bm25 expr", K(ret));
     // Copy column ref expr referenced by aggregation in different index table scan
