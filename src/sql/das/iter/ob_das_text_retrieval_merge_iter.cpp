@@ -726,8 +726,10 @@ int ObDASTextRetrievalMergeIter::init_total_doc_cnt_param(
     scan_param.fb_read_tx_uncommitted_ = rtdef->fb_read_tx_uncommitted_;
     scan_param.ls_id_ = ls_id_;
     scan_param.tablet_id_ = domain_id_idx_tablet_id_;
-    if (ctdef->pd_expr_spec_.pushdown_filters_.empty()) {
+    if (!ctdef->pd_expr_spec_.pushdown_filters_.empty()) {
       scan_param.op_filters_ = &ctdef->pd_expr_spec_.pushdown_filters_;
+      const int64_t pd_filter_cnt = ctdef->pd_expr_spec_.pushdown_filters_.count();
+      LOG_DEBUG("IR merge iter set pushdown filters", K(pd_filter_cnt));
     }
     scan_param.pd_storage_filters_ = rtdef->p_pd_expr_op_->pd_storage_filters_;
     if (OB_NOT_NULL(tx_desc)) {
