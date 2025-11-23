@@ -4,46 +4,69 @@ from typing import List
 
 def split_text(
     text: str,
-    max_chunk_size: int = 2000,
+    max_chunk_size: int = 1200,
+    overlap: int = 150,
 ) -> List[str]:
     """
-    Split text into chunks by paragraphs. Only split long paragraphs if they exceed max_chunk_size.
+    将文本按段落优先切分；当段落过长时再按句子边界切分，并使用少量重叠以保持上下文连续性。
 
     Args:
-        text: Input text to split
-        max_chunk_size: Maximum size for a chunk (in characters).
-                        Only paragraphs longer than this will be split further.
+        text: 待切分文本
+        max_chunk_size: 单块最大字符数（近似 token 控制）
+        overlap: 邻接块之间的重叠字符数（仅用于长段落切分后拼块）
 
     Returns:
-        List of text chunks, each chunk is typically a paragraph or part of a very long paragraph
+        文本块列表
     """
     if not text or not text.strip():
         return []
 
-    # Normalize whitespace: replace multiple spaces/newlines with single space/newline
+    # 归一化空白
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     text = text.strip()
 
-    # Split by paragraphs (double newlines)
+    # 按双换行视为段落
     paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
 
     if not paragraphs:
         return []
 
-    chunks = []
+    chunks: List[str] = []
+
+    def _with_overlap(parts: List[str]) -> List[str]:
+        if not parts:
+            return []
+        out: List[str] = []
+        buf = ""
+        for i, s in enumerate(parts):
+            if not buf:
+                buf = s
+                continue
+            # 若加入后超限则提交当前块并带重叠开启新块
+            if len(buf) + 1 + len(s) > max_chunk_size:
+                out.append(buf)
+                if overlap > 0:
+                    # 取尾部 overlap 字符作为下块开头
+                    tail = buf[-overlap:]
+                    buf = (tail + " " + s)[:max_chunk_size]
+                else:
+                    buf = s
+            else:
+                buf += " " + s
+        if buf:
+            out.append(buf)
+        return out
 
     for paragraph in paragraphs:
-        # If paragraph is too long, split it at sentence boundaries
-        if len(paragraph) > max_chunk_size:
-            # Split long paragraph by sentences
-            long_chunks = _split_long_paragraph(paragraph, max_chunk_size)
-            chunks.extend(long_chunks)
-        else:
-            # Keep paragraph as is
+        if len(paragraph) <= max_chunk_size:
             chunks.append(paragraph)
+        else:
+            # 先按句子切分再组块并加重叠
+            long_sentences = _split_long_paragraph(paragraph, max_chunk_size)
+            chunks.extend(_with_overlap(long_sentences))
 
-    # Filter out empty chunks
+    # 过滤空块
     return [chunk for chunk in chunks if chunk.strip()]
 
 

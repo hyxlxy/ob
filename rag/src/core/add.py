@@ -29,54 +29,60 @@ from src.storage.oceanbase import get_or_create_client
 
 dotenv.load_dotenv()
 
-# Embedding dimension from environment variable
-EMBEDDING_DIM = 1024
+# Embedding/Index 配置（可通过环境变量覆盖）
+EMBEDDING_DIM = int(os.getenv("EMBEDDING_DIM", "0"))  # 0 表示自动探测
+VECTOR_METRIC = os.getenv("VECTOR_METRIC", "cosine")  # l2 | ip | cosine
 
 # Table name for storing document chunks
 TABLE_NAME = "rag_documents"
 
 
 def create_table_if_not_exists(client: HybridSearch, vector_dim: int):
-    """Create the documents table if it doesn't exist."""
-    logger.info(f"Creating table '{TABLE_NAME}' with vector dimension {vector_dim}...")
+    """Create the documents table if it doesn't exist (idempotent)."""
+    logger.info(f"Ensuring table '{TABLE_NAME}' exists (dim={vector_dim})...")
+
+    # 根据度量选择索引参数
+    metric = (VECTOR_METRIC or "l2").lower()
+    if metric not in {"l2", "ip", "cosine"}:
+        metric = "l2"
+    vec_index_param = f"distance={metric}, type=hnsw, lib=vsag"
+
     try:
-        # Try to drop table if exists (for re-running)
-        client.drop_table_if_exist(table_name=TABLE_NAME)
-        logger.debug(f"Dropped existing table '{TABLE_NAME}' if it existed")
-    except Exception:
-        logger.debug(f"Table '{TABLE_NAME}' does not exist, will create new one")
+        client.create_table(
+            table_name=TABLE_NAME,
+            columns=[
+                Column("id", Integer, primary_key=True, autoincrement=True),
+                Column("source_id", VARCHAR(64)),  # Unique identifier for each chunk
+                Column("filename", VARCHAR(512)),  # PDF filename
+                Column("page", Integer),  # Page number (1-indexed)
+                Column("content", VARCHAR(8192)),  # Text content
+                Column("vector", VECTOR(vector_dim)),  # Embedding vector
+            ],
+            indexes=[
+                VectorIndex("vec_idx", "vector", params=vec_index_param),
+            ],
+            mysql_charset="utf8mb4",
+            mysql_collate="utf8mb4_unicode_ci",
+            mysql_organization="heap",
+        )
+        logger.info(f"Table '{TABLE_NAME}' created.")
+    except Exception as e:
+        # 已存在时忽略
+        logger.debug(f"Create table skipped or failed (may exist): {e}")
 
-    # Create table with required columns
-    client.create_table(
-        table_name=TABLE_NAME,
-        columns=[
-            Column("id", Integer, primary_key=True, autoincrement=True),
-            Column("source_id", VARCHAR(64)),  # Unique identifier for each chunk
-            Column("filename", VARCHAR(512)),  # PDF filename
-            Column("page", Integer),  # Page number (1-indexed)
-            Column("content", VARCHAR(8192)),  # Text content
-            Column("vector", VECTOR(vector_dim)),  # Embedding vector
-        ],
-        indexes=[
-            VectorIndex("vec_idx", "vector", params="distance=l2, type=hnsw, lib=vsag"),
-        ],
-        mysql_charset="utf8mb4",
-        mysql_collate="utf8mb4_unicode_ci",
-        mysql_organization="heap",
-    )
-
-    # Create full-text search index on content
-    client.create_fts_idx_with_fts_index_param(
-        table_name=TABLE_NAME,
-        fts_idx_param=FtsIndexParam(
-            index_name="fts_idx_content",
-            field_names=["content"],
-            parser_type=FtsParser.IK,
-        ),
-    )
-    logger.info(
-        f"Table '{TABLE_NAME}' created successfully with vector and FTS indexes"
-    )
+    # 创建/确保全文索引
+    try:
+        client.create_fts_idx_with_fts_index_param(
+            table_name=TABLE_NAME,
+            fts_idx_param=FtsIndexParam(
+                index_name="fts_idx_content",
+                field_names=["content"],
+                parser_type=FtsParser.IK,
+            ),
+        )
+        logger.info("FTS index ensured: fts_idx_content")
+    except Exception as e:
+        logger.debug(f"Create FTS index skipped or failed (may exist): {e}")
 
 
 def process_pdf_file(
@@ -118,56 +124,83 @@ def process_pdf_file(
             page_text = ""
 
             try:
-                # Step 1: Convert PDF to image
-                page_image_path = pdf_page_to_image(pdf_file, page_num, dpi=100)
-                logger.debug(f"Converted page {page_num} to image: {page_image_path}")
-
-                # Step 2: Extract information using VLM
+                # Step 1: Try direct text extraction from PDF
                 try:
-                    page_text = generate_vlm_response(
-                        VLM_IMAGE_EXTRACTION_PROMPT, images=page_image_path
-                    )
-                    if page_text.strip():
-                        logger.debug(f"Extracted text from page {page_num} using VLM")
+                    if PdfReader is None:
+                        raise ImportError("PdfReader not available")
+                    reader = PdfReader(pdf_file)
+                    raw_text = reader.pages[page_num - 1].extract_text() or ""
+                    page_text = raw_text.strip()
+                    if len(page_text) >= 50:  # 简单阈值，避免空白/目录页
+                        logger.debug(
+                            f"Extracted text from page {page_num} via PdfReader (len={len(page_text)})"
+                        )
+                        # 若文本足够，不再走图片+VLM
+                        pass
+                    else:
+                        page_text = ""
                 except Exception as e:
-                    # Check if it's a 502 error (likely due to large image)
-                    error_str = str(e).lower()
-                    is_502_error = (
-                        "502" in error_str
-                        or "bad gateway" in error_str
-                        or (hasattr(e, "status_code") and e.status_code == 502)
+                    logger.debug(
+                        f"PdfReader extract_text failed for page {page_num}, will fallback to VLM: {e}"
+                    )
+                    page_text = ""
+
+                # Step 2: If no text, fallback to image + VLM
+                if not page_text:
+                    page_image_path = pdf_page_to_image(pdf_file, page_num, dpi=100)
+                    logger.debug(
+                        f"Converted page {page_num} to image: {page_image_path}"
                     )
 
-                    if is_502_error:
-                        logger.warning(
-                            f"502 error detected for page {page_num} of {filename}. "
-                            f"Attempting to compress image and retry..."
+                    try:
+                        page_text = generate_vlm_response(
+                            VLM_IMAGE_EXTRACTION_PROMPT, images=page_image_path
                         )
-                        try:
-                            # Compress the image and retry
-                            compressed_image_path = compress_image(
-                                page_image_path,
-                                max_size_mb=5.0,
-                                max_dimension=2048,
+                        if page_text.strip():
+                            logger.debug(
+                                f"Extracted text from page {page_num} using VLM"
                             )
-                            page_text = generate_vlm_response(
-                                VLM_IMAGE_EXTRACTION_PROMPT,
-                                images=compressed_image_path,
-                            )
-                            if page_text.strip():
-                                logger.info(
-                                    f"Successfully extracted text from compressed page {page_num} image"
-                                )
-                        except Exception as retry_e:
+                    except Exception as e:
+                        # Check if it's a 502 error (likely due to large image)
+                        error_str = str(e).lower()
+                        is_502_error = (
+                            "502" in error_str
+                            or "bad gateway" in error_str
+                            or (hasattr(e, "status_code") and e.status_code == 502)
+                        )
+
+                        if is_502_error:
                             logger.warning(
-                                f"Failed to extract text from compressed page {page_num} image of {filename}: {retry_e}"
+                                f"502 error detected for page {page_num} of {filename}. "
+                                f"Attempting to compress image and retry..."
                             )
-                    else:
-                        logger.warning(
-                            f"Failed to extract text from page {page_num} image of {filename}: {e}"
-                        )
+                            try:
+                                # Compress the image and retry
+                                compressed_image_path = compress_image(
+                                    page_image_path,
+                                    max_size_mb=5.0,
+                                    max_dimension=2048,
+                                )
+                                page_text = generate_vlm_response(
+                                    VLM_IMAGE_EXTRACTION_PROMPT,
+                                    images=compressed_image_path,
+                                )
+                                if page_text.strip():
+                                    logger.info(
+                                        f"Successfully extracted text from compressed page {page_num} image"
+                                    )
+                            except Exception as retry_e:
+                                logger.warning(
+                                    f"Failed to extract text from compressed page {page_num} image of {filename}: {retry_e}"
+                                )
+                        else:
+                            logger.warning(
+                                f"Failed to extract text from page {page_num} image of {filename}: {e}"
+                            )
             except Exception as e:
-                logger.warning(f"Failed to process page {page_num} of {filename}: {e}")
+                logger.warning(
+                    f"Failed to process page {page_num} of {filename}: {e}"
+                )
             finally:
                 # Clean up temporary image files
                 if compressed_image_path and os.path.exists(compressed_image_path):
@@ -243,6 +276,17 @@ def process_pdf_file(
         return 0
 
 
+def _detect_embedding_dim() -> int:
+    """调用一次嵌入接口以探测维度。"""
+    try:
+        vec = generate_embedding("dim_probe")
+        if isinstance(vec, list) and len(vec) > 0:
+            return len(vec)
+    except Exception as e:
+        logger.warning(f"自动探测嵌入维度失败，将回退至默认1024: {e}")
+    return 1024
+
+
 def add(dataset_dir: str, max_worker: int):
     """
     Prepare RAG data by parsing PDFs, generating embeddings, and storing in OceanBase.
@@ -262,8 +306,8 @@ def add(dataset_dir: str, max_worker: int):
     # Initialize OceanBase client
     client = get_or_create_client()
 
-    # Use embedding dimension from environment variable
-    vector_dim = EMBEDDING_DIM
+    # Use embedding dimension from environment variable or auto detect
+    vector_dim = EMBEDDING_DIM if EMBEDDING_DIM > 0 else _detect_embedding_dim()
     logger.info(f"Using embedding vector dimension: {vector_dim}")
 
     create_table_if_not_exists(client, vector_dim)
