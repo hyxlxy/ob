@@ -399,3 +399,6 @@ tools/flamegraph/
 *.md
 ob-mldr-test/
 canko/
+# ignore perf artifacts
+perf.data*
+perf*.old
