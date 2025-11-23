@@ -902,54 +902,6 @@ int ObSortVecOpImpl<Compare, Store_Row, has_addon>::add_sort_batch_row(const ObB
     SQL_ENG_LOG(WARN, "add store row failed", K(ret), K(mem_context_->used()), K(get_memory_limit()));
   } else {
     append_row_count = stored_rows_cnt;
-    // for (int64_t i = 0; OB_SUCC(ret) && i < stored_rows_cnt; i++) {
-    //   inmem_row_size_ += sk_rows_[i]->get_row_size();
-    //   if (has_addon) {
-    //     sk_rows_[i]->set_addon_ptr(addon_rows_[i], *sk_row_meta_);
-    //     inmem_row_size_ += addon_rows_[i]->get_row_size();
-    //   }
-    // }
-    // SSE2优化 - 内存计算
-#if defined(__SSE2__)
-#include <emmintrin.h>
-    int64_t total = 0;
-    int64_t i = 0;
-
-    // 向量化部分 - 只处理主行大小
-    if (stored_rows_cnt >= 4) {
-      __m128i sum_vec = _mm_setzero_si128();
-      
-      for (; i + 3 < stored_rows_cnt; i += 4) {
-        // 读取4个主行大小
-        int32_t main_sizes[4];
-        for (int j = 0; j < 4; j++) {
-          main_sizes[j] = static_cast<int32_t>(sk_rows_[i + j]->get_row_size());
-        }
-        
-        __m128i main_vec = _mm_loadu_si128((__m128i*)main_sizes);
-        sum_vec = _mm_add_epi32(sum_vec, main_vec);
-      }
-      
-      // 水平求和
-      int32_t temp[4];
-      _mm_storeu_si128((__m128i*)temp, sum_vec);
-      total = temp[0] + temp[1] + temp[2] + temp[3];
-    }
-
-    // 处理剩余行和addon（标量方式，保证正确性）
-    for (; i < stored_rows_cnt; i++) {
-      total += sk_rows_[i]->get_row_size();
-      if (has_addon) {
-        total += addon_rows_[i]->get_row_size();
-        if (OB_SUCC(ret)) {
-          sk_rows_[i]->set_addon_ptr(addon_rows_[i], *sk_row_meta_);
-        }
-      }
-    }
-
-    inmem_row_size_ += total;
-#else
-    // 原来的代码（没有SSE2优化）
     for (int64_t i = 0; OB_SUCC(ret) && i < stored_rows_cnt; i++) {
       inmem_row_size_ += sk_rows_[i]->get_row_size();
       if (has_addon) {
@@ -957,7 +909,6 @@ int ObSortVecOpImpl<Compare, Store_Row, has_addon>::add_sort_batch_row(const ObB
         inmem_row_size_ += addon_rows_[i]->get_row_size();
       }
     }
-#endif
   }
   return ret;
 }

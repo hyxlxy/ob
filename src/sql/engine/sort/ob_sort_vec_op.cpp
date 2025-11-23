@@ -348,10 +348,10 @@ int ObSortVecOp::scan_all_then_sort_batch()
       if (OB_FAIL(finish_add_prescan_store())) {
         LOG_WARN("failed to finish add prescan store", K(ret));
       } else {
-        constexpr int64_t MAX_BATCH_SIZE = 256;
+        constexpr int64_t MAX_BATCH_SIZE = 512; // 之前是256
         const ObCompactRow *sk_rows[MAX_BATCH_SIZE];
         const ObCompactRow *addon_rows[MAX_BATCH_SIZE];
-        int64_t max_batch_size = min(256, MY_SPEC.max_batch_size_);
+        int64_t max_batch_size = min(512, MY_SPEC.max_batch_size_);
         int64_t read_rows = -1;
         while (OB_SUCC(ret)) {
           if (OB_FAIL(
