@@ -918,7 +918,7 @@ int ObSortVecOpImpl<Compare, Store_Row, has_addon>::add_sort_batch_row(
   int64_t stored_rows_cnt = 0;
 
 // SSE2优化 - 预取
-#if defined(__SSE2__)
+#if !defined(__SSE2__)
 #include <emmintrin.h>
   for (int64_t i = 0; i < input_brs.size_; i += 4) {
     if (i < input_brs.size_ && !input_brs.skip_->exist(i)) {
@@ -944,15 +944,15 @@ int ObSortVecOpImpl<Compare, Store_Row, has_addon>::add_sort_batch_row(
                 K(get_memory_limit()));
   } else {
     append_row_count = stored_rows_cnt;
-// for (int64_t i = 0; OB_SUCC(ret) && i < stored_rows_cnt; i++) {
-//   inmem_row_size_ += sk_rows_[i]->get_row_size();
-//   if (has_addon) {
-//     sk_rows_[i]->set_addon_ptr(addon_rows_[i], *sk_row_meta_);
-//     inmem_row_size_ += addon_rows_[i]->get_row_size();
-//   }
-// }
+    for (int64_t i = 0; OB_SUCC(ret) && i < stored_rows_cnt; i++) {
+      inmem_row_size_ += sk_rows_[i]->get_row_size();
+      if (has_addon) {
+        sk_rows_[i]->set_addon_ptr(addon_rows_[i], *sk_row_meta_);
+        inmem_row_size_ += addon_rows_[i]->get_row_size();
+      }
+    }
 // SSE2优化 - 内存计算
-#if defined(__SSE2__)
+#if !defined(__SSE2__)
 #include <emmintrin.h>
     __m128i total_vec = _mm_setzero_si128(); // 初始化为0
     int64_t i = 0;
@@ -1031,7 +1031,7 @@ int ObSortVecOpImpl<Compare, Store_Row, has_addon>::add_sort_batch_row(
     //   }
     // }
     // SSE2优化 - 内存计算
-#if defined(__SSE2__)
+#if !defined(__SSE2__)
 #include <emmintrin.h>
     __m128i total_vec = _mm_setzero_si128(); // 初始化为0
     int64_t i = 0;
