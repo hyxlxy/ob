@@ -480,11 +480,11 @@ int ObPxTransmitOp::next_vector(const int64_t max_row_cnt) {
     } else {
       int64_t *value =
           MY_SPEC.random_expr_->get_fixed_vector_data<int64_t>(eval_ctx_);
-      int64_t count = 0;
+      // int64_t count = 0;
       for (int64_t i = 0; i < brs->size_; i++) {
-        // value[i] = get_random_seq();
-        value[i] = ++count;
-        count %= 3;
+        value[i] = get_random_seq();
+        // value[i] = ++count;
+        // count %= 3;
       }
     }
   }

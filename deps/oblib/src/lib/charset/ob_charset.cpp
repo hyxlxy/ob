@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <cstring>
 #define USING_LOG_PREFIX LIB_CHARSET
 #include "ob_charset.h"
 #include "lib/worker.h"
@@ -950,6 +951,33 @@ int ObCharset::strcmpsp(ObCollationType collation_type,
 {
   int result = 0;
   if (is_argument_valid(collation_type, str1, str1_len, str2, str2_len)) {
+
+    if (collation_type == CS_TYPE_UTF8MB4_UNICODE_CI) {
+      if (str1 == str2 and str1_len == str2_len) {
+        return 0;
+      }
+      if (!cmp_endspace) {
+        int64_t min_len = std::min(str1_len, str2_len);
+        int cmp_res = std::memcmp(str1, str2, min_len);
+        if (cmp_res != 0) {
+          return cmp_res;
+        }
+
+        if (str1_len == str2_len) {
+          return 0;
+        }
+
+        const char *str_tmp = (str1_len > str2_len)? str1 : str2;
+        bool is_space = (str_tmp[min_len + 1] == ' ');
+        // 代表对于 (aaa) (aaa   ) 这种来说，是ok的
+        // 对于 (aaa) (aaabbb) 来说是不 ok 的
+        if (is_space) {
+          return 0;
+        }
+        return (str1_len < str2_len )? -1 : 1;
+      }
+    }
+
     const ObCharsetInfo *cs = get_charset(collation_type);
     result = cs->coll->strnncollsp(cs,
                                 reinterpret_cast<const unsigned char *>(str1),
