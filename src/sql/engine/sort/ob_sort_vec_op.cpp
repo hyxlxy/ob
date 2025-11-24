@@ -18,36 +18,38 @@
 
 #include "sql/engine/sort/ob_sort_vec_op.h"
 #include "sql/engine/aggregate/ob_hash_groupby_op.h"
-#include "sql/engine/px/ob_px_util.h"
 #include "sql/engine/expr/ob_expr_topn_filter.h"
+#include "sql/engine/px/ob_px_util.h"
 
-namespace oceanbase
-{
-namespace sql
-{
-ObSortVecSpec::ObSortVecSpec(common::ObIAllocator &alloc, const ObPhyOperatorType type) :
-  ObOpSpec(alloc, type), topn_expr_(nullptr), topk_limit_expr_(nullptr), topk_offset_expr_(nullptr),
-  sk_exprs_(alloc), addon_exprs_(alloc), sk_collations_(alloc), addon_collations_(alloc),
-  minimum_row_count_(0), topk_precision_(0), prefix_pos_(0), is_local_merge_sort_(false),
-  is_fetch_with_ties_(false), prescan_enabled_(false), enable_encode_sortkey_opt_(false),
-  has_addon_(false), part_cnt_(0), pd_topn_filter_info_(alloc), enable_single_col_compare_opt_(false)
-{}
+namespace oceanbase {
+namespace sql {
+ObSortVecSpec::ObSortVecSpec(common::ObIAllocator &alloc,
+                             const ObPhyOperatorType type)
+    : ObOpSpec(alloc, type), topn_expr_(nullptr), topk_limit_expr_(nullptr),
+      topk_offset_expr_(nullptr), sk_exprs_(alloc), addon_exprs_(alloc),
+      sk_collations_(alloc), addon_collations_(alloc), minimum_row_count_(0),
+      topk_precision_(0), prefix_pos_(0), is_local_merge_sort_(false),
+      is_fetch_with_ties_(false), prescan_enabled_(false),
+      enable_encode_sortkey_opt_(false), has_addon_(false), part_cnt_(0),
+      pd_topn_filter_info_(alloc), enable_single_col_compare_opt_(false) {}
 
-OB_SERIALIZE_MEMBER((ObSortVecSpec, ObOpSpec), topn_expr_, topk_limit_expr_, topk_offset_expr_,
-                    sk_exprs_, addon_exprs_, sk_collations_, addon_collations_, minimum_row_count_,
-                    topk_precision_, prefix_pos_, is_local_merge_sort_, is_fetch_with_ties_,
-                    prescan_enabled_, enable_encode_sortkey_opt_, has_addon_, part_cnt_, compress_type_,
-                    pd_topn_filter_info_, enable_single_col_compare_opt_);
+OB_SERIALIZE_MEMBER((ObSortVecSpec, ObOpSpec), topn_expr_, topk_limit_expr_,
+                    topk_offset_expr_, sk_exprs_, addon_exprs_, sk_collations_,
+                    addon_collations_, minimum_row_count_, topk_precision_,
+                    prefix_pos_, is_local_merge_sort_, is_fetch_with_ties_,
+                    prescan_enabled_, enable_encode_sortkey_opt_, has_addon_,
+                    part_cnt_, compress_type_, pd_topn_filter_info_,
+                    enable_single_col_compare_opt_);
 
-ObSortVecOp::ObSortVecOp(ObExecContext &ctx_, const ObOpSpec &spec, ObOpInput *input) :
-  ObOperator(ctx_, spec, input), sort_op_provider_(op_monitor_info_), sort_row_count_(0),
-  is_first_(true), ret_row_count_(0), sk_row_store_(), addon_row_store_(), sk_row_iter_(),
-  addon_row_iter_()
-{}
+ObSortVecOp::ObSortVecOp(ObExecContext &ctx_, const ObOpSpec &spec,
+                         ObOpInput *input)
+    : ObOperator(ctx_, spec, input), sort_op_provider_(op_monitor_info_),
+      sort_row_count_(0), is_first_(true), ret_row_count_(0), sk_row_store_(),
+      addon_row_store_(), sk_row_iter_(), addon_row_iter_() {}
 
-int ObSortVecOp::inner_rescan()
-{
-  if (MY_SPEC.enable_pd_topn_filter() && !MY_SPEC.pd_topn_filter_info_.is_shuffle_) {
+int ObSortVecOp::inner_rescan() {
+  if (MY_SPEC.enable_pd_topn_filter() &&
+      !MY_SPEC.pd_topn_filter_info_.is_shuffle_) {
     // for local topn runtime filter, rescan topn filter expression context
     reset_pd_topn_filter_expr_ctx();
   }
@@ -55,8 +57,7 @@ int ObSortVecOp::inner_rescan()
   return ObOperator::inner_rescan();
 }
 
-void ObSortVecOp::reset_pd_topn_filter_expr_ctx()
-{
+void ObSortVecOp::reset_pd_topn_filter_expr_ctx() {
   uint32_t expr_ctx_id = MY_SPEC.pd_topn_filter_info_.expr_ctx_id_;
   ObExprTopNFilterContext *topn_filter_ctx =
       static_cast<ObExprTopNFilterContext *>(ctx_.get_expr_op_ctx(expr_ctx_id));
@@ -65,8 +66,7 @@ void ObSortVecOp::reset_pd_topn_filter_expr_ctx()
   }
 }
 
-void ObSortVecOp::reset()
-{
+void ObSortVecOp::reset() {
   sort_row_count_ = 0;
   ret_row_count_ = 0;
   is_first_ = true;
@@ -77,8 +77,7 @@ void ObSortVecOp::reset()
   sort_op_provider_.reset();
 }
 
-void ObSortVecOp::destroy()
-{
+void ObSortVecOp::destroy() {
   reset();
   sk_row_store_.~ObTempRowStore();
   addon_row_store_.~ObTempRowStore();
@@ -87,8 +86,7 @@ void ObSortVecOp::destroy()
   ObOperator::destroy();
 }
 
-int ObSortVecOp::inner_close()
-{
+int ObSortVecOp::inner_close() {
   sort_op_provider_.collect_memory_dump_info(op_monitor_info_);
   sort_op_provider_.unregister_profile();
   if (MY_SPEC.enable_pd_topn_filter()) {
@@ -99,12 +97,12 @@ int ObSortVecOp::inner_close()
   return OB_SUCCESS;
 }
 
-int ObSortVecOp::get_int_value(const ObExpr *in_val, int64_t &out_val)
-{
+int ObSortVecOp::get_int_value(const ObExpr *in_val, int64_t &out_val) {
   int ret = OB_SUCCESS;
   if (NULL != in_val) {
     int64_t skip_mem = 0;
-    const ObBitVector *my_skip = to_bit_vector(reinterpret_cast<void *>(&skip_mem));
+    const ObBitVector *my_skip =
+        to_bit_vector(reinterpret_cast<void *>(&skip_mem));
     if (OB_FAIL(in_val->eval_vector(eval_ctx_, *my_skip, 1, true))) {
       LOG_WARN("Failed to calculate expression", K(ret));
     } else if (in_val->get_vector(eval_ctx_)->is_null(0)) {
@@ -116,13 +114,13 @@ int ObSortVecOp::get_int_value(const ObExpr *in_val, int64_t &out_val)
   return ret;
 }
 
-int ObSortVecOp::get_topn_count(int64_t &topn_cnt)
-{
+int ObSortVecOp::get_topn_count(int64_t &topn_cnt) {
   int ret = OB_SUCCESS;
   topn_cnt = INT64_MAX;
   if ((OB_ISNULL(MY_SPEC.topn_expr_) && OB_ISNULL(MY_SPEC.topk_limit_expr_))) {
     // do nothing
-  } else if (((NULL != MY_SPEC.topn_expr_) && (NULL != MY_SPEC.topk_limit_expr_))) {
+  } else if (((NULL != MY_SPEC.topn_expr_) &&
+              (NULL != MY_SPEC.topk_limit_expr_))) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("invalid topn_expr or topk_limit_expr", K(MY_SPEC.topn_expr_),
              K(MY_SPEC.topk_limit_expr_), K(ret));
@@ -135,8 +133,8 @@ int ObSortVecOp::get_topn_count(int64_t &topn_cnt)
   } else if (NULL != MY_SPEC.topk_limit_expr_) {
     int64_t limit = -1;
     int64_t offset = 0;
-    if ((OB_FAIL(get_int_value(MY_SPEC.topk_limit_expr_, limit))
-         || OB_FAIL(get_int_value(MY_SPEC.topk_offset_expr_, offset)))) {
+    if ((OB_FAIL(get_int_value(MY_SPEC.topk_limit_expr_, limit)) ||
+         OB_FAIL(get_int_value(MY_SPEC.topk_offset_expr_, offset)))) {
       LOG_WARN("Get limit/offset value failed", K(ret));
     } else if (OB_UNLIKELY(limit < 0 || offset < 0)) {
       ret = OB_ERR_ILLEGAL_VALUE;
@@ -149,15 +147,18 @@ int ObSortVecOp::get_topn_count(int64_t &topn_cnt)
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("Invalid child_op_", K(op_type), K(ret));
       } else if (PHY_HASH_GROUP_BY == op_type) {
-        ObHashGroupByOp *hash_groupby_op = static_cast<ObHashGroupByOp *>(child_);
+        ObHashGroupByOp *hash_groupby_op =
+            static_cast<ObHashGroupByOp *>(child_);
         row_count = hash_groupby_op->get_hash_groupby_row_count();
       } else if (PHY_VEC_HASH_GROUP_BY == op_type) {
-        ObHashGroupByVecOp *hash_groupby_op = static_cast<ObHashGroupByVecOp *>(child_);
+        ObHashGroupByVecOp *hash_groupby_op =
+            static_cast<ObHashGroupByVecOp *>(child_);
         row_count = hash_groupby_op->get_hash_groupby_row_count();
       }
       if (OB_SUCC(ret)) {
-        topn_cnt =
-          std::max(topn_cnt, static_cast<int64_t>(row_count * MY_SPEC.topk_precision_ / 100));
+        topn_cnt = std::max(
+            topn_cnt,
+            static_cast<int64_t>(row_count * MY_SPEC.topk_precision_ / 100));
         if (topn_cnt >= row_count) {
           ctx_.get_physical_plan_ctx()->set_is_result_accurate(true);
         } else {
@@ -169,8 +170,7 @@ int ObSortVecOp::get_topn_count(int64_t &topn_cnt)
   return ret;
 }
 
-int ObSortVecOp::process_sort_batch()
-{
+int ObSortVecOp::process_sort_batch() {
   int ret = OB_SUCCESS;
   if (MY_SPEC.prefix_pos_ > 0) {
     // prefix sort get child row in it's own wrap, do nothing here
@@ -181,12 +181,14 @@ int ObSortVecOp::process_sort_batch()
       const ObBatchRows *input_brs = NULL;
       if (OB_FAIL(try_check_status())) {
         LOG_WARN("failed to check status", K(ret));
-      } else if (OB_FAIL(child_->get_next_batch(MY_SPEC.max_batch_size_, input_brs))) {
+      } else if (OB_FAIL(child_->get_next_batch(MY_SPEC.max_batch_size_,
+                                                input_brs))) {
         LOG_WARN("get next batch failed", K(ret));
       } else {
         if (input_brs->size_ > 0) {
           sort_row_count_ +=
-            input_brs->size_ - input_brs->skip_->accumulate_bit_cnt(input_brs->size_);
+              input_brs->size_ -
+              input_brs->skip_->accumulate_bit_cnt(input_brs->size_);
           OZ(sort_op_provider_.add_batch(*input_brs, need_dump));
           sort_op_provider_.collect_memory_dump_info(op_monitor_info_);
         }
@@ -195,8 +197,8 @@ int ObSortVecOp::process_sort_batch()
         }
       }
     }
-    if (OB_SUCC(ret) && need_dump && MY_SPEC.prescan_enabled_
-        && OB_FAIL(scan_all_then_sort_batch())) {
+    if (OB_SUCC(ret) && need_dump && MY_SPEC.prescan_enabled_ &&
+        OB_FAIL(scan_all_then_sort_batch())) {
       if (OB_ITER_END != ret) {
         LOG_WARN("fail to scan all rows before inmem sort", K(ret));
       }
@@ -205,7 +207,7 @@ int ObSortVecOp::process_sort_batch()
       ret = OB_SUCCESS;
     }
     op_monitor_info_.otherstat_7_id_ = ObSqlMonitorStatIds::ROW_COUNT;
-    op_monitor_info_.otherstat_7_value_ = sort_row_count_; 
+    op_monitor_info_.otherstat_7_value_ = sort_row_count_;
     OZ(sort_op_provider_.sort());
     sort_op_provider_.collect_memory_dump_info(op_monitor_info_);
   }
@@ -213,18 +215,21 @@ int ObSortVecOp::process_sort_batch()
 }
 
 int ObSortVecOp::init_temp_row_store(const common::ObIArray<ObExpr *> &exprs,
-                                     const int64_t batch_size, const ObMemAttr &mem_attr,
-                                     const bool is_sort_key, ObCompressorType compress_type,
-                                     ObTempRowStore &row_store)
-{
+                                     const int64_t batch_size,
+                                     const ObMemAttr &mem_attr,
+                                     const bool is_sort_key,
+                                     ObCompressorType compress_type,
+                                     ObTempRowStore &row_store) {
   int ret = OB_SUCCESS;
   const bool enable_trunc = true;
   const bool reorder_fixed_expr = true;
   if (row_store.is_inited()) {
     // do nothing
-  } else if (OB_FAIL(row_store.init(exprs, batch_size, mem_attr, 16 * 1024, true,
-                             sort_op_provider_.get_extra_size(is_sort_key) /* row_extra_size */,
-                             compress_type, reorder_fixed_expr, enable_trunc))) {
+  } else if (OB_FAIL(row_store.init(
+                 exprs, batch_size, mem_attr, 16 * 1024, true,
+                 sort_op_provider_.get_extra_size(
+                     is_sort_key) /* row_extra_size */,
+                 compress_type, reorder_fixed_expr, enable_trunc))) {
     LOG_WARN("init row store failed", K(ret));
   } else if (OB_FAIL(row_store.alloc_dir_id())) {
     LOG_WARN("failed to alloc dir id", K(ret));
@@ -232,46 +237,46 @@ int ObSortVecOp::init_temp_row_store(const common::ObIArray<ObExpr *> &exprs,
   return ret;
 }
 
-int ObSortVecOp::init_prescan_row_store()
-{
+int ObSortVecOp::init_prescan_row_store() {
   int ret = OB_SUCCESS;
   sk_row_store_.reset();
   addon_row_store_.reset();
-  ObMemAttr mem_attr(ctx_.get_my_session()->get_effective_tenant_id(), "SORT_VEC_CTX",
-                     ObCtxIds::WORK_AREA);
-  if (OB_FAIL(init_temp_row_store(MY_SPEC.sk_exprs_, MY_SPEC.max_batch_size_, mem_attr, true,
-                                  MY_SPEC.compress_type_, sk_row_store_))) {
+  ObMemAttr mem_attr(ctx_.get_my_session()->get_effective_tenant_id(),
+                     "SORT_VEC_CTX", ObCtxIds::WORK_AREA);
+  if (OB_FAIL(init_temp_row_store(MY_SPEC.sk_exprs_, MY_SPEC.max_batch_size_,
+                                  mem_attr, true, MY_SPEC.compress_type_,
+                                  sk_row_store_))) {
     LOG_WARN("failed to init temp row store", K(ret));
-  } else if (MY_SPEC.has_addon_
-             && OB_FAIL(init_temp_row_store(MY_SPEC.addon_exprs_, MY_SPEC.max_batch_size_, mem_attr,
-                                            false, MY_SPEC.compress_type_, addon_row_store_))) {
+  } else if (MY_SPEC.has_addon_ &&
+             OB_FAIL(init_temp_row_store(
+                 MY_SPEC.addon_exprs_, MY_SPEC.max_batch_size_, mem_attr, false,
+                 MY_SPEC.compress_type_, addon_row_store_))) {
     LOG_WARN("failed to init temp row store", K(ret));
   }
   return ret;
 }
 
-int ObSortVecOp::add_batch_prescan_store(const ObBatchRows &input_brs)
-{
+int ObSortVecOp::add_batch_prescan_store(const ObBatchRows &input_brs) {
   int ret = OB_SUCCESS;
   int64_t sk_row_count = -1;
   int64_t addon_row_count = -1;
-  if (OB_FAIL(sk_row_store_.add_batch(MY_SPEC.sk_exprs_, eval_ctx_, input_brs, sk_row_count))) {
+  if (OB_FAIL(sk_row_store_.add_batch(MY_SPEC.sk_exprs_, eval_ctx_, input_brs,
+                                      sk_row_count))) {
     LOG_WARN("failed to add row to cache store", K(ret));
   } else if (MY_SPEC.has_addon_) {
-    if (OB_FAIL(addon_row_store_.add_batch(MY_SPEC.addon_exprs_, eval_ctx_, input_brs,
-                                           addon_row_count))) {
+    if (OB_FAIL(addon_row_store_.add_batch(MY_SPEC.addon_exprs_, eval_ctx_,
+                                           input_brs, addon_row_count))) {
       LOG_WARN("failed to add row to cache store", K(ret));
     } else if (sk_row_count != addon_row_count) {
       ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("sort key row count and addon row count not match", K(sk_row_count),
-               K(addon_row_count));
+      LOG_WARN("sort key row count and addon row count not match",
+               K(sk_row_count), K(addon_row_count));
     }
   }
   return ret;
 }
 
-int ObSortVecOp::finish_add_prescan_store()
-{
+int ObSortVecOp::finish_add_prescan_store() {
   int ret = OB_SUCCESS;
   if (OB_FAIL(sk_row_store_.finish_add_row(false))) {
     LOG_WARN("fail to finish add row", K(ret));
@@ -287,24 +292,26 @@ int ObSortVecOp::finish_add_prescan_store()
   return ret;
 }
 
-int ObSortVecOp::get_next_batch_prescan_store(const int64_t max_rows, int64_t &read_rows,
-                                              const ObCompactRow **sk_stored_rows,
-                                              const ObCompactRow **addon_stored_rows)
-{
+int ObSortVecOp::get_next_batch_prescan_store(
+    const int64_t max_rows, int64_t &read_rows,
+    const ObCompactRow **sk_stored_rows,
+    const ObCompactRow **addon_stored_rows) {
   int ret = OB_SUCCESS;
   int64_t sk_read_rows = -1;
-  if (OB_FAIL(sk_row_iter_.get_next_batch(max_rows, sk_read_rows, sk_stored_rows))) {
+  if (OB_FAIL(sk_row_iter_.get_next_batch(max_rows, sk_read_rows,
+                                          sk_stored_rows))) {
     if (OB_ITER_END != ret) {
       LOG_WARN("failed to get batch row");
     }
   } else if (MY_SPEC.has_addon_) {
     int64_t addon_read_rows = 0;
-    if (OB_FAIL(addon_row_iter_.get_next_batch(sk_read_rows, addon_read_rows, addon_stored_rows))) {
+    if (OB_FAIL(addon_row_iter_.get_next_batch(sk_read_rows, addon_read_rows,
+                                               addon_stored_rows))) {
       LOG_WARN("failed to get batch row");
     } else if (sk_read_rows != addon_read_rows) {
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("The count of sk rows does not match the add-on rows.", K(ret),
-        K(sk_read_rows), K(addon_read_rows));
+               K(sk_read_rows), K(addon_read_rows));
     }
   }
   if (OB_SUCC(ret)) {
@@ -313,8 +320,7 @@ int ObSortVecOp::get_next_batch_prescan_store(const int64_t max_rows, int64_t &r
   return ret;
 }
 
-int ObSortVecOp::scan_all_then_sort_batch()
-{
+int ObSortVecOp::scan_all_then_sort_batch() {
   int ret = OB_SUCCESS;
   if (OB_FAIL(init_prescan_row_store())) {
     LOG_WARN("failed to init prescan row store", K(ret));
@@ -324,12 +330,14 @@ int ObSortVecOp::scan_all_then_sort_batch()
       const ObBatchRows *input_brs = NULL;
       if (OB_FAIL(try_check_status())) {
         LOG_WARN("failed to check status", K(ret));
-      } else if (OB_FAIL(child_->get_next_batch(MY_SPEC.max_batch_size_, input_brs))) {
+      } else if (OB_FAIL(child_->get_next_batch(MY_SPEC.max_batch_size_,
+                                                input_brs))) {
         LOG_WARN("get next batch failed", K(ret));
       } else {
         if (input_brs->size_ > 0) {
           sort_row_count_ +=
-            input_brs->size_ - input_brs->skip_->accumulate_bit_cnt(input_brs->size_);
+              input_brs->size_ -
+              input_brs->skip_->accumulate_bit_cnt(input_brs->size_);
           if (OB_FAIL(add_batch_prescan_store(*input_brs))) {
             LOG_WARN("failed to add batch prescan store", K(ret));
           }
@@ -343,25 +351,27 @@ int ObSortVecOp::scan_all_then_sort_batch()
       ret = OB_SUCCESS;
     }
     op_monitor_info_.otherstat_7_id_ = ObSqlMonitorStatIds::ROW_COUNT;
-    op_monitor_info_.otherstat_7_value_ = sort_row_count_; 
+    op_monitor_info_.otherstat_7_value_ = sort_row_count_;
     if (OB_SUCC(ret)) {
       if (OB_FAIL(finish_add_prescan_store())) {
         LOG_WARN("failed to finish add prescan store", K(ret));
       } else {
-        constexpr int64_t MAX_BATCH_SIZE = 512; // 之前是256
+        constexpr int64_t MAX_BATCH_SIZE = 316; // 之前是256
         const ObCompactRow *sk_rows[MAX_BATCH_SIZE];
         const ObCompactRow *addon_rows[MAX_BATCH_SIZE];
-        int64_t max_batch_size = min(512, MY_SPEC.max_batch_size_);
+        // int64_t max_batch_size = min(MAX_BATCH_SIZE, MAX_BATCH_SIZE);
+        int64_t max_batch_size = min(316, MY_SPEC.max_batch_size_);
         int64_t read_rows = -1;
         while (OB_SUCC(ret)) {
-          if (OB_FAIL(
-                get_next_batch_prescan_store(max_batch_size, read_rows, &sk_rows[0],
-                                             MY_SPEC.has_addon_ ? &addon_rows[0] : nullptr))) {
+          if (OB_FAIL(get_next_batch_prescan_store(
+                  max_batch_size, read_rows, &sk_rows[0],
+                  MY_SPEC.has_addon_ ? &addon_rows[0] : nullptr))) {
             if (OB_ITER_END != ret) {
               LOG_WARN("failed to get next batch", K(ret));
             }
           } else if (OB_FAIL(sort_op_provider_.add_batch_stored_row(
-                       read_rows, &sk_rows[0], MY_SPEC.has_addon_ ? &addon_rows[0] : nullptr))) {
+                         read_rows, &sk_rows[0],
+                         MY_SPEC.has_addon_ ? &addon_rows[0] : nullptr))) {
             LOG_WARN("failed to add batch stored row", K(ret));
           }
         }
@@ -377,8 +387,7 @@ int ObSortVecOp::scan_all_then_sort_batch()
   return ret;
 }
 
-int ObSortVecOp::sort_component_next_batch(const int64_t max_cnt)
-{
+int ObSortVecOp::sort_component_next_batch(const int64_t max_cnt) {
   int ret = OB_SUCCESS;
   int64_t read_rows = 0;
   ret = sort_op_provider_.get_next_batch(max_cnt, read_rows);
@@ -391,8 +400,8 @@ int ObSortVecOp::sort_component_next_batch(const int64_t max_cnt)
   return ret;
 }
 
-int ObSortVecOp::init_sort(int64_t tenant_id, int64_t row_count, int64_t topn_cnt)
-{
+int ObSortVecOp::init_sort(int64_t tenant_id, int64_t row_count,
+                           int64_t topn_cnt) {
   int ret = OB_SUCCESS;
   ObSortVecOpContext context;
   context.tenant_id_ = tenant_id;
@@ -418,8 +427,9 @@ int ObSortVecOp::init_sort(int64_t tenant_id, int64_t row_count, int64_t topn_cn
     context.in_local_order_ = MY_SPEC.is_local_merge_sort_;
     context.part_cnt_ = MY_SPEC.part_cnt_;
   }
-  int aqs_head =
-    MY_SPEC.enable_encode_sortkey_opt_ ? sizeof(oceanbase::sql::ObSortOpImpl::AQSItem) : 0;
+  int aqs_head = MY_SPEC.enable_encode_sortkey_opt_
+                     ? sizeof(oceanbase::sql::ObSortOpImpl::AQSItem)
+                     : 0;
   if (OB_FAIL(sort_op_provider_.init(context))) {
     LOG_WARN("failed to init sort operator provider", K(ret));
   } else {
@@ -434,16 +444,15 @@ int ObSortVecOp::init_sort(int64_t tenant_id, int64_t row_count, int64_t topn_cn
   return ret;
 }
 
-int ObSortVecOp::inner_get_next_batch(const int64_t max_row_cnt)
-{
+int ObSortVecOp::inner_get_next_batch(const int64_t max_row_cnt) {
   int ret = OB_SUCCESS;
   if (is_first_) {
     is_first_ = false;
     int64_t topn_cnt = INT64_MAX;
     int64_t row_count = MY_SPEC.rows_;
     const int64_t tenant_id = ctx_.get_my_session()->get_effective_tenant_id();
-    if (OB_FAIL(ObPxEstimateSizeUtil::get_px_size(&ctx_, MY_SPEC.px_est_size_factor_, MY_SPEC.rows_,
-                                                  row_count))) {
+    if (OB_FAIL(ObPxEstimateSizeUtil::get_px_size(
+            &ctx_, MY_SPEC.px_est_size_factor_, MY_SPEC.rows_, row_count))) {
       LOG_WARN("failed to get px size", K(ret));
     } else if (OB_FAIL(get_topn_count(topn_cnt))) {
       LOG_WARN("failed to get topn count", K(ret));
@@ -459,17 +468,20 @@ int ObSortVecOp::inner_get_next_batch(const int64_t max_row_cnt)
 
   if (OB_SUCC(ret) && !brs_.end_) {
     clear_evaluated_flag();
-    if (OB_FAIL(sort_component_next_batch(std::min(max_row_cnt, MY_SPEC.max_batch_size_)))) {
+    if (OB_FAIL(sort_component_next_batch(
+            std::min(max_row_cnt, MY_SPEC.max_batch_size_)))) {
       LOG_WARN("get next row failed");
     } else {
       ret_row_count_ += brs_.size_;
       if (brs_.end_) {
-        if (ctx_.get_my_session()->get_ddl_info().is_ddl() && ret_row_count_ != sort_row_count_) {
+        if (ctx_.get_my_session()->get_ddl_info().is_ddl() &&
+            ret_row_count_ != sort_row_count_) {
           ret = OB_CHECKSUM_ERROR;
-          LOG_WARN("output row count not match", K(ret), K(sort_row_count_), K(ret_row_count_));
+          LOG_WARN("output row count not match", K(ret), K(sort_row_count_),
+                   K(ret_row_count_));
         }
-        LOG_DEBUG("finish ObSortVecOp::inner_get_next_batch", K(MY_SPEC.output_), K(brs_),
-                  K(ret_row_count_));
+        LOG_DEBUG("finish ObSortVecOp::inner_get_next_batch",
+                  K(MY_SPEC.output_), K(brs_), K(ret_row_count_));
       }
     }
   }
