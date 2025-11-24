@@ -814,6 +814,7 @@ static inline void ob_hash_add(unsigned long int *n1, unsigned long int *n2, uns
   n2[0]+= 3;
 }
 
+//ADVISE
 
 static void ob_hash_sort_utf8mb4(const ObCharsetInfo *cs, const unsigned char *src, size_t srclen,
                unsigned long int *n1, unsigned long int *n2, const bool calc_end_space, hash_algo hash_algo)
@@ -858,6 +859,224 @@ static void ob_hash_sort_utf8mb4(const ObCharsetInfo *cs, const unsigned char *s
     }
   }
 }
+// static void ob_hash_sort_utf8mb4(const ObCharsetInfo *cs, const unsigned char *src, size_t srclen,
+//   unsigned long int *n1, unsigned long int *n2, const bool calc_end_space, hash_algo hash_algo)
+// {
+//   ob_wc_t wc;
+//   const unsigned char *end = src + srclen;
+//   ObUnicaseInfo *uni_plane = cs->caseinfo;
+
+//   // 去除末尾空格
+//   if (!calc_end_space) {
+//     while (end > src && end[-1] == ' ') {
+//       end--;
+//     }
+//   }
+
+//   if (hash_algo == NULL) {
+//     // 无哈希算法版本 - 直接处理
+//     unsigned long int local_n1 = *n1;
+//     unsigned long int local_n2 = *n2;
+//     const unsigned char *p = src;
+
+//     while (p < end) {
+//       int res = ob_mb_wc_utf8mb4(cs, &wc, p, end);
+//       if (res <= 0) break;
+
+//       ob_tosort_unicode(uni_plane, &wc, cs->state);
+
+//       // 直接处理字符数据
+//       ob_hash_add(&local_n1, &local_n2, (unsigned int)(wc & 0xFF));
+//       ob_hash_add(&local_n1, &local_n2, (unsigned int)((wc >> 8) & 0xFF));
+//       if (wc > 0xFFFF) {
+//         ob_hash_add(&local_n1, &local_n2, (unsigned int)((wc >> 16) & 0xFF));
+//       }
+
+//       p += res;
+//     }
+//     *n1 = local_n1;
+//     *n2 = local_n2;
+//     } else {
+//     // 有哈希算法版本 - 使用缓冲区批量处理
+//     unsigned char data[HASH_BUFFER_LENGTH];
+//     int length = 0;
+//     const unsigned char *p = src;
+
+//     while (p < end) {
+//       int res = ob_mb_wc_utf8mb4(cs, &wc, p, end);
+//       if (res <= 0) break;
+
+//       ob_tosort_unicode(uni_plane, &wc, cs->state);
+
+//       // 计算当前字符需要的字节数
+//       const int char_bytes = (wc > 0xFFFF) ? 3 : 2;
+
+//       // 检查缓冲区是否足够
+//       if (length + char_bytes > HASH_BUFFER_LENGTH) {
+//         *n1 = hash_algo(data, length, *n1);
+//         length = 0;
+//       }
+
+//       // 存储字符数据
+//       data[length++] = (unsigned char)(wc & 0xFF);
+//       data[length++] = (unsigned char)((wc >> 8) & 0xFF);
+//       if (char_bytes == 3) {
+//         data[length++] = (unsigned char)((wc >> 16) & 0xFF);
+//       }
+
+//       p += res;
+//     }
+
+//     // 处理缓冲区中剩余的数据
+//     if (length > 0) {
+//       *n1 = hash_algo(data, length, *n1);
+//     }
+//   }
+// }
+
+// static void ob_hash_sort_utf8mb4_optimized(const ObCharsetInfo *cs, const unsigned char *src, size_t srclen,
+//   unsigned long int *n1, unsigned long int *n2, const bool calc_end_space, hash_algo hash_algo)
+// {
+// ob_wc_t wc;
+// const unsigned char *end = src + srclen;
+// ObUnicaseInfo *uni_plane = cs->caseinfo;
+
+// // 快速去除末尾空格 - 使用SIMD思想批量处理
+// if (!calc_end_space) {
+// while (end > src + 7) {  // 8字节对齐检查
+// uint64_t tail_bytes;
+// memcpy(&tail_bytes, end - 8, 8);
+// if ((tail_bytes & 0x8080808080808080) != 0x2020202020202020) { // 不是8个空格
+// break;
+// }
+// end -= 8;
+// }
+// // 处理剩余字节
+// while (end > src && end[-1] == ' ') {
+// end--;
+// }
+// }
+
+// const size_t actual_len = end - src;
+
+// if (hash_algo == NULL) {
+// // 优化版本1: 批量处理ASCII字符范围
+// unsigned long int local_n1 = *n1;
+// unsigned long int local_n2 = *n2;
+// const unsigned char *p = src;
+
+// // 快速路径：处理连续ASCII字符
+// while (p < end && (*p & 0x80) == 0) {  // ASCII字符最高位为0
+// ob_wc_t ascii_wc = *p;
+// ob_tosort_unicode(uni_plane, &ascii_wc, cs->state);
+
+// ob_hash_add(&local_n1, &local_n2, (unsigned int)(ascii_wc & 0xFF));
+// ob_hash_add(&local_n1, &local_n2, (unsigned int)((ascii_wc >> 8) & 0xFF));
+
+// p++;
+// }
+
+// // 处理非ASCII字符
+// while (p < end) {
+// int res = ob_mb_wc_utf8mb4(cs, &wc, p, end);
+// if (res <= 0) break;
+
+// ob_tosort_unicode(uni_plane, &wc, cs->state);
+
+// // 批量处理哈希更新
+// uint32_t wc_val = wc;
+// ob_hash_add(&local_n1, &local_n2, wc_val & 0xFF);
+// ob_hash_add(&local_n1, &local_n2, (wc_val >> 8) & 0xFF);
+// if (wc_val > 0xFFFF) {
+// ob_hash_add(&local_n1, &local_n2, (wc_val >> 16) & 0xFF);
+// }
+
+// p += res;
+// }
+
+// *n1 = local_n1;
+// *n2 = local_n2;
+// } else {
+// // 优化版本2: 增大缓冲区，减少哈希调用
+// constexpr int OPTIMAL_BUFFER_SIZE = 4096;  // 增大缓冲区
+// unsigned char data[OPTIMAL_BUFFER_SIZE];
+// int length = 0;
+// const unsigned char *p = src;
+
+// // 同样先处理ASCII字符
+// while (p < end && length < OPTIMAL_BUFFER_SIZE - 3) {
+// if ((*p & 0x80) == 0) {  // ASCII字符
+// ob_wc_t ascii_wc = *p;
+// ob_tosort_unicode(uni_plane, &ascii_wc, cs->state);
+
+// data[length++] = (unsigned char)(ascii_wc & 0xFF);
+// data[length++] = (unsigned char)((ascii_wc >> 8) & 0xFF);
+// p++;
+// } else {
+// break;  // 遇到非ASCII，回退到正常处理
+// }
+// }
+
+// // 处理剩余字符
+// while (p < end) {
+// int res = ob_mb_wc_utf8mb4(cs, &wc, p, end);
+// if (res <= 0) break;
+
+// ob_tosort_unicode(uni_plane, &wc, cs->state);
+
+// const int char_bytes = (wc > 0xFFFF) ? 3 : 2;
+
+// if (length + char_bytes > OPTIMAL_BUFFER_SIZE) {
+// *n1 = hash_algo(data, length, *n1);
+// length = 0;
+// }
+
+// data[length++] = (unsigned char)(wc & 0xFF);
+// data[length++] = (unsigned char)((wc >> 8) & 0xFF);
+// if (char_bytes == 3) {
+// data[length++] = (unsigned char)((wc >> 16) & 0xFF);
+// }
+
+// p += res;
+// }
+
+// if (length > 0) {
+// *n1 = hash_algo(data, length, *n1);
+// }
+// }
+// }
+
+// // 假设可以修改调用方，添加缓存机制
+// static thread_local std::unordered_map<uint64_t, std::pair<unsigned long, unsigned long>> hash_cache;
+
+// static void ob_hash_sort_utf8mb4(const ObCharsetInfo *cs, const unsigned char *src, size_t srclen,
+//                unsigned long int *n1, unsigned long int *n2, const bool calc_end_space, hash_algo hash_algo)
+// {
+//   // 生成缓存键 - 使用字符串内容的简单哈希
+//   uint64_t cache_key = 0;
+//   const char* str_data = reinterpret_cast<const char*>(src);
+//   for (size_t i = 0; i < std::min(srclen, size_t(64)); ++i) {
+//     cache_key = (cache_key * 131) + str_data[i];
+//   }
+//   cache_key = (cache_key << 32) | (srclen & 0xFFFFFFFF);
+  
+//   // 检查缓存
+//   auto it = hash_cache.find(cache_key);
+//   if (it != hash_cache.end()) {
+//     *n1 = it->second.first;
+//     *n2 = it->second.second;
+//     return;
+//   }
+  
+//   // 缓存未命中，正常计算
+//   ob_hash_sort_utf8mb4_optimized(cs, src, srclen, n1, n2, calc_end_space, hash_algo);
+  
+//   // 更新缓存（限制缓存大小）
+//   if (hash_cache.size() < 10000) {
+//     hash_cache[cache_key] = std::make_pair(*n1, *n2);
+//   }
+// }
+
 
 size_t ob_strnxfrm_unicode_full_bin(const ObCharsetInfo *cs,
                              unsigned char *dst, size_t dstlen, unsigned int nweights,
