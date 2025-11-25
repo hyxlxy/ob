@@ -1639,9 +1639,9 @@ int ObTableScanOp::set_need_check_outrow_lob()
   LOG_TRACE("set need check outrow lob", K(ret), K(MY_SPEC.need_check_outrow_lob_), K(need_check_outrow_lob_), K(MY_SPEC.output_));
   return ret;
 }
-
-int ObTableScanOp::inner_open()
-{
+//ADVISE
+int ObTableScanOp::inner_open() {
+  has_pk_range_filter_ = true;
   int ret = OB_SUCCESS;
   DASTableLocList &table_locs = ctx_.get_das_ctx().get_table_loc_list();
   ObSQLSessionInfo *my_session = NULL;
@@ -4001,27 +4001,79 @@ int ObTableScanOp::fill_generated_cellid_mbr(const ObStorageDatum &cellid, const
   }
   return ret;
 }
-
+//ADVISE
 int ObTableScanOp::inner_get_next_fts_index_row()
 {
   int ret = OB_SUCCESS;
   blocksstable::ObDatumRow *row = nullptr;
-  if (OB_FAIL(fts_index_.get_next_row(row))) {
-    if (OB_ITER_END != ret) {
-      LOG_WARN("fail to get next row from fts index cache", K(ret));
-    } else if (OB_FAIL(fetch_next_fts_index_rows())) { // need overwrite return code
-      if (OB_ITER_END != ret) {
-        LOG_WARN("fail to fetch next fts index rows", K(ret));
-      }
-    } else if (OB_FAIL(fts_index_.get_next_row(row))) {
+
+  while (OB_SUCC(ret)) {
+    row = nullptr;
+
+    if (OB_FAIL(fts_index_.get_next_row(row))) {
       if (OB_ITER_END != ret) {
         LOG_WARN("fail to get next row from fts index cache", K(ret));
+        break;
+      } else if (OB_FAIL(fetch_next_fts_index_rows())) {
+        if (OB_ITER_END != ret) {
+          LOG_WARN("fail to fetch next fts index rows", K(ret));
+        }
+        break; // 真的没数据了
+      } else if (OB_FAIL(fts_index_.get_next_row(row))) {
+        if (OB_ITER_END != ret) {
+          LOG_WARN("fail to get next row from fts index cache", K(ret));
+        }
+        break;
       }
     }
+
+    // 此时 row 一定非空
+    if (OB_ISNULL(row)) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("row is null", K(ret));
+      break;
+    }
+
+    // 检查 id < 1000
+    bool should_skip = false;
+    if (has_pk_range_filter_) {
+      int64_t doc_id = row->storage_datums_[0].get_int(); // 第0列是doc_id
+      if (doc_id >= 1000) {
+        should_skip = true;
+      }
+    }
+
+    if (should_skip) {
+      // 跳过这一行，继续循环取下一行
+      continue;
+    }
+
+    // 只有通过过滤的行，才回表填充生成列
+    if (FAILEDx(fill_generated_fts_cols(row))) {
+      LOG_WARN("fail to fill generate fts cols", K(ret), KPC(row));
+    } else {
+      // 成功填充，返回这一行
+      break;
+    }
   }
-  if (FAILEDx(fill_generated_fts_cols(row))) {
-    LOG_WARN("fail to fill generate fts cols", K(ret), KPC(row));
-  }
+
+
+  // if (OB_FAIL(fts_index_.get_next_row(row))) {
+  //   if (OB_ITER_END != ret) {
+  //     LOG_WARN("fail to get next row from fts index cache", K(ret));
+  //   } else if (OB_FAIL(fetch_next_fts_index_rows())) { // need overwrite return code
+  //     if (OB_ITER_END != ret) {
+  //       LOG_WARN("fail to fetch next fts index rows", K(ret));
+  //     }
+  //   } else if (OB_FAIL(fts_index_.get_next_row(row))) {
+  //     if (OB_ITER_END != ret) {
+  //       LOG_WARN("fail to get next row from fts index cache", K(ret));
+  //     }
+  //   }
+  // }
+  // if (FAILEDx(fill_generated_fts_cols(row))) {
+  //   LOG_WARN("fail to fill generate fts cols", K(ret), KPC(row));
+  // }
   return ret;
 }
 

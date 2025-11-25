@@ -777,6 +777,8 @@ protected:
   ObDASTCBMemProfileKey das_tasks_key_;
   ObTSCMonitorInfo tsc_monitor_info_;
   bool need_check_outrow_lob_;
+
+  bool has_pk_range_filter_ = false;
 private:
   ObRandScanProcessor rand_scan_processor_;
  };
