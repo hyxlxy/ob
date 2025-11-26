@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <cstdint>
+#include <cstdlib>
 #define USING_LOG_PREFIX SQL_ENG
 
 
@@ -27,6 +29,8 @@
 #include "share/index_usage/ob_index_usage_info_mgr.h"
 #include "sql/engine/px/ob_granule_iterator_op.h"
 #include "sql/engine/expr/ob_expr_lob_utils.h"
+
+#include "common/ad_log.h"
 
 namespace oceanbase
 {
@@ -933,11 +937,11 @@ int ObTableScanOp::prepare_das_task()
 {
   int ret = OB_SUCCESS;
   ObTaskExecutorCtx &task_exec_ctx = ctx_.get_task_exec_ctx();
-  if (OB_LIKELY(!MY_SPEC.use_dist_das_)) {
-    if (OB_FAIL(create_one_das_task(MY_INPUT.tablet_loc_))) {
+  if (OB_LIKELY(!MY_SPEC.use_dist_das_)) { // 本地模式：数据就在当前节点，不需要分布式访问
+    if (OB_FAIL(create_one_das_task(MY_INPUT.tablet_loc_))) { // 只需要创建一个任务，访问本地 tablet
       LOG_WARN("create one das task failed", K(ret));
     }
-  } else if (OB_LIKELY(nullptr == MY_CTDEF.das_dppr_tbl_)) {
+  } else if (OB_LIKELY(nullptr == MY_CTDEF.das_dppr_tbl_)) { // // 分布式模式：数据分布在多个节点
     ObDASTableLoc *table_loc = tsc_rtdef_.scan_rtdef_.table_loc_;
     for (DASTabletLocListIter node = table_loc->tablet_locs_begin();
          OB_SUCC(ret) && node != table_loc->tablet_locs_end(); ++node) {
@@ -1013,7 +1017,7 @@ int ObTableScanOp::prepare_all_das_tasks()
   }
 
   if (OB_SUCC(ret)) {
-    if (MY_SPEC.gi_above_ && !MY_INPUT.key_ranges_.empty()) {
+    if (MY_SPEC.gi_above_ && !MY_INPUT.key_ranges_.empty()) { // 如果是全局索引查询且有范围条件，直接准备 DAS 任务
       if (OB_FAIL(prepare_das_task())) {
         LOG_WARN("prepare das task failed", K(ret));
       }
@@ -1641,7 +1645,12 @@ int ObTableScanOp::set_need_check_outrow_lob()
 }
 //ADVISE
 int ObTableScanOp::inner_open() {
-  has_pk_range_filter_ = true;
+  // static bool first_flag = false;
+  // if (first_flag == false) {
+  //   first_flag = true;
+  //   // std::cout<<"OB_TABLE_SCAN_OP: inner_open"<<std::endl;
+    // adlog::DEBUG("OB_TABLE_SCAN_OP: inner_open");
+  // }
   int ret = OB_SUCCESS;
   DASTableLocList &table_locs = ctx_.get_das_ctx().get_table_loc_list();
   ObSQLSessionInfo *my_session = NULL;
@@ -1729,6 +1738,64 @@ int ObTableScanOp::inner_open() {
   if (OB_SUCC(ret) && OB_FAIL(rand_scan_processor_.init(&spec, this))) {
     LOG_WARN("failed to init rand scan processor", K(ret));
   }
+
+
+  // // 在 inner_open 的最后，手动调用 prepare_scan_range 来提取范围
+  //   if (OB_SUCC(ret) && MY_SPEC.is_fts_ddl_) {
+  //     if (OB_FAIL(prepare_scan_range())) {
+  //         LOG_WARN("fail to prepare scan range", K(ret));
+  //     } else {
+  //         // 现在 MY_INPUT.key_ranges_ 应该被填充了
+  //         adlog::DEBUG("After prepare_scan_range, key_ranges count: ", MY_INPUT.key_ranges_.count());
+  //     }
+  // }
+    // 🔥 在 inner_open 的最后，手动调用 prepare_scan_range 来提取范围
+    if (OB_SUCC(ret) && MY_SPEC.is_fts_ddl_) {
+      if (OB_FAIL(prepare_scan_range())) {
+          LOG_WARN("fail to prepare scan range", K(ret));
+      } else {
+          adlog::DEBUG("After prepare_scan_range, key_ranges count: ", MY_INPUT.key_ranges_.count());
+          
+          // 🔥 保存范围到备份数组，防止被 reuse() 清空
+          if (!MY_INPUT.key_ranges_.empty()) {
+              backup_key_ranges_.reuse();
+              for (int64_t i = 0; i < MY_INPUT.key_ranges_.count(); ++i) {
+                  if (OB_FAIL(backup_key_ranges_.push_back(MY_INPUT.key_ranges_.at(i)))) {
+                      LOG_WARN("fail to backup key range", K(ret));
+                  }
+              }
+          }
+          
+          // 🔥 立即提取主键范围
+          if (!backup_key_ranges_.empty()) {
+              for (int64_t i = 0; i < backup_key_ranges_.count(); ++i) {
+                  const common::ObNewRange &range = backup_key_ranges_.at(i);
+                  
+                  if (range.get_end_key().get_obj_cnt() > 0) {
+                      const common::ObObj &end_obj = range.get_end_key().get_obj_ptr()[0];
+                      if (end_obj.is_integer_type()) {
+                          cached_max_pk_val_ = end_obj.get_int();
+                          
+                          if (range.get_start_key().get_obj_cnt() > 0) {
+                              const common::ObObj &start_obj = range.get_start_key().get_obj_ptr()[0];
+                              if (start_obj.is_integer_type()) {
+                                  cached_min_pk_val_ = start_obj.get_int();
+                              }
+                          } else {
+                              cached_min_pk_val_ = INT64_MIN;
+                          }
+                          
+                          adlog::DEBUG("Extracted PK range: [", cached_min_pk_val_, ", ", cached_max_pk_val_, ")");
+                          has_initialized_pk_range_ = true;
+                          break;
+                      }
+                  }
+              }
+          }
+      }
+  }
+
+
   return ret;
 }
 
@@ -2278,7 +2345,7 @@ int ObTableScanOp::get_next_row_with_das()
     LOG_DEBUG("get next row with das iter end", K(ret), K_(limit_param), K_(output_row_cnt));
   }
   while (OB_SUCC(ret) && !got_row) {
-    clear_evaluated_flag();
+    clear_evaluated_flag(); //清除表达式求值标志，为下一行的谓词评估做准备
     if (OB_FAIL(output_->get_next_row())) {
       if (OB_ITER_END == ret) {
         // do nothing.
@@ -2288,7 +2355,8 @@ int ObTableScanOp::get_next_row_with_das()
     } else {
       // We need do filter first before do the limit.
       // See the issue 47201028.
-      bool filtered = false;
+      // 在这里实现谓词过滤
+      bool filtered = false; 
       if (need_final_limit_ && !MY_SPEC.filters_.empty()) {
         if (OB_FAIL(filter_row(filtered))) {
           LOG_WARN("das get_next_row filter row failed", K(ret));
@@ -2444,18 +2512,19 @@ int ObTableScanOp::inner_get_next_row_for_tsc()
 {
   int ret = OB_SUCCESS;
   if (OB_UNLIKELY(0 == limit_param_.limit_)) {
+    // 对于limit = 0 进行一个特判
     // The number of involved partitions is 0 or limit is 0, directly return iter end
     ret = OB_ITER_END;
-  } else if (OB_FAIL(do_init_before_get_row())) {
+  } else if (OB_FAIL(do_init_before_get_row())) { // 进行一些扫描前的准备
     LOG_WARN("failed to init before get row", K(ret));
-  } else if (iter_end_) {
+  } else if (iter_end_) { // 如果迭代器已经结束了，就返回结束
     // Ensure that multiple calls return OB_ITER_END when there is no data, or directly return iter end for an empty scan
     ret = OB_ITER_END;
     LOG_DEBUG("inner get next row meet a iter end", K(MY_SPEC.id_), K(this), K(lbt()));
   } else if (0 == (++iterated_rows_ % CHECK_STATUS_ROWS_INTERVAL)
              && OB_FAIL(ctx_.check_status())) {
     LOG_WARN("check physical plan status failed", K(ret));
-  } else if (OB_FAIL(get_next_row_with_das())) {
+  } else if (OB_FAIL(get_next_row_with_das())) { // 从 DAS 获取下一行
     if (OB_ITER_END != ret) {
       LOG_WARN("fail to get next row from ObNewRowIterator", K(ret));
     } else {
@@ -2474,6 +2543,8 @@ int ObTableScanOp::inner_get_next_row_for_tsc()
   } else {
     NG_TRACE_TIMES_WITH_TRACE_ID(1, cur_trace_id_, get_row);
   }
+
+  //
   if (OB_SUCC(ret)) {
     const ExprFixedArray &storage_output = MY_CTDEF.get_das_output_exprs();
     if (!MY_SPEC.is_global_index_back()) {
@@ -2540,21 +2611,21 @@ int ObTableScanOp::inner_get_next_batch(const int64_t max_row_cnt)
 int ObTableScanOp::inner_get_next_batch_for_tsc(const int64_t max_row_cnt)
 {
   int ret = OB_SUCCESS;
-  clear_evaluated_flag();
+  clear_evaluated_flag();  // 清除记录
   int64_t batch_size = min(max_row_cnt, MY_SPEC.max_batch_size_);
-  if (OB_UNLIKELY(0 == limit_param_.limit_)) {
+  if (OB_UNLIKELY(0 == limit_param_.limit_)) { // 特判，如果limit是0
     // The number of involved partitions is 0 or limit is 0, directly return iter end
     brs_.size_ = 0;
     brs_.end_ = true;
-  } else if (OB_FAIL(do_init_before_get_row())) {
+  } else if (OB_FAIL(do_init_before_get_row())) { // 先做一个初始化
     LOG_WARN("failed to init before get row", K(ret));
-  } else if (iter_end_) {
+  } else if (iter_end_) {  // 如果迭代器已经到头了
     // Ensure that multiple calls return OB_ITER_END when there is no data, or directly return iter end for an empty scan
     brs_.size_ = 0;
     brs_.end_ = true;
     LOG_DEBUG("inner get next row meet a iter end", K(MY_SPEC.id_), K(this), K(lbt()));
   } else {
-    access_expr_sanity_check();
+    access_expr_sanity_check(); // 安全检查
     ObEvalCtx::BatchInfoScopeGuard batch_info_guard(eval_ctx_);
     batch_info_guard.set_batch_idx(0);
     batch_info_guard.set_batch_size(batch_size);
@@ -2562,7 +2633,7 @@ int ObTableScanOp::inner_get_next_batch_for_tsc(const int64_t max_row_cnt)
     brs_.end_ = false;
     if (0 == batch_size) {
       brs_.end_ = true;
-    } else if (OB_FAIL(get_next_batch_with_das(brs_.size_, batch_size))) {
+    } else if (OB_FAIL(get_next_batch_with_das(brs_.size_, batch_size))) { // 通过 DAS 获取数据批次
       if (OB_ITER_END != ret) {
         LOG_WARN("get next batch with mode failed", K(ret));
       } else {
@@ -3284,17 +3355,27 @@ int ObTableScanOp::do_diagnosis(ObExecContext &exec_ctx, ObBitVector &skip)
   }
   return ret;
 }
-
+//ADVSIE
 int ObTableScanOp::inner_get_next_row()
 {
   int ret = OB_SUCCESS;
+
+     // 在首次调用时进行初始化
+  if (!has_initialized_predicates_) {
+    if (OB_FAIL(init_predicate_context())) {
+        LOG_WARN("fail to init predicate context", K(ret));
+        return ret;
+    }
+    has_initialized_predicates_ = true;
+  }
+
   if (OB_UNLIKELY(MY_SPEC.is_spatial_ddl())) {
     if (OB_FAIL(inner_get_next_spatial_index_row())) {
       if (ret != OB_ITER_END) {
         LOG_WARN("spatial index ddl : get next spatial index row failed", K(ret));
       }
     }
-  } else if (OB_UNLIKELY(MY_SPEC.is_fts_ddl_ && nullptr == tsc_rtdef_.scan_rtdef_.sample_info_)) {
+  } else if (OB_UNLIKELY(MY_SPEC.is_fts_ddl_ && nullptr == tsc_rtdef_.scan_rtdef_.sample_info_)) { //进入全文搜索
     if (OB_FAIL(inner_get_next_fts_index_row())) {
       if (OB_ITER_END != ret) {
         LOG_WARN("fail to get next fts index row", K(ret));
@@ -3312,7 +3393,7 @@ int ObTableScanOp::inner_get_next_row()
         LOG_WARN("spiv index ddl : get next spiv index row failed", K(ret));
       }
     }
-  } else if (OB_FAIL(inner_get_next_row_implement())) {
+  } else if (OB_FAIL(inner_get_next_row_implement())) { //一般表的扫描在这里
     if (ret != OB_ITER_END) {
       LOG_WARN("get next row failed", K(ret));
     }
@@ -4006,8 +4087,57 @@ int ObTableScanOp::inner_get_next_fts_index_row()
 {
   int ret = OB_SUCCESS;
   blocksstable::ObDatumRow *row = nullptr;
+  bool got_row = false;
+  // adlog::DEBUG_ONCE(10000,"OB_TABLE_SCAN_OP: inner_get_next_fts_index_row");
+   
 
-  while (OB_SUCC(ret)) {
+  // {
+  //   static bool first_call = true;
+  //   if (first_call) {
+  //       adlog::DEBUG("=== inner_get_next_fts_index_row ===");
+  //       adlog::DEBUG("backup_key_ranges_.count(): ", backup_key_ranges_.count());
+  //       adlog::DEBUG("cached_min_pk_val_ ", cached_min_pk_val_);
+  //       adlog::DEBUG("cached_max_pk_val_ ", cached_max_pk_val_);
+  //       adlog::DEBUG("has_initialized_pk_range_ ", has_initialized_pk_range_);
+        
+  //       // 如果还没有初始化范围，尝试从备份中获取
+  //       if (!has_initialized_pk_range_ && !backup_key_ranges_.empty()) {
+  //           for (int64_t i = 0; i < backup_key_ranges_.count(); ++i) {
+  //               const common::ObNewRange &range = backup_key_ranges_.at(i);
+  //               adlog::DEBUG("range.get_end_key().get_obj_cnt() :",range.get_end_key().get_obj_cnt() );
+  //               if (range.get_end_key().get_obj_cnt() > 0) {
+  //                 const common::ObObj &end_obj =
+  //                     range.get_end_key().get_obj_ptr()[0];
+  //                   adlog::DEBUG("end_obj.is_integer_type(): ",end_obj.is_integer_type());
+  //                   adlog::DEBUG("end_obj.is_numeric_type(): ",end_obj.is_numeric_type());
+  //                   if (end_obj.is_numeric_type()) {
+  //                       cached_max_pk_val_ = end_obj.get_int();
+                        
+  //                       if (range.get_start_key().get_obj_cnt() > 0) {
+  //                           const common::ObObj &start_obj = range.get_start_key().get_obj_ptr()[0];
+  //                           if (start_obj.is_integer_type()) {
+  //                               cached_min_pk_val_ = start_obj.get_int();
+  //                           }
+  //                       } else {
+  //                           cached_min_pk_val_ = INT64_MIN;
+  //                       }
+                        
+  //                       adlog::DEBUG("Extracted PK range from backup: [", cached_min_pk_val_, ", ", cached_max_pk_val_, ")");
+  //                       has_initialized_pk_range_ = true;
+  //                       break;
+  //                   }
+  //               }
+  //           }
+  //       }
+        
+  //       first_call = false;
+  //   }    
+  // }
+  // if (need_final_limit_ && limit_param_.limit_ > 0 && output_row_cnt_ >= limit_param_.limit_) {
+  //   ret = OB_ITER_END;
+  // }
+
+  while (OB_SUCC(ret) and !got_row) {
     row = nullptr;
 
     if (OB_FAIL(fts_index_.get_next_row(row))) {
@@ -4034,27 +4164,81 @@ int ObTableScanOp::inner_get_next_fts_index_row()
       break;
     }
 
-    // 检查 id < 1000
-    bool should_skip = false;
-    if (has_pk_range_filter_) {
-      int64_t doc_id = row->storage_datums_[0].get_int(); // 第0列是doc_id
-      if (doc_id >= 1000) {
-        should_skip = true;
-      }
-    }
+    // // 从 tsc_rtdef_.range_ 解析主键范围
+    // if (has_pk_range_filter_) {
+    //   int64_t tmp_id = row->storage_datums_[0].get_int();
+    //   if (tmp_id >= cached_max_pk_val_) {
+    //     continue;
+    //   }
+    // }
 
-    if (should_skip) {
-      // 跳过这一行，继续循环取下一行
-      continue;
-    }
+    // {
+    //   int rand_num = rand() % 100;
+    //   if (rand_num < 20) {
+    //     continue;
+    //   }
+    // }
+
+
+    // // 检查 id < 1000
+    // bool should_skip = false;
+    // if (has_pk_range_filter_) {
+    //   int64_t doc_id = row->storage_datums_[0].get_int(); // 第0列是doc_id
+    //   if (doc_id >= 1000) {
+    //     should_skip = true;
+    //   }
+    // }
+
+    // if (should_skip) {
+    //   // 跳过这一行，继续循环取下一行
+    //   continue;
+    // }
+
+    // 从查询范围中提取主键范围进行预过滤
+    // if (!has_pk_range_filter_ && !MY_INPUT.key_ranges_.empty()) {
+    //   if (OB_SUCC(extract_pk_range_from_plan())) {
+    //       has_pk_range_filter_ = true;
+    //   }
+    // }
+    
+  //   if (has_pk_range_filter_ && doc_id >= cached_max_pk_val_) {
+  //     continue; // 🔥 跳过这个文档，避免分词处理
+  //  }
 
     // 只有通过过滤的行，才回表填充生成列
     if (FAILEDx(fill_generated_fts_cols(row))) {
       LOG_WARN("fail to fill generate fts cols", K(ret), KPC(row));
-    } else {
-      // 成功填充，返回这一行
-      break;
+      continue;
     }
+    // adlog::DEBUG("After fill_generated_fts_cols, applying filters");
+    // clear_evaluated_flag();
+
+    // bool filtered = false;
+    
+    //   static int count = 0;
+    //   ++count;
+    //   if (count % 1000 == 0) {
+    //     adlog::DEBUG("have filter: ", !MY_SPEC.filters_.empty());
+    //     adlog::DEBUG("inner_get_next_fts_index_row::MY_INPUT.key_ranges_.empty() ",MY_INPUT.key_ranges_.empty());
+    //   }
+    
+    // if (!MY_SPEC.filters_.empty()) {
+    //   if (OB_FAIL(filter_row(filtered))) {
+    //     // adlog::DEBUG("filter_row failed: ", ret);
+    //     continue;
+    //   }
+    // }
+    // adlog::DEBUG("Filter result: ", (filtered ? "FILTERED" : "PASSED"));
+    // if (filtered) {
+    //   if (count % 1000 == 0) {
+    //     adlog::DEBUG("GOOD FILTER");
+    //   }
+    //   continue;
+    // }
+
+    got_row = true;
+    // adlog::DEBUG("Got valid row");
+    
   }
 
 

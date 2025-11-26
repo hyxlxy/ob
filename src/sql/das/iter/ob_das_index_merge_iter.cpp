@@ -967,7 +967,23 @@ int ObDASIndexMergeIter::union_get_next_rows(int64_t &count, int64_t capacity)
   }
   return ret;
 }
+// ADVISE
 
+int ObDASIndexMergeIter::execute_two_phase() {
+  int ret = first_merge_phase();
+  if (ret != OB_SUCCESS) {
+    return ret;
+  }
+  return second_merge_phase();
+}
+int ObDASIndexMergeIter::first_merge_phase() {
+  int ret = OB_SUCCESS;
+  return ret;
+}
+int ObDASIndexMergeIter::second_merge_phase() {
+  int ret = OB_SUCCESS;
+  return ret;  
+}
 
 }  // namespace sql
 }  // namespace oceanbase

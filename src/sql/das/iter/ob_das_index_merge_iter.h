@@ -45,12 +45,12 @@ public:
       is_reverse_(false)
   {}
 
-  ObIndexMergeType merge_type_;
-  const ExprFixedArray *rowkey_exprs_;
+  ObIndexMergeType merge_type_; // and 或者 or
+  const ExprFixedArray *rowkey_exprs_; // 行键表达式数组，用于判断不同索引的迭代器返回的行是否为同一行
   const ObDASIndexMergeCtDef *ctdef_;
   ObDASIndexMergeRtDef *rtdef_;
-  const common::ObIArray<ObDASIter*> *child_iters_;
-  const common::ObIArray<ObDASScanRtDef*> *child_scan_rtdefs_;
+  const common::ObIArray<ObDASIter*> *child_iters_;  // 子迭代器数组
+  const common::ObIArray<ObDASScanRtDef*> *child_scan_rtdefs_; // 每一个子迭代器的定义（参数
   transaction::ObTxDesc *tx_desc_;
   transaction::ObTxReadSnapshot *snapshot_;
   bool is_reverse_;
@@ -67,13 +67,13 @@ public:
            ObDASIterParam::is_valid();
   }
 };
-
+class ObDASTRMergeIter;
 class ObDASIndexMergeIter : public ObDASIter
 {
 
 public:
   /* used to store and merge child rows */
-  struct IndexMergeRowStore
+  struct IndexMergeRowStore // // 临时存储子迭代器的结果
   {
   public:
     IndexMergeRowStore()
@@ -119,15 +119,21 @@ public:
     ObEvalCtx *eval_ctx_;
     int64_t max_size_;
     int64_t saved_size_;
-    int64_t cur_idx_;
-    LastDASStoreRow *store_rows_;
+    int64_t cur_idx_; // 当前访问的位置
+    LastDASStoreRow *store_rows_;  // 存储行数据的缓冲区
     bool iter_end_;
+
+
+
   };
 
-  /* shared exprs may cause the results on the frame to be overwritten by get_next_rows() of child iters,
-   * thus we use a result buffer to temporarily store a batch of result rows and @to_expr() at the end of 
-   * each iteration.
+  /* shared exprs may cause the results on the frame to be overwritten by
+   * get_next_rows() of child iters, thus we use a result buffer to temporarily
+   * store a batch of result rows and @to_expr() at the end of each iteration.
    */
+  // 为了防止表达式的内存位置冲突，所以开了一个Buffer 去存储表达式
+  // 
+  //
   struct MergeResultBuffer
   {
   public:
@@ -149,7 +155,7 @@ public:
     ObEvalCtx *eval_ctx_;
     int64_t max_size_;
 
-    ObChunkDatumStore result_store_;
+    ObChunkDatumStore result_store_;           // 结果存储区
     ObChunkDatumStore::Iterator result_store_iter_;
   };
 
@@ -234,6 +240,21 @@ private:
   // only relevance score in fulltext search for now.
   common::ObFixedArray<ExprFixedArray, common::ObIAllocator> child_match_against_exprs_;
   MergeResultBuffer result_buffer_;
+
+public:
+      // ADVISE
+      bool enable_two_phase_ = false;
+      bool has_executed_two_phase_ = false;
+      double first_phase_min_score_;
+      int64_t top_n_count_;
+      bool has_fts_iter_ = false;
+      ObDASTRMergeIter *fts_iter_;      // FTS迭代器指针
+  
+      int execute_two_phase();
+      int first_merge_phase();
+      int second_merge_phase();
+      int check_mixed_query_with_fts();
+      int check_init_two_phase(ObDASIndexMergeIterParam &param);
 };
 
 }  // namespace sql

@@ -17,7 +17,7 @@
 #define USING_LOG_PREFIX SQL_OPT
 
 #include "sql/engine/table/ob_ddl_block_sample_scan_op.h"
-
+#include "common/ad_log.h"
 using namespace oceanbase;
 using namespace common;
 using namespace storage;
@@ -26,6 +26,7 @@ using namespace sql;
 int ObDDLBlockSampleScanOp::inner_open()
 {
   int ret = OB_SUCCESS;
+  adlog::DEBUG("=== ObDDLBlockSampleScanOp::open called ===");
   if (OB_FAIL(ObTableScanOp::inner_open())) {
     LOG_WARN("fail to inner open", K(ret));
   } else if (MY_SPEC.use_dist_das()) {

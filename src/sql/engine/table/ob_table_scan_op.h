@@ -39,6 +39,8 @@
 #include "share/ob_fts_index_builder_util.h"
 #include "sql/rewrite/ob_range_generator.h"
 
+#include "common/ad_log.h"
+
 namespace oceanbase
 {
 namespace common
@@ -520,6 +522,81 @@ public:
   int do_diagnosis(ObExecContext &exec_ctx, ObBitVector &skip) override;
 
 protected:
+  // int64_t extract_pk_range_from_scan_range()
+  // {
+  //   const ObNewRange &range = tsc_rtdef_.scan_rtdef_.range_;
+    
+  //   if (range.get_end_key().get_obj_cnt() > 0) {
+  //     const ObObj &end_obj = range.get_end_key().get_obj_ptr()[0];
+  //     if (end_obj.is_integer_type()) {
+  //       if (!range.get_border_flag().inclusive_end()) {
+  //         // id < N
+  //         return end_obj.get_int();
+  //       } else {
+  //         // id <= N
+  //         return end_obj.get_int() + 1;
+  //       }
+  //     }
+  //   }
+
+  //   return INT64_MAX; // 无范围限制
+  // }
+  bool has_initialized_predicates_ = false;  // 谓词初始化标志
+  int init_predicate_context()
+  {
+      int ret = OB_SUCCESS;
+      
+      
+      // 确保表达式求值信息已设置
+      if (eval_infos_.count() > 0) {
+        
+      }
+      // extract_pk_range_from_plan();
+      // 确保过滤条件存在
+      adlog::DEBUG("Filter count: ", MY_SPEC.filters_.count());
+      adlog::DEBUG("Need final limit: ", need_final_limit_);
+
+      return ret;
+  }
+  int extract_pk_range_from_plan()
+  {
+    int ret = OB_SUCCESS;
+    
+    if (!MY_INPUT.key_ranges_.empty()) {
+        // 遍历所有范围，提取主键范围
+        for (int64_t i = 0; i < MY_INPUT.key_ranges_.count(); ++i) {
+            const common::ObNewRange &range = MY_INPUT.key_ranges_.at(i);
+            
+            if (range.get_end_key().get_obj_cnt() > 0) {
+                const common::ObObj &end_obj = range.get_end_key().get_obj_ptr()[0];
+                
+                if (end_obj.is_integer_type()) {
+                    int64_t range_end = end_obj.get_int();
+                    
+                    // // 根据边界标志确定范围
+                    // if (range.get_border_flag().inclusive_end()) {
+                    //     cached_max_pk_val_ = range_end + 1;
+                    // } else {
+                    //     cached_max_pk_val_ = range_end;
+                    // }
+                    cached_max_pk_val_ = range_end + 2;
+                    cached_min_pk_val_ = INT64_MIN; // 设置合理的默认值
+                    adlog::DEBUG("Extracted PK range max: ", cached_max_pk_val_);
+                    break;
+                }
+            }
+        }
+    }
+      adlog::DEBUG("cached_min_pk_val_ ",cached_min_pk_val_);
+      adlog::DEBUG("cached_max_pk_val_ ",cached_max_pk_val_);
+      adlog::DEBUG("MY_INPUT.key_ranges_.empty(): ",MY_INPUT.key_ranges_.empty());
+    
+    return ret;
+  }
+  common::ObSEArray<common::ObNewRange, 1> backup_key_ranges_;
+  bool has_initialized_pk_range_ = false;
+  ////////////////////////////////////ADVISE
+  
   // Get GI task then update location_idx and $cur_access_tablet_
   // NOTE: set $iter_end_ if no task found.
   int get_access_tablet_loc(ObGranuleTaskInfo &info);
@@ -779,6 +856,10 @@ protected:
   bool need_check_outrow_lob_;
 
   bool has_pk_range_filter_ = false;
+  int64_t cached_max_pk_val_;  // 预解析的主键上限
+  int64_t cached_min_pk_val_;  // 预解析的主键上限
+
+  //ADVISE
 private:
   ObRandScanProcessor rand_scan_processor_;
  };

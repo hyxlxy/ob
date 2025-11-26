@@ -18,7 +18,7 @@
 
 #include "ob_sparse_bmw_iter.h"
 #include "ob_block_max_iter.h"
-
+#include "common/ad_log.h"
 namespace oceanbase
 {
 namespace storage
@@ -88,8 +88,8 @@ void ObSRBMWIterImpl::reset()
   allocator_.reset();
 }
 
-int ObSRBMWIterImpl::get_next_rows(const int64_t capacity, int64_t &count)
-{
+int ObSRBMWIterImpl::get_next_rows(const int64_t capacity, int64_t &count) {
+  adlog::DEBUG("have used BMWIterImpl");
   int ret = OB_SUCCESS;
 
   if (IS_NOT_INIT) {
