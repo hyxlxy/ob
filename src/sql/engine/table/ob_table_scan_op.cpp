@@ -4172,13 +4172,6 @@ int ObTableScanOp::inner_get_next_fts_index_row()
     //   }
     // }
 
-    // {
-    //   int rand_num = rand() % 100;
-    //   if (rand_num < 20) {
-    //     continue;
-    //   }
-    // }
-
 
     // // 检查 id < 1000
     // bool should_skip = false;

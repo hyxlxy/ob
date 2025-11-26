@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <cstdint>
 #define USING_LOG_PREFIX SQL_DAS
 #include "sql/das/iter/ob_das_index_merge_iter.h"
 #include "src/sql/das/ob_das_attach_define.h"
@@ -180,6 +181,7 @@ void ObDASIndexMergeIter::MergeResultBuffer::reset()
 
 int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
 {
+  adlog::DEBUG("index merge iter use!!!");
   int ret = OB_SUCCESS;
   if (ObDASIterType::DAS_ITER_INDEX_MERGE != param.type_) {
     ret = OB_ERR_UNEXPECTED;
@@ -197,6 +199,10 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
     tx_desc_ = index_merge_param.tx_desc_;
     snapshot_ = index_merge_param.snapshot_;
     is_reverse_ = index_merge_param.is_reverse_;
+
+    //
+    // top_n_count_ = param.limit_param_;
+    // adlog::DEBUG("top_n_count: ", top_n_count_);
     
     lib::ContextParam context_param;
     context_param.set_mem_attr(MTL_ID(), "DASIndexMerge", ObCtxIds::DEFAULT_CTX_ID)
@@ -259,6 +265,11 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
           }
         }
       }
+    }
+  }
+  if (OB_SUCC(ret)) {
+    if (OB_FAIL(init_two_phase(param))) {
+      return ret;
     }
   }
   return ret;
@@ -982,7 +993,90 @@ int ObDASIndexMergeIter::first_merge_phase() {
 }
 int ObDASIndexMergeIter::second_merge_phase() {
   int ret = OB_SUCCESS;
-  return ret;  
+  return ret;
+}
+
+// int64_t ObDASIndexMergeIter::get_top_n_count() {
+  
+// }
+
+/*
+      int check_top_k();
+      int check_support_two_phase();
+*/
+int ObDASIndexMergeIter::init_two_phase(ObDASIterParam &param) {
+  int ret = OB_SUCCESS;
+  if (merge_type_ != INDEX_MERGE_INTERSECT) {
+    adlog::DEBUG("check_init_two_phase: no and");
+    return OB_SUCCESS;
+  }
+
+  if (!check_mixed_query_with_fts()) {
+    adlog::DEBUG("check_mixed_query_with_fts false");
+    return OB_SUCCESS;
+  }
+
+  if (!has_fts_iter_) {
+    adlog::DEBUG("has_fts_iter_: false");
+    return OB_SUCCESS;
+  }
+
+  if (!check_top_k()) {
+    adlog::DEBUG("check top k false");
+    return OB_SUCCESS;
+  }
+
+  if (!check_support_two_phase()) {
+    adlog::DEBUG("check_support_two_phase false");
+    return OB_SUCCESS;
+  }
+
+  enable_two_phase_ = true;
+
+  adlog::DEBUG("Two-phase optimization enabled ");
+
+  return ret;
+}
+
+bool ObDASIndexMergeIter::check_top_k() {
+
+  // if (merge_rtdef_ && merge_rtdef_->limit_param_.is_valid()) {
+  //   top_n_count_ = merge_rtdef_->limit_param_.limit_count_;
+  //   if (top_n_count_ > 0) {
+  //       adlog::DEBUG("Top-K query detected from limit_param: ", top_n_count_);
+  //       return true;
+  //   }
+  // }
+  if (top_n_count_ == 0 or top_n_count_ == 114514) {
+    return false;
+  }
+  return true;
+}
+
+bool ObDASIndexMergeIter::check_support_two_phase() { return true; }
+
+bool ObDASIndexMergeIter::check_mixed_query_with_fts() {
+  has_fts_iter_ = false;
+  fts_iter_ = nullptr;
+
+  for (int64_t i = 0; i < child_iters_.count(); i++) {
+    ObDASIter *child = child_iters_.at(i);
+    if (child == nullptr) {
+      continue;
+    }
+    
+    ObDASIterType child_type = child->get_type();
+    
+    if (child_type == DAS_ITER_TEXT_RETRIEVAL_MERGE) {
+      // 找到FTS迭代器
+      has_fts_iter_ = true;
+      fts_iter_ = static_cast<ObDASTRMergeIter *>(child);
+      adlog::DEBUG("find fts_iter");
+      break;
+    }
+  }
+
+  return has_fts_iter_;
 }
 
 }  // namespace sql

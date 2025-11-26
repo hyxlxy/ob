@@ -19,6 +19,7 @@
 
 #include "sql/das/iter/ob_das_iter.h"
 #include "sql/optimizer/ob_join_order.h"
+#include <cstdint>
 
 namespace oceanbase
 {
@@ -246,15 +247,18 @@ public:
       bool enable_two_phase_ = false;
       bool has_executed_two_phase_ = false;
       double first_phase_min_score_;
-      int64_t top_n_count_;
+      int64_t top_n_count_ = 114514;
       bool has_fts_iter_ = false;
       ObDASTRMergeIter *fts_iter_;      // FTS迭代器指针
   
       int execute_two_phase();
       int first_merge_phase();
       int second_merge_phase();
-      int check_mixed_query_with_fts();
-      int check_init_two_phase(ObDASIndexMergeIterParam &param);
+      int init_two_phase(ObDASIterParam &param);
+      int64_t get_top_n_count();
+      bool check_mixed_query_with_fts();
+      bool check_top_k();
+      bool check_support_two_phase();
 };
 
 }  // namespace sql

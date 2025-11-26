@@ -82,7 +82,8 @@ const char *ObLogTableScan::get_name() const
     }
   } else if (is_vec_idx_scan_post_filter()) {
     name = use_das() ? "DISTRIBUTED VECTOR INDEX SCAN" : "VECTOR INDEX SCAN";
-  } else if (is_text_retrieval_scan() || has_es_match()) {
+  // } else if (is_text_retrieval_scan() || has_es_match()) {
+  } else if (false) {
     name = use_das() ? "DISTRIBUTED TEXT RETRIEVAL SCAN" : "TEXT RETRIEVAL SCAN";
   } else if (is_skip_scan()) {
     name = use_das() ? "DISTRIBUTED TABLE SKIP SCAN" : "TABLE SKIP SCAN";
