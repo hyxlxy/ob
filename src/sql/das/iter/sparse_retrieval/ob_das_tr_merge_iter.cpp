@@ -482,7 +482,19 @@ int ObDASTRMergeIter::create_sparse_retrieval_iter()
   sr_iter_param_.relevance_expr_ = ir_ctdef_->relevance_expr_;
   sr_iter_param_.relevance_proj_expr_ = ir_ctdef_->relevance_proj_col_;
   sr_iter_param_.filter_expr_ = ir_ctdef_->match_filter_;
-  sr_iter_param_.topk_limit_ = topk_limit_;
+  // Apply expand factor for TopK pushdown to reduce upper-layer sort cost.
+  // Hard-coded knob for competition; can be made session-level.
+  const int64_t OB_TR_TOPK_EXPAND_FACTOR = 3; // alpha
+  if (topk_mode_ && topk_limit_ > 0) {
+    // Expand a bit to be robust for recall, shrink input to upper sort from full-candidate to alpha*N
+    const int64_t expanded = topk_limit_ * OB_TR_TOPK_EXPAND_FACTOR;
+    sr_iter_param_.topk_limit_ = expanded;
+    LOG_DEBUG("[TR Merge] apply topk expand factor", K_(topk_limit), K(expanded), K(OB_TR_TOPK_EXPAND_FACTOR));
+  } else {
+    sr_iter_param_.topk_limit_ = topk_limit_;
+  }
+  // Two-phase hook: score lower bound to prune by BMW. Phase-1 min score will be wired later.
+  sr_iter_param_.score_lower_bound_ = 0.0; // epsilon lowering will be applied on phase-1 min score in follow-ups
   if (OB_NOT_NULL(ir_ctdef_->field_boost_expr_)) {
     ObDatum *boost_datum = nullptr;
     if (OB_FAIL(ir_ctdef_->field_boost_expr_->eval(*ir_rtdef_->eval_ctx_, boost_datum))) {

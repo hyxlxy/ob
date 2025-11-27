@@ -30,6 +30,7 @@ ObSRBMWIterImpl::ObSRBMWIterImpl()
     less_score_cmp_(),
     top_k_heap_(less_score_cmp_, &allocator_),
     top_k_count_(0),
+    initial_threshold_(0.0),
     domain_id_cmp_(),
     id_cache_(),
     status_(BMWStatus::MAX_STATUS)
@@ -49,10 +50,12 @@ int ObSRBMWIterImpl::init(
     LOG_WARN("invalid argument", K(ret), K(iter_param));
   } else if (iter_param.topk_limit_ == 0) {
     top_k_count_ = 0;
+    initial_threshold_ = 0.0;
     status_ = BMWStatus::FINISHED;
     is_inited_ = true;
   } else {
     top_k_count_ = iter_param.topk_limit_;
+    initial_threshold_ = iter_param.score_lower_bound_ > 0.0 ? iter_param.score_lower_bound_ : 0.0;
     status_ = BMWStatus::MAX_STATUS;
     id_cache_.set_allocator(&allocator_);
     if (OB_FAIL(domain_id_cmp_.init(iter_param.id_proj_expr_->obj_meta_))) {

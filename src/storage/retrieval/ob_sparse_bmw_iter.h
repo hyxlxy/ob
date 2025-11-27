@@ -51,7 +51,8 @@ protected:
   int evaluate_pivot_range(const int64_t pivot_iter_idx, bool &is_candidate);
   double get_top_k_threshold()
   {
-    return top_k_heap_.empty() ? 0.0 : top_k_heap_.top().relevance_;
+    const double heap_top = top_k_heap_.empty() ? 0.0 : top_k_heap_.top().relevance_;
+    return heap_top > initial_threshold_ ? heap_top : initial_threshold_;
   }
 
 private:
@@ -102,6 +103,7 @@ protected:
   // Maybe domain id not need to be cached within the topk heap since there would be top-n sort with datum store above
   TopKHeap top_k_heap_;
   int64_t top_k_count_;
+  double initial_threshold_;
   ObDomainIdCmp domain_id_cmp_;
   ObFixedArray<ObDocIdExt, ObIAllocator> id_cache_;
   BMWStatus status_;
