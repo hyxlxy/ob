@@ -17,6 +17,8 @@
 #define USING_LOG_PREFIX SQL_DAS
 #include "ob_das_tr_merge_iter.h"
 #include "sql/das/ob_das_ir_define.h"
+#include <cstdlib> // getenv, atoll, atof
+#include <strings.h> // strcasecmp
 
 namespace oceanbase
 {
@@ -475,6 +477,16 @@ int ObDASTRMergeIter::init_dim_iter_param(ObTextRetrievalScanIterParam &iter_par
 int ObDASTRMergeIter::create_sparse_retrieval_iter()
 {
   int ret = OB_SUCCESS;
+  // Allow override of algorithm via env: OB_TR_MODE=bmw|daat|taat
+  if (const char *env_mode = getenv("OB_TR_MODE")) {
+    if (0 == strcasecmp(env_mode, "bmw")) {
+      topk_mode_ = true; daat_mode_ = false; taat_mode_ = false;
+    } else if (0 == strcasecmp(env_mode, "daat")) {
+      topk_mode_ = false; daat_mode_ = true; taat_mode_ = false;
+    } else if (0 == strcasecmp(env_mode, "taat")) {
+      topk_mode_ = false; daat_mode_ = false; taat_mode_ = true;
+    }
+  }
   sr_iter_param_.dim_weights_ = dim_weights_.count() >= 1 ? &dim_weights_ : nullptr;
   sr_iter_param_.limit_param_ = &ir_rtdef_->get_inv_idx_scan_rtdef()->limit_param_;
   sr_iter_param_.eval_ctx_ = ir_rtdef_->eval_ctx_;
@@ -484,10 +496,16 @@ int ObDASTRMergeIter::create_sparse_retrieval_iter()
   sr_iter_param_.filter_expr_ = ir_ctdef_->match_filter_;
   // Apply expand factor for TopK pushdown to reduce upper-layer sort cost.
   // Hard-coded knob for competition; can be made session-level.
-  const int64_t OB_TR_TOPK_EXPAND_FACTOR = 3; // alpha
+  int64_t OB_TR_TOPK_EXPAND_FACTOR = 3; // alpha
+  if (const char *env = getenv("OB_TR_TOPK_EXPAND")) {
+    int64_t v = atoll(env);
+    if (v > 0 && v <= 16) { OB_TR_TOPK_EXPAND_FACTOR = v; }
+  }
   if (topk_mode_ && topk_limit_ > 0) {
     // Expand a bit to be robust for recall, shrink input to upper sort from full-candidate to alpha*N
-    const int64_t expanded = topk_limit_ * OB_TR_TOPK_EXPAND_FACTOR;
+    int64_t expanded = topk_limit_ * OB_TR_TOPK_EXPAND_FACTOR;
+    if (expanded < topk_limit_ + 10) expanded = topk_limit_ + 10; // give minimal headroom
+    if (expanded > topk_limit_ * 16) expanded = topk_limit_ * 16; // hard cap
     sr_iter_param_.topk_limit_ = expanded;
     LOG_DEBUG("[TR Merge] apply topk expand factor", K_(topk_limit), K(expanded), K(OB_TR_TOPK_EXPAND_FACTOR));
   } else {
@@ -527,6 +545,34 @@ int ObDASTRMergeIter::create_sparse_retrieval_iter()
   }
   if (OB_FAIL(ret)) {
   } else if (topk_mode_) {
+    // Optional: estimate max possible relevance to set an initial score lower bound for BMW
+    double est_max_score = 0.0;
+    if (dim_iters_.count() > 0) {
+      for (int64_t i = 0; i < dim_iters_.count(); ++i) {
+        double dim_score = 0.0;
+        if (OB_FAIL(static_cast<ObISRDimBlockMaxIter*>(dim_iters_.at(i))->get_dim_max_score(dim_score))) {
+          LOG_DEBUG("failed to get dim max score, ignore", K(ret));
+          ret = OB_SUCCESS; // ignore estimation error
+          dim_score = 0.0;
+        }
+        if (sr_iter_param_.dim_weights_ != nullptr && i < sr_iter_param_.dim_weights_->count()) {
+          dim_score *= sr_iter_param_.field_boost_ * sr_iter_param_.dim_weights_->at(i);
+        }
+        est_max_score += dim_score;
+      }
+      // read env percentage [0,100], default 0 (disabled)
+      double pct = 0.0;
+      if (const char *env = getenv("OB_TR_SCORE_LB_PCT")) {
+        double v = atof(env);
+        if (v > 0 && v < 100) pct = v;
+      }
+      if (pct > 0.0) {
+        const double lower = est_max_score * (pct / 100.0);
+        sr_iter_param_.score_lower_bound_ = lower;
+        LOG_DEBUG("[TR Merge] set initial score lower bound", K(est_max_score), K(pct), K(lower));
+      }
+    }
+
     ObTextDaaTParam iter_param;
     ObTextBMWIter *bmw_iter = nullptr;
     if (OB_FAIL(init_daat_iter_param(iter_param))) {

@@ -106,6 +106,9 @@ protected:
   double initial_threshold_;
   ObDomainIdCmp domain_id_cmp_;
   ObFixedArray<ObDocIdExt, ObIAllocator> id_cache_;
+  // final projection buffer in relevance-desc order
+  ObFixedArray<TopKItem, ObIAllocator> projected_items_;
+  int64_t projected_pos_;
   BMWStatus status_;
 };
 
