@@ -28,26 +28,24 @@ embedding_client = OpenAI(
 
 
 def generate_response(
-    embedding_text: str,
+    embedding_text: str | List[str],
     model: str = "text-embedding-v4",
     max_retries: int = 3,
     initial_backoff: float = 1.0,
-) -> List[float]:
+) -> List[float] | List[List[float]]:
     """
     Generate embeddings from text using OpenAI-compatible API with error handling and retry logic.
+    Supports both single string and list of strings (batch mode).
 
     Args:
-        embedding_text: Text to generate embeddings for
-        model: Model name to use for embedding generation (default: "text-embedding-3-small")
+        embedding_text: Text or list of texts to generate embeddings for
+        model: Model name to use for embedding generation (default: "text-embedding-v4")
         max_retries: Maximum number of retry attempts
         initial_backoff: Initial backoff time in seconds (doubles on each retry)
 
     Returns:
-        The embedding vector as a list of floats
-
-    Raises:
-        Exception: If the embedding request fails after all retries
-        ValueError: If the response is empty or invalid
+        The embedding vector as a list of floats (for single input)
+        or a list of embedding vectors (for list input)
     """
     last_exception = None
 
@@ -61,11 +59,16 @@ def generate_response(
             if not response or not response.data or len(response.data) == 0:
                 raise ValueError("Empty or invalid response from OpenAI API")
 
-            embedding_vector = response.data[0].embedding
-            if not embedding_vector or len(embedding_vector) == 0:
-                raise ValueError("Empty embedding vector from API")
+            # Sort data by index to ensure order matches input
+            data = sorted(response.data, key=lambda x: x.index)
+            embeddings = [item.embedding for item in data]
 
-            return embedding_vector
+            if isinstance(embedding_text, str):
+                 if not embeddings or len(embeddings) == 0:
+                     raise ValueError("Empty embedding vector from API")
+                 return embeddings[0]
+            
+            return embeddings
 
         except RateLimitError as e:
             last_exception = e

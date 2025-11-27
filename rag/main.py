@@ -84,7 +84,7 @@ if __name__ == "__main__":
     logger.info("Starting data preparation...")
     add(
         dataset_dir=args.dataset,
-        max_worker=4,
+        max_worker=8,
     )
     logger.info("Data preparation completed.")
 
@@ -94,9 +94,16 @@ if __name__ == "__main__":
     questions: List[str] = read_questions_json(args.questions)
     logger.info(f"Loaded {len(questions)} questions from {args.questions}")
 
-    for idx, question in enumerate(questions, 1):
-        logger.debug(f"Processing question {idx}/{len(questions)}: {question[:50]}...")
-        answers.append(search(question))
+    from concurrent.futures import ThreadPoolExecutor
+    
+    # Use 4 workers for QA to balance concurrency and rate limits
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        # Submit all questions. We preserve order by mapping futures to their original index
+        # or simply using executor.map if search returns the Answer object directly.
+        # search(question) returns Answer.
+        results = list(executor.map(search, questions))
+    
+    answers = results
 
     logger.info(f"Completed processing {len(answers)} questions.")
     logger.info(f"Writing answers to {args.output}...")

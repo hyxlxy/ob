@@ -126,40 +126,36 @@ def process_pdf_file(
             try:
                 # Step 1: Try direct text extraction from PDF
                 try:
-                    if PdfReader is None:
-                        raise ImportError("PdfReader not available")
-                    reader = PdfReader(pdf_file)
+                    # Use the already instantiated reader
                     raw_text = reader.pages[page_num - 1].extract_text() or ""
                     page_text = raw_text.strip()
-                    if len(page_text) >= 50:  # 简单阈值，避免空白/目录页
-                        logger.debug(
-                            f"Extracted text from page {page_num} via PdfReader (len={len(page_text)})"
-                        )
-                        # 若文本足够，不再走图片+VLM
-                        pass
-                    else:
-                        page_text = ""
                 except Exception as e:
                     logger.debug(
                         f"PdfReader extract_text failed for page {page_num}, will fallback to VLM: {e}"
                     )
                     page_text = ""
 
-                # Step 2: If no text, fallback to image + VLM
-                if not page_text:
+                # Step 2: Logic to determine if we need VLM
+                # If text is sparse (< 500 chars), it might be a chart/image-heavy page.
+                # We append VLM description to the extracted text to capture visual info.
+                if len(page_text) < 500:
                     page_image_path = pdf_page_to_image(pdf_file, page_num, dpi=100)
                     logger.debug(
-                        f"Converted page {page_num} to image: {page_image_path}"
+                        f"Page {page_num} text len={len(page_text)} (<500), engaging VLM. Image: {page_image_path}"
                     )
 
                     try:
-                        page_text = generate_vlm_response(
+                        vlm_text = generate_vlm_response(
                             VLM_IMAGE_EXTRACTION_PROMPT, images=page_image_path
                         )
-                        if page_text.strip():
-                            logger.debug(
-                                f"Extracted text from page {page_num} using VLM"
+                        if vlm_text.strip():
+                            logger.info(
+                                f"Extracted visual info from page {page_num} using VLM"
                             )
+                            if page_text:
+                                page_text += f"\n\n【页面视觉内容描述】\n{vlm_text}"
+                            else:
+                                page_text = vlm_text
                     except Exception as e:
                         # Check if it's a 502 error (likely due to large image)
                         error_str = str(e).lower()
@@ -181,14 +177,18 @@ def process_pdf_file(
                                     max_size_mb=5.0,
                                     max_dimension=2048,
                                 )
-                                page_text = generate_vlm_response(
+                                vlm_text = generate_vlm_response(
                                     VLM_IMAGE_EXTRACTION_PROMPT,
                                     images=compressed_image_path,
                                 )
-                                if page_text.strip():
+                                if vlm_text.strip():
                                     logger.info(
                                         f"Successfully extracted text from compressed page {page_num} image"
                                     )
+                                    if page_text:
+                                        page_text += f"\n\n【页面视觉内容描述】\n{vlm_text}"
+                                    else:
+                                        page_text = vlm_text
                             except Exception as retry_e:
                                 logger.warning(
                                     f"Failed to extract text from compressed page {page_num} image of {filename}: {retry_e}"
@@ -197,26 +197,24 @@ def process_pdf_file(
                             logger.warning(
                                 f"Failed to extract text from page {page_num} image of {filename}: {e}"
                             )
+                    finally:
+                         # Clean up temporary image files
+                        if compressed_image_path and os.path.exists(compressed_image_path):
+                            try:
+                                os.unlink(compressed_image_path)
+                            except Exception as e:
+                                logger.debug(f"Failed to delete compressed image: {e}")
+                        if page_image_path and os.path.exists(page_image_path):
+                            try:
+                                os.unlink(page_image_path)
+                            except Exception as e:
+                                logger.debug(f"Failed to delete page image: {e}")
+
             except Exception as e:
                 logger.warning(
                     f"Failed to process page {page_num} of {filename}: {e}"
                 )
-            finally:
-                # Clean up temporary image files
-                if compressed_image_path and os.path.exists(compressed_image_path):
-                    try:
-                        os.unlink(compressed_image_path)
-                    except Exception as e:
-                        logger.debug(
-                            f"Failed to delete compressed image {compressed_image_path}: {e}"
-                        )
-                if page_image_path and os.path.exists(page_image_path):
-                    try:
-                        os.unlink(page_image_path)
-                    except Exception as e:
-                        logger.debug(
-                            f"Failed to delete temporary page image {page_image_path}: {e}"
-                        )
+
 
             # Skip if no content extracted
             if not page_text.strip():
@@ -227,18 +225,29 @@ def process_pdf_file(
             text_chunks = split_text(page_text)
 
             # Step 4 & 5: Embed -> Store
-            for chunk_text in text_chunks:
-                if not chunk_text.strip():
-                    continue
+            # Filter valid chunks
+            valid_chunks = [c for c in text_chunks if c.strip()]
+            if not valid_chunks:
+                continue
 
-                # Generate embedding
-                try:
-                    embedding = generate_embedding(chunk_text)
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to generate embedding for chunk in {filename} page {page_num}: {e}"
-                    )
-                    continue
+            try:
+                # Batch generate embeddings
+                embeddings = generate_embedding(valid_chunks)
+            except Exception as e:
+                logger.warning(
+                    f"Failed to generate embeddings for page {page_num} of {filename}: {e}"
+                )
+                continue
+            
+            # Verify embedding count matches chunk count
+            if len(embeddings) != len(valid_chunks):
+                 logger.warning(
+                    f"Embedding count mismatch for page {page_num} of {filename}: expected {len(valid_chunks)}, got {len(embeddings)}"
+                )
+                 continue
+
+            for i, chunk_text in enumerate(valid_chunks):
+                embedding = embeddings[i]
 
                 # Create unique source_id
                 source_id = str(uuid.uuid4())

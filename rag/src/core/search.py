@@ -1,6 +1,7 @@
 import logging
 import os
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Tuple
 
 import dotenv
@@ -25,11 +26,11 @@ OCEANBASE_DBNAME = os.getenv("OCEANBASE_DBNAME")
 TABLE_NAME = "rag_documents"
 
 # Retrieval parameters (configurable via env)
-TOP_K = int(os.getenv("TOP_K", "5"))
+TOP_K = int(os.getenv("TOP_K", "15"))
 BM25_CANDIDATES = int(os.getenv("BM25_CANDIDATES", str(TOP_K * 4)))
 VEC_CANDIDATES = int(os.getenv("VEC_CANDIDATES", str(TOP_K * 6)))
 RRF_K = float(os.getenv("RRF_K", "60"))  # RRF 常数项
-MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "6000"))
+MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "20000"))
 
 
 def _build_fts_query(query: str) -> Dict:
@@ -74,17 +75,25 @@ def _rrf_fuse(bm25: List[Dict], dense: List[Dict], top_k: int) -> List[Dict]:
 
 
 def _truncate_context(chunks: List[str], limit: int) -> List[str]:
+    """
+    Truncate context to fit within the limit, prioritizing complete chunks.
+    """
     out = []
     total = 0
     for c in chunks:
-        if total + len(c) <= limit:
+        c_len = len(c)
+        if total + c_len <= limit:
             out.append(c)
-            total += len(c)
+            total += c_len
         else:
-            remain = max(0, limit - total)
-            if remain > 50:  # 至少保留一些字符
-                out.append(c[:remain])
+            # If the chunk is very large and we haven't added anything, or we have space for a significant portion
+            remain = limit - total
+            if remain > 200:  # Only add partial if we can add a meaningful amount
+                out.append(c[:remain] + "...")
                 total += remain
+            elif not out: # If empty, force add at least one chunk (truncated)
+                out.append(c[:limit] + "...")
+                total += limit
             break
     return out
 
@@ -110,7 +119,7 @@ def search(question: str) -> Answer:
         # 2) 初始化客户端
         client = get_or_create_client()
 
-        # 3) 分别执行 BM25 与 向量检索
+        # 3) 分别执行 BM25 与 向量检索 (并行)
         fts_query = _build_fts_query(question)
 
         bm25_request = {
@@ -135,8 +144,23 @@ def search(question: str) -> Answer:
         logger.debug(
             f"Searching: BM25 size={BM25_CANDIDATES}, VEC size={VEC_CANDIDATES}, TOP_K={TOP_K}"
         )
-        bm25_results = client.search(index=TABLE_NAME, body=bm25_request) or []
-        vec_results = client.search(index=TABLE_NAME, body=vec_request) or []
+        
+        bm25_results = []
+        vec_results = []
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            future_bm25 = executor.submit(client.search, index=TABLE_NAME, body=bm25_request)
+            future_vec = executor.submit(client.search, index=TABLE_NAME, body=vec_request)
+            
+            try:
+                bm25_results = future_bm25.result() or []
+            except Exception as e:
+                logger.error(f"BM25 search failed: {e}")
+
+            try:
+                vec_results = future_vec.result() or []
+            except Exception as e:
+                logger.error(f"Vector search failed: {e}")
 
         if not bm25_results and not vec_results:
             logger.warning(f"No search results found for question: '{question[:50]}...'")
