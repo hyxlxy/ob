@@ -65,7 +65,12 @@ int ObSRBMWIterImpl::init(
     } else if (OB_FAIL(id_cache_.prepare_allocate(top_k_count_))) {
       LOG_WARN("failed to prepare allocate id cache", K(ret));
     } else {
+      // seed warm-up: take half of top_k_count_ or minimal 8 as initial fill target
+      seed_topk_ = top_k_count_ / 2;
+      if (seed_topk_ < 8) seed_topk_ = 8;
+      if (seed_topk_ > top_k_count_) seed_topk_ = top_k_count_;
       is_inited_ = true;
+      LOG_DEBUG("[BMW] init with seed topk", K_(top_k_count), K_(seed_topk), K_(initial_threshold));
     }
   }
   return ret;
@@ -85,6 +90,8 @@ void ObSRBMWIterImpl::reset()
 {
   top_k_heap_.reset();
   top_k_count_ = 0;
+  seed_topk_ = 0;
+  initial_threshold_ = 0.0;
   status_ = BMWStatus::MAX_STATUS;
   domain_id_cmp_.reset();
   id_cache_.reset();
@@ -223,13 +230,32 @@ int ObSRBMWIterImpl::build_top_k_heap()
     bool need_project = true;
     double relevance = 0.0;
     const ObDatum *id_datum = nullptr;
+    // Phase 1: seed warm-up to quickly raise heap threshold
+    while (OB_SUCC(ret) && top_k_heap_.count() < seed_topk_) {
+      if (OB_FAIL(fill_merge_heap())) {
+        if (OB_UNLIKELY(OB_ITER_END != ret)) {
+          LOG_WARN("failed to fill merge heap in seed phase", K(ret));
+        }
+      } else if (OB_FAIL(collect_dims_by_id(id_datum, relevance, need_project))) {
+        LOG_WARN("failed to collect dims by id in seed phase", K(ret));
+      }
+    }
+    // Raise initial threshold using current heap top (if any)
+    if (top_k_heap_.count() > 0) {
+      const double heap_top = top_k_heap_.top().relevance_;
+      if (heap_top > initial_threshold_) {
+        initial_threshold_ = heap_top;
+      }
+      LOG_DEBUG("[BMW] seed finished, raise initial threshold", K_(seed_topk), K(heap_top), K_(initial_threshold));
+    }
+    // Phase 2: continue to fill full top_k_count_
     while (OB_SUCC(ret) && top_k_heap_.count() < top_k_count_) {
       if (OB_FAIL(fill_merge_heap())) {
         if (OB_UNLIKELY(OB_ITER_END != ret)) {
-          LOG_WARN("failed to fill merge heap", K(ret));
+          LOG_WARN("failed to fill merge heap in full phase", K(ret));
         }
       } else if (OB_FAIL(collect_dims_by_id(id_datum, relevance, need_project))) {
-        LOG_WARN("failed to collect dims by id", K(ret));
+        LOG_WARN("failed to collect dims by id in full phase", K(ret));
       }
     }
 

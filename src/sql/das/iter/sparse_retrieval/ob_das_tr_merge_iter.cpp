@@ -509,7 +509,7 @@ int ObDASTRMergeIter::create_sparse_retrieval_iter()
     sr_iter_param_.topk_limit_ = expanded;
     LOG_DEBUG("[TR Merge] apply topk expand factor", K_(topk_limit), K(expanded), K(OB_TR_TOPK_EXPAND_FACTOR));
   } else {
-    sr_iter_param_.topk_limit_ = topk_limit_;
+  sr_iter_param_.topk_limit_ = topk_limit_;
   }
   // Two-phase hook: score lower bound to prune by BMW. Phase-1 min score will be wired later.
   sr_iter_param_.score_lower_bound_ = 0.0; // epsilon lowering will be applied on phase-1 min score in follow-ups

@@ -109,6 +109,7 @@ protected:
   // final projection buffer in relevance-desc order
   ObFixedArray<TopKItem, ObIAllocator> projected_items_;
   int64_t projected_pos_;
+  int64_t seed_topk_;
   BMWStatus status_;
 };
 

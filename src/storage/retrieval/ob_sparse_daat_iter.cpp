@@ -17,6 +17,7 @@
 #define USING_LOG_PREFIX STORAGE
 
 #include "ob_sparse_daat_iter.h"
+#include <algorithm>
 
 namespace oceanbase
 {
@@ -145,8 +146,31 @@ int ObSRDaaTIterImpl::init(
     } else if (OB_FAIL(merge_heap_->open(dim_iters_->count()))) {
       LOG_WARN("failed to open iter loser tree", K(ret));
     } else {
+      // 默认顺序
       for (int64_t i = 0; i < dim_iters.count(); ++i) {
         next_round_iter_idxes_[i] = i;
+      }
+      // 维度顺序优化：按 max_score×权重×field_boost 降序重排（若接口不支持则沿用默认顺序）
+      bool can_reorder = true;
+      common::ObSEArray<std::pair<double,int64_t>, 16> ord;
+      for (int64_t i = 0; i < dim_iters.count(); ++i) {
+        double s = 0.0;
+        if (OB_FAIL(dim_iters.at(i)->get_dim_max_score(s))) {
+          can_reorder = false;
+          ret = OB_SUCCESS; // 忽略不支持情况
+          break;
+        }
+        if (OB_NOT_NULL(iter_param_->dim_weights_) && i < iter_param_->dim_weights_->count()) {
+          s *= iter_param_->field_boost_ * iter_param_->dim_weights_->at(i);
+        }
+        ord.push_back({s, i});
+      }
+      if (can_reorder && ord.count() == dim_iters.count()) {
+        std::sort(ord.begin(), ord.end(), [](const auto &a, const auto &b){ return a.first > b.first; });
+        for (int64_t i = 0; i < ord.count(); ++i) {
+          next_round_iter_idxes_[i] = ord.at(i).second;
+        }
+        LOG_DEBUG("[Sparse Retrieval] reorder dim by max_score*weight", K(ord.count()));
       }
     }
 
