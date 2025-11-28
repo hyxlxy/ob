@@ -199,11 +199,13 @@ protected:
 
 // Forward declaration for friend
 struct ObIRIterLoserTreeCmp;
+class ObDASTRDaatIter;
 
 class ObDASTRCacheIter : public ObDASTextRetrievalIter
 {
   // Friend declaration to allow direct access to doc_id_ array for optimization
   friend struct ObIRIterLoserTreeCmp;
+  friend class ObDASTRDaatIter;
 public:
   ObDASTRCacheIter();
   virtual ~ObDASTRCacheIter() {}
