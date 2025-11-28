@@ -18,6 +18,7 @@
 #include "sql/das/iter/ob_das_scan_iter.h"
 #include "storage/tx_storage/ob_access_service.h"
 #include "src/sql/engine/ob_exec_context.h"
+#include "common/ad_log.h"
 
 namespace oceanbase
 {
@@ -70,9 +71,12 @@ int ObDASScanIter::inner_release()
   }
   return ret;
 }
-
-int ObDASScanIter::do_table_scan()
-{
+// do_index_lookup() → do_table_scan() → 初始化扫描，准备数据 → 结果保存在 result_ 中
+int ObDASScanIter::do_table_scan() {
+  static int count = 0;count++;
+  if (count % 1000 == 0) { 
+    adlog::DEBUG("ObDASScanIter::do_table_scan()");
+  }
   int ret = OB_SUCCESS;
   if (OB_ISNULL(scan_param_)) {
     ret = OB_ERR_UNEXPECTED;
@@ -116,7 +120,7 @@ int ObDASScanIter::inner_get_next_row()
 {
   int ret = OB_SUCCESS;
   common::ObASHTabletIdSetterGuard ash_tablet_id_guard(scan_param_ != nullptr? scan_param_->index_id_ : 0);
-
+  adlog::DEBUG("ObDASScanIter::inner_get_next_row()");
   if (OB_ISNULL(result_)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("unexpected nullptr scan iter", K(ret));
@@ -127,12 +131,11 @@ int ObDASScanIter::inner_get_next_row()
   }
   return ret;
 }
-
 int ObDASScanIter::inner_get_next_rows(int64_t &count, int64_t capacity)
 {
   int ret = OB_SUCCESS;
   common::ObASHTabletIdSetterGuard ash_tablet_id_guard(scan_param_ != nullptr? scan_param_->index_id_ : 0);
-
+  
   if (OB_ISNULL(result_)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("unexpected nullptr scan iter", K(ret));

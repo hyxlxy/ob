@@ -127,6 +127,11 @@ struct ObSparseRetrievalMergeParam
   int64_t topk_limit_;
   double field_boost_;
   int64_t max_batch_size_;
+  //ADVISE
+  // bool has_id_less_filter_{false};     // 是否有ID小于过滤条件
+  // uint64_t id_less_value_{UINT64_MAX};      // ID小于的值
+  // bool id_less_filter_extracted_flag_{false}; // ID小于过滤条件是否尝试提取 // 注意，这个主要是起到了一个flag的作用
+  // common::ObString id_column_name_; // ID列名
 };
 
 class ObISparseRetrievalMergeIter

@@ -148,6 +148,11 @@ private:
   int init_topk_limit();
   int init_block_max_iter_param();
   int init_doc_length_est_param();
+//ADVISE
+public:
+  storage::ObISparseRetrievalMergeIter *get_sparse_retrieval_iter() {
+    return sparse_retrieval_iter_;
+  }
 private:
   static const int64_t FWD_IDX_ROWKEY_COL_CNT = 2;
   static const int64_t INV_IDX_ROWKEY_COL_CNT = 2;

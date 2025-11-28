@@ -20,7 +20,7 @@
 #include "storage/concurrency_control/ob_data_validation_service.h"
 #include "sql/das/iter/ob_das_iter_utils.h"
 #include "storage/tx_storage/ob_access_service.h"
-
+#include "common/ad_log.h"
 
 namespace oceanbase
 {
@@ -1806,8 +1806,8 @@ int ObLocalIndexLookupOp::process_data_table_rowkeys(const int64_t size, const O
   return ret;
 }
 
-int ObLocalIndexLookupOp::do_index_lookup()
-{
+int ObLocalIndexLookupOp::do_index_lookup() {
+  adlog::DEBUG("ObLocalIndexLookupOp::do_index_lookup()");
   int ret = OB_SUCCESS;
   ObITabletScan &tsc_service = get_tsc_service();
   ObNewRowIterator *&storage_iter = get_lookup_storage_iter();

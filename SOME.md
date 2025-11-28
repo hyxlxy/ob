@@ -1,7 +1,98 @@
 
+*****************************************2025-11-28 *********************************************************
+
+外层: ObDASCacheLookupIter (最终结果获取)
+├── index_table_iter_ → 内层 ObDASCacheLookupIter (全文检索+条件验证)  
+│   ├── index_table_iter_ → ObDASTRMergeIter -> （ObISparseRetrievalMergeIter 的派生类）ObSRDaaTIterImpl (全文索引扫描)
+│   └── data_table_iter_ → ObDASScanIter 
+└── data_table_iter_ → ObDASFuncLookupIter (最终结果回表)
+
+do_index_look_up 都是调用 data_table_iter_ 的 do_table_scan
+
+现在已知，内层会返回全文检索的行，内层的回表是找到文档id（系统内部生成）对应的主键id
 
 
-==============================================2025-11-26：
+考虑有可能是log_plan.cpp文件里面的问题，尝试去改写路径
+
+*****************************************2025-11-27，28(lingchen) *********************************************************
+
+一个更加清晰地内容：
+
+有关ObDASCacheLookupIter的嵌套的查询内容：
+
+[2025-11-28 02:25:27.196 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
+[2025-11-28 02:25:27.196 DEBUG] --------------INDEX_SCAN----------
+[2025-11-28 02:25:27.196 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
+
+    [2025-11-28 02:25:27.196 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
+    [2025-11-28 02:25:27.196 DEBUG] --------------INDEX_SCAN----------
+    [2025-11-28 02:25:27.196 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
+    [2025-11-28 02:25:27.196 DEBUG] start try id_less_filter_extract
+    [2025-11-28 02:25:27.196 DEBUG] now expr args cnt: 1 now expr type: 178
+    [2025-11-28 02:25:27.196 DEBUG] not T_OP_AND and not id < xxx
+    [2025-11-28 02:25:27.196 DEBUG] now expr args cnt: 2 now expr type: 4617
+    [2025-11-28 02:25:27.196 DEBUG] not T_OP_AND and not id < xxx
+    [2025-11-28 02:25:27.196 DEBUG] now expr args cnt: 0 now expr type: 89
+    [2025-11-28 02:25:27.196 DEBUG] not T_OP_AND and not id < xxx
+    [2025-11-28 02:25:27.196 DEBUG] now expr args cnt: 2 now expr type: 501
+    [2025-11-28 02:25:27.196 DEBUG] not T_OP_AND and not id < xxx
+    [2025-11-28 02:25:27.196 DEBUG] now expr args cnt: 0 now expr type: 26
+    [2025-11-28 02:25:27.196 DEBUG] not T_OP_AND and not id < xxx
+    [2025-11-28 02:25:27.196 DEBUG] now expr args cnt: 0 now expr type: 5
+    [2025-11-28 02:25:27.196 DEBUG] not T_OP_AND and not id < xxx
+    [2025-11-28 02:25:27.196 DEBUG] not find id_less_filter
+    [2025-11-28 02:25:27.197 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
+    [2025-11-28 02:25:27.197 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
+    [2025-11-28 02:25:27.197 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
+    [2025-11-28 02:25:27.197 DEBUG] --------------DO_LOOKUP----------
+    [2025-11-28 02:25:27.197 DEBUG] ObDASLocalLookupIter::do_index_lookup()
+    [2025-11-28 02:25:27.198 DEBUG] --------------OUTPUT_ROWS----------
+    [2025-11-28 02:25:27.198 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
+    [2025-11-28 02:25:27.200 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
+
+[2025-11-28 02:25:27.200 DEBUG] --------------DO_LOOKUP----------
+[2025-11-28 02:25:27.200 DEBUG] ObDASLocalLookupIter::do_index_lookup()
+[2025-11-28 02:25:27.200 DEBUG] ObDASFuncLookupIter::do_table_scan()
+[2025-11-28 02:25:27.201 DEBUG] --------------OUTPUT_ROWS----------
+[2025-11-28 02:25:27.201 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
+[2025-11-28 02:25:27.206 DEBUG] ObDASFuncLookupIter::do_index_lookup()
+[2025-11-28 02:25:27.206 DEBUG] ObSRDaaTIterImpl::id_count: 2
+[2025-11-28 02:25:27.206 DEBUG] ObTextDaaTIter::init
+[2025-11-28 02:25:27.214 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
+
+
+有关于 内层的 data_table_iter  是 ObDASScanIter.
+目前来看：
+这个嵌套的内容中：
+
+外层: ObDASCacheLookupIter (最终结果获取)
+├── index_table_iter_ → 内层 ObDASCacheLookupIter (全文检索+条件验证)  
+│   ├── index_table_iter_ → ObDASTRMergeIter -> （ObISparseRetrievalMergeIter 的派生类）ObSRDaaTIterImpl (全文索引扫描)
+│   └── data_table_iter_ → ObDASScanIter 
+└── data_table_iter_ → ObDASFuncLookupIter (最终结果回表)
+
+
+
+所以现在的目标是希望可以在内层的全文索引扫描的时候就把id给筛掉，这样子应该可以快一些。
+所以希望可以把data_table_iter里面有关filter或者range的内容提取出来。
+
+那么以下内容是ObDASScanIter中的成员变量
+  common::ObITabletScan *tsc_service_;
+  common::ObNewRowIterator *result_;
+  // must ensure the lifecycle of scan param is longer than scan iter.
+  storage::ObTableScanParam *scan_param_;
+
+目前猜测：利用tsc_service_或者scan_param_,但是scan_param_貌似是要do_table_scan之后才初始化的？
+      不，应该是猜测scan_param_在之前的某个时候就已经被设定好了，因为在ObDASScanIter中看到了set_scan_param的函数
+
+    然后在scan_param里的基类里有如下变量：
+      const sql::ObExprPtrIArray *op_filters_;
+      sql::ObPushdownFilterExecutor *pd_storage_filters_;
+        在它本身里还有key_range
+
+所以目前的进度就是确定好data_table_iter里面有关filter或者range的内容，然后放进我们之前写好的ObSRDaaTIterImpl里的关于id的less的内容当中.
+
+*****************************************2025-11-26 *********************************************************
 
 [2025-11-26 14:56:08.944 DEBUG] === ObDDLBlockSampleScanOp::open called ===
 [2025-11-26 14:56:09.372 DEBUG] === ObDDLBlockSampleScanOp::open called ===

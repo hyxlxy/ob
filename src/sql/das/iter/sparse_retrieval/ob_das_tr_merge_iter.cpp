@@ -17,7 +17,7 @@
 #define USING_LOG_PREFIX SQL_DAS
 #include "ob_das_tr_merge_iter.h"
 #include "sql/das/ob_das_ir_define.h"
-
+#include "common/ad_log.h"
 namespace oceanbase
 {
 using namespace share;
@@ -1076,6 +1076,7 @@ int ObDASTRMergeIter::inner_get_next_row()
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("sparse retrieval iter is null", K(ret));
   } else {
+    adlog::DEBUG("sparse_retrieval_iter_->get_next_row()");
     ret = sparse_retrieval_iter_->get_next_row();
   }
   return ret;
@@ -1093,6 +1094,7 @@ int ObDASTRMergeIter::inner_get_next_rows(int64_t &count, int64_t capacity)
   } else if (OB_UNLIKELY(0 == capacity)) {
     count = 0;
   } else {
+    adlog::DEBUG("sparse_retrieval_iter_->get_next_rows()");
     ret = sparse_retrieval_iter_->get_next_rows(capacity, count);
   }
   return ret;

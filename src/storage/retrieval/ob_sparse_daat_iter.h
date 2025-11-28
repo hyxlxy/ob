@@ -21,6 +21,7 @@
 #include "ob_sparse_utils.h"
 #include "lib/container/ob_loser_tree.h"
 #include "sql/das/ob_das_ir_define.h"
+#include <cstdint>
 
 namespace oceanbase
 {
@@ -102,6 +103,25 @@ protected:
   ObFixedArray<int64_t, ObIAllocator> next_round_iter_idxes_;
   int64_t next_round_cnt_;
   void (*set_datum_func_)(ObDatum &, const ObDocIdExt &);
+
+  // ADVISE
+  int ididid;
+  bool has_id_less_filter_{false};     // 是否有ID小于过滤条件
+  uint64_t id_less_value_{UINT64_MAX};      // ID小于的值
+  bool id_less_filter_extracted_flag_{
+      false}; // ID小于过滤条件是否尝试提取 //
+              // 注意，这个主要是起到了一个flag的作用
+  
+  int extract_id_less_filter_from_expr(ObExpr *filter_expr);
+  int analyze_and_expr_tree(ObExpr *expr);
+  bool is_id_column_expr(ObExpr *expr);
+
+public:
+  void set_id_less(int64_t val) {
+    has_id_less_filter_ = true;
+    id_less_filter_extracted_flag_ = true;
+    id_less_value_ = val;
+  }
 private:
   DISALLOW_COPY_AND_ASSIGN(ObSRDaaTIterImpl);
 };

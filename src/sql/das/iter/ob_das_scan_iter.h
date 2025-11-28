@@ -19,6 +19,7 @@
 
 #include "sql/das/iter/ob_das_iter.h"
 #include "sql/das/ob_das_scan_op.h"
+#include "common/ad_log.h"
 namespace oceanbase
 {
 namespace common {
@@ -61,8 +62,14 @@ public:
   virtual ~ObDASScanIter() {}
   common::ObNewRowIterator *&get_output_result_iter() { return result_; }
 
-  void set_scan_param(storage::ObTableScanParam &scan_param) { scan_param_ = &scan_param; }
-  storage::ObTableScanParam &get_scan_param() { return *scan_param_; }
+  void set_scan_param(storage::ObTableScanParam &scan_param) {
+    // adlog::DEBUG("ObDASScanIter set_scan_param");
+    scan_param_ = &scan_param;
+  }
+  storage::ObTableScanParam &get_scan_param() {
+    adlog::DEBUG("ObDASScanIter get_scan_param");
+    return *scan_param_;
+  }
 
   virtual int do_table_scan() override;
   virtual int rescan() override;

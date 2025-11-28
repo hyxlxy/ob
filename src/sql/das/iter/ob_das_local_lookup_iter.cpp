@@ -22,7 +22,7 @@
 #include "sql/das/ob_das_ir_define.h"
 #include "sql/das/ob_das_vec_define.h"
 #include "storage/concurrency_control/ob_data_validation_service.h"
-
+#include "common/ad_log.h"
 namespace oceanbase
 {
 using namespace common;
@@ -156,9 +156,26 @@ int ObDASLocalLookupIter::init_scan_param(ObTableScanParam &param, const ObDASSc
       param.tx_id_.reset();
     }
     if (!ctdef->pd_expr_spec_.pushdown_filters_.empty()) {
+      adlog::DEBUG("!!!!!!ctdef->pd_expr_spec_.pushdown_filters_.empty()");
       param.op_filters_ = &ctdef->pd_expr_spec_.pushdown_filters_;
+      // 检查是否有 id < 1000 的过滤条件
+      const common::ObIArray<ObExpr*> *filters = &ctdef->pd_expr_spec_.pushdown_filters_;
+      for (int i = 0; i < filters->count(); i++) {
+          const ObExpr *filter = filters->at(i);
+          if (nullptr != filter) {
+              // 检查是否是 id < 1000 类型的条件
+              adlog::DEBUG("pushdown filter type: %d", filter->type_);
+              // 可能需要检查 filter 的具体表达式内容
+          }
+      }
+    } else {
+      adlog::DEBUG("ctdef->pd_expr_spec_.pushdown_filters_.empty()");
     }
     param.pd_storage_filters_ = rtdef->p_pd_expr_op_->pd_storage_filters_;
+    // 检查 pd_storage_filters_ 中是否有相关过滤条件
+    if (nullptr != rtdef->p_pd_expr_op_->pd_storage_filters_) {
+      adlog::DEBUG("pd_storage_filters_ is not null, may contain id < 1000 condition");
+    }
     if (FAILEDx(param.column_ids_.assign(ctdef->access_column_ids_))) {
       LOG_WARN("failed to assign column ids", K(ret));
     }
@@ -240,25 +257,39 @@ int ObDASLocalLookupIter::add_rowkeys(int64_t count)
   return ret;
 }
 
-int ObDASLocalLookupIter::do_index_lookup()
-{
+int ObDASLocalLookupIter::do_index_lookup() {
+  adlog::DEBUG("ObDASLocalLookupIter::do_index_lookup()");
+  // 检查当前要回表的 rowkey 数量
+  // adlog::DEBUG("lookup_rowkey_cnt_: %ld", lookup_rowkey_cnt_);
+
   int ret = OB_SUCCESS;
   OB_ASSERT(data_table_iter_->get_type() == DAS_ITER_SCAN ||
             data_table_iter_->get_type() == DAS_ITER_FUNC_LOOKUP ||
             data_table_iter_->get_type() == DAS_ITER_FUNC_DATA ||
             data_table_iter_->get_type() == DAS_ITER_DOMAIN_ID_MERGE);
   if (is_first_lookup_) {
-    is_first_lookup_ = false;
+  is_first_lookup_ = false;
     if (DAS_ITER_FUNC_DATA != data_table_iter_->get_type() &&
         OB_FAIL(init_scan_param(lookup_param_, lookup_ctdef_, lookup_rtdef_))) {
       LOG_WARN("failed to init scan param", K(ret));
-    } else if (OB_FAIL(data_table_iter_->do_table_scan())) {
-      if (DAS_ITER_FUNC_DATA == data_table_iter_->get_type()) {
-        LOG_WARN("failed to scan func data iter", K(ret));
-      } else if (OB_SNAPSHOT_DISCARDED == ret && lookup_param_.fb_snapshot_.is_valid()) {
-        ret = OB_INVALID_QUERY_TIMESTAMP;
-      } else if (OB_TRY_LOCK_ROW_CONFLICT != ret) {
-        LOG_WARN("failed to do partition scan", K(lookup_param_), K(ret));
+    } else {
+      // 检查扫描参数是否包含标量过滤条件
+      if (lookup_param_.op_filters_) { 
+        adlog::DEBUG("do_index_lookup::scan_param op_filters_:", lookup_param_.op_filters_->count());
+      } else {
+        adlog::DEBUG("do_index_lookup::scan_param op_filters_ nonono");
+      }
+      // adlog::DEBUG("do_index_lookup::scan_param pd_storage_filters_: ",
+      //              lookup_param_.pd_storage_filters_->count());
+      
+      if (OB_FAIL(data_table_iter_->do_table_scan())) {
+        if (DAS_ITER_FUNC_DATA == data_table_iter_->get_type()) {
+          LOG_WARN("failed to scan func data iter", K(ret));
+        } else if (OB_SNAPSHOT_DISCARDED == ret && lookup_param_.fb_snapshot_.is_valid()) {
+          ret = OB_INVALID_QUERY_TIMESTAMP;
+        } else if (OB_TRY_LOCK_ROW_CONFLICT != ret) {
+          LOG_WARN("failed to do partition scan", K(lookup_param_), K(ret));
+        }
       }
     }
   } else {

@@ -4189,7 +4189,7 @@ int ObJoinOrder::check_index_merge_paths_contain_fts(ObIArray<AccessPath*> &acce
   }
   return ret;
 }
-
+#include "common/ad_log.h"
 int IndexMergePath::estimate_cost()
 {
   int ret = OB_SUCCESS;
@@ -4315,6 +4315,8 @@ int IndexMergePath::estimate_cost()
     cost_ += filter_cost;
     OPT_TRACE_COST_MODEL("index_merge_cost (", cost_, ") +=", KV(filter_cost));
   }
+  cost_ = 0;
+  adlog::DEBUG("set index merge path cost = 0");
   DISABLE_OPT_TRACE_COST_MODEL;
   return ret;
 }

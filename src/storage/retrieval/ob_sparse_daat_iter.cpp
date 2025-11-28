@@ -17,7 +17,7 @@
 #define USING_LOG_PREFIX STORAGE
 
 #include "ob_sparse_daat_iter.h"
-
+#include "common/ad_log.h"
 namespace oceanbase
 {
 namespace storage
@@ -71,20 +71,15 @@ int ObSRMergeCmp::cmp(
 }
 
 ObSRDaaTIterImpl::ObSRDaaTIterImpl()
-  : ObISparseRetrievalMergeIter(),
-    iter_allocator_(nullptr),
-    iter_param_(nullptr),
-    dim_iters_(nullptr),
-    merge_cmp_(),
-    merge_heap_(nullptr),
-    relevance_collector_(nullptr),
-    iter_domain_ids_(),
-    buffered_domain_ids_(),
-    buffered_relevances_(),
-    next_round_iter_idxes_(),
-    next_round_cnt_(0),
-    set_datum_func_(nullptr)
-{
+    : ObISparseRetrievalMergeIter(), iter_allocator_(nullptr),
+      iter_param_(nullptr), dim_iters_(nullptr), merge_cmp_(),
+      merge_heap_(nullptr), relevance_collector_(nullptr), iter_domain_ids_(),
+      buffered_domain_ids_(), buffered_relevances_(), next_round_iter_idxes_(),
+      next_round_cnt_(0), set_datum_func_(nullptr) {
+  static int id_count = 0;
+  id_count++;
+  ididid = id_count;
+  adlog::DEBUG("ObSRDaaTIterImpl::id_count: ",id_count);
 }
 
 int ObSRDaaTIterImpl::init(
@@ -178,6 +173,10 @@ void ObSRDaaTIterImpl::reset()
   input_row_cnt_ = 0;
   output_row_cnt_ = 0;
   is_inited_ = false;
+
+  has_id_less_filter_ = false;     // 是否有ID小于过滤条件
+  id_less_value_ = UINT64_MAX;      // ID小于的值
+  id_less_filter_extracted_flag_ = false;
 }
 
 void ObSRDaaTIterImpl::reuse(const bool switch_tablet)
@@ -197,6 +196,10 @@ void ObSRDaaTIterImpl::reuse(const bool switch_tablet)
   }
   input_row_cnt_ = 0;
   output_row_cnt_ = 0;
+
+  has_id_less_filter_ = false;     // 是否有ID小于过滤条件
+  id_less_value_ = UINT64_MAX;      // ID小于的值
+  id_less_filter_extracted_flag_ = false;
 }
 
   int ObSRDaaTIterImpl::get_query_max_score(double &score)
@@ -287,6 +290,23 @@ int ObSRDaaTIterImpl::do_one_merge_round(int64_t &count)
   bool need_project = true;
   double relevance = 0.0;
   const ObDatum *id_datum = nullptr;
+
+  // {
+  //   ObExpr *filter_expr = iter_param_->filter_expr_;
+  //   if (OB_UNLIKELY(!id_less_filter_extracted_flag_)) {
+  //     if (OB_NOT_NULL(filter_expr)) { 
+  //       adlog::DEBUG("start try id_less_filter_extract");
+  //       if (OB_FAIL(extract_id_less_filter_from_expr(filter_expr))) {
+  //         adlog::DEBUG("failed to extract id less filter");
+  //       }
+  //       id_less_filter_extracted_flag_ = true;
+  //       if (!has_id_less_filter_) {
+  //         adlog::DEBUG("not find id_less_filter");
+  //       }
+  //     }
+  //   }
+  // }
+
   if (OB_FAIL(fill_merge_heap())) {
     if (OB_UNLIKELY(OB_ITER_END != ret)) {
       LOG_WARN("failed to fill merge heap", K(ret));
@@ -373,10 +393,39 @@ int ObSRDaaTIterImpl::collect_dims_by_id(const ObDatum *&id_datum, double &relev
     if (OB_ISNULL(id_datum)) {
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("unexpected null id datum", K(ret));
-    } else if (OB_FAIL(relevance_collector_->get_result(relevance, got_valid_id))) {
-      LOG_WARN("failed to get result", K(ret));
-    } else if (got_valid_id && OB_FAIL(process_collected_row(*id_datum, relevance))) {
-      LOG_WARN("failed to process collected row", K(ret));
+    } else {
+
+      // // 在这里添加ID筛选逻辑 - 回表前的筛选
+      // bool id_passes_filter = true;
+      // if (has_id_less_filter_) {
+      //   int64_t current_id = 0;
+      //   current_id = static_cast<int64_t>(id_datum->get_int());
+
+      //   id_passes_filter = (current_id < id_less_value_);
+      //   static int count = 0;
+      //   count++;
+      //   if (count % 100 == 0) {
+      //     adlog::DEBUG("current_id: ", current_id, " id_less_value_: ",id_less_value_);
+      //     {
+      //       auto str = id_datum->get_string();
+      //       std::string std_str(str.ptr(), str.length());  // 转换为 std::string
+      //       adlog::DEBUG("current_id_str: ",std_str);
+      //     }
+      //   }
+      // }
+      
+      // // 如果ID不满足筛选条件，直接返回，不进行后续处理（包括回表）
+      // if (!id_passes_filter) {
+      //   got_valid_id = false;  // 标记为无效ID，不进行回表
+      //   return ret;  // 直接返回，跳过后续的process_collected_row
+      // }
+
+
+      if (OB_FAIL(relevance_collector_->get_result(relevance, got_valid_id))) {
+        LOG_WARN("failed to get result", K(ret));
+      } else if (got_valid_id && OB_FAIL(process_collected_row(*id_datum, relevance))) {
+        LOG_WARN("failed to process collected row", K(ret));
+      }
     }
   }
 
@@ -493,6 +542,130 @@ int ObSRDaaTIterImpl::project_results(const int64_t count)
     relevance_proj_expr->set_evaluated_projected(*eval_ctx);
   }
   return ret;
+}
+
+// ADVISE
+int ObSRDaaTIterImpl::extract_id_less_filter_from_expr(ObExpr *filter_expr)
+{
+  int ret = OB_SUCCESS;
+  if (OB_ISNULL(filter_expr)) {
+    adlog::DEBUG("filter_expr is nullptr");
+    return ret;
+  }
+  
+  // 分析AND连接的表达式树
+  if (OB_FAIL(analyze_and_expr_tree(filter_expr))) {
+    LOG_WARN("failed to analyze and expression tree for id less filter", K(ret));
+  }
+  
+  return ret;
+}
+int ObSRDaaTIterImpl::analyze_and_expr_tree(ObExpr *expr)
+{
+  int ret = OB_SUCCESS;
+
+  {
+    static int dep = 0;
+    dep++;
+    if (dep >= 10000) {
+      adlog::DEBUG("over dep");
+      return ret;
+    }
+  }
+
+  if (OB_ISNULL(expr)) {
+    adlog::DEBUG("expr tree : expr is nullptr");
+    return ret;
+  }
+  adlog::DEBUG("now expr args cnt: ",expr->arg_cnt_," now expr type: ",expr->type_);
+  // 检查当前表达式是否是 id < 数字 的形式
+  if (expr->type_ == T_OP_LT && expr->arg_cnt_ == 2) {
+    adlog::DEBUG("right now expr is id < xxx");
+    ObExpr *left = expr->args_[0];
+    ObExpr *right = expr->args_[1];
+    
+    // 检查是否是 id < 数字
+    if (left && right && 
+        is_id_column_expr(left) && 
+        right->is_const_expr()) {
+      
+      // 检查右边表达式的类型是否为整数类型
+      if (right->datum_meta_.type_ == common::ObIntType || 
+          right->datum_meta_.type_ == common::ObUInt64Type) {
+        // 获取常量值
+        ObDatum *datum = nullptr;
+        if (OB_SUCC(right->eval(*iter_param_->eval_ctx_, datum)) && OB_NOT_NULL(datum)) {
+          uint64_t value = 0;
+          if (datum->is_null()) {
+            value = 0;
+          } 
+          else {
+            // 基于表达式的元信息我们知道这是整数，安全获取
+            if (right->datum_meta_.type_ == common::ObIntType) {
+              int64_t temp_val = datum->get_int();
+              value = static_cast<uint64_t>(temp_val);
+            } else if (right->datum_meta_.type_ == common::ObUInt64Type) {
+              value = datum->get_uint();
+            }
+          }
+          
+          id_less_value_ = value;
+          has_id_less_filter_ = true;
+          adlog::DEBUG("have got id_less_value");
+        }
+      }
+    }
+  }
+  // 如果是AND操作，递归处理子表达式
+  else if (expr->type_ == T_OP_AND) {
+    adlog::DEBUG("now expr type is T_OP_AND , have",expr->arg_cnt_ ," expr sons");
+    for (int64_t i = 0; i < expr->arg_cnt_; ++i) {
+      ObExpr *child_expr = expr->args_[i];
+      if (OB_FAIL(analyze_and_expr_tree(child_expr))) {
+        LOG_WARN("failed to analyze child expression", K(ret));
+        break;
+      }
+    }
+  } else {
+    adlog::DEBUG("not T_OP_AND and not id < xxx");
+    // 尝试递归分析所有子表达式
+    for (int64_t i = 0; i < expr->arg_cnt_; ++i) {
+      ObExpr *child_expr = expr->args_[i];
+      if (OB_NOT_NULL(child_expr)) {
+        if (OB_FAIL(analyze_and_expr_tree(child_expr))) {
+          LOG_WARN("failed to analyze general child expression", K(ret));
+          break;
+        }
+      }
+    }
+  }
+  
+  return ret;
+}
+
+
+bool ObSRDaaTIterImpl::is_id_column_expr(ObExpr *expr)
+{
+  if (OB_ISNULL(expr) || OB_ISNULL(iter_param_) || OB_ISNULL(iter_param_->id_proj_expr_)) {
+    return false;
+  }
+  
+  // 检查当前表达式是否与ID投影表达式相同（即是否是ID列）
+  // 这是最可靠的方法，因为id_proj_expr_就是指向ID列的表达式
+  if (expr == iter_param_->id_proj_expr_) {
+    return true;
+  }
+  
+  // 如果是列引用且类型匹配ID列类型
+  if (expr->type_ == T_REF_COLUMN) {
+    // 检查数据类型是否匹配ID列的类型
+    if (expr->datum_meta_.type_ == iter_param_->id_proj_expr_->datum_meta_.type_) {
+      // 由于没有直接的列名，我们基于类型和上下文来判断
+      return true;
+    }
+  }
+  
+  return false;
 }
 
 } // namespace storage

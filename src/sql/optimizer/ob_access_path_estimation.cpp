@@ -2758,30 +2758,59 @@ bool ObAccessPathEstimation::is_retry_ret(int ret)
          ret == OB_LS_NOT_EXIST ||
          ret == OB_TABLET_NOT_EXIST;
 }
-
+#include "common/ad_log.h"
 int ObAccessPathEstimation::classify_paths(ObIArray<AccessPath *> &paths,
                                            ObIArray<AccessPath *> &normal_paths,
                                            ObIArray<AccessPath *> &geo_paths,
                                            ObIArray<IndexMergePath *> &index_merge_paths)
 {
+  // int ret = OB_SUCCESS;
+  // for (int64_t i = 0; OB_SUCC(ret) && i < paths.count(); ++i) {
+  //   if (OB_ISNULL(paths.at(i))) {
+  //     ret = OB_ERR_UNEXPECTED;
+  //     LOG_WARN("get null path", K(ret));
+  //   } else if (paths.at(i)->is_index_merge_path()) {
+  //     if
+  //     (OB_FAIL(index_merge_paths.push_back(static_cast<IndexMergePath*>(paths.at(i)))))
+  //     {
+  //       LOG_WARN("failed to push back index merge path", K(ret));
+  //     } else if
+  //     (OB_FAIL(static_cast<IndexMergePath*>(paths.at(i))->get_all_scan_access_paths(normal_paths)))
+  //     {
+  //       LOG_WARN("failed to get index merge scan path", K(ret));
+  //     }
+  //   } else if (paths.at(i)->est_cost_info_.index_meta_info_.is_geo_index_) {
+  //     if (OB_FAIL(geo_paths.push_back(paths.at(i)))) {
+  //       LOG_WARN("failed to push back geo path", K(ret));
+  //     }
+  //   } else if (OB_FAIL(normal_paths.push_back(paths.at(i)))) {
+  //     LOG_WARN("failed to push back normal path", K(ret));
+  //   }
+  // }
+
   int ret = OB_SUCCESS;
   for (int64_t i = 0; OB_SUCC(ret) && i < paths.count(); ++i) {
+    static int count = 0 ;count++;
     if (OB_ISNULL(paths.at(i))) {
       ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("get null path", K(ret));
+      if(count%1==0){
+        adlog::DEBUG("get null path");
+        LOG_WARN("get null path", K(ret));
+      }
     } else if (paths.at(i)->is_index_merge_path()) {
+      adlog::DEBUG("there is index merge path");
       if (OB_FAIL(index_merge_paths.push_back(static_cast<IndexMergePath*>(paths.at(i))))) {
         LOG_WARN("failed to push back index merge path", K(ret));
-      } else if (OB_FAIL(static_cast<IndexMergePath*>(paths.at(i))->get_all_scan_access_paths(normal_paths))) {
+        adlog::DEBUG("fail to push back index merge path");
+      }
+      else if (OB_FAIL(static_cast<IndexMergePath *>(paths.at(i))
+                           ->get_all_scan_access_paths(normal_paths))) {
         LOG_WARN("failed to get index merge scan path", K(ret));
-      }
-    } else if (paths.at(i)->est_cost_info_.index_meta_info_.is_geo_index_) {
-      if (OB_FAIL(geo_paths.push_back(paths.at(i)))) {
-        LOG_WARN("failed to push back geo path", K(ret));
-      }
+        adlog::DEBUG("fail index merge path i", i);
+        }
     } else if (OB_FAIL(normal_paths.push_back(paths.at(i)))) {
-      LOG_WARN("failed to push back normal path", K(ret));
-    }
+          LOG_WARN("failed to push back normal path", K(ret));
+        }
   }
   return ret;
 }

@@ -22,7 +22,7 @@
 #include "sql/das/ob_das_ir_define.h"
 #include "storage/concurrency_control/ob_data_validation_service.h"
 #include "sql/das/iter/ob_das_text_retrieval_iter.h"
-
+#include "common/ad_log.h"
 namespace oceanbase
 {
 using namespace common;
@@ -115,8 +115,8 @@ int ObDASFuncLookupIter::inner_release()
   return ret;
 }
 
-int ObDASFuncLookupIter::do_table_scan()
-{
+int ObDASFuncLookupIter::do_table_scan() {
+  adlog::DEBUG("ObDASFuncLookupIter::do_table_scan()");
   int ret = OB_SUCCESS;
   start_table_scan_ = true;
   OB_ASSERT(index_table_iter_->get_type() == DAS_ITER_SCAN);
@@ -183,8 +183,8 @@ int ObDASFuncLookupIter::inner_get_next_row()
   return ret;
 }
 
-int ObDASFuncLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
-{
+int ObDASFuncLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity) {
+  adlog::DEBUG(" ObDASFuncLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)");
   int ret = OB_SUCCESS;
   ObDASScanIter *index_table_iter = static_cast<ObDASScanIter *>(index_table_iter_);
   storage::ObTableScanParam &index_scan_param = index_table_iter->get_scan_param();
@@ -233,8 +233,9 @@ int ObDASFuncLookupIter::add_rowkeys(int64_t storage_count)
   return ret;
 }
 
-int ObDASFuncLookupIter::do_index_lookup()
-{
+int ObDASFuncLookupIter::do_index_lookup() {
+  adlog::DEBUG("ObDASFuncLookupIter::do_index_lookup()");
+  
   int ret = OB_SUCCESS;
   OB_ASSERT(data_table_iter_->get_type() == DAS_ITER_FUNC_DATA);
   ObDASScanIter *index_table_iter = static_cast<ObDASScanIter *>(index_table_iter_);
