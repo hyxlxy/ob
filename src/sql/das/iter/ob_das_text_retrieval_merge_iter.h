@@ -271,6 +271,9 @@ protected:
               ObDASTextRetrievalIter &iter,
               const int64_t iter_idx,
               ObIRIterLoserTreeItem &item);
+  int try_refill_iter_from_cache(
+      const ObIRIterLoserTreeItem &consumed_item,
+      bool &refilled);
   int next_disjunctive_document(const bool is_batch, bool &doc_valid);
 protected:
   ObIRIterLoserTreeCmp loser_tree_cmp_;

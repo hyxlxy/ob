@@ -1,0 +1,26 @@
+Diagnostics:
+  Suppress:
+    - incompatible-pointer-types
+    - incompatible-pointer-types-discards-qualifiers
+    - invalid-static-cast-downcast
+    - no-matching-function
+    - invalid-member-function-call
+    - member-reference-base-type
+  UnusedIncludes: None
+  MissingIncludes: None
+  ClangTidy:
+    Add: []
+    Remove: [*]
+Index:
+  Background: Build
+  StandardLibrary: Yes
+CompileFlags:
+  Add:
+    - -Wno-error
+    - -Wno-incompatible-pointer-types
+    - -Wno-invalid-static-cast-downcast
+    - -Wno-undefined-internal
+    - -Wno-undefined-inline
+    - -fno-strict-aliasing
+
+

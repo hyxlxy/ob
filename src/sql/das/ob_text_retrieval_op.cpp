@@ -212,11 +212,26 @@ void ObTextRetrievalMerge::reset()
 
 int ObTextRetrievalMerge::get_next_row(ObNewRow *&row)
 {
-  int ret = OB_SUCCESS;
+  int64_t cnt = 0;
+  int ret = get_next_rows(cnt, 1);
+  if (OB_FAIL(ret) && OB_UNLIKELY(OB_ITER_END != ret)) {
+    LOG_WARN("failed to fetch single text retrieval row", K(ret));
+  }
+  return ret;
+}
 
-  if (IS_NOT_INIT) {
+int ObTextRetrievalMerge::get_next_rows(int64_t &count, int64_t capacity)
+{
+  int ret = OB_SUCCESS;
+  int64_t fetched = 0;
+  bool reached_iter_end = false;
+
+  if (capacity <= 0) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("invalid batch capacity", K(ret), K(capacity));
+  } else if (IS_NOT_INIT) {
     ret = OB_NOT_INIT;
-    LOG_WARN("not inited", K(ret));
+    LOG_WARN("text retrieval merge not init", K(ret));
   } else if (0 == query_tokens_.count()) {
     ret = OB_ITER_END;
   } else if (!doc_cnt_calculated_) {
@@ -229,19 +244,28 @@ int ObTextRetrievalMerge::get_next_row(ObNewRow *&row)
     }
   }
   
-  bool got_valid_document = false;
-  ObExpr *match_filter = retrieval_param_.need_relevance()
-      ? retrieval_param_.get_ir_ctdef()->match_filter_ : nullptr;
+  ObExpr *match_filter = nullptr;
   ObDatum *filter_res = nullptr;
+  if (OB_SUCC(ret)) {
+    match_filter = retrieval_param_.need_relevance()
+        ? retrieval_param_.get_ir_ctdef()->match_filter_
+        : nullptr;
+  }
+
+  while (OB_SUCC(ret) && !reached_iter_end && fetched < capacity) {
+    bool got_valid_document = false;
   while (OB_SUCC(ret) && !got_valid_document) {
     clear_evaluated_infos();
     if (OB_FAIL(pull_next_batch_rows())) {
-      if (OB_UNLIKELY(OB_ITER_END != ret)) {
+        if (OB_LIKELY(OB_ITER_END == ret)) {
+          reached_iter_end = true;
+          ret = OB_SUCCESS;
+        } else {
         LOG_WARN("failed to pull next batch rows from iterator", K(ret));
       }
     } else if (OB_FAIL(next_disjunctive_document())) {
       LOG_WARN("failed to get next document with disjunctive tokens", K(ret));
-    } else if (OB_ISNULL(match_filter)) {
+      } else if (nullptr == match_filter) {
       got_valid_document = true;
     } else if (OB_FAIL(match_filter->eval(*retrieval_param_.get_ir_rtdef()->eval_ctx_, filter_res))) {
       LOG_WARN("failed to evaluate match filter", K(ret));
@@ -250,21 +274,17 @@ int ObTextRetrievalMerge::get_next_row(ObNewRow *&row)
     }
   }
 
-  return ret;
-}
-
-int ObTextRetrievalMerge::get_next_rows(int64_t &count, int64_t capacity)
-{
-  // only one row at a time
-  // TODO: support batch vectorized execution later
-  int ret = OB_SUCCESS;
-  if (OB_FAIL(get_next_row())) {
-    if (OB_UNLIKELY(OB_ITER_END != ret)) {
-      LOG_WARN("failed to get next row", K(ret));
+    if (OB_SUCC(ret) && got_valid_document) {
+      ++fetched;
     }
-  } else {
-    count += 1;
   }
+
+  if (OB_SUCC(ret) && fetched > 0) {
+    count += fetched;
+  } else if (OB_SUCC(ret) && 0 == fetched) {
+    ret = OB_ITER_END;
+  }
+
   return ret;
 }
 
@@ -866,15 +886,32 @@ int ObTextRetrievalOp::inner_get_next_row_for_output()
 
 int ObTextRetrievalOp::get_next_rows(int64_t &count, int64_t capacity)
 {
-  // only one row at a time
-  // TODO: support batch vectorized execution later
   int ret = OB_SUCCESS;
-  if (OB_FAIL(get_next_row())) {
-    if (OB_UNLIKELY(OB_ITER_END != ret)) {
-      LOG_WARN("failed to get next row", K(ret));
-    }
+  int64_t fetched = 0;
+  ObNewRow *row = nullptr;
+  if (capacity <= 0) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("invalid batch capacity", K(ret), K(capacity));
+  }
+
+  while (OB_SUCC(ret) && fetched < capacity) {
+    if (OB_FAIL(get_next_row(row))) {
+      if (OB_LIKELY(OB_ITER_END == ret)) {
+        ret = OB_SUCCESS;
   } else {
-    count += 1;
+        LOG_WARN("failed to get next row for batch output", K(ret));
+      }
+      break;
+    } else {
+      ++fetched;
+    }
+  }
+
+  if (OB_SUCC(ret)) {
+    count += fetched;
+    if (0 == fetched) {
+      ret = OB_ITER_END;
+    }
   }
   return ret;
 }

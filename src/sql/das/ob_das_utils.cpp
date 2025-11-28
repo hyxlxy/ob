@@ -41,7 +41,6 @@ void ObDASUtils::log_user_error_and_warn(const obrpc::ObRpcResultCode &rcode)
   }
 }
 
-
 int ObDASUtils::check_nested_sql_mutating(ObTableID ref_table_id, ObExecContext &exec_ctx, bool is_reading)
 {
   int ret = OB_SUCCESS;

@@ -1960,47 +1960,10 @@ int ObDASTRDaatIter::inner_release()
 
 int ObDASTRDaatIter::inner_get_next_row()
 {
-  int ret = OB_SUCCESS;
-  if (OB_FAIL(check_and_prepare())) {
-    if (OB_ITER_END != ret) {
-      LOG_WARN("failed to prepare to get next row", K(ret));
-    }
-  } else {
-    bool filter_valid = false;
-    bool got_valid_document = false;
-    bool doc_valid = false;
-    ObExpr *match_filter = ir_ctdef_->need_calc_relevance() ? ir_ctdef_->match_filter_ : nullptr;
-    ObDatum *filter_res = nullptr;
-    const bool is_batch = false;
-    while (OB_SUCC(ret) && !got_valid_document) {
-      clear_evaluated_infos();
-      filter_valid = false;
-      doc_valid = true;
-      if (OB_FAIL(pull_next_batch_rows())) {
-        if (OB_UNLIKELY(OB_ITER_END != ret)) {
-          LOG_WARN("failed to pull next batch rows from iterator", K(ret));
-        }
-      } else if (OB_FAIL(next_disjunctive_document(is_batch, doc_valid))) {
-        LOG_WARN("failed to get next document with disjunctive tokens", K(ret));
-      } else if (!doc_valid) {
-        // do nothing
-      } else if (nullptr == match_filter) {
-        filter_valid = true;
-      } else if (OB_FAIL(match_filter->eval(*ir_rtdef_->eval_ctx_, filter_res))) {
-        LOG_WARN("failed to evaluate match filter", K(ret));
-      } else {
-        filter_valid = !(filter_res->is_null() || 0 == filter_res->get_int());
-      }
-      if (OB_SUCC(ret)) {
-        if (doc_valid && filter_valid) {
-          ++input_row_cnt_;
-          if (input_row_cnt_ > limit_param_.offset_) {
-            got_valid_document = true;
-            ++output_row_cnt_;
-          }
-        }
-      }
-    }
+  int64_t count = 0;
+  int ret = inner_get_next_rows(count, 1);
+  if (OB_FAIL(ret) && OB_UNLIKELY(OB_ITER_END != ret)) {
+    LOG_WARN("failed to fetch single DAAT row", K(ret));
   }
   return ret;
 }
@@ -2008,64 +1971,74 @@ int ObDASTRDaatIter::inner_get_next_row()
 int ObDASTRDaatIter::inner_get_next_rows(int64_t &count, int64_t capacity)
 {
   int ret = OB_SUCCESS;
+  bool reached_iter_end = false;
+  count = 0;
 
-  if (OB_FAIL(check_and_prepare())) {
+  if (OB_UNLIKELY(capacity <= 0)) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("invalid batch capacity", K(ret), K(capacity));
+  } else if (OB_FAIL(check_and_prepare())) {
     if (OB_ITER_END != ret) {
       LOG_WARN("failed to prepare to get next rows", K(ret));
     }
-  } else if (0 == capacity) {
-    count = 0;
   } else {
     ObExpr *match_filter = ir_ctdef_->need_calc_relevance() ? ir_ctdef_->match_filter_ : nullptr;
-    int64_t real_capacity = min(capacity, ir_rtdef_->eval_ctx_->max_batch_size_);
+    const int64_t real_capacity = min(capacity, ir_rtdef_->eval_ctx_->max_batch_size_);
     ObDatum *filter_res = nullptr;
     const bool is_batch = true;
     next_written_idx_ = 0;
-    count = 0;
-    bool filter_valid = false;
     bool doc_valid = true;
-    while (OB_SUCC(ret) && next_written_idx_ < real_capacity) {
+    bool filter_valid = false;
+
+    while (OB_SUCC(ret) && !reached_iter_end && next_written_idx_ < real_capacity) {
       if (OB_FAIL(pull_next_batch_rows_with_batch_mode())) {
         if (OB_UNLIKELY(OB_ITER_END != ret)) {
           LOG_WARN("failed to pull next batch rows from iterator", K(ret));
+        } else {
+          reached_iter_end = true;
+          ret = OB_SUCCESS;
         }
       } else if (OB_FAIL(next_disjunctive_document(is_batch, doc_valid))) {
         LOG_WARN("failed to get next document with disjunctive tokens", K(ret));
       } else if (!doc_valid) {
-        // do nothing
+        // skip invalid doc
       } else {
         ObEvalCtx *ctx = ir_rtdef_->eval_ctx_;
         ObEvalCtx::BatchInfoScopeGuard guard(*ctx);
         guard.set_batch_idx(next_written_idx_);
         clear_evaluated_infos();
-        // Although we use the batch interface, we need still use the non-batch interface of the match_filter.
-        // This is because the batch interface of the match_filter might lead to generate some invalid data position in the ctx of expr.
-        // Passing this invalid data position to the upper level is Costly.
         if (nullptr == match_filter) {
           filter_valid = true;
-        } else if (OB_FAIL(match_filter->eval(*ir_rtdef_->eval_ctx_, filter_res))) {
+        } else if (OB_FAIL(match_filter->eval(*ctx, filter_res))) {
           LOG_WARN("failed to evaluate match filter", K(ret));
         } else {
           filter_valid = !(filter_res->is_null() || 0 == filter_res->get_int());
         }
+
         if (OB_SUCC(ret) && filter_valid) {
           ++input_row_cnt_;
           if (limit_param_.limit_ > 0 && input_row_cnt_ <= limit_param_.offset_) {
+            // skip until hitting offset
           } else {
-            next_written_idx_++;
-            count ++;
-            output_row_cnt_ ++;
+            ++next_written_idx_;
+            ++count;
+            ++output_row_cnt_;
             if (limit_param_.limit_ > 0 && output_row_cnt_ >= limit_param_.limit_) {
+              reached_iter_end = true;
               ret = OB_ITER_END;
             }
           }
         }
       }
     }
+
     if ((OB_SUCC(ret) || OB_ITER_END == ret) && count > 0 && OB_FAIL(project_docid())) {
       LOG_WARN("failed to project docids", K(ret));
+    } else if (OB_SUCC(ret) && count == 0 && reached_iter_end) {
+      ret = OB_ITER_END;
     }
   }
+
   return ret;
 }
 
@@ -2153,6 +2126,41 @@ int ObDASTRDaatIter::pull_next_batch_rows_with_batch_mode()
   return ret;
 }
 
+int ObDASTRDaatIter::try_refill_iter_from_cache(
+    const ObIRIterLoserTreeItem &consumed_item,
+    bool &refilled)
+{
+  int ret = OB_SUCCESS;
+  refilled = false;
+  ObDASTRCacheIter *cache_iter = consumed_item.cache_iter_;
+  if (nullptr == cache_iter) {
+    // nothing to do
+  } else {
+    // align iter cursor with the consumed slot
+    cache_iter->cur_idx_ = consumed_item.cache_idx_;
+    const int64_t next_idx = cache_iter->cur_idx_ + 1;
+    if (next_idx < cache_iter->count_) {
+      cache_iter->cur_idx_ = next_idx;
+      ObIRIterLoserTreeItem next_item;
+      next_item.iter_idx_ = consumed_item.iter_idx_;
+      next_item.cache_iter_ = cache_iter;
+      next_item.cache_idx_ = next_idx;
+      next_item.relevance_ = ir_ctdef_->need_calc_relevance()
+          ? cache_iter->relevance_[next_idx]
+          : 0.0;
+      if (OB_FAIL(iter_row_heap_->push(next_item))) {
+        LOG_WARN("fail to push cached iter item back to loser tree", K(ret));
+      } else {
+        refilled = true;
+      }
+    } else {
+      // keep cursor at the last valid entry so that the next fetch triggers storage refill
+      cache_iter->cur_idx_ = consumed_item.cache_idx_;
+    }
+  }
+  return ret;
+}
+
 int ObDASTRDaatIter::fill_loser_tree_item(
     ObDASTextRetrievalIter &iter,
     const int64_t iter_idx,
@@ -2175,9 +2183,10 @@ int ObDASTRDaatIter::fill_loser_tree_item(
 int ObDASTRDaatIter::next_disjunctive_document(const bool is_batch, bool &doc_valid)
 {
   int ret = OB_SUCCESS;
-  int64_t doc_cnt = 0;
   bool curr_doc_end = false;
   const ObIRIterLoserTreeItem *top_item = nullptr;
+  ObIRIterLoserTreeItem last_item;
+  bool last_item_valid = false;
   // Do we need to use ObExpr to collect relevance?
   double cur_doc_relevance = 0.0;
   doc_valid = true;
@@ -2193,15 +2202,31 @@ int ObDASTRDaatIter::next_disjunctive_document(const bool is_batch, bool &doc_va
     if (OB_FAIL(iter_row_heap_->top(top_item))) {
       LOG_WARN("failed to get top item from heap", K(ret));
     } else {
-      next_batch_iter_idxes_[next_batch_cnt_++] = top_item->iter_idx_;
+      ObIRIterLoserTreeItem current_item = *top_item;
       if (BOOLEAN == relation_type_) {
-        boolean_relevances_[top_item->iter_idx_] = top_item->relevance_;
+        boolean_relevances_[current_item.iter_idx_] = current_item.relevance_;
       } else {
         // consider to add an expr for collectiong conjunction result between query tokens here?
-        cur_doc_relevance += top_item->relevance_;
+        cur_doc_relevance += current_item.relevance_;
       }
       if (OB_FAIL(iter_row_heap_->pop())) {
         LOG_WARN("failed to pop top item in heap", K(ret));
+      } else {
+        bool refilled = false;
+        if (OB_FAIL(try_refill_iter_from_cache(current_item, refilled))) {
+          LOG_WARN("failed to refill iter from cache", K(ret));
+        } else if (!refilled) {
+          if (OB_UNLIKELY(next_batch_cnt_ >= next_batch_iter_idxes_.count())) {
+            ret = OB_SIZE_OVERFLOW;
+            LOG_WARN("next batch idx overflow", K(ret), K_(next_batch_cnt), K(next_batch_iter_idxes_.count()));
+          } else {
+            next_batch_iter_idxes_[next_batch_cnt_++] = current_item.iter_idx_;
+          }
+        }
+      }
+      if (OB_SUCC(ret)) {
+        last_item = current_item;
+        last_item_valid = true;
       }
     }
   }
@@ -2218,14 +2243,19 @@ int ObDASTRDaatIter::next_disjunctive_document(const bool is_batch, bool &doc_va
 
   if (OB_SUCC(ret) && doc_valid) {
     const double relevance_score = ir_ctdef_->need_calc_relevance() ? cur_doc_relevance : 1;
-    // Optimization: Get doc_id directly from cache iter if available, otherwise fallback to iter_doc_ids_
-    const ObDocIdExt &doc_id = (nullptr != top_item->cache_iter_ && top_item->cache_idx_ >= 0)
-        ? top_item->cache_iter_->doc_id_[top_item->cache_idx_]
-        : iter_doc_ids_[top_item->iter_idx_];
-    if (!is_batch && OB_FAIL(project_result(doc_id, relevance_score))) {
-      LOG_WARN("failed to project result", K(ret));
-    } else if (is_batch && OB_FAIL(project_relevance(doc_id, relevance_score))) {
-      LOG_WARN("failed to project relevance", K(ret));
+    if (OB_UNLIKELY(!last_item_valid)) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("no iterator item recorded for projection", K(ret));
+    } else {
+      // Optimization: Get doc_id directly from cache iter if available, otherwise fallback to iter_doc_ids_
+      const ObDocIdExt &doc_id = (nullptr != last_item.cache_iter_ && last_item.cache_idx_ >= 0)
+          ? last_item.cache_iter_->doc_id_[last_item.cache_idx_]
+          : iter_doc_ids_[last_item.iter_idx_];
+      if (!is_batch && OB_FAIL(project_result(doc_id, relevance_score))) {
+        LOG_WARN("failed to project result", K(ret));
+      } else if (is_batch && OB_FAIL(project_relevance(doc_id, relevance_score))) {
+        LOG_WARN("failed to project relevance", K(ret));
+      }
     }
   }
   return ret;
