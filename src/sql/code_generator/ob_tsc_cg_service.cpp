@@ -2469,19 +2469,27 @@ int ObTscCgService::generate_text_ir_ctdef(const ObLogTableScan &op,
   }
 
   if (OB_SUCC(ret) && tr_info.need_sort()) {
-    ObSEArray<OrderItem, 2> order_items;
-    if (OB_FAIL(order_items.push_back(tr_info.sort_key_))) {
-      LOG_WARN("append order item array failed", K(ret));
-    } else if (OB_FAIL(generate_das_sort_ctdef(
-        order_items,
-        tr_info.with_ties_,
-        tr_info.topk_limit_expr_,
-        tr_info.topk_offset_expr_,
-        ir_scan_ctdef,
-        sort_ctdef))) {
-      LOG_WARN("generate sort ctdef failed", K(ret));
+    // 如果已经将TopK下推到文本检索并启用了Block-Max（BMW），则不再生成DAS层的Sort算子，
+    // 由检索层直接产出TopN，避免额外排序开销。
+    const bool has_pushdown_topk = (nullptr != ir_scan_ctdef->topk_limit_expr_);
+    const bool enable_block_max = ir_scan_ctdef->need_block_max_scan();
+    if (has_pushdown_topk && enable_block_max) {
+      // 跳过生成 sort_ctdef，root_ctdef 保持为 ir_scan_ctdef
     } else {
-      root_ctdef = sort_ctdef;
+      ObSEArray<OrderItem, 2> order_items;
+      if (OB_FAIL(order_items.push_back(tr_info.sort_key_))) {
+        LOG_WARN("append order item array failed", K(ret));
+      } else if (OB_FAIL(generate_das_sort_ctdef(
+          order_items,
+          tr_info.with_ties_,
+          tr_info.topk_limit_expr_,
+          tr_info.topk_offset_expr_,
+          ir_scan_ctdef,
+          sort_ctdef))) {
+        LOG_WARN("generate sort ctdef failed", K(ret));
+      } else {
+        root_ctdef = sort_ctdef;
+      }
     }
   }
 

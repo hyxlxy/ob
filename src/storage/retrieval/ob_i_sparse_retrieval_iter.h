@@ -108,7 +108,9 @@ struct ObSparseRetrievalMergeParam
       filter_expr_(nullptr),
       topk_limit_(0),
       field_boost_(1.0),
-      max_batch_size_(1)
+      max_batch_size_(1),
+      oversample_factor_(1),
+      min_score_threshold_(0.0)
   {}
   ~ObSparseRetrievalMergeParam() {}
   bool need_project_relevance() const { return relevance_proj_expr_ != nullptr; }
@@ -116,7 +118,7 @@ struct ObSparseRetrievalMergeParam
   bool need_pushdown_topk() const { return topk_limit_ > 0; }
   TO_STRING_KV(KPC_(dim_weights), KPC(limit_param_), KP_(eval_ctx),
       KP_(id_proj_expr), KP_(relevance_expr), KP_(relevance_proj_expr), KP_(filter_expr),
-      K_(topk_limit), K_(max_batch_size));
+      K_(topk_limit), K_(max_batch_size), K_(oversample_factor), K_(min_score_threshold));
   const ObIArray<double> *dim_weights_; // score weight for each dimension
   const common::ObLimitParam *limit_param_;
   sql::ObEvalCtx *eval_ctx_;
@@ -127,6 +129,8 @@ struct ObSparseRetrievalMergeParam
   int64_t topk_limit_;
   double field_boost_;
   int64_t max_batch_size_;
+  int64_t oversample_factor_;
+  double min_score_threshold_;
 };
 
 class ObISparseRetrievalMergeIter

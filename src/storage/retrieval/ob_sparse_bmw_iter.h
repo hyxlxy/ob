@@ -51,7 +51,9 @@ protected:
   int evaluate_pivot_range(const int64_t pivot_iter_idx, bool &is_candidate);
   double get_top_k_threshold()
   {
-    return top_k_heap_.empty() ? 0.0 : top_k_heap_.top().relevance_;
+    const double heap_threshold = top_k_heap_.empty() ? 0.0 : top_k_heap_.top().relevance_;
+    const double ext_threshold = (nullptr != iter_param_) ? iter_param_->min_score_threshold_ : 0.0;
+    return heap_threshold > ext_threshold ? heap_threshold : ext_threshold;
   }
 
 private:

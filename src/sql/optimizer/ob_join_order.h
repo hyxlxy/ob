@@ -1784,6 +1784,12 @@ struct NullAwareAntiJoinInfo {
                                         ObIndexInfoCache &index_info_cache,
                                         ObIArray<AccessPath *> &access_paths,
                                         bool &ignore_normal_access_path);
+
+    int force_synthesize_im_from_single_paths(const uint64_t table_id,
+                                              const uint64_t ref_table_id,
+                                              PathHelper &helper,
+                                              ObIndexInfoCache &index_info_cache,
+                                              ObIArray<AccessPath*> &access_paths);
     
     int get_candi_index_merge_trees(const uint64_t table_id,
                                     const uint64_t ref_table_id,

@@ -7937,6 +7937,46 @@ int ObLogPlan::try_allocate_sort_as_top(ObLogicalOperator *&top,
   return ret;
 }
 
+// Helper: 深度遍历子树，判断是否存在“可安全替代 LOG_SORT 的 TR Block-Max TopK TSC”，
+// 要求：
+// 1) 子树不包含会打乱顺序的阻塞/重排算子（这里只允许沿单链路向下）；
+// 2) 落到 LOG_TABLE_SCAN 时，满足 need_block_max_scan() 且 filter_before_indexback 全 true 且 need_sort()。
+static bool ob_has_safe_tr_topk_in_single_chain(ObLogicalOperator *node)
+{
+  if (node == nullptr) { return false; }
+  // 如果是表扫描，直接判定
+  if (node->get_type() == log_op_def::LOG_TABLE_SCAN) {
+    ObLogTableScan *tsc = static_cast<ObLogTableScan *>(node);
+    const ObTextRetrievalInfo &tr = tsc->get_text_retrieval_info();
+    if (tr.need_block_max_scan() && tr.need_sort()) {
+      bool all_before_indexback = true;
+      const ObIArray<bool> &flags = tsc->get_filter_before_index_flags();
+      for (int64_t i = 0; all_before_indexback && i < flags.count(); ++i) {
+        all_before_indexback = flags.at(i);
+      }
+      return all_before_indexback;
+    }
+    return false;
+  }
+  // 对于可直通节点（单孩子且非阻塞），继续向下；否则不安全
+  if (node->get_num_of_child() != 1) { return false; }
+  ObLogicalOperator *child = node->get_child(ObLogicalOperator::first_child);
+  // 简化起见：遇到以下类型直接判定不可安全下推（会改变顺序/阻塞/分布）
+  switch (node->get_type()) {
+    case log_op_def::LOG_SORT:
+    case log_op_def::LOG_EXCHANGE:
+    case log_op_def::LOG_GROUP_BY:
+    case log_op_def::LOG_WINDOW_FUNCTION:
+    case log_op_def::LOG_DISTINCT:
+    case log_op_def::LOG_JOIN:
+    case log_op_def::LOG_MATERIAL:
+      return false;
+    default:
+      break;
+  }
+  return ob_has_safe_tr_topk_in_single_chain(child);
+}
+
 int ObLogPlan::allocate_sort_as_top(ObLogicalOperator *&top,
                                     const ObIArray<OrderItem> &sort_keys,
                                     const int64_t prefix_pos,
@@ -7951,33 +7991,42 @@ int ObLogPlan::allocate_sort_as_top(ObLogicalOperator *&top,
   if (OB_ISNULL(top)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("get unexpected null", K(top), K(ret));
-  } else if (OB_ISNULL(sort = static_cast<ObLogSort*>(get_log_op_factory().allocate(*this, LOG_SORT)))) {
-    ret = OB_ALLOCATE_MEMORY_FAILED;
-    LOG_ERROR("failed to allocate sort for order by", K(ret));
   } else {
-    sort->set_child(ObLogicalOperator::first_child, top);
-    sort->set_prefix_pos(prefix_pos);
-    sort->set_local_merge_sort(is_local_merge_sort);
-    sort->set_topn_expr(topn_expr);
-    sort->set_fetch_with_ties(is_fetch_with_ties);
-    if (hash_sortkey != NULL &&
-        hash_sortkey->expr_ != NULL &&
-        hash_sortkey->expr_->get_expr_type() == T_FUN_SYS_HASH) {
-      part_cnt = hash_sortkey->expr_->get_param_count();
+    // 特殊优化：当子树上存在“单链路可直达的 TR Block-Max TopK 表扫描”且过滤均可前置时，
+    // 依赖检索层按得分输出 TopN，直接跳过分配 LOG_SORT。
+    if (ob_has_safe_tr_topk_in_single_chain(top)) {
+      OPT_TRACE("[TR-TopK] skip logical sort by subtree check");
+      return ret;
     }
-    sort->set_part_cnt(part_cnt);
 
-    if (OB_FAIL(sort->set_sort_keys(sort_keys))) {
-      LOG_WARN("failed to set sort keys", K(ret));
-    } else if (part_cnt > 0 && FALSE_IT(sort->set_hash_sortkey(*hash_sortkey))) {
-    } else if (OB_FAIL(sort->compute_property())) {
-      LOG_WARN("failed to compute property", K(ret));
+    if (OB_ISNULL(sort = static_cast<ObLogSort*>(get_log_op_factory().allocate(*this, LOG_SORT)))) {
+      ret = OB_ALLOCATE_MEMORY_FAILED;
+      LOG_ERROR("failed to allocate sort for order by", K(ret));
     } else {
-      top = sort;
-    }
-    if (OB_SUCC(ret) && NULL != topn_expr &&
-        OB_FAIL(construct_startup_filter_for_limit(topn_expr, sort))) {
-      LOG_WARN("failed to construct startup filter", KPC(topn_expr));
+      sort->set_child(ObLogicalOperator::first_child, top);
+      sort->set_prefix_pos(prefix_pos);
+      sort->set_local_merge_sort(is_local_merge_sort);
+      sort->set_topn_expr(topn_expr);
+      sort->set_fetch_with_ties(is_fetch_with_ties);
+      if (hash_sortkey != NULL &&
+          hash_sortkey->expr_ != NULL &&
+          hash_sortkey->expr_->get_expr_type() == T_FUN_SYS_HASH) {
+        part_cnt = hash_sortkey->expr_->get_param_count();
+      }
+      sort->set_part_cnt(part_cnt);
+
+      if (OB_FAIL(sort->set_sort_keys(sort_keys))) {
+        LOG_WARN("failed to set sort keys", K(ret));
+      } else if (part_cnt > 0 && FALSE_IT(sort->set_hash_sortkey(*hash_sortkey))) {
+      } else if (OB_FAIL(sort->compute_property())) {
+        LOG_WARN("failed to compute property", K(ret));
+      } else {
+        top = sort;
+      }
+      if (OB_SUCC(ret) && NULL != topn_expr &&
+          OB_FAIL(construct_startup_filter_for_limit(topn_expr, sort))) {
+        LOG_WARN("failed to construct startup filter", KPC(topn_expr));
+      }
     }
   }
   return ret;
@@ -15699,14 +15748,12 @@ int ObLogPlan::try_push_topn_into_text_retrieval_scan(ObLogicalOperator *&top,
     // do nothing, topn pushdown requires that only match filter exists on the base table.
   } else if (sort_keys.count() >= 1 && OB_NOT_NULL(sort_keys.at(0).expr_) &&
              sort_keys.at(0).expr_ == table_scan->get_text_retrieval_info().match_expr_) {
-    // only accept match expr as prefix sort key.
-    has_multi_sort_keys = sort_keys.count() == 1 ? false : true;
-    need_further_sort = has_multi_sort_keys || table_scan->use_das() || need_exchange;
-    pushed_limit_expr = need_further_sort ? topn_expr : limit_expr;
-    pushed_offset_expr = need_further_sort ? NULL : offset_expr;
+    // 仅支持以 MATCH 表达式作为首排序键的场景，将 TopK 下推至文本检索层
+    has_multi_sort_keys = sort_keys.count() > 1;
+    // 先设置下推参数
     ObSEArray<OrderItem, 1> tmp_sort_keys;
-    table_scan->get_text_retrieval_info().topk_limit_expr_ = pushed_limit_expr;
-    table_scan->get_text_retrieval_info().topk_offset_expr_ = pushed_offset_expr;
+    table_scan->get_text_retrieval_info().topk_limit_expr_ = topn_expr;
+    table_scan->get_text_retrieval_info().topk_offset_expr_ = offset_expr;
     table_scan->get_text_retrieval_info().sort_key_.expr_ = sort_keys.at(0).expr_;
     table_scan->get_text_retrieval_info().sort_key_.order_type_ = sort_keys.at(0).order_type_;
     table_scan->get_text_retrieval_info().with_ties_ = (has_multi_sort_keys || is_fetch_with_ties);
@@ -15714,6 +15761,13 @@ int ObLogPlan::try_push_topn_into_text_retrieval_scan(ObLogicalOperator *&top,
       LOG_WARN("failed to push back order item", K(ret));
     } else if (OB_FAIL(table_scan->set_op_ordering(tmp_sort_keys))) {
       LOG_WARN("failed to set op ordering", K(ret));
+    } else {
+      // 若可启用 Block-Max（BMW）并完成 TopK 下推，则无需在上层再排序
+      const bool can_block_max = table_scan->get_text_retrieval_info().need_block_max_scan();
+      need_further_sort = has_multi_sort_keys || need_exchange ? true : !can_block_max;
+      // 对于 TopK 已下推且启用 BMW 的场景，避免复用上层 limit 以免重复限制
+      pushed_limit_expr = NULL;
+      pushed_offset_expr = NULL;
     }
   }
   return ret;

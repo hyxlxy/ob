@@ -54,13 +54,15 @@ struct ObTextRetrievalInfo
     doc_token_cnt_(NULL),
     avg_doc_token_cnt_(NULL),
     relevance_expr_(NULL),
-    column_boost_idx_(-1)
+    column_boost_idx_(-1),
+    two_phase_topk_enabled_(false),
+    oversample_factor_(3)
   { }
   ~ObTextRetrievalInfo() {}
 
   TO_STRING_KV(K_(match_expr), K_(pushdown_match_filter), K_(sort_key), K_(topk_limit_expr),
                K_(topk_offset_expr), K_(with_ties), K_(need_calc_relevance), K_(inv_idx_tid),
-               K_(fwd_idx_tid), K_(doc_id_idx_tid), K_(column_boost_idx));
+               K_(fwd_idx_tid), K_(doc_id_idx_tid), K_(column_boost_idx), K_(two_phase_topk_enabled), K_(oversample_factor));
 
   bool need_sort() const { return sort_key_.expr_ != nullptr; }
   bool need_block_max_scan() const { return need_sort() && nullptr != topk_limit_expr_ && sort_key_.is_descending(); }
@@ -87,6 +89,9 @@ struct ObTextRetrievalInfo
   ObRawExpr *avg_doc_token_cnt_; // avg(token_cnt_column) group by doc_id, average doc length
   ObRawExpr *relevance_expr_; // BM25
   int column_boost_idx_;
+  // two-phase topk controls
+  bool two_phase_topk_enabled_;
+  int64_t oversample_factor_;
 };
 
 struct ObRawFilterMonotonicity

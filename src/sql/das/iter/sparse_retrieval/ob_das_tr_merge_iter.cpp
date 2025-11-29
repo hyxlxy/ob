@@ -17,6 +17,7 @@
 #define USING_LOG_PREFIX SQL_DAS
 #include "ob_das_tr_merge_iter.h"
 #include "sql/das/ob_das_ir_define.h"
+#include "sql/session/ob_basic_session_info.h"
 
 namespace oceanbase
 {
@@ -480,7 +481,45 @@ int ObDASTRMergeIter::create_sparse_retrieval_iter()
   sr_iter_param_.relevance_expr_ = ir_ctdef_->relevance_expr_;
   sr_iter_param_.relevance_proj_expr_ = ir_ctdef_->relevance_proj_col_;
   sr_iter_param_.filter_expr_ = ir_ctdef_->match_filter_;
-  sr_iter_param_.topk_limit_ = topk_limit_;
+  // 启用过采样：默认3，可由会话变量覆盖
+  int64_t oversample_factor = 3;
+  double min_score_threshold = 0.0;
+  // 会话变量名：ob_tr_topk_oversample, ob_tr_min_score_threshold
+  if (OB_NOT_NULL(ir_rtdef_) && OB_NOT_NULL(ir_rtdef_->eval_ctx_)) {
+    ObSQLSessionInfo *session = ir_rtdef_->eval_ctx_->exec_ctx_.get_my_session();
+    if (OB_NOT_NULL(session)) {
+      // oversample
+      common::ObObj v;
+      if (OB_SUCCESS == session->get_user_variable_value(ObString::make_string("ob_tr_topk_oversample"), v)) {
+        if (v.is_integer_type()) {
+          int64_t val = v.get_int();
+          if (val > 0) oversample_factor = val;
+        } else if (v.is_uint64()) {
+          uint64_t val = v.get_uint64();
+          if (val > 0) oversample_factor = static_cast<int64_t>(val);
+        } else if (v.is_double()) {
+          double dv = v.get_double();
+          if (dv > 0.0) oversample_factor = static_cast<int64_t>(dv);
+        }
+      }
+      // min_score_threshold
+      if (OB_SUCCESS == session->get_user_variable_value(ObString::make_string("ob_tr_min_score_threshold"), v)) {
+        if (v.is_double()) {
+          double dv = v.get_double();
+          if (dv >= 0.0) min_score_threshold = dv;
+        } else if (v.is_integer_type()) {
+          int64_t iv = v.get_int();
+          if (iv >= 0) min_score_threshold = static_cast<double>(iv);
+        } else if (v.is_uint64()) {
+          uint64_t uv = v.get_uint64();
+          min_score_threshold = static_cast<double>(uv);
+        }
+      }
+    }
+  }
+  sr_iter_param_.oversample_factor_ = oversample_factor;
+  sr_iter_param_.min_score_threshold_ = min_score_threshold;
+  sr_iter_param_.topk_limit_ = topk_limit_ * oversample_factor;
   if (OB_NOT_NULL(ir_ctdef_->field_boost_expr_)) {
     ObDatum *boost_datum = nullptr;
     if (OB_FAIL(ir_ctdef_->field_boost_expr_->eval(*ir_rtdef_->eval_ctx_, boost_datum))) {
