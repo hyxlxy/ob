@@ -3260,9 +3260,18 @@ int ObJoinOrder::create_index_merge_access_paths(const uint64_t table_id,
   } else if (OB_FAIL(check_index_merge_paths_contain_fts(access_paths, contain_fts))) {
     LOG_WARN("failed to check index merge paths contain FTS", K(ret));
   } else if (contain_fts && !access_paths.empty()) {
-    // 【强制优化】检测到FTS+标量混合，直接使用Index Merge，忽略其他所有路径
-    ignore_normal_access_path = true;
-    LOG_INFO("[FTS+SCALAR OPTIMIZATION] Force using Index Merge path, ignoring all other paths",
+    // 【优化调整】仅当存在“有效的”index merge 路径（至少包含两个子扫描节点）时，才忽略常规路径
+    bool has_viable_im = false;
+    for (int64_t p = 0; !has_viable_im && p < access_paths.count(); ++p) {
+      if (OB_NOT_NULL(access_paths.at(p)) && access_paths.at(p)->is_index_merge_path()) {
+        ObIndexMergeNode *r = static_cast<IndexMergePath*>(access_paths.at(p))->root_;
+        if (OB_NOT_NULL(r) && r->children_.count() >= 2) {
+          has_viable_im = true;
+        }
+      }
+    }
+    ignore_normal_access_path = has_viable_im;
+    LOG_INFO("[FTS+SCALAR OPTIMIZATION] use Index Merge only:", K(ignore_normal_access_path),
              K(ref_table_id), "path_count", access_paths.count());
   } else if (!is_match_hint && !contain_fts
              && OB_FAIL(prune_index_merge_path(access_paths))) {
