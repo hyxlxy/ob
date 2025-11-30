@@ -29,31 +29,7 @@ INSERT INTO t_demo VALUES
 
 ANALYZE TABLE t_demo;
 
--- 4) Two-phase BMW knobs (session variables)
-SET @ob_tr_topk_oversample = 3;
-SET @ob_tr_min_score_threshold = 0.0;
-SELECT @ob_tr_topk_oversample AS over_sample, @ob_tr_min_score_threshold AS min_score_thres;
-
--- 5) Pure FTS TopK (should be no LOG_SORT; TR Block-Max handles TopN)
-EXPLAIN EXTENDED
-SELECT
-  t.id,
-  MATCH(doc_content) AGAINST('oceanbase database') AS _score
-FROM t_demo t
-WHERE MATCH(doc_content) AGAINST('oceanbase database')
-ORDER BY _score DESC
-LIMIT 5;
-
--- Run it
-SELECT
-  t.id,
-  MATCH(doc_content) AGAINST('oceanbase database') AS _score
-FROM t_demo t
-WHERE MATCH(doc_content) AGAINST('oceanbase database')
-ORDER BY _score DESC
-LIMIT 5;
-
--- 6) Mixed baseline (no union merge)
+-- 4) 测试1：不带hint（对照组，预期只有TEXT RETRIEVAL SCAN）
 EXPLAIN EXTENDED
 SELECT
   t.id, t.category_id, t.status,
@@ -66,10 +42,9 @@ WHERE MATCH(doc_content) AGAINST('oceanbase database')
 ORDER BY _score DESC
 LIMIT 5;
 
--- 7) Mixed with UNION_MERGE variants
--- A) Most common (no QB binding)
+-- 5) 测试2：带UNION_MERGE hint（实验组，预期生成INDEX MERGE）
 EXPLAIN EXTENDED
-SELECT /*+ UNION_MERGE(t idx_ft idx_cs) */
+SELECT /*+ INDEX(t idx_ft idx_cs) UNION_MERGE(t idx_ft idx_cs) */
   t.id, t.category_id, t.status,
   MATCH(doc_content) AGAINST('oceanbase database') AS _score
 FROM t_demo t
@@ -79,42 +54,3 @@ WHERE MATCH(doc_content) AGAINST('oceanbase database')
   AND t.id < 100000000
 ORDER BY _score DESC
 LIMIT 5;
-
--- B) With QB_NAME binding (no @ usage)
-EXPLAIN EXTENDED
-SELECT /*+ QB_NAME(SEL1) UNION_MERGE(SEL1 t idx_ft idx_cs) */
-  t.id, t.category_id, t.status,
-  MATCH(doc_content) AGAINST('oceanbase database') AS _score
-FROM t_demo t
-WHERE MATCH(doc_content) AGAINST('oceanbase database')
-  AND t.category_id = 100
-  AND t.status = 1
-  AND t.id < 100000000
-ORDER BY _score DESC
-LIMIT 5;
-
--- C) Swap index order
-EXPLAIN EXTENDED
-SELECT /*+ UNION_MERGE(t idx_cs idx_ft) */
-  t.id, t.category_id, t.status,
-  MATCH(doc_content) AGAINST('oceanbase database') AS _score
-FROM t_demo t
-WHERE MATCH(doc_content) AGAINST('oceanbase database')
-  AND t.category_id = 100
-  AND t.status = 1
-  AND t.id < 100000000
-ORDER BY _score DESC
-LIMIT 5;
-
--- D) Run one variant
-SELECT /*+ UNION_MERGE(t idx_ft idx_cs) */
-  t.id, t.category_id, t.status,
-  MATCH(doc_content) AGAINST('oceanbase database') AS _score
-FROM t_demo t
-WHERE MATCH(doc_content) AGAINST('oceanbase database')
-  AND t.category_id = 100
-  AND t.status = 1
-  AND t.id < 100000000
-ORDER BY _score DESC
-LIMIT 5;
-
