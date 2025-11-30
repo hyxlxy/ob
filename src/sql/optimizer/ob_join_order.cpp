@@ -3537,17 +3537,35 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
                 }
               }
 
-              // 查找最优索引（优先选择idx_cs）
+              // 查找“非FTS”的最优标量索引（优先选择普通二级索引，其次回退主表）
               uint64_t best_index_id = OB_INVALID_ID;
-              for (int64_t i = 0; i < valid_index_ids.count(); ++i) {
-                uint64_t index_id = valid_index_ids.at(i);
-                if (index_id != ref_table_id) {  // 不是主表
-                  best_index_id = index_id;
+              ObSqlSchemaGuard *schema_guard = NULL;
+              const ObTableSchema *index_schema = NULL;
+              bool is_link_tbl = false;
+              if (OB_ISNULL(schema_guard = get_plan()->get_optimizer_context().get_sql_schema_guard())) {
+                ret = OB_ERR_UNEXPECTED;
+                LOG_WARN("unexpected null schema_guard", K(ret));
+              }
+              // 先在所有可用索引中挑选普通索引（排除FTS）
+              for (int64_t i = 0; OB_SUCC(ret) && i < valid_index_ids.count(); ++i) {
+                const uint64_t index_id = valid_index_ids.at(i);
+                if (index_id == ref_table_id) { // 跳过主表，优先挑索引
+                  continue;
+                } else if (OB_FAIL(schema_guard->get_table_schema(index_id, index_schema, is_link_tbl))) {
+                  LOG_WARN("failed to get index schema", K(ret), K(index_id));
+                } else if (OB_ISNULL(index_schema)) {
+                  ret = OB_ERR_UNEXPECTED;
+                  LOG_WARN("null index schema", K(ret), K(index_id));
+                } else if (index_schema->is_index_local_storage() && index_schema->is_normal_index()) {
+                  best_index_id = index_id; // 选择普通索引
                   break;
+                } else {
+                  // 跳过FTS/其他类型索引
                 }
               }
-              if (best_index_id == OB_INVALID_ID && valid_index_ids.count() > 0) {
-                best_index_id = ref_table_id;  // fallback到主表
+              // 若未找到普通索引，回退到主表
+              if (OB_SUCC(ret) && OB_INVALID_ID == best_index_id) {
+                best_index_id = ref_table_id;
               }
 
               if (OB_SUCC(ret) && best_index_id != OB_INVALID_ID) {
