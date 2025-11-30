@@ -15741,18 +15741,19 @@ int ObLogPlan::try_push_topn_into_text_retrieval_scan(ObLogicalOperator *&top,
   } else if (log_op_def::LOG_TABLE_SCAN != top->get_type()) {
     // do nothing
   } else if (OB_FALSE_IT(table_scan = static_cast<ObLogTableScan*>(top))) {
-  } else if (!table_scan->is_text_retrieval_scan() || table_scan->use_index_merge()) {
+  } else if (!table_scan->is_text_retrieval_scan()) {
     // do nothing
-  } else if (table_scan->get_filter_exprs().count() != 0 ||
-             table_scan->get_pushdown_filter_exprs().count() != 0) {
-    // do nothing, topn pushdown requires that only match filter exists on the base table.
+  } else if ((table_scan->get_filter_exprs().count() != 0 ||
+              table_scan->get_pushdown_filter_exprs().count() != 0) &&
+             !table_scan->use_index_merge()) {
+    // 非 Index Merge 的场景仍保持原限制：仅在无额外过滤时下推 TopK
   } else if (sort_keys.count() >= 1 && OB_NOT_NULL(sort_keys.at(0).expr_) &&
              sort_keys.at(0).expr_ == table_scan->get_text_retrieval_info().match_expr_) {
     // 仅支持以 MATCH 表达式作为首排序键的场景，将 TopK 下推至文本检索层
     has_multi_sort_keys = sort_keys.count() > 1;
     // 先设置下推参数
     ObSEArray<OrderItem, 1> tmp_sort_keys;
-    table_scan->get_text_retrieval_info().topk_limit_expr_ = topn_expr;
+    table_scan->get_text_retrieval_info().topk_limit_expr_ = (topn_expr != NULL ? topn_expr : limit_expr);
     table_scan->get_text_retrieval_info().topk_offset_expr_ = offset_expr;
     table_scan->get_text_retrieval_info().sort_key_.expr_ = sort_keys.at(0).expr_;
     table_scan->get_text_retrieval_info().sort_key_.order_type_ = sort_keys.at(0).order_type_;

@@ -4501,6 +4501,16 @@ int IndexMergePath::estimate_cost()
     }
   }
   // scan and sort cost
+  bool has_fts_child = false;
+  if (OB_NOT_NULL(root_)) {
+    for (int64_t ci = 0; ci < root_->children_.count(); ++ci) {
+      ObIndexMergeNode *n = root_->children_.at(ci);
+      if (OB_NOT_NULL(n) && n->node_type_ == INDEX_MERGE_FTS_INDEX) {
+        has_fts_child = true;
+        break;
+      }
+    }
+  }
   for (int64_t i = 0; OB_SUCC(ret) && i < scan_aps.count(); ++i) {
     if (OB_ISNULL(scan_aps.at(i))) {
       ret = OB_ERR_UNEXPECTED;
@@ -4542,7 +4552,11 @@ int IndexMergePath::estimate_cost()
                                    &plan->get_selectivity_ctx(),
                                    -1, /* topn */
                                    0 /* part_cnt */ );
-          if (OB_FAIL(ObOptEstCost::cost_sort(cost_info, sort_cost, plan->get_optimizer_context()))) {
+          if (has_fts_child) {
+            // 当 Index Merge 包含 FTS 子树，且实际执行会使用 TR 的 docid 交集与 Block-Max TopK，
+            // 不需要为每个子扫描再按主键排序用于 merge，置零该部分排序成本。
+            OPT_TRACE_COST_MODEL("index_merge_cost (", cost_, ") += sort_cost ( 0 ), fts child avoids per-scan pk sort");
+          } else if (OB_FAIL(ObOptEstCost::cost_sort(cost_info, sort_cost, plan->get_optimizer_context()))) {
             LOG_WARN("failed to calc sort cost", K(ret));
           } else {
             cost_ += sort_cost;
