@@ -3410,6 +3410,8 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
   if (valid_index_ids.empty()) {
     // do nothing
   } else {
+    bool has_or_filter = false;
+    // 优先：根据 OR 条件构造 UNION_MERGE 树
     for (int64_t i = 0; OB_SUCC(ret) && i < filters.count(); ++i) {
       ObRawExpr *filter = filters.at(i);
       ObIndexMergeNode *candi_node = NULL;
@@ -3418,7 +3420,7 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("get unexpected null filter", K(ret), K(i));
       } else if (filter->get_expr_type() != T_OP_OR) {
-        // do nothing, only support UNION MERGE now
+        // skip here, try AND-based intersect fallback later
       } else if (OB_FAIL(generate_candi_index_merge_node(ref_table_id,
                                                          filter,
                                                          valid_index_ids,
@@ -3432,6 +3434,48 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
         LOG_WARN("failed to formalize candi index merge tree", K(ret), KPC(candi_node));
       } else if (OB_FAIL(candi_index_trees.push_back(candi_node))) {
         LOG_WARN("failed to push back candi index tree", K(ret));
+      } else {
+        has_or_filter = true;
+      }
+    }
+    // 回落：若不存在 OR 过滤，尝试基于 AND 的 INTERSECT 组合（FTS ∩ 普通索引）
+    if (OB_SUCC(ret) && !has_or_filter && candi_index_trees.empty()) {
+      ObIndexMergeNode *root = NULL;
+      if (OB_ISNULL(root = OB_NEWx(ObIndexMergeNode, allocator_))) {
+        ret = OB_ALLOCATE_MEMORY_FAILED;
+        LOG_WARN("failed to allocate index merge node", K(ret));
+      } else {
+        root->node_type_ = INDEX_MERGE_INTERSECT;
+        bool has_child = false;
+        for (int64_t i = 0; OB_SUCC(ret) && i < filters.count(); ++i) {
+          ObRawExpr *filter = filters.at(i);
+          ObIndexMergeNode *child = NULL;
+          bool is_child_valid = false;
+          if (OB_ISNULL(filter)) {
+            ret = OB_ERR_UNEXPECTED;
+            LOG_WARN("unexpected null filter", K(ret), K(i));
+          } else if (OB_FAIL(generate_candi_index_merge_node(ref_table_id,
+                                                              filter,
+                                                              valid_index_ids,
+                                                              valid_index_cols,
+                                                              child,
+                                                              is_child_valid))) {
+            LOG_WARN("failed to generate child index merge node", K(ret), KPC(filter));
+          } else if (!is_child_valid || NULL == child) {
+            // skip
+          } else if (OB_FAIL(root->children_.push_back(child))) {
+            LOG_WARN("failed to push back child node", K(ret));
+          } else {
+            has_child = true;
+          }
+        }
+        if (OB_SUCC(ret) && has_child && root->children_.count() >= 2) {
+          if (OB_FAIL(root->formalize_index_merge_tree())) {
+            LOG_WARN("failed to formalize intersect candi index merge tree", K(ret), KPC(root));
+          } else if (OB_FAIL(candi_index_trees.push_back(root))) {
+            LOG_WARN("failed to push back candi intersect tree", K(ret));
+          }
+        }
       }
     }
   }
@@ -3780,93 +3824,167 @@ int ObJoinOrder::prune_candi_index_merge_trees(ObIArray<ObIndexMergeNode*> &cand
   }
   return ret;
 }
-
-int ObJoinOrder::do_create_index_merge_paths(const uint64_t table_id,
-                                             const uint64_t ref_table_id,
-                                             const PathHelper &helper,
-                                             ObIndexInfoCache &index_info_cache,
-                                             ObIArray<ObIndexMergeNode*> &candi_index_trees,
-                                             ObIArray<AccessPath*> &access_paths)
+int ObJoinOrder::do_create_index_merge_paths(
+    const uint64_t table_id,
+    const uint64_t ref_table_id,
+    const PathHelper &helper,
+    ObIndexInfoCache &index_info_cache,
+    ObIArray<ObIndexMergeNode *> &candi_index_trees,  // 注意：是指针数组
+    ObIArray<AccessPath *> &access_paths)             // 注意：是指针数组
 {
   int ret = OB_SUCCESS;
+  
+  // 【修复】正确处理指针数组
   for (int64_t i = 0; OB_SUCC(ret) && i < candi_index_trees.count(); ++i) {
-    ObIndexMergeNode* root_node = candi_index_trees.at(i);
-    IndexMergePath* index_merge_path = NULL;
+    ObIndexMergeNode *root_node = candi_index_trees.at(i);  // 获取指针
+    IndexMergePath *index_merge_path = NULL;                // 指针初始化为 NULL
     ObSEArray<ObExprConstraint, 4> range_expr_constraint;
     int64_t scan_node_count = 0;
+    
+    // 【修复】使用 OB_ISNULL 宏检查指针
     if (OB_ISNULL(root_node)) {
       ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("index merge node is null", K(ret), KPC(root_node));
-    } else if (OB_FAIL(choose_best_selectivity_branch(root_node))) {
-      LOG_WARN("failed to choose best selectivity branch", K(ret), KPC(root_node));
-    } else if (OB_FAIL(root_node->formalize_index_merge_tree())) {
-      LOG_WARN("failed to formalize index merge tree", K(ret), KPC(root_node));
-    } else if (OB_FAIL(build_access_path_for_scan_node(table_id,
-                                                       ref_table_id,
-                                                       helper,
-                                                       index_info_cache,
-                                                       range_expr_constraint,
-                                                       root_node,
-                                                       scan_node_count))) {
-      LOG_WARN("failed to build access path for scan node", K(ret));
-    } else if (OB_FAIL(create_one_index_merge_path(table_id,
-                                                   ref_table_id,
-                                                   helper,
-                                                   range_expr_constraint,
-                                                   root_node,
-                                                   index_merge_path))) {
-      LOG_WARN("failed to create one index merge path", K(ret), KPC(root_node));
-    } else if (OB_ISNULL(index_merge_path)) {
-      ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("index merge path is null", K(ret), KPC(root_node));
-    } else if (OB_FALSE_IT(index_merge_path->index_cnt_ = scan_node_count)) {
-    } else if (OB_FAIL(access_paths.push_back(static_cast<AccessPath*>(index_merge_path)))) {
-      LOG_WARN("failed to push back index merge path", K(ret));
+      LOG_WARN("index merge node is null", K(ret), KP(root_node));
     } else {
-      OPT_TRACE("generate one index merge path for", root_node->filter_);
-      LOG_TRACE("generate one index merge path", KPC(index_merge_path));
+      // 【修复】检查是否为 FTS + 标量混合查询
+      // 当根为 INTERSECT 且同时包含 FTS 与普通索引两个 scan 分支时，保留交集结构
+      bool keep_intersect = false;
+      
+      if (INDEX_MERGE_INTERSECT == root_node->node_type_) {
+        bool has_fts = false;
+        bool has_normal = false;
+        
+        // 【修复】正确遍历子节点指针数组
+        for (int64_t j = 0; j < root_node->children_.count(); ++j) {
+          ObIndexMergeNode *child = root_node->children_.at(j);
+          
+          if (OB_ISNULL(child) || child->is_merge_node()) {
+            continue;
+          }
+          
+          if (INDEX_MERGE_FTS_INDEX == child->node_type_) {
+            has_fts = true;
+          } else {
+            has_normal = true;
+          }
+        }
+        
+        keep_intersect = has_fts && has_normal;
+      }
+      
+      // 【修复】如果不保留交集，选择最优分支
+      if (!keep_intersect) {
+        if (OB_FAIL(choose_best_selectivity_branch(root_node))) {
+          LOG_WARN("failed to choose best selectivity branch", K(ret), KP(root_node));
+        }
+      }
+      
+      if (OB_SUCC(ret)) {
+        if (OB_FAIL(root_node->formalize_index_merge_tree())) {
+          LOG_WARN("failed to formalize index merge tree", K(ret), KP(root_node));
+        } else if (OB_FAIL(build_access_path_for_scan_node(
+                      table_id,
+                      ref_table_id,
+                      helper,
+                      index_info_cache,
+                      range_expr_constraint,
+                      root_node,
+                      scan_node_count))) {
+          LOG_WARN("failed to build access path for scan node", K(ret));
+        } else if (OB_FAIL(create_one_index_merge_path(
+                      table_id,
+                      ref_table_id,
+                      helper,
+                      range_expr_constraint,
+                      root_node,
+                      index_merge_path))) {
+          LOG_WARN("failed to create one index merge path", K(ret), KP(root_node));
+        } else if (OB_ISNULL(index_merge_path)) {
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("index merge path is null", K(ret), KP(root_node));
+        } else if (OB_FALSE_IT(index_merge_path->index_cnt_ = scan_node_count)) {
+          // nop
+        } else if (OB_FAIL(access_paths.push_back(static_cast<AccessPath*>(index_merge_path)))) {
+          LOG_WARN("failed to push back index merge path", K(ret));
+        } else {
+          OPT_TRACE("generate one index merge path for", root_node->filter_);
+          LOG_TRACE("generate one index merge path", KP(index_merge_path));
+        }
+      }
     }
   }
+  
   return ret;
 }
+
 
 int ObJoinOrder::choose_best_selectivity_branch(ObIndexMergeNode* &candi_node)
 {
   int ret = OB_SUCCESS;
   if (OB_ISNULL(candi_node)) {
     ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("get unexpected null", K(ret), KPC(candi_node));
+    LOG_WARN("get unexpected null", K(ret), KP(candi_node));
   } else if (INDEX_MERGE_UNION == candi_node->node_type_) {
+    // 递归处理 UNION 的每个子节点
     for (int64_t i = 0; OB_SUCC(ret) && i < candi_node->children_.count(); ++i) {
-      if (OB_FAIL(SMART_CALL(choose_best_selectivity_branch(candi_node->children_.at(i))))) {
-        LOG_WARN("failed to choose best branch for child", K(ret), KPC(candi_node->children_.at(i)));
+      ObIndexMergeNode *child = candi_node->children_.at(i);
+      if (OB_FAIL(SMART_CALL(choose_best_selectivity_branch(child)))) {
+        LOG_WARN("failed to choose best branch for child", K(ret), KP(child));
+      } else {
+        candi_node->children_.at(i) = child;
       }
     }
   } else if (INDEX_MERGE_INTERSECT == candi_node->node_type_) {
-    ObIndexMergeNode* best_child = NULL;
+    // 如果 INTERSECT 同时包含 FTS 与普通索引两个 scan 分支，则保留交集结构（不坍缩）
+    bool has_fts = false;
+    bool has_scalar = false;
+    for (int64_t i = 0; i < candi_node->children_.count(); ++i) {
+      ObIndexMergeNode *child = candi_node->children_.at(i);
+      if (OB_ISNULL(child) || child->is_merge_node()) { continue; }
+      if (INDEX_MERGE_FTS_INDEX == child->node_type_) {
+        has_fts = true;
+      } else if (INDEX_MERGE_SCAN == child->node_type_) {
+        has_scalar = true;
+      }
+    }
+    if (has_fts && has_scalar) {
+      // 保留交集结构，仅递归处理子节点
+      for (int64_t i = 0; OB_SUCC(ret) && i < candi_node->children_.count(); ++i) {
+        ObIndexMergeNode *child = candi_node->children_.at(i);
+        if (OB_FAIL(SMART_CALL(choose_best_selectivity_branch(child)))) {
+          LOG_WARN("failed to choose best branch for child", K(ret));
+        } else {
+          candi_node->children_.at(i) = child;
+        }
+      }
+      return ret;
+    }
+
+    // 否则按原有逻辑在 INTERSECT 下挑选最优分支
+    ObIndexMergeNode *best_child = NULL;
     double best_selectivity = 1;
     for (int64_t i = 0; OB_SUCC(ret) && i < candi_node->children_.count(); ++i) {
-      ObIndexMergeNode* child_candi_node = candi_node->children_.at(i);
+      ObIndexMergeNode *child_candi_node = candi_node->children_.at(i);
       double child_selectivity = 1;
       if (OB_ISNULL(child_candi_node)) {
         ret = OB_ERR_UNEXPECTED;
-        LOG_WARN("child node is null", K(ret), K(i), KPC(candi_node));
+        LOG_WARN("child node is null", K(ret), K(i), KP(candi_node));
       } else if (INDEX_MERGE_FTS_INDEX == child_candi_node->node_type_) {
+        // 若仅有 FTS 分支，则直接使用 FTS 分支
         best_child = child_candi_node;
         break;
       } else if (OB_FAIL(THIS_WORKER.check_status())) {
         LOG_WARN("check status failed", K(ret));
       } else if (OB_FAIL(SMART_CALL(choose_best_selectivity_branch(child_candi_node)))) {
-        LOG_WARN("failed to choose best branch for child", K(ret), KPC(child_candi_node));
-      } else if (OB_FAIL(calc_selectivity_for_index_merge_node(child_candi_node,
-                                                               child_selectivity))) {
+        LOG_WARN("failed to choose best branch for child", K(ret), KP(child_candi_node));
+      } else if (OB_FAIL(calc_selectivity_for_index_merge_node(child_candi_node, child_selectivity))) {
         LOG_WARN("failed to calculate selectivity", K(ret));
       } else if (NULL == best_child || child_selectivity < best_selectivity) {
         best_child = child_candi_node;
         best_selectivity = child_selectivity;
       }
     }
-    if (OB_SUCC(ret)) {
+    if (OB_SUCC(ret) && NULL != best_child) {
       candi_node = best_child;
     }
   }
@@ -4167,24 +4285,26 @@ int ObJoinOrder::check_index_merge_paths_contain_fts(ObIArray<AccessPath*> &acce
                                                      bool &contain_fts)
 {
   int ret = OB_SUCCESS;
-  ObIndexMergeNode *root_node = NULL;
   contain_fts = false;
-  if (OB_UNLIKELY(access_paths.empty())
-      || OB_ISNULL(access_paths.at(0))
-      || OB_UNLIKELY(!access_paths.at(0)->is_index_merge_path())
-      || OB_ISNULL(root_node = static_cast<IndexMergePath*>(access_paths.at(0))->root_)) {
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("get unexpected index merge path", K(ret), K(access_paths), K(root_node));
-  }
-  for (int64_t i = 0; OB_SUCC(ret) && i < root_node->children_.count(); ++i) {
-    ObIndexMergeNode *child_node = root_node->children_.at(i);
-    if (OB_ISNULL(child_node)
-        || OB_UNLIKELY(!child_node->is_scan_node())) {
+  for (int64_t p = 0; OB_SUCC(ret) && p < access_paths.count() && !contain_fts; ++p) {
+    ObIndexMergeNode *root_node = NULL;
+    if (OB_UNLIKELY(NULL == access_paths.at(p))
+        || OB_UNLIKELY(!access_paths.at(p)->is_index_merge_path())
+        || OB_ISNULL(root_node = static_cast<IndexMergePath*>(access_paths.at(p))->root_)) {
       ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("get unexpected index merge node", K(ret), K(i), K(root_node));
-    } else if (INDEX_MERGE_FTS_INDEX == child_node->node_type_) {
-      contain_fts = true;
+      LOG_WARN("get unexpected index merge path", K(ret), K(p), K(access_paths));
       break;
+    }
+    for (int64_t i = 0; OB_SUCC(ret) && i < root_node->children_.count(); ++i) {
+      ObIndexMergeNode *child_node = root_node->children_.at(i);
+      if (OB_ISNULL(child_node) || OB_UNLIKELY(!child_node->is_scan_node())) {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("get unexpected index merge node", K(ret), K(i), K(root_node));
+        break;
+      } else if (INDEX_MERGE_FTS_INDEX == child_node->node_type_) {
+        contain_fts = true;
+        break;
+      }
     }
   }
   return ret;
