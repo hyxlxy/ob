@@ -3259,11 +3259,18 @@ int ObJoinOrder::create_index_merge_access_paths(const uint64_t table_id,
     LOG_TRACE("[EN_FORCE_INDEX_MERGE_PLAN] finish create index merge path ", K(ref_table_id), K(is_match_hint), K(contain_fts), K(access_paths));
   } else if (OB_FAIL(check_index_merge_paths_contain_fts(access_paths, contain_fts))) {
     LOG_WARN("failed to check index merge paths contain FTS", K(ret));
+  } else if (contain_fts && !access_paths.empty()) {
+    // 【强制优化】检测到FTS+标量混合，直接使用Index Merge，忽略其他所有路径
+    ignore_normal_access_path = true;
+    LOG_INFO("[FTS+SCALAR OPTIMIZATION] Force using Index Merge path, ignoring all other paths",
+             K(ref_table_id), "path_count", access_paths.count());
   } else if (!is_match_hint && !contain_fts
              && OB_FAIL(prune_index_merge_path(access_paths))) {
     LOG_WARN("failed to prune index merge path", K(ret));
   } else {
-    ignore_normal_access_path = (is_match_hint || contain_fts) && !access_paths.empty();
+    ignore_normal_access_path = is_match_hint && !access_paths.empty();
+    LOG_INFO("[INDEX MERGE] finish create index merge paths", K(ref_table_id), K(is_match_hint),
+             K(contain_fts), K(ignore_normal_access_path), "path_count", access_paths.count());
     LOG_TRACE("finish create index merge path", K(ref_table_id), K(is_match_hint), K(contain_fts), K(access_paths));
   }
   return ret;
@@ -3302,25 +3309,48 @@ int ObJoinOrder::get_candi_index_merge_trees(const uint64_t table_id,
     is_match_hint = true;
     OPT_TRACE("generate", candi_index_trees.count(), "candi index merge trees using hint");
     LOG_TRACE("generate candi index merge trees using hint", K(table_id), K(candi_index_trees));
-  } else if (get_plan()->get_log_plan_hint().is_outline_data_
-             || (!tenant_config->_enable_index_merge && OB_LIKELY(!EN_FORCE_INDEX_MERGE_PLAN))) {
+  }
+
+  // 检查是否为FTS+标量混合查询（即使没有hint也应该尝试Index Merge）
+  bool has_fts_scalar_mix = false;
+  if (OB_SUCC(ret) && candi_index_trees.empty()) {
+    bool has_fts = false;
+    bool has_scalar = false;
+    for (int64_t i = 0; i < helper.filters_.count(); ++i) {
+      ObRawExpr *filter = helper.filters_.at(i);
+      if (OB_NOT_NULL(filter)) {
+        if (filter->has_flag(CNT_MATCH_EXPR)) {
+          has_fts = true;
+        } else if (filter->has_flag(IS_SIMPLE_COND) || filter->has_flag(IS_RANGE_COND)) {
+          has_scalar = true;
+        }
+      }
+    }
+    has_fts_scalar_mix = has_fts && has_scalar;
+  }
+
+  if (OB_SUCC(ret) && candi_index_trees.empty() && !has_fts_scalar_mix
+      && (get_plan()->get_log_plan_hint().is_outline_data_
+          || (!tenant_config->_enable_index_merge && OB_LIKELY(!EN_FORCE_INDEX_MERGE_PLAN)))) {
     OPT_TRACE("can not create index merge paths due to outline or tenant config");
-  } else if (OB_FAIL(get_valid_index_merge_indexes(table_id,
+  } else if (OB_SUCC(ret) && candi_index_trees.empty() && OB_FAIL(get_valid_index_merge_indexes(table_id,
                                                    ref_table_id,
                                                    valid_index_ids,
                                                    valid_index_cols,
                                                    true /* ignore_hint */ ))) {
     LOG_WARN("failed to get valid index merge ids", K(ret));
-  } else if (OB_FAIL(generate_candi_index_merge_trees(ref_table_id,
+  } else if (OB_SUCC(ret) && candi_index_trees.empty() && OB_FAIL(generate_candi_index_merge_trees(ref_table_id,
                                                       helper.filters_,
                                                       valid_index_ids,
                                                       valid_index_cols,
                                                       candi_index_trees))) {
     LOG_WARN("failed to generate candi index merge trees", K(ret));
-  } else if (!candi_index_trees.empty()
+  } else if (OB_SUCC(ret) && !candi_index_trees.empty()
              && OB_FAIL(prune_candi_index_merge_trees(candi_index_trees))) {
     LOG_WARN("failed to prune candi index trees", K(ret));
-  } else {
+  }
+
+  if (OB_SUCC(ret) && !candi_index_trees.empty()) {
     OPT_TRACE("generate", candi_index_trees.count(), "candi index merge trees");
     LOG_TRACE("generate candi index merge trees", K(table_id), K(candi_index_trees));
   }
@@ -3466,6 +3496,9 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
       // 如果同时存在FTS和标量条件，强制生成INTERSECT
       if (OB_SUCC(ret) && has_fts_filter && has_scalar_filter) {
         ObIndexMergeNode *root = nullptr;
+        LOG_INFO("[FTS+SCALAR] Detected mixed query, creating INTERSECT tree",
+                 K(has_fts_filter), K(has_scalar_filter), "scalar_count", scalar_filters.count());
+
         if (OB_ISNULL(root = OB_NEWx(ObIndexMergeNode, allocator_))) {
           ret = OB_ALLOCATE_MEMORY_FAILED;
           LOG_WARN("failed to allocate index merge node", K(ret));
@@ -3535,8 +3568,12 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
             } else if (OB_FAIL(candi_index_trees.push_back(root))) {
               LOG_WARN("failed to push back intersect tree", K(ret));
             } else {
-              LOG_TRACE("successfully created FTS+scalar INTERSECT tree", K(ret), KPC(root));
+              LOG_INFO("[FTS+SCALAR] Successfully created INTERSECT tree",
+                       "child_count", root->children_.count(), KPC(root));
             }
+          } else if (OB_SUCC(ret)) {
+            LOG_WARN("[FTS+SCALAR] Failed to create INTERSECT tree: insufficient children",
+                     "child_count", root->children_.count());
           }
         }
       }
