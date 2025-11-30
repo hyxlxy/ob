@@ -3324,6 +3324,7 @@ int ObJoinOrder::get_candi_index_merge_trees(const uint64_t table_id,
     OPT_TRACE("generate", candi_index_trees.count(), "candi index merge trees");
     LOG_TRACE("generate candi index merge trees", K(table_id), K(candi_index_trees));
   }
+
   return ret;
 }
 
@@ -3719,19 +3720,20 @@ int ObJoinOrder::check_one_candi_node_match_hint(ObIndexMergeNode *candi_node,
         break;
       }
       case INDEX_MERGE_INTERSECT: {
-        for (int64_t i = 0; OB_SUCC(ret) && !is_match_hint && i < candi_node->children_.count(); ++i) {
+        bool any_match = false;
+        int64_t consumed_idx = idx;
+        for (int64_t i = 0; OB_SUCC(ret) && i < candi_node->children_.count(); ++i) {
           int64_t sub_idx = idx;
-          if (OB_FAIL(SMART_CALL(check_one_candi_node_match_hint(candi_node->children_.at(i), index_ids, sub_idx, is_match_hint)))) {
+          bool child_match = false;
+          if (OB_FAIL(SMART_CALL(check_one_candi_node_match_hint(candi_node->children_.at(i), index_ids, sub_idx, child_match)))) {
             LOG_WARN("failed to check candi tree match hint", K(ret), K(i), KPC(candi_node->children_.at(i)));
-          } else if (is_match_hint) {
-            ObIndexMergeNode *tmp_node = candi_node->children_.at(i);
-            candi_node->children_.reuse();
-            idx = sub_idx;
-            if (OB_FAIL(candi_node->children_.push_back(tmp_node))) {
-              LOG_WARN("failed to push back child node", K(ret));
-            }
+          } else if (child_match) {
+            any_match = true;
+            consumed_idx = std::max(consumed_idx, sub_idx);
           }
         }
+        is_match_hint = any_match;
+        idx = consumed_idx;
         break;
       }
       case INDEX_MERGE_SCAN:
@@ -3826,36 +3828,36 @@ int ObJoinOrder::prune_candi_index_merge_trees(ObIArray<ObIndexMergeNode*> &cand
 }
 int ObJoinOrder::do_create_index_merge_paths(
     const uint64_t table_id,
-    const uint64_t ref_table_id,
-    const PathHelper &helper,
-    ObIndexInfoCache &index_info_cache,
+const uint64_t ref_table_id,
+const PathHelper &helper,
+ObIndexInfoCache &index_info_cache,
     ObIArray<ObIndexMergeNode *> &candi_index_trees,  // 注意：是指针数组
     ObIArray<AccessPath *> &access_paths)             // 注意：是指针数组
 {
-  int ret = OB_SUCCESS;
+int ret = OB_SUCCESS;
   
   // 【修复】正确处理指针数组
-  for (int64_t i = 0; OB_SUCC(ret) && i < candi_index_trees.count(); ++i) {
+for (int64_t i = 0; OB_SUCC(ret) && i < candi_index_trees.count(); ++i) {
     ObIndexMergeNode *root_node = candi_index_trees.at(i);  // 获取指针
     IndexMergePath *index_merge_path = NULL;                // 指针初始化为 NULL
-    ObSEArray<ObExprConstraint, 4> range_expr_constraint;
-    int64_t scan_node_count = 0;
+ObSEArray<ObExprConstraint, 4> range_expr_constraint;
+int64_t scan_node_count = 0;
     
     // 【修复】使用 OB_ISNULL 宏检查指针
-    if (OB_ISNULL(root_node)) {
-      ret = OB_ERR_UNEXPECTED;
+if (OB_ISNULL(root_node)) {
+ret = OB_ERR_UNEXPECTED;
       LOG_WARN("index merge node is null", K(ret), KP(root_node));
-    } else {
+} else {
       // 【修复】检查是否为 FTS + 标量混合查询
       // 当根为 INTERSECT 且同时包含 FTS 与普通索引两个 scan 分支时，保留交集结构
-      bool keep_intersect = false;
+bool keep_intersect = false;
       
-      if (INDEX_MERGE_INTERSECT == root_node->node_type_) {
-        bool has_fts = false;
-        bool has_normal = false;
+if (INDEX_MERGE_INTERSECT == root_node->node_type_) {
+bool has_fts = false;
+bool has_normal = false;
         
         // 【修复】正确遍历子节点指针数组
-        for (int64_t j = 0; j < root_node->children_.count(); ++j) {
+for (int64_t j = 0; j < root_node->children_.count(); ++j) {
           ObIndexMergeNode *child = root_node->children_.at(j);
           
           if (OB_ISNULL(child) || child->is_merge_node()) {
@@ -3867,58 +3869,58 @@ int ObJoinOrder::do_create_index_merge_paths(
           } else {
             has_normal = true;
           }
-        }
+}
         
-        keep_intersect = has_fts && has_normal;
-      }
+keep_intersect = has_fts && has_normal;
+}
       
       // 【修复】如果不保留交集，选择最优分支
-      if (!keep_intersect) {
-        if (OB_FAIL(choose_best_selectivity_branch(root_node))) {
+if (!keep_intersect) {
+if (OB_FAIL(choose_best_selectivity_branch(root_node))) {
           LOG_WARN("failed to choose best selectivity branch", K(ret), KP(root_node));
-        }
-      }
+}
+}
       
-      if (OB_SUCC(ret)) {
-        if (OB_FAIL(root_node->formalize_index_merge_tree())) {
+if (OB_SUCC(ret)) {
+if (OB_FAIL(root_node->formalize_index_merge_tree())) {
           LOG_WARN("failed to formalize index merge tree", K(ret), KP(root_node));
         } else if (OB_FAIL(build_access_path_for_scan_node(
                       table_id,
-                      ref_table_id,
-                      helper,
-                      index_info_cache,
-                      range_expr_constraint,
-                      root_node,
-                      scan_node_count))) {
-          LOG_WARN("failed to build access path for scan node", K(ret));
+ref_table_id,
+helper,
+index_info_cache,
+range_expr_constraint,
+root_node,
+scan_node_count))) {
+LOG_WARN("failed to build access path for scan node", K(ret));
         } else if (OB_FAIL(create_one_index_merge_path(
                       table_id,
-                      ref_table_id,
-                      helper,
-                      range_expr_constraint,
-                      root_node,
-                      index_merge_path))) {
+ref_table_id,
+helper,
+range_expr_constraint,
+root_node,
+index_merge_path))) {
           LOG_WARN("failed to create one index merge path", K(ret), KP(root_node));
-        } else if (OB_ISNULL(index_merge_path)) {
-          ret = OB_ERR_UNEXPECTED;
+} else if (OB_ISNULL(index_merge_path)) {
+ret = OB_ERR_UNEXPECTED;
           LOG_WARN("index merge path is null", K(ret), KP(root_node));
-        } else if (OB_FALSE_IT(index_merge_path->index_cnt_ = scan_node_count)) {
-          // nop
+} else if (OB_FALSE_IT(index_merge_path->index_cnt_ = scan_node_count)) {
+// nop
         } else if (OB_FAIL(access_paths.push_back(static_cast<AccessPath*>(index_merge_path)))) {
-          LOG_WARN("failed to push back index merge path", K(ret));
-        } else {
-          OPT_TRACE("generate one index merge path for", root_node->filter_);
+LOG_WARN("failed to push back index merge path", K(ret));
+} else {
+OPT_TRACE("generate one index merge path for", root_node->filter_);
           LOG_TRACE("generate one index merge path", KP(index_merge_path));
-        }
-      }
-    }
-  }
+}
+}
+}
+}
   
-  return ret;
+return ret;
 }
 
 
-int ObJoinOrder::choose_best_selectivity_branch(ObIndexMergeNode* &candi_node)
+  int ObJoinOrder::choose_best_selectivity_branch(ObIndexMergeNode* &candi_node)
 {
   int ret = OB_SUCCESS;
   if (OB_ISNULL(candi_node)) {
@@ -19538,6 +19540,32 @@ int ObJoinOrder::process_index_for_match_expr(const uint64_t table_id,
         LOG_WARN("failed to append func lookup exprs", K(ret), KPC(curr_expr));
       } else if (OB_FAIL(access_path.domain_idx_info_.func_lookup_index_ids_.push_back(match_expr_info->inv_idx_id_))) {
         LOG_WARN("failed to append func lookup index id", K(ret));
+      }
+    }
+  }
+  // derive score ordering for TR when ORDER BY matches MATCH AGAINST and single item
+  const ObDMLStmt *stmt2 = NULL;
+  if (OB_SUCC(ret) && OB_NOT_NULL(get_plan()) && OB_NOT_NULL(stmt2 = get_plan()->get_stmt())) {
+    if (stmt2->get_order_items().count() == 1) {
+      const OrderItem &oi = stmt2->get_order_items().at(0);
+      ObRawExpr *order_expr = oi.expr_;
+      if (OB_NOT_NULL(order_expr)) {
+        ObRawExpr *score_match_expr = NULL;
+        if (order_expr->has_flag(IS_MATCH_EXPR)) {
+          score_match_expr = order_expr;
+        } else if (order_expr->get_expr_type() == T_OP_BOOL && order_expr->has_flag(CNT_MATCH_EXPR)
+                   && order_expr->get_param_count() > 0) {
+          ObRawExpr *p0 = order_expr->get_param_expr(0);
+          if (OB_NOT_NULL(p0) && p0->has_flag(IS_MATCH_EXPR)) {
+            score_match_expr = p0;
+          }
+        }
+        if (OB_NOT_NULL(score_match_expr)) {
+          access_path.ordering_.reuse();
+          if (OB_FAIL(access_path.ordering_.push_back(OrderItem(score_match_expr, oi.is_ascending() ? NULLS_FIRST_ASC : NULLS_FIRST_DESC)))) {
+            LOG_WARN("failed to push back score ordering", K(ret));
+          }
+        }
       }
     }
   }
