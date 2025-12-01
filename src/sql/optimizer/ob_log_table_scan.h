@@ -862,6 +862,13 @@ public:
   inline bool is_spatial_index_scan() const { return is_spatial_index_; }
   inline ObTextRetrievalInfo &get_text_retrieval_info() { return text_retrieval_info_; }
   inline const ObTextRetrievalInfo &get_text_retrieval_info() const { return text_retrieval_info_; }
+  // TR TopK pushdown helpers
+  inline int tr_set_sort_key(const OrderItem &item) {
+    text_retrieval_info_.sort_key_ = item; return common::OB_SUCCESS;
+  }
+  inline void tr_set_topk_limit_expr(ObRawExpr *limit_expr) {
+    text_retrieval_info_.topk_limit_expr_ = limit_expr;
+  }
   int prepare_vector_access_exprs();
   int vector_access_push_rowkey_exprs();
   inline bool has_func_lookup() const { return 0 != lookup_tr_infos_.count(); }

@@ -7923,7 +7923,22 @@ int ObLogPlan::try_allocate_sort_as_top(ObLogicalOperator *&top,
     // TR-TopK shortcut: 当子树存在可直达的 TR Block-Max TopK 表扫描且确需排序时，
     // 直接跳过 LOG_SORT，由检索层输出相关性序 TopK。
     if (need_sort && ob_has_safe_tr_topk_in_single_chain(top)) {
-      OPT_TRACE("[TR-TopK] skip logical sort in try_allocate_sort_as_top");
+      // 下推 TR TopK：将排序与TopK信息传给TSC（TR）
+      ObLogicalOperator *ts = top;
+      while (nullptr != ts && ts->get_num_of_child() == 1) {
+        ts = ts->get_child(ObLogicalOperator::first_child);
+      }
+      if (nullptr != ts && ts->get_type() == log_op_def::LOG_TABLE_SCAN) {
+        ObLogTableScan *tsc = static_cast<ObLogTableScan *>(ts);
+        if (sort_keys.count() > 0) {
+          (void)tsc->tr_set_sort_key(sort_keys.at(0));
+        }
+        const ObDMLStmt *stmt = get_stmt();
+        if (nullptr != stmt && nullptr != stmt->get_limit_expr()) {
+          tsc->tr_set_topk_limit_expr(const_cast<ObRawExpr *>(stmt->get_limit_expr()));
+        }
+      }
+      OPT_TRACE("[TR-TopK] push topk to TSC and skip logical sort in try_allocate_sort_as_top");
       return OB_SUCCESS;
     }
     bool is_local_order = top->get_is_local_order()
