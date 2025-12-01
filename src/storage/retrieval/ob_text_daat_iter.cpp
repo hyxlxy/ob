@@ -17,6 +17,7 @@
 #define USING_LOG_PREFIX STORAGE
 
 #include "ob_text_daat_iter.h"
+#include "sql/das/ob_das_ir_define.h"
 
 namespace oceanbase
 {
@@ -84,7 +85,11 @@ int ObTextDaaTIter::pre_process()
 
 ObTextBMWIter::ObTextBMWIter()
   : ObSRBMWIterImpl(),
-    bm25_param_estimator_() {}
+    bm25_param_estimator_(),
+    valid_docids_(nullptr),
+    hash_ready_(false)
+{
+}
 
 void ObTextBMWIter::reuse(const bool switch_tablet)
 {
@@ -94,6 +99,10 @@ void ObTextBMWIter::reuse(const bool switch_tablet)
       static_cast<ObTextRetrievalBlockMaxIter *>(dim_iters_->at(i))->reuse();
     }
   }
+  if (valid_docid_hash_.created()) {
+    (void)valid_docid_hash_.destroy();
+  }
+  hash_ready_ = false;
   ObSRBMWIterImpl::reuse(switch_tablet);
 }
 
@@ -161,6 +170,69 @@ int ObTextBMWIter::init_before_wand_process()
     }
   }
   return ret;
+}
+
+int ObTextBMWIter::set_valid_docid_set(const common::ObIArray<sql::ObDocIdExt> *set)
+{
+  int ret = OB_SUCCESS;
+  valid_docids_ = set;
+  hash_ready_ = false;
+  if (nullptr != valid_docids_ && valid_docids_->count() > 0) {
+    // 构建hash，使用 ObDocIdExt::hash(uint64_t&) 作为key
+    const int64_t bucket_num = valid_docids_->count() * 2 + 1;
+    if (valid_docid_hash_.created()) {
+      (void)valid_docid_hash_.destroy();
+    }
+    if (OB_SUCCESS != valid_docid_hash_.create(bucket_num, ObMemAttr(MTL_ID(), "TRDocIdHash"))) {
+      // 构建失败不视为致命，回退到线性查找
+      hash_ready_ = false;
+    } else {
+      bool hash_ok = true;
+      for (int64_t i = 0; hash_ok && i < valid_docids_->count(); ++i) {
+        uint64_t hv = 0;
+        if (OB_SUCCESS != valid_docids_->at(i).hash(hv)) {
+          hash_ok = false;
+          break;
+        } else if (OB_SUCCESS != valid_docid_hash_.set_refactored(hv, 1 /*overwrite*/)) {
+          hash_ok = false;
+          break;
+        }
+      }
+      hash_ready_ = hash_ok;
+      if (!hash_ready_) {
+        (void)valid_docid_hash_.destroy();
+      }
+    }
+  }
+  return ret;
+}
+
+bool ObTextBMWIter::accept_docid(const ObDatum &id_datum, const double /*relevance*/)
+{
+  bool accept = true;
+  if (nullptr != valid_docids_ && valid_docids_->count() > 0) {
+    sql::ObDocIdExt tmp;
+    if (OB_SUCCESS != tmp.from_datum(id_datum)) {
+      accept = true; // 遇到异常时回退为接受，避免影响正确性
+    } else if (hash_ready_) {
+      uint64_t hv = 0;
+      if (OB_SUCCESS != tmp.hash(hv)) {
+        accept = true; // hash失败回退接受
+      } else {
+        int ret2 = valid_docid_hash_.exist_refactored(hv);
+        accept = (ret2 == OB_HASH_EXIST);
+      }
+    } else {
+      // 线性回退
+      accept = false;
+      for (int64_t i = 0; !accept && i < valid_docids_->count(); ++i) {
+        if (tmp == valid_docids_->at(i)) {
+          accept = true;
+        }
+      }
+    }
+  }
+  return accept;
 }
 
 } // namespace storage

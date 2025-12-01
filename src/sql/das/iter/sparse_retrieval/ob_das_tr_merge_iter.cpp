@@ -519,7 +519,8 @@ int ObDASTRMergeIter::create_sparse_retrieval_iter()
   }
   sr_iter_param_.oversample_factor_ = oversample_factor;
   sr_iter_param_.min_score_threshold_ = min_score_threshold;
-  sr_iter_param_.topk_limit_ = topk_limit_ * oversample_factor;
+  // 保持TopK上层语义不变（只输出K），过采样因子仅用于BMW内部阈值稳定
+  sr_iter_param_.topk_limit_ = topk_limit_;
   if (OB_NOT_NULL(ir_ctdef_->field_boost_expr_)) {
     ObDatum *boost_datum = nullptr;
     if (OB_FAIL(ir_ctdef_->field_boost_expr_->eval(*ir_rtdef_->eval_ctx_, boost_datum))) {
@@ -562,6 +563,40 @@ int ObDASTRMergeIter::create_sparse_retrieval_iter()
     } else if (OB_FAIL(bmw_iter->init(iter_param))) {
       LOG_WARN("failed to init text retrieval bm25 iter", K(ret));
     } else {
+      // 方案B：若存在预收窄docid集合，则按cap截断后下推到BMW迭代器
+      if (pre_filtered_docids_.count() > 0) {
+        int64_t docid_cap = 50000; // 默认cap
+        if (OB_NOT_NULL(ir_rtdef_) && OB_NOT_NULL(ir_rtdef_->eval_ctx_)) {
+          ObSQLSessionInfo *session = ir_rtdef_->eval_ctx_->exec_ctx_.get_my_session();
+          if (OB_NOT_NULL(session)) {
+            common::ObObj v;
+            if (OB_SUCCESS == session->get_user_variable_value(ObString::make_string("ob_tr_valid_docid_cap"), v)) {
+              if (v.is_integer_type()) {
+                int64_t val = v.get_int();
+                if (val > 0) docid_cap = val;
+              } else if (v.is_uint64()) {
+                uint64_t val = v.get_uint64();
+                if (val > 0) docid_cap = static_cast<int64_t>(val);
+              }
+            }
+          }
+        }
+        capped_pre_filtered_docids_.reset();
+        const int64_t n = pre_filtered_docids_.count();
+        const int64_t take = docid_cap < n ? docid_cap : n;
+        for (int64_t i = 0; i < take; ++i) {
+          (void)capped_pre_filtered_docids_.push_back(pre_filtered_docids_.at(i));
+        }
+        if (take < n) {
+          LOG_INFO("cap pre-filtered docids", K(n), K(docid_cap), K(take));
+        }
+        int tmp_ret = bmw_iter->set_valid_docid_set(&capped_pre_filtered_docids_);
+        if (OB_SUCCESS != tmp_ret) {
+          LOG_WARN("failed to set valid docid set for bmw iter", K(tmp_ret));
+        } else {
+          LOG_DEBUG("pushed down pre-filtered docids to BMW iter", K(capped_pre_filtered_docids_.count()));
+        }
+      }
       sparse_retrieval_iter_ = bmw_iter;
     }
   } else if (daat_mode_) {
@@ -1116,6 +1151,22 @@ int ObDASTRMergeIter::inner_get_next_row()
     LOG_WARN("sparse retrieval iter is null", K(ret));
   } else {
     ret = sparse_retrieval_iter_->get_next_row();
+  }
+  return ret;
+}
+
+int ObDASTRMergeIter::set_pre_filtered_docids(const common::ObIArray<ObDocIdExt> &docids)
+{
+  int ret = OB_SUCCESS;
+  if (IS_NOT_INIT) {
+    // 允许在init前设置，使用自身allocator即可
+  }
+  if (docids.count() == 0) {
+    pre_filtered_docids_.reset();
+  } else if (OB_FAIL(pre_filtered_docids_.assign(docids))) {
+    LOG_WARN("failed to assign pre filtered docids", K(ret), K(docids.count()));
+  } else {
+    LOG_DEBUG("set pre filtered docids", K(pre_filtered_docids_.count()));
   }
   return ret;
 }

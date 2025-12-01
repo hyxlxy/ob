@@ -93,6 +93,8 @@ protected:
   virtual int inner_release() override;
   virtual int inner_get_next_row() override;
   virtual int inner_get_next_rows(int64_t &count, int64_t capacity) override;
+  // 方案B：外部可将预收窄的docid集合注入到TR Merge迭代器，后续在创建BMW迭代器时下推
+  int set_pre_filtered_docids(const common::ObIArray<ObDocIdExt> &docids);
 public:
   int set_related_tablet_ids(
       const ObLSID &ls_id,
@@ -175,6 +177,9 @@ private:
   ObBlockMaxScoreIterParam block_max_iter_param_;
   ObBlockStatScanParam doc_length_est_param_;
   ObFixedArray<ObSkipIndexColMeta, ObIAllocator> doc_length_est_stat_cols_;
+  // 预收窄docid集合（方案B：外部注入）。若非空，则在创建BMW迭代器后下推给其做预过滤
+  common::ObArray<ObDocIdExt, common::ModulePageAllocator, true> pre_filtered_docids_;
+  common::ObArray<ObDocIdExt, common::ModulePageAllocator, true> capped_pre_filtered_docids_;
   int64_t topk_limit_;
   ObLSID ls_id_;
   ObTabletID total_doc_cnt_tablet_id_;

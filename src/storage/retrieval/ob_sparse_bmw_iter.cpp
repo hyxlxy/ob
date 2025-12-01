@@ -29,11 +29,16 @@ ObSRBMWIterImpl::ObSRBMWIterImpl()
     allocator_("BMWAlloc"),
     less_score_cmp_(),
     top_k_heap_(less_score_cmp_, &allocator_),
+    top_k_thresh_heap_(less_score_cmp_, &allocator_),
     top_k_count_(0),
     domain_id_cmp_(),
     id_cache_(),
     status_(BMWStatus::MAX_STATUS)
-{}
+{
+  top_k_capacity_ = 0;
+  top_k_project_count_ = 0;
+  top_k_projected_ = 0;
+}
 
 int ObSRBMWIterImpl::init(
     ObSparseRetrievalMergeParam &iter_param,
@@ -55,11 +60,16 @@ int ObSRBMWIterImpl::init(
     top_k_count_ = iter_param.topk_limit_;
     status_ = BMWStatus::MAX_STATUS;
     id_cache_.set_allocator(&allocator_);
+    // oversample: capacity = K * factor; project_count = K; reset projected counter
+    const int64_t factor = iter_param.oversample_factor_ > 1 ? iter_param.oversample_factor_ : 1;
+    top_k_project_count_ = top_k_count_;
+    top_k_capacity_ = top_k_project_count_ * factor;
+    top_k_projected_ = 0;
     if (OB_FAIL(domain_id_cmp_.init(iter_param.id_proj_expr_->obj_meta_))) {
       LOG_WARN("failed to init domain id cmp", K(ret));
-    } else if (OB_FAIL(id_cache_.init(top_k_count_))) {
+    } else if (OB_FAIL(id_cache_.init(top_k_capacity_))) {
       LOG_WARN("failed to init id cache", K(ret));
-    } else if (OB_FAIL(id_cache_.prepare_allocate(top_k_count_))) {
+    } else if (OB_FAIL(id_cache_.prepare_allocate(top_k_capacity_))) {
       LOG_WARN("failed to prepare allocate id cache", K(ret));
     } else {
       is_inited_ = true;
@@ -70,10 +80,13 @@ int ObSRBMWIterImpl::init(
 
 void ObSRBMWIterImpl::reuse(const bool switch_tablet)
 {
-
   while (!top_k_heap_.empty()) {
     top_k_heap_.pop();
   }
+  while (!top_k_thresh_heap_.empty()) {
+    top_k_thresh_heap_.pop();
+  }
+  top_k_projected_ = 0;
   status_ = BMWStatus::MAX_STATUS;
   ObSRDaaTIterImpl::reuse(switch_tablet);
 }
@@ -81,6 +94,10 @@ void ObSRBMWIterImpl::reuse(const bool switch_tablet)
 void ObSRBMWIterImpl::reset()
 {
   top_k_heap_.reset();
+  top_k_thresh_heap_.reset();
+  top_k_capacity_ = 0;
+  top_k_project_count_ = 0;
+  top_k_projected_ = 0;
   top_k_count_ = 0;
   status_ = BMWStatus::MAX_STATUS;
   domain_id_cmp_.reset();
@@ -220,7 +237,7 @@ int ObSRBMWIterImpl::build_top_k_heap()
     bool need_project = true;
     double relevance = 0.0;
     const ObDatum *id_datum = nullptr;
-    while (OB_SUCC(ret) && top_k_heap_.count() < top_k_count_) {
+    while (OB_SUCC(ret) && top_k_thresh_heap_.count() < top_k_project_count_) {
       if (OB_FAIL(fill_merge_heap())) {
         if (OB_UNLIKELY(OB_ITER_END != ret)) {
           LOG_WARN("failed to fill merge heap", K(ret));
@@ -241,13 +258,32 @@ int ObSRBMWIterImpl::build_top_k_heap()
 int ObSRBMWIterImpl::process_collected_row(const ObDatum &id_datum, const double relevance)
 {
   int ret = OB_SUCCESS;
-  if (OB_UNLIKELY(top_k_heap_.count() > top_k_count_)) {
+  // docid 预过滤钩子（可由子类覆盖），默认总是接受
+  if (OB_SUCC(ret) && !accept_docid(id_datum, relevance)) {
+    return ret; // skip this docid silently
+  }
+  // 1) 维护阈值堆（容量=K，用于确定早停阈值，不涉及id缓存）
+  if (top_k_thresh_heap_.count() < top_k_project_count_) {
+    if (OB_FAIL(top_k_thresh_heap_.push(TopKItem(relevance, -1)))) {
+      LOG_WARN("failed to push threshold heap item", K(ret));
+    }
+  } else if (!top_k_thresh_heap_.empty() && relevance > top_k_thresh_heap_.top().relevance_) {
+    if (OB_FAIL(top_k_thresh_heap_.pop())) {
+      LOG_WARN("failed to pop threshold heap", K(ret));
+    } else if (OB_FAIL(top_k_thresh_heap_.push(TopKItem(relevance, -1)))) {
+      LOG_WARN("failed to push threshold heap item", K(ret));
+    }
+  }
+
+  // 2) 维护结果堆（容量=K'，对外仅投影K条）
+  if (OB_UNLIKELY(top_k_heap_.count() > top_k_capacity_)) {
     ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("unexpected top k heap count", K(ret), K(top_k_heap_.count()), K_(top_k_count));
-  } else if (top_k_heap_.count() < top_k_count_) {
-    if (OB_FAIL(id_cache_.at(top_k_heap_.count()).from_datum(id_datum))) {
+    LOG_WARN("unexpected top k heap count", K(ret), K(top_k_heap_.count()), K_(top_k_capacity));
+  } else if (top_k_heap_.count() < top_k_capacity_) {
+    const int64_t cache_idx = top_k_heap_.count();
+    if (OB_FAIL(id_cache_.at(cache_idx).from_datum(id_datum))) {
       LOG_WARN("failed to from datum", K(ret));
-    } else if (OB_FAIL(top_k_heap_.push(TopKItem(relevance, top_k_heap_.count())))) {
+    } else if (OB_FAIL(top_k_heap_.push(TopKItem(relevance, cache_idx)))) {
       LOG_WARN("failed to push top k item", K(ret));
     }
   } else {
@@ -621,27 +657,33 @@ int ObSRBMWIterImpl::project_rows_from_top_k_heap(const int64_t capacity, int64_
   if (OB_UNLIKELY(BMWStatus::FINISHED != status_)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("unexpected status", K(ret), K_(status));
-  } else if (OB_UNLIKELY(top_k_heap_.empty())) {
-    ret = OB_ITER_END;
   } else if (OB_UNLIKELY(capacity < 0 || capacity > buffered_domain_ids_.count())) {
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("invalid argument", K(ret), K(capacity), K(buffered_domain_ids_.count()));
+  } else if (top_k_projected_ >= top_k_project_count_) {
+    ret = OB_ITER_END;
+  } else if (OB_UNLIKELY(top_k_heap_.empty())) {
+    ret = OB_ITER_END;
   } else {
+    // 限制本批最多输出 remain = K - projected
+    int64_t remain = top_k_project_count_ - top_k_projected_;
+    int64_t batch = remain < capacity ? remain : capacity;
+
     ObExpr *relevance_proj_expr = iter_param_->relevance_proj_expr_;
     ObExpr *id_proj_expr = iter_param_->id_proj_expr_;
     ObEvalCtx *eval_ctx = iter_param_->eval_ctx_;
     sql::ObBitVector &id_evaluated_flags = id_proj_expr->get_evaluated_flags(*eval_ctx);
     sql::ObBitVector *relevance_evaluated_flags = nullptr;
-    ObDatum *id_datums = id_proj_expr->locate_datums_for_update(*eval_ctx, capacity);
+    ObDatum *id_datums = id_proj_expr->locate_datums_for_update(*eval_ctx, batch);
     ObDatum *relevance_datums = nullptr;
     if (iter_param_->need_project_relevance()) {
-      relevance_datums = relevance_proj_expr->locate_datums_for_update(*eval_ctx, capacity);
+      relevance_datums = relevance_proj_expr->locate_datums_for_update(*eval_ctx, batch);
       relevance_evaluated_flags = &relevance_proj_expr->get_evaluated_flags(*eval_ctx);
     }
 
     ObEvalCtx::BatchInfoScopeGuard guard(*eval_ctx);
     count = 0;
-    for (int64_t i = 0; OB_SUCC(ret) && i < capacity && !top_k_heap_.empty(); ++i) {
+    for (int64_t i = 0; OB_SUCC(ret) && i < batch && !top_k_heap_.empty(); ++i) {
       guard.set_batch_idx(i);
       const TopKItem &top_k_item = top_k_heap_.top();
       const ObDocIdExt &id = id_cache_.at(top_k_item.cache_idx_);
@@ -659,6 +701,7 @@ int ObSRBMWIterImpl::project_rows_from_top_k_heap(const int64_t capacity, int64_
         LOG_WARN("failed to pop top k heap", K(ret));
       }
     }
+    top_k_projected_ += count;
   }
   return ret;
 }

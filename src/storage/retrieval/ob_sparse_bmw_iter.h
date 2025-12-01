@@ -41,6 +41,8 @@ public:
   virtual int get_next_rows(const int64_t capacity, int64_t &count) override;
 protected:
   virtual int process_collected_row(const ObDatum &id_datum, const double relevance) override;
+  // hook for docid acceptance (e.g., pre-filter by valid docid set), default accept all
+  virtual bool accept_docid(const ObDatum &id_datum, const double relevance) { UNUSED(id_datum); UNUSED(relevance); return true; }
   virtual int init_before_wand_process() { return OB_SUCCESS; }
 
   int top_k_search();
@@ -51,7 +53,7 @@ protected:
   int evaluate_pivot_range(const int64_t pivot_iter_idx, bool &is_candidate);
   double get_top_k_threshold()
   {
-    const double heap_threshold = top_k_heap_.empty() ? 0.0 : top_k_heap_.top().relevance_;
+    const double heap_threshold = top_k_thresh_heap_.empty() ? 0.0 : top_k_thresh_heap_.top().relevance_;
     const double ext_threshold = (nullptr != iter_param_) ? iter_param_->min_score_threshold_ : 0.0;
     return heap_threshold > ext_threshold ? heap_threshold : ext_threshold;
   }
@@ -103,6 +105,11 @@ protected:
   TopKItemCmp less_score_cmp_;
   // Maybe domain id not need to be cached within the topk heap since there would be top-n sort with datum store above
   TopKHeap top_k_heap_;
+  TopKHeap top_k_thresh_heap_;
+  // oversample support: heap capacity may be larger than final projection K
+  int64_t top_k_capacity_;
+  int64_t top_k_project_count_;
+  int64_t top_k_projected_;
   int64_t top_k_count_;
   ObDomainIdCmp domain_id_cmp_;
   ObFixedArray<ObDocIdExt, ObIAllocator> id_cache_;

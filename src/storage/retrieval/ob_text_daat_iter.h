@@ -21,6 +21,7 @@
 #include "ob_sparse_bmw_iter.h"
 #include "ob_sparse_daat_iter.h"
 #include "ob_text_retrieval_token_iter.h"
+#include "lib/hash/ob_hashset.h"
 
 namespace oceanbase
 {
@@ -28,6 +29,7 @@ namespace sql
 {
   class ObDASScanIter;
 }
+namespace sql { class ObDocIdExt; }
 namespace storage
 {
 
@@ -79,11 +81,17 @@ public:
   virtual void reuse(const bool switch_tablet = false) override;
   virtual void reset() override;
   int init(const ObTextDaaTParam &param);
+  // 设置docid预过滤集合（可选）；若为nullptr或空则不启用过滤
+  int set_valid_docid_set(const common::ObIArray<sql::ObDocIdExt> *set);
 protected:
   virtual int get_next_rows(const int64_t capacity, int64_t &count) override;
   virtual int init_before_wand_process() override;
+  virtual bool accept_docid(const ObDatum &id_datum, const double relevance) override;
 protected:
   ObBM25ParamEstimator bm25_param_estimator_;
+  const common::ObIArray<sql::ObDocIdExt> *valid_docids_;
+  bool hash_ready_;
+  common::hash::ObHashSet<uint64_t> valid_docid_hash_;
 private:
   DISALLOW_COPY_AND_ASSIGN(ObTextBMWIter);
 };
