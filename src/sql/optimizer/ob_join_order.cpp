@@ -3530,60 +3530,22 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
             }
           }
 
-          // 为标量条件创建一个组合子节点（使用最优索引）
+          // 为每个标量条件分别构造一个 INDEX_MERGE_SCAN 子节点（使用各自可用的最佳索引），形成真正的 AND Index Merge
           if (OB_SUCC(ret) && !scalar_filters.empty()) {
-            ObIndexMergeNode *scalar_child = nullptr;
-            if (OB_ISNULL(scalar_child = OB_NEWx(ObIndexMergeNode, allocator_))) {
-              ret = OB_ALLOCATE_MEMORY_FAILED;
-              LOG_WARN("failed to allocate scalar child node", K(ret));
-            } else {
-              scalar_child->node_type_ = INDEX_MERGE_SCAN;
-
-              // 将所有标量条件添加到filter
-              for (int64_t i = 0; OB_SUCC(ret) && i < scalar_filters.count(); ++i) {
-                if (OB_FAIL(scalar_child->filter_.push_back(scalar_filters.at(i)))) {
-                  LOG_WARN("failed to push back scalar filter", K(ret));
-                }
-              }
-
-              // 查找“非FTS”的最优标量索引（优先选择普通二级索引，其次回退主表）
-              uint64_t best_index_id = OB_INVALID_ID;
-              ObSqlSchemaGuard *schema_guard = NULL;
-              const ObTableSchema *index_schema = NULL;
-              bool is_link_tbl = false;
-              if (OB_ISNULL(schema_guard = get_plan()->get_optimizer_context().get_sql_schema_guard())) {
-                ret = OB_ERR_UNEXPECTED;
-                LOG_WARN("unexpected null schema_guard", K(ret));
-              }
-              // 先在所有可用索引中挑选普通索引（排除FTS）
-              for (int64_t i = 0; OB_SUCC(ret) && i < valid_index_ids.count(); ++i) {
-                const uint64_t index_id = valid_index_ids.at(i);
-                if (index_id == ref_table_id) { // 跳过主表，优先挑索引
-                  continue;
-                } else if (OB_FAIL(schema_guard->get_table_schema(index_id, index_schema, is_link_tbl))) {
-                  LOG_WARN("failed to get index schema", K(ret), K(index_id));
-                } else if (OB_ISNULL(index_schema)) {
-                  ret = OB_ERR_UNEXPECTED;
-                  LOG_WARN("null index schema", K(ret), K(index_id));
-                } else if (index_schema->is_index_local_storage() && index_schema->is_normal_index()) {
-                  best_index_id = index_id; // 选择普通索引
-                  break;
-                } else {
-                  // 跳过FTS/其他类型索引
-                }
-              }
-              // 若未找到普通索引，回退到主表
-              if (OB_SUCC(ret) && OB_INVALID_ID == best_index_id) {
-                best_index_id = ref_table_id;
-              }
-
-              if (OB_SUCC(ret) && best_index_id != OB_INVALID_ID) {
-                scalar_child->index_tid_ = best_index_id;
-                if (OB_FAIL(scalar_child->candicate_index_tids_.push_back(best_index_id))) {
-                  LOG_WARN("failed to push back index tid", K(ret));
-                } else if (OB_FAIL(root->children_.push_back(scalar_child))) {
-                  LOG_WARN("failed to push back scalar child", K(ret));
-                }
+            for (int64_t si = 0; OB_SUCC(ret) && si < scalar_filters.count(); ++si) {
+              ObIndexMergeNode *scalar_child = nullptr;
+              bool is_scalar_valid = false;
+              if (OB_FAIL(generate_candi_index_merge_node(ref_table_id,
+                                                          scalar_filters.at(si),
+                                                          valid_index_ids,
+                                                          valid_index_cols,
+                                                          scalar_child,
+                                                          is_scalar_valid))) {
+                LOG_WARN("failed to generate scalar child node", K(ret), K(si));
+              } else if (!is_scalar_valid || nullptr == scalar_child) {
+                // 跳过不可用的标量条件
+              } else if (OB_FAIL(root->children_.push_back(scalar_child))) {
+                LOG_WARN("failed to push back scalar child", K(ret));
               }
             }
           }
