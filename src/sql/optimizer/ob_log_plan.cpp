@@ -7949,12 +7949,8 @@ static bool ob_has_safe_tr_topk_in_single_chain(ObLogicalOperator *node)
     ObLogTableScan *tsc = static_cast<ObLogTableScan *>(node);
     const ObTextRetrievalInfo &tr = tsc->get_text_retrieval_info();
     if (tr.need_block_max_scan() && tr.need_sort()) {
-      bool all_before_indexback = true;
-      const ObIArray<bool> &flags = tsc->get_filter_before_index_flags();
-      for (int64_t i = 0; all_before_indexback && i < flags.count(); ++i) {
-        all_before_indexback = flags.at(i);
-      }
-      return all_before_indexback;
+      // 放宽：只要TR为Block-Max TopK且需要排序，即可由底层输出相关性序TopK，跳过LOG_SORT
+      return true;
     }
     return false;
   }
