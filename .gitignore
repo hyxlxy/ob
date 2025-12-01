@@ -392,3 +392,4 @@ test/var
 store/
 perf.data
 perf.script
+flamegraph.svg
