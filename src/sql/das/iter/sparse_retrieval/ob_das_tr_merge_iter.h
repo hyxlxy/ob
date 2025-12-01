@@ -150,6 +150,9 @@ private:
   int init_topk_limit();
   int init_block_max_iter_param();
   int init_doc_length_est_param();
+  // Phase1/Phase2 skeletons (not yet enabled)
+  int phase1_collect_docids_kprime(const int64_t kprime, common::ObIArray<ObDocIdExt> &docids, double &min_score);
+  int phase2_apply_threshold_and_rescan(const double min_score);
 private:
   static const int64_t FWD_IDX_ROWKEY_COL_CNT = 2;
   static const int64_t INV_IDX_ROWKEY_COL_CNT = 2;
@@ -180,6 +183,13 @@ private:
   // 预收窄docid集合（方案B：外部注入）。若非空，则在创建BMW迭代器后下推给其做预过滤
   common::ObArray<ObDocIdExt, common::ModulePageAllocator, true> pre_filtered_docids_;
   common::ObArray<ObDocIdExt, common::ModulePageAllocator, true> capped_pre_filtered_docids_;
+  // 两阶段占位：Phase1保底缓存与阈值
+  common::ObArray<ObDocIdExt, common::ModulePageAllocator, true> phase1_docids_;
+  double phase1_min_score_ = 0.0;
+  // 两阶段配置缓存（会话读取后存放，便于后续 Phase1/2 使用）
+  bool two_phase_enable_cfg_ = true;
+  int64_t two_phase_factor_cfg_ = 3;
+  bool two_phase_prepared_ = false;
   int64_t topk_limit_;
   ObLSID ls_id_;
   ObTabletID total_doc_cnt_tablet_id_;
