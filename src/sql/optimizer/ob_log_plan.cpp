@@ -7902,6 +7902,8 @@ int ObLogPlan::allocate_dist_range_sort_as_top(ObLogicalOperator *&top,
   }
   return ret;
 }
+// forward declaration for helper used below
+static bool ob_has_safe_tr_topk_in_single_chain(ObLogicalOperator *node);
 
 int ObLogPlan::try_allocate_sort_as_top(ObLogicalOperator *&top,
                                         const ObIArray<OrderItem> &sort_keys,
@@ -7918,6 +7920,12 @@ int ObLogPlan::try_allocate_sort_as_top(ObLogicalOperator *&top,
             OB_FAIL(create_hash_sortkey(part_cnt, sort_keys, hash_sortkey))) {
     LOG_WARN("failed to create hash sort key", K(ret), K(part_cnt), K(sort_keys));
   } else {
+    // TR-TopK shortcut: 当子树存在可直达的 TR Block-Max TopK 表扫描且确需排序时，
+    // 直接跳过 LOG_SORT，由检索层输出相关性序 TopK。
+    if (need_sort && ob_has_safe_tr_topk_in_single_chain(top)) {
+      OPT_TRACE("[TR-TopK] skip logical sort in try_allocate_sort_as_top");
+      return OB_SUCCESS;
+    }
     bool is_local_order = top->get_is_local_order()
         && (top->is_single() || (top->is_distributed() && top->is_exchange_allocated()));
     ObExchangeInfo exch_info;
