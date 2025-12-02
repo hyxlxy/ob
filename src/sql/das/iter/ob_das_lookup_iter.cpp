@@ -17,7 +17,7 @@
 #define USING_LOG_PREFIX SQL_DAS
 #include "sql/das/iter/ob_das_lookup_iter.h"
 #include "src/sql/engine/ob_exec_context.h"
-
+#include "common/ad_log.h"
 namespace oceanbase
 {
 using namespace common;
@@ -100,10 +100,15 @@ int ObDASLookupIter::inner_get_next_row()
   int64_t simulate_batch_row_cnt = - EVENT_CALL(EventTable::EN_TABLE_LOOKUP_BATCH_ROW_COUNT);
   const bool use_simulate_batch_row_cnt = simulate_batch_row_cnt > 0 && simulate_batch_row_cnt < default_batch_row_count_;
   int64_t default_row_batch_cnt  = use_simulate_batch_row_cnt ? simulate_batch_row_cnt : default_batch_row_count_;
-  LOG_DEBUG("simulate lookup row batch count", K(simulate_batch_row_cnt), K(default_row_batch_cnt));
+  LOG_DEBUG("simulate lookup row batch count", K(simulate_batch_row_cnt),
+            K(default_row_batch_cnt));
+  adlog::DEBUG("--------------ObDASLookupIter::next_row begin----------");
+  
   do {
     switch (state_) {
-      case INDEX_SCAN: {
+    case INDEX_SCAN: {
+      adlog::DEBUG("--------------ObDASLookupIter::next_row INDEX_SCAN----------");
+      
         reset_lookup_state();
         while (OB_SUCC(ret) && !index_end_ && lookup_rowkey_cnt_ < default_row_batch_cnt) {
           index_table_iter_->clear_evaluated_flag();
@@ -132,6 +137,8 @@ int ObDASLookupIter::inner_get_next_row()
       }
 
       case DO_LOOKUP: {
+        adlog::DEBUG("--------------ObDASLookupIter::next_row DO_LOOKUP----------");
+
         if (OB_FAIL(do_index_lookup())) {
           LOG_WARN("failed to do index lookup", K(ret));
         } else {
@@ -141,6 +148,8 @@ int ObDASLookupIter::inner_get_next_row()
       }
 
       case OUTPUT_ROWS: {
+        adlog::DEBUG("--------------ObDASLookupIter::next_row OUTPUT_ROWS----------");
+
         data_table_iter_->clear_evaluated_flag();
         if (OB_FAIL(data_table_iter_->get_next_row())) {
           if (OB_LIKELY(OB_ITER_END == ret)) {
@@ -170,6 +179,7 @@ int ObDASLookupIter::inner_get_next_row()
       }
     }
   } while (!got_next_row && OB_SUCC(ret));
+  adlog::DEBUG("--------------ObDASLookupIter::next_row end----------");
 
   return ret;
 }
@@ -181,10 +191,16 @@ int ObDASLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
   int64_t simulate_batch_row_cnt = - EVENT_CALL(EventTable::EN_TABLE_LOOKUP_BATCH_ROW_COUNT);
   const bool use_simulate_batch_row_cnt = simulate_batch_row_cnt > 0 && simulate_batch_row_cnt < default_batch_row_count_;
   int64_t default_row_batch_cnt  = use_simulate_batch_row_cnt ? simulate_batch_row_cnt : default_batch_row_count_;
-  LOG_DEBUG("simulate lookup row batch count", K(simulate_batch_row_cnt), K(default_row_batch_cnt));
+  LOG_DEBUG("simulate lookup row batch count", K(simulate_batch_row_cnt),
+            K(default_row_batch_cnt));
+  
+  adlog::DEBUG("--------------ObDASLookupIter::next_rows begin----------");
+
   do {
     switch (state_) {
       case INDEX_SCAN: {
+        adlog::DEBUG("--------------ObDASLookupIter::next_rows INDEX_SCAN----------");
+      
         reset_lookup_state();
         int64_t storage_count = 0;
         int64_t index_capacity = 0;
@@ -192,6 +208,8 @@ int ObDASLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
           storage_count = 0;
           index_capacity = std::min(max_size_, default_row_batch_cnt - lookup_rowkey_cnt_);
           index_table_iter_->clear_evaluated_flag();
+          adlog::DEBUG("--------------ObDASLookupIter::next_rows INDEX_SCAN get_next_rows----------");
+
           if (OB_FAIL(index_table_iter_->get_next_rows(storage_count, index_capacity))) {
             if (OB_UNLIKELY(OB_ITER_END != ret)) {
               LOG_WARN("failed to get next rows from index table", K(ret));
@@ -222,6 +240,8 @@ int ObDASLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
       }
 
       case DO_LOOKUP: {
+        adlog::DEBUG("--------------ObDASLookupIter::next_rows DO_LOOKUP----------");
+
         if (OB_FAIL(do_index_lookup())) {
           LOG_WARN("failed to do index lookup", K(ret));
         } else {
@@ -231,8 +251,12 @@ int ObDASLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
       }
 
       case OUTPUT_ROWS: {
+        adlog::DEBUG("--------------ObDASLookupIter::next_rows OUTPUT_ROWS----------");
+
         count = 0;
         data_table_iter_->clear_evaluated_flag();
+        adlog::DEBUG("--------------ObDASLookupIter::next_rows OUTPUT_ROWS get_next_rows----------");
+
         if (OB_FAIL(data_table_iter_->get_next_rows(count, capacity))) {
           if (OB_LIKELY(OB_ITER_END == ret)) {
             ret = OB_SUCCESS;
@@ -262,6 +286,7 @@ int ObDASLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
       }
     }
   } while (!get_next_rows && OB_SUCC(ret));
+  adlog::DEBUG("--------------ObDASLookupIter::next_rows end----------");
 
   return ret;
 }

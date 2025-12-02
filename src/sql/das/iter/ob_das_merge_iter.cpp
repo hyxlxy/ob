@@ -998,52 +998,104 @@ int ObDASMergeIter::get_next_seq_rows(int64_t &count, int64_t capacity)
                 ObDASIter *data_iter = cache_iter->get_data_table_iter();
                 if (data_iter->get_type() == ObDASIterType::DAS_ITER_FUNC_LOOKUP) {
                   auto && func_lookup_iter = dynamic_cast<ObDASFuncLookupIter*>(data_iter);
-                  storage::ObTableScanParam& param = func_lookup_iter->get_lookup_param();
+                  //对于lookup_iter的lookup_param
+                  {
+                    storage::ObTableScanParam& param = func_lookup_iter->get_lookup_param();
 
-                  if (param.op_filters_ != nullptr) {
-                    adlog::DEBUG("333 param.op_filters_ != nullptr");
-                  // 将parent_filters_的内容添加到现有的op_filters_中
-                  // 注意：不能直接修改const成员，需要找到正确的方法
-                    for (int64_t i = 0; i < parent_filters_.count(); i++) {
-                      // 尝试将parent filter添加到现有filters中
-                      int ret = const_cast<sql::ObExprPtrIArray*>(param.op_filters_)->push_back(parent_filters_.at(i));
-                      if (OB_FAIL(ret)) {
-                        LOG_WARN("failed to add parent filter", K(ret));
-                        break;
-                      }
-                    }
-                  } else {
-                    adlog::DEBUG("333 param.op_filters_ is nullptr");
-                        // 使用param的allocator分配内存
-                    if (param.allocator_ != nullptr) {
-                      // 分配一个新的数组对象，使用4作为栈上元素数量（因为最多3个filter）
-                      void* buf = param.allocator_->alloc(sizeof(common::ObSEArray<sql::ObExpr*, 4>));
-                      if (buf != nullptr) {
-                        // 在分配的内存上构造数组对象
-                        common::ObSEArray<sql::ObExpr*, 4>* new_filters = 
-                            new(buf) common::ObSEArray<sql::ObExpr*, 4>();
-                        adlog::DEBUG("333 new_filters->assign(parent_filters_)");
-                        // 将parent_filters_的内容复制到新数组
-                        int ret = new_filters->assign(parent_filters_);
-                        // int ret = OB_SUCCESS;
-                        if (OB_SUCC(ret)) {
-                          // 使用const_cast修改const指针
-                          if (auto &&one = dynamic_cast<sql::ObExprPtrIArray *>(
-                                  new_filters)) {
-                            const_cast<sql::ObExprPtrIArray*&>(param.op_filters_) = one;
-                            adlog::DEBUG("success to assign parent filters to new array");
+                    if (param.op_filters_ != nullptr) {
+                      adlog::DEBUG("333 param.op_filters_ != nullptr");
+                    } else {
+                      adlog::DEBUG("333 param.op_filters_ is nullptr");
+                          // 使用param的allocator分配内存
+                      if (param.allocator_ != nullptr) {
+                        // 分配一个新的数组对象，使用4作为栈上元素数量（因为最多3个filter）
+                        void* buf = param.allocator_->alloc(sizeof(common::ObSEArray<sql::ObExpr*, 4>));
+                        if (buf != nullptr) {
+                          // 在分配的内存上构造数组对象
+                          common::ObSEArray<sql::ObExpr*, 4>* new_filters = 
+                              new(buf) common::ObSEArray<sql::ObExpr*, 4>();
+                          adlog::DEBUG("333 new_filters->assign(parent_filters_)");
+                          // 将parent_filters_的内容复制到新数组
+                          int ret = new_filters->assign(parent_filters_);
+                          // int ret = OB_SUCCESS;
+                          if (OB_SUCC(ret)) {
+                            // 使用const_cast修改const指针
+                            if (auto &&one = dynamic_cast<sql::ObExprPtrIArray *>(
+                                    new_filters)) {
+                              const_cast<sql::ObExprPtrIArray*&>(param.op_filters_) = one;
+                              adlog::DEBUG("success to assign parent filters to new array");
+                            } else {
+                              adlog::DEBUG("can not cast to ObExprPtrIArray");
+                            }
                           } else {
-                            adlog::DEBUG("can not cast to ObExprPtrIArray");
+                            adlog::DEBUG("failed to assign parent filters to new array");
+                            LOG_WARN("failed to assign parent filters to new array", K(ret));
                           }
                         } else {
-                          adlog::DEBUG("failed to assign parent filters to new array");
-                          LOG_WARN("failed to assign parent filters to new array", K(ret));
+                          LOG_WARN("failed to allocate memory for filters");
                         }
-                      } else {
-                        LOG_WARN("failed to allocate memory for filters");
                       }
+                    } 
+                  }
+                  // 对于lookup_iter的data_table_iter
+                  {
+                    ObDASIter *data_iter =
+                        func_lookup_iter->get_data_table_iter();
+                    if (auto &&iter =
+                            dynamic_cast<ObDASScanIter *>(data_iter)) {
+                              storage::ObTableScanParam& param = iter->get_scan_param();
+
+                              if (param.op_filters_ != nullptr) {
+                                adlog::DEBUG("444 param.op_filters_ != nullptr");
+                              } else {
+                                adlog::DEBUG("444 param.op_filters_ is nullptr");
+                                    // 使用param的allocator分配内存
+                                if (param.allocator_ != nullptr) {
+                                  // 分配一个新的数组对象，使用4作为栈上元素数量（因为最多3个filter）
+                                  void* buf = param.allocator_->alloc(sizeof(common::ObSEArray<sql::ObExpr*, 4>));
+                                  if (buf != nullptr) {
+                                    // 在分配的内存上构造数组对象
+                                    common::ObSEArray<sql::ObExpr*, 4>* new_filters = 
+                                        new(buf) common::ObSEArray<sql::ObExpr*, 4>();
+                                    adlog::DEBUG("444 new_filters->assign(parent_filters_)");
+                                    // 将parent_filters_的内容复制到新数组
+                                    int ret = new_filters->assign(parent_filters_);
+                                    // int ret = OB_SUCCESS;
+                                    if (OB_SUCC(ret)) {
+                                      // 使用const_cast修改const指针
+                                      if (auto &&one = dynamic_cast<sql::ObExprPtrIArray *>(
+                                              new_filters)) {
+                                        const_cast<sql::ObExprPtrIArray*&>(param.op_filters_) = one;
+                                        adlog::DEBUG("success to assign parent filters to new array");
+                                      } else {
+                                        adlog::DEBUG("can not cast to ObExprPtrIArray");
+                                      }
+                                    } else {
+                                      adlog::DEBUG("failed to assign parent filters to new array");
+                                      LOG_WARN("failed to assign parent filters to new array", K(ret));
+                                    }
+                                  } else {
+                                    LOG_WARN("failed to allocate memory for filters");
+                                  }
+                                }
+                              } 
+                    } else {
+                      adlog::DEBUG("out 's data_table_iter 's lookup_iter 's data_table_iter is not das_scan_iter");
                     }
-                  } 
+                    // 测试类型
+                    {
+                      if(auto && iter = dynamic_cast<ObDASLocalLookupIter*>(data_iter)){
+                        adlog::DEBUG("good2");
+                      }
+                      if(auto && iter = dynamic_cast<ObDASLookupIter*>(data_iter)){
+                        adlog::DEBUG("good3");
+                      }
+                      if(auto && iter = dynamic_cast<ObDASCacheLookupIter*>(data_iter)){
+                        adlog::DEBUG("good4");
+                      }
+
+                    }
+                  }
                 }
                 
               }
