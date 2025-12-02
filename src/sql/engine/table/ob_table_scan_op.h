@@ -553,8 +553,8 @@ protected:
       }
       // extract_pk_range_from_plan();
       // 确保过滤条件存在
-      adlog::DEBUG("Filter count: ", MY_SPEC.filters_.count());
-      adlog::DEBUG("Need final limit: ", need_final_limit_);
+      // adlog::DEBUG("Filter count: ", MY_SPEC.filters_.count());
+      // adlog::DEBUG("Need final limit: ", need_final_limit_);
 
       return ret;
   }

@@ -26,6 +26,7 @@
 #include "storage/truncate_info/ob_truncate_partition_filter.h"
 #include "share/ob_partition_split_query.h"
 #include "sql/engine/px/ob_granule_iterator_op.h"
+#include "common/ad_log.h"
 
 namespace oceanbase
 {
@@ -111,11 +112,10 @@ ObMultipleMerge::~ObMultipleMerge()
   }
 }
 
-int ObMultipleMerge::init(
-    ObTableAccessParam &param,
-    ObTableAccessContext &context,
-    ObGetTableParam &get_table_param)
-{
+int ObMultipleMerge::init(ObTableAccessParam &param,
+                          ObTableAccessContext &context,
+                          ObGetTableParam &get_table_param) {
+  // adlog::DEBUG("ObMultipleMerge::init");
   int ret = OB_SUCCESS;
   if (OB_UNLIKELY(inited_)) {
     ret = OB_INIT_TWICE;
@@ -724,6 +724,8 @@ int ObMultipleMerge::get_next_normal_rows(int64_t &count, int64_t capacity)
 
             if (OB_FAIL(ret)) {
             } else if (unprojected_row_.is_filtered()) {
+              adlog::DEBUG("unprojected_row_.is_filtered()");
+
               // continue
             } else if (need_handle_lob_columns(unprojected_row_) && OB_FAIL(handle_lob_before_fuse_row())) {
               LOG_WARN("Fail to handle lobs", K(ret), KP(this));
@@ -926,6 +928,8 @@ int ObMultipleMerge::get_next_aggregate_row(ObDatumRow *&row)
 
             if (OB_FAIL(ret)) {
             } else if (unprojected_row_.is_filtered()) {
+              adlog::DEBUG("unprojected_row_.is_filtered()");
+              //do_index_lookup::scan_param
               // continue
             } else if (need_handle_lob_columns(unprojected_row_) && OB_FAIL(handle_lob_before_fuse_row())) {
               LOG_WARN("Fail to handle lobs", K(ret), KP(this));

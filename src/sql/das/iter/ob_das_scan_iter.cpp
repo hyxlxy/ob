@@ -120,7 +120,7 @@ int ObDASScanIter::inner_get_next_row()
 {
   int ret = OB_SUCCESS;
   common::ObASHTabletIdSetterGuard ash_tablet_id_guard(scan_param_ != nullptr? scan_param_->index_id_ : 0);
-  adlog::DEBUG("ObDASScanIter::inner_get_next_row()");
+  // adlog::DEBUG("ObDASScanIter::inner_get_next_row()");
   if (OB_ISNULL(result_)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("unexpected nullptr scan iter", K(ret));

@@ -767,6 +767,7 @@ OB_INLINE int ObTableScanOp::create_one_das_task(ObDASTabletLoc *tablet_loc)
   int ret = OB_SUCCESS;
   ObDASScanOp *scan_op = nullptr;
   bool reuse_das_op = false;
+  adlog::DEBUG("ObTableScanOp::create_one_das_task");
   if (OB_ISNULL(scan_iter_)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("unexpected nullptr scan iter", K(ret));
@@ -930,6 +931,10 @@ int ObTableScanOp::prepare_pushdown_limit_param()
   if (MY_CTDEF.is_das_keep_order_ && OB_NOT_NULL(scan_iter_) && scan_iter_->get_das_task_cnt() > 1) {
     need_final_limit_ = false;
   }
+
+  // if (MY_SPEC.filters_.count() > 0) {
+  //   need_final_limit_ = true;
+  // }
   return ret;
 }
 
@@ -1735,6 +1740,22 @@ int ObTableScanOp::inner_open() {
     LOG_WARN("failed to create table scan iter tree", K(tree_type), K(ret));
   }
   output_ = iter_tree_;
+  // ADVISE: 在这里去传递一下filter
+
+  if (output_->get_type() == ObDASIterType::DAS_ITER_MERGE) {
+    // 代表下面这一层是DasMergeIter
+    adlog::DEBUG("output_->get_type() == ObDASIterType::DAS_ITER_MERGE true");
+    if (auto &&output = dynamic_cast<ObDASMergeIter*>(output_)) {
+      adlog::DEBUG("output set parendt filters ");
+      // output->parent_filters_ = *MY_SPEC.filters_;
+      int ret = output->parent_filters_.assign(MY_SPEC.filters_);
+      if (OB_FAIL(ret)) {
+        adlog::DEBUG("pushdown error from tableScanOp to DasMergeIter");
+      }
+    }
+    //MY_SPEC.filters_
+  }
+
   if (OB_SUCC(ret) && OB_FAIL(rand_scan_processor_.init(&spec, this))) {
     LOG_WARN("failed to init rand scan processor", K(ret));
   }
@@ -2416,8 +2437,19 @@ int ObTableScanOp::get_next_batch_with_das(int64_t &count, int64_t capacity)
     } else {
       // We need do filter first before do the limit.
       // See the issue 47201028.
+      if(MY_SPEC.filters_.empty()){
+        static int count1 = 0;
+        count1++;
+        if(count1 == 1) {
+          adlog::DEBUG("MY_SPEC filter is empty");
+        }
+      }
+      else{
+        adlog::DEBUG("MY_SEPC filter size: ", MY_SPEC.filters_.count()," count: ",count);
+      }
       if (!MY_SPEC.filters_.empty() && count > 0) {
         bool all_filtered = false;
+        adlog::DEBUG("filter rows strat");
         if (OB_FAIL(filter_rows(MY_SPEC.filters_,
                                 *brs_.skip_,
                                 count,
@@ -2471,8 +2503,24 @@ int ObTableScanOp::get_next_batch_with_das(int64_t &count, int64_t capacity)
     } else {
       // We need do filter first before do the limit.
       // See the issue 47201028.
+
+      if(MY_SPEC.filters_.empty()){
+        static int count1 = 0;
+        count1++;
+        if(count1 == 1) {
+          adlog::DEBUG("MY_SPEC filter is empty");
+        }
+      }
+      else{
+        adlog::DEBUG("MY_SEPC filter size: ", MY_SPEC.filters_.count()," count: ",count," need_final_limit: ",need_final_limit_);
+
+      }
+
       if (need_final_limit_ && !MY_SPEC.filters_.empty() && count > 0) {
+        // if (!MY_SPEC.filters_.empty() && count > 0) {
         bool all_filtered = false;
+        adlog::DEBUG("filter rows strat2");
+
         if (OB_FAIL(filter_rows(MY_SPEC.filters_,
                                 *brs_.skip_,
                                 count,

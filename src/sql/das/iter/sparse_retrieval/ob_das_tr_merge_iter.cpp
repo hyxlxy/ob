@@ -473,6 +473,20 @@ int ObDASTRMergeIter::init_dim_iter_param(ObTextRetrievalScanIterParam &iter_par
 int ObDASTRMergeIter::create_sparse_retrieval_iter()
 {
   int ret = OB_SUCCESS;
+
+  // // Allow override of algorithm via env: OB_TR_MODE=bmw|daat|taat
+  // if (const char *env_mode = getenv("OB_TR_MODE")) {
+  //   if (0 == strcasecmp(env_mode, "bmw")) {
+  //     topk_mode_ = true; daat_mode_ = false; taat_mode_ = false;
+  //   } else if (0 == strcasecmp(env_mode, "daat")) {
+  //     topk_mode_ = false; daat_mode_ = true; taat_mode_ = false;
+  //   } else if (0 == strcasecmp(env_mode, "taat")) {
+  //     topk_mode_ = false; daat_mode_ = false; taat_mode_ = true;
+  //   }
+  // }
+  // topk_mode_ = true; daat_mode_ = false; taat_mode_ = false;
+  
+
   sr_iter_param_.dim_weights_ = dim_weights_.count() >= 1 ? &dim_weights_ : nullptr;
   sr_iter_param_.limit_param_ = &ir_rtdef_->get_inv_idx_scan_rtdef()->limit_param_;
   sr_iter_param_.eval_ctx_ = ir_rtdef_->eval_ctx_;
@@ -481,6 +495,17 @@ int ObDASTRMergeIter::create_sparse_retrieval_iter()
   sr_iter_param_.relevance_proj_expr_ = ir_ctdef_->relevance_proj_col_;
   sr_iter_param_.filter_expr_ = ir_ctdef_->match_filter_;
   sr_iter_param_.topk_limit_ = topk_limit_;
+
+  const int64_t OB_TR_TOPK_EXPAND_FACTOR = 3; // alpha
+  if (topk_mode_ && topk_limit_ > 0) {
+    const int64_t expanded = topk_limit_ * OB_TR_TOPK_EXPAND_FACTOR;
+    sr_iter_param_.topk_limit_ = expanded;
+  } else {
+    sr_iter_param_.topk_limit_ = topk_limit_;
+  }
+  bool topk_mode_res = (topk_mode_)? true:false;
+  adlog::DEBUG("ObDASTRMergeIter::create_sparse_retrieval_iter(), topl_mode_", topk_mode_res );
+
   if (OB_NOT_NULL(ir_ctdef_->field_boost_expr_)) {
     ObDatum *boost_datum = nullptr;
     if (OB_FAIL(ir_ctdef_->field_boost_expr_->eval(*ir_rtdef_->eval_ctx_, boost_datum))) {

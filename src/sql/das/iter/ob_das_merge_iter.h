@@ -282,6 +282,11 @@ private:
   const share::schema::ObTableSchema *table_schema_ = NULL;
   share::schema::ObPartitionLevel part_level_;
   /********* SORT MERGE END *********/
+public:
+  // common::ObSEArray<sql::ObExpr*, 4> parent_filters_;
+
+  common::ObArray<sql::ObExpr*> parent_filters_;
+
 };
 
 }//end namespace sql

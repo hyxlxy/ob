@@ -19,7 +19,7 @@
 #include "sql/optimizer/ob_log_join.h"
 #include "share/vector_index/ob_vector_index_util.h"
 #include "share/domain_id/ob_domain_id.h"
-
+#include "common/ad_log.h"
 using namespace oceanbase::sql;
 using namespace oceanbase::common;
 using namespace oceanbase::share;
@@ -398,7 +398,12 @@ int ObLogTableScan::allocate_expr_post(ObAllocExprContext &ctx)
   if (OB_SUCC(ret)) {
     // match against relevance expr will be calculated in storage
     ObSEArray<ObRawExpr *, 8> tmp_exprs;
-    if (is_text_retrieval_scan()
+    if (use_index_merge()
+        && OB_FAIL(get_index_merge_calc_exprs(tmp_exprs))) {
+      LOG_WARN("failed to get index merge calc exprs", K(ret));
+      adlog::DEBUG("index merge first nono");
+    }
+    else if (is_text_retrieval_scan()
         && OB_FAIL(get_text_retrieval_calc_exprs(get_text_retrieval_info(), tmp_exprs))) {
       LOG_WARN("failed to get text retrieval calc exprs", K(ret));
     } else if (has_func_lookup()
@@ -1278,8 +1283,8 @@ int ObLogTableScan::allocate_group_id_expr()
   return ret;
 }
 
-int ObLogTableScan::generate_necessary_domain_exprs()
-{
+int ObLogTableScan::generate_necessary_domain_exprs() {
+  // adlog::DEBUG("ObLogTableScan::generate_necessary_domain_exprs()");
   int ret = OB_SUCCESS;
   if ((need_doc_id_index_back() || need_vec_id_index_back()) && OB_FAIL(extract_domain_id_index_back_expr(domain_exprs_))) {
     LOG_WARN("failed to extract doc id index back exprs", K(ret));

@@ -23,7 +23,7 @@
 #include "observer/table_load/ob_table_load_store_ctx.h"
 #include "observer/table_load/ob_table_load_store_table_ctx.h"
 #include "observer/table_load/ob_table_load_table_ctx.h"
-
+#include "common/ad_log.h"
 namespace oceanbase
 {
 namespace observer
@@ -137,6 +137,7 @@ int ObTableLoadMergeInsertPhaseOp::switch_next_op(bool is_parent_called)
       }
       case Status::INDEX_MERGE: {
         status_ = Status::COMPLETED;
+        adlog::DEBUG("case Status::INDEX_MERGE: { status_ = Status::COMPLETED");
         break;
       }
       default: {
@@ -214,6 +215,8 @@ int ObTableLoadMergeDeletePhaseOp::switch_next_op(bool is_parent_called)
       }
       case Status::INDEX_MERGE: {
         status_ = Status::COMPLETED;
+        adlog::DEBUG("case Status::INDEX_MERGE: { status_ = Status::COMPLETED");
+
         break;
       }
       default: {

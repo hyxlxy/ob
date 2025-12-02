@@ -43,10 +43,10 @@ log_info "开始编译 OceanBase (类型: $BUILD_TYPE, 并行数: 1)..."
 
 if [ "$BUILD_TYPE" = "debug" ]; then
     # 调试版本，带完整符号信息
-    bash build.sh debug -DOB_DEBUG_SYMBOLS=ON  --make -j1
+    bash build.sh debug -DOB_DEBUG_SYMBOLS=ON -DADVISE=ON --make -j1
 else
     # 发布版本，但仍保留符号用于perf
-    bash build.sh release -DOB_DEBUG_SYMBOLS=ON  --make -j1
+    bash build.sh release -DOB_DEBUG_SYMBOLS=ON  -DADVISE=ON --make -j1
 fi
 
 # 检查编译结果

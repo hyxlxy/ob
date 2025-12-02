@@ -122,15 +122,18 @@ int ObDASGlobalLookupIter::add_rowkey()
                                                     partition_id,
                                                     first_partition_id))) {
       LOG_WARN("failed to get tablet loc by tablet_id", K(ret));
-    } else if (OB_FAIL(merge_iter->create_das_task(tablet_loc, das_scan_op, reuse_das_op))) {
-      LOG_WARN("failed to create das task", K(ret));
-    } else if (!reuse_das_op) {
-      das_scan_op->set_scan_ctdef(lookup_ctdef_);
-      das_scan_op->set_scan_rtdef(lookup_rtdef_);
-      das_scan_op->set_can_part_retry(can_retry_);
-      if (OB_NOT_NULL(attach_rtinfo_)) {
-        if (OB_FAIL(pushdown_attach_task_to_das(*das_scan_op))) {
-          LOG_WARN("fail to pushdown attach task into das scan", K(ret));
+    } else {
+      adlog::DEBUG("merge_iter->create_das_task(tablet_loc, das_scan_op, reuse_das_op)");
+      if (OB_FAIL(merge_iter->create_das_task(tablet_loc, das_scan_op, reuse_das_op))) {
+        LOG_WARN("failed to create das task", K(ret));
+      } else if (!reuse_das_op) {
+        das_scan_op->set_scan_ctdef(lookup_ctdef_);
+        das_scan_op->set_scan_rtdef(lookup_rtdef_);
+        das_scan_op->set_can_part_retry(can_retry_);
+        if (OB_NOT_NULL(attach_rtinfo_)) {
+          if (OB_FAIL(pushdown_attach_task_to_das(*das_scan_op))) {
+            LOG_WARN("fail to pushdown attach task into das scan", K(ret));
+          }
         }
       }
     }

@@ -19,7 +19,7 @@
 #include "sql/das/ob_data_access_service.h"
 #include "sql/das/ob_das_retry_ctrl.h"
 #include "observer/mysql/ob_query_retry_ctrl.h"
-
+#include "common/ad_log.h"
 namespace oceanbase
 {
 using namespace common;
@@ -613,7 +613,7 @@ int ObDASRef::find_agg_task(const ObDASTabletLoc *tablet_loc, ObDASOpType op_typ
   }
   return ret;
 }
-
+//advise create task
 int ObDASRef::create_agg_task(ObDASOpType op_type, const ObDASTabletLoc *tablet_loc, ObDasAggregatedTask *&agg_task)
 {
   int ret = OB_SUCCESS;
@@ -628,12 +628,15 @@ int ObDASRef::create_agg_task(ObDASOpType op_type, const ObDASTabletLoc *tablet_
   } else if (DAS_OP_TABLE_DELETE == op_type &&
       OB_FAIL(del_aggregated_tasks_.store_obj(tmp_agg_task))) {
     LOG_WARN("failed to add aggregated tasks", KR(ret));
-  } else if (DAS_OP_TABLE_DELETE != op_type &&
-      OB_FAIL(aggregated_tasks_.store_obj(tmp_agg_task))) {
-    LOG_WARN("failed to add aggregated tasks", KR(ret));
   } else {
-    agg_task = tmp_agg_task;
-    agg_task->server_ = tablet_loc->server_;
+    if (DAS_OP_TABLE_DELETE != op_type &&
+      OB_FAIL(aggregated_tasks_.store_obj(tmp_agg_task))) {
+        LOG_WARN("failed to add aggregated tasks", KR(ret));
+      } else {
+      adlog::DEBUG("ObDASRef::create_agg_task  aggregated_tasks_.store_obj(tmp_agg_task) ok!");
+      agg_task = tmp_agg_task;
+      agg_task->server_ = tablet_loc->server_;
+    }
   }
   return ret;
 }

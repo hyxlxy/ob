@@ -1,3 +1,56 @@
+*****************************************2025-12-1 *********************************************************
+TODO：
+要给multipleMerge的Init里面打个日志
+给TableScanIterator里也要打日志，看是什么时候初始化的MultipleMerge的。
+
+
+
+--------有关get_next_rows的路径---------
+TableScanOp:
+调用了get_next_batch_with_das函数 (拥有标量筛选的filter)
+    函数里的output_是DasMergeIter
+
+DasMergeIter::
+调用了inner_get_next_rows -> get_next_seq_rows 函数
+                            函数中的scan_op->get_output_result_iter()->get_next_rows(count, capacity);
+进入了CacheLookupIter（外层）
+
+CacheLookupIter（外层的data_iter）
+中的data_table_iter_（其实是父类LocalLookupIter的父类的DasLookupIter）是DasScanIter
+
+DasScanIter的result_是TableScanIterator
+
+TableScanIterator 再往下是 multipleMerge
+
+-------------------------
+
+--------有关初始化的路径（猜测）------------
+外层的CacheLookupIter在执行do_index_lookup -> DASScanIter的do_table_scan -> AccessService (ObITabletScan的派生)的table_scan -> LSTabletService的table_scan 
+-> LSTabletService 的inner_table_scan -> TableScanIterator 的init -> TableScanIterator 的 open_iter -> TableScanIterator 的 init_and_open_get_merge_iter 
+
+
+在 INIT_AND_OPEN_ITER 宏里面有这么一条：
+iter->init(main_table_param_, main_table_ctx_, get_table_param_)
+这就是init的过程了应该
+
+所以我们需要把 filter 弄到 TableScanIterator 里的main_table_param_就好了
+
+param是从DasScanIter的do_table_scan一路传下来的，
+
+set_scan_param是DasScanIter中修改scan_param的路径，init里不存在初始化他的内容
+
+
+-----------有关filter的内容-------------
+在class ObVTableScanParam中 有一个成员变量：const sql::ObExprPtrIArray *op_filters_;
+然后 class ObTableScanParam : public common::ObVTableScanParam
+这个ObTableScanParam是前者的派生类，所以里面也是存着filter的 const sql::ObExprPtrIArray *op_filters_
+
+
+-------关于open的内容
+ObDASScanOp里的scan_param_是创建迭代器树的开始。
+ObIDASTaskOp::start_das_task是一个虚函数,ObDASScanOp是ObIDASTaskOp的派生类。
+
+DasMergeIter中的das_ref_会执行execute_all_task
 
 *****************************************2025-11-28 *********************************************************
 

@@ -1421,6 +1421,7 @@ int ObDASScanOp::get_index_merge_tablet_ids(common::ObIArray<common::ObTabletID>
     }
   }
   if (OB_SUCC(ret) && index_merge_cnt > 0) {
+    adlog::DEBUG("if (OB_SUCC(ret) && index_merge_cnt > 0)");
     if (OB_FAIL(index_merge_tablet_ids.prepare_allocate(index_merge_cnt))) {
       LOG_WARN("failed to reserve index merge tablet ids", K(ret));
     }

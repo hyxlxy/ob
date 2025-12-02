@@ -2808,9 +2808,12 @@ int ObAccessPathEstimation::classify_paths(ObIArray<AccessPath *> &paths,
         LOG_WARN("failed to get index merge scan path", K(ret));
         adlog::DEBUG("fail index merge path i", i);
         }
-    } else if (OB_FAIL(normal_paths.push_back(paths.at(i)))) {
-          LOG_WARN("failed to push back normal path", K(ret));
-        }
+    } else {
+      // adlog::DEBUG("there is normal path");
+      if (OB_FAIL(normal_paths.push_back(paths.at(i)))) {
+        LOG_WARN("failed to push back normal path", K(ret));
+      }
+    }
   }
   return ret;
 }

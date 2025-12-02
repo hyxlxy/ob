@@ -15,7 +15,6 @@
  */
 
 #define USING_LOG_PREFIX SERVER
-
 #include "lib/alloc/malloc_hook.h"
 #include "lib/alloc/ob_malloc_allocator.h"
 #include "lib/allocator/ob_malloc.h"

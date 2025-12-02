@@ -4124,8 +4124,8 @@ int ObJoinOrder::create_one_index_merge_path(const uint64_t table_id,
   return ret;
 }
 
-int ObJoinOrder::prune_index_merge_path(ObIArray<AccessPath*> &access_paths)
-{
+int ObJoinOrder::prune_index_merge_path(ObIArray<AccessPath *> &access_paths) {
+  adlog::DEBUG("ObJoinOrder::prune_index_merge_path start!!");
   int ret = OB_SUCCESS;
   ObSEArray<AccessPath*, 4> tmp_paths;
   for (int64_t i = 0; OB_SUCC(ret) && i < access_paths.count(); ++i) {
@@ -4155,11 +4155,16 @@ int ObJoinOrder::prune_index_merge_path(ObIArray<AccessPath*> &access_paths)
     } else if (OB_FAIL(tmp_paths.push_back(access_paths.at(i)))) {
       LOG_WARN("failed to push back access path", K(ret));
     }
+    if (contain_multi_index) {
+      adlog::DEBUG("i: ",i,"contain_multi_index: ",contain_multi_index);
+    }
   }
   if (OB_FAIL(ret)) {
   } else if (OB_FAIL(access_paths.assign(tmp_paths))) {
     LOG_WARN("failed to assign access paths", K(ret));
   }
+  adlog::DEBUG("ObJoinOrder::prune_index_merge_path end!!");
+  
   return ret;
 }
 
@@ -5041,9 +5046,9 @@ int ObJoinOrder::extract_interesting_column_ids(const ObIArray<ObRawExpr*> &keys
 }
 
 int ObJoinOrder::is_join_match(const ObIArray<OrderItem> &ordering,
-                               int64_t &prefix_count,   // max join match prefix
-                               bool &sort_match)
-{
+                               int64_t &prefix_count, // max join match prefix
+                               bool &sort_match) {
+  // adlog::DEBUG("is_join_macth start");
   int ret = OB_SUCCESS;
   sort_match = false;
   prefix_count = 0;
