@@ -125,6 +125,10 @@ protected:
   int build_trans_info_datum(const ObExpr *trans_info_expr, ObDatum *&datum_ptr);
   common::ObArenaAllocator &get_arena_allocator() { return lookup_memctx_->get_arena_allocator(); }
   lib::MemoryContext lookup_memctx_;
+
+public:
+  ObDASIter * get_data_table_iter() { return data_table_iter_;}
+  ObDASIter * get_index_table_iter() {return index_table_iter_;}
 };
 
 }  // namespace sql

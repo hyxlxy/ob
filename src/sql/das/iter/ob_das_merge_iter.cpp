@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "ob_das_iter.h"
 #define USING_LOG_PREFIX SQL_DAS
 #include "sql/das/iter/ob_das_merge_iter.h"
 #include "sql/das/ob_data_access_service.h"
@@ -919,9 +920,10 @@ int ObDASMergeIter::get_next_seq_rows(int64_t &count, int64_t capacity)
                     dynamic_cast<ObDASCacheLookupIter *>(new_row_iter)) {
               adlog::DEBUG("change new_rot_iter to ObDASCacheLookupIter");
               // 接下来要把filter传到cache_lookup_iter的lookup_param的filter里面去
-              storage::ObTableScanParam& param = cache_iter->get_lookup_param();
-
-              if (parent_filters_.count() > 0 and parent_filters_.count() < 3) {
+              
+              //这里是先尝试下推到cache_lookup_iter的lookup_param去
+              if (parent_filters_.count() > 0 and parent_filters_.count() < 3 and false) {
+                storage::ObTableScanParam& param = cache_iter->get_lookup_param();
                 adlog::DEBUG("222 parent_filters_.count() > 0");
 
                 bool valid = true;
@@ -988,6 +990,66 @@ int ObDASMergeIter::get_next_seq_rows(int64_t &count, int64_t capacity)
               } else {
                 adlog::DEBUG("222 parent_filters_.count() = 0");
               }
+
+              // 这里是吧filter下推到data_table_iter_里面去
+              if (parent_filters_.count() > 0 and parent_filters_.count() < 3) {
+                //ObDASIter * get_data_table_iter() { return data_table_iter_;}
+
+                ObDASIter *data_iter = cache_iter->get_data_table_iter();
+                if (data_iter->get_type() == ObDASIterType::DAS_ITER_FUNC_LOOKUP) {
+                  auto && func_lookup_iter = dynamic_cast<ObDASFuncLookupIter*>(data_iter);
+                  storage::ObTableScanParam& param = func_lookup_iter->get_lookup_param();
+
+                  if (param.op_filters_ != nullptr) {
+                    adlog::DEBUG("333 param.op_filters_ != nullptr");
+                  // 将parent_filters_的内容添加到现有的op_filters_中
+                  // 注意：不能直接修改const成员，需要找到正确的方法
+                    for (int64_t i = 0; i < parent_filters_.count(); i++) {
+                      // 尝试将parent filter添加到现有filters中
+                      int ret = const_cast<sql::ObExprPtrIArray*>(param.op_filters_)->push_back(parent_filters_.at(i));
+                      if (OB_FAIL(ret)) {
+                        LOG_WARN("failed to add parent filter", K(ret));
+                        break;
+                      }
+                    }
+                  } else {
+                    adlog::DEBUG("333 param.op_filters_ is nullptr");
+                        // 使用param的allocator分配内存
+                    if (param.allocator_ != nullptr) {
+                      // 分配一个新的数组对象，使用4作为栈上元素数量（因为最多3个filter）
+                      void* buf = param.allocator_->alloc(sizeof(common::ObSEArray<sql::ObExpr*, 4>));
+                      if (buf != nullptr) {
+                        // 在分配的内存上构造数组对象
+                        common::ObSEArray<sql::ObExpr*, 4>* new_filters = 
+                            new(buf) common::ObSEArray<sql::ObExpr*, 4>();
+                        adlog::DEBUG("333 new_filters->assign(parent_filters_)");
+                        // 将parent_filters_的内容复制到新数组
+                        int ret = new_filters->assign(parent_filters_);
+                        // int ret = OB_SUCCESS;
+                        if (OB_SUCC(ret)) {
+                          // 使用const_cast修改const指针
+                          if (auto &&one = dynamic_cast<sql::ObExprPtrIArray *>(
+                                  new_filters)) {
+                            const_cast<sql::ObExprPtrIArray*&>(param.op_filters_) = one;
+                            adlog::DEBUG("success to assign parent filters to new array");
+                          } else {
+                            adlog::DEBUG("can not cast to ObExprPtrIArray");
+                          }
+                        } else {
+                          adlog::DEBUG("failed to assign parent filters to new array");
+                          LOG_WARN("failed to assign parent filters to new array", K(ret));
+                        }
+                      } else {
+                        LOG_WARN("failed to allocate memory for filters");
+                      }
+                    }
+                  } 
+                }
+                
+              }
+
+
+
 
             }
           }
