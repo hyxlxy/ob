@@ -7967,15 +7967,10 @@ int ObLogPlan::try_allocate_sort_as_top(ObLogicalOperator *&top,
 static bool ob_has_safe_tr_topk_in_single_chain(ObLogicalOperator *node)
 {
   if (node == nullptr) { return false; }
-  // 如果是表扫描，直接判定
+  // 如果是表扫描，直接判定：只要是文本检索扫描即可（后续由调用点负责推下TopK与排序）
   if (node->get_type() == log_op_def::LOG_TABLE_SCAN) {
     ObLogTableScan *tsc = static_cast<ObLogTableScan *>(node);
-    const ObTextRetrievalInfo &tr = tsc->get_text_retrieval_info();
-    if (tr.need_block_max_scan() && tr.need_sort()) {
-      // 放宽：只要TR为Block-Max TopK且需要排序，即可由底层输出相关性序TopK，跳过LOG_SORT
-      return true;
-    }
-    return false;
+    return tsc->is_text_retrieval_scan();
   }
   // 对于可直通节点（单孩子且非阻塞），继续向下；否则不安全
   if (node->get_num_of_child() != 1) { return false; }
@@ -8014,7 +8009,26 @@ int ObLogPlan::allocate_sort_as_top(ObLogicalOperator *&top,
     // 特殊优化：当子树上存在“单链路可直达的 TR Block-Max TopK 表扫描”且过滤均可前置时，
     // 依赖检索层按得分输出 TopN，直接跳过分配 LOG_SORT。
     if (ob_has_safe_tr_topk_in_single_chain(top)) {
-      OPT_TRACE("[TR-TopK] skip logical sort by subtree check");
+      // 下推 TR TopK：将排序与TopK信息传给TSC（TR），然后跳过 LOG_SORT
+      ObLogicalOperator *ts = top;
+      while (nullptr != ts && ts->get_num_of_child() == 1) {
+        ts = ts->get_child(ObLogicalOperator::first_child);
+      }
+      if (nullptr != ts && ts->get_type() == log_op_def::LOG_TABLE_SCAN) {
+        ObLogTableScan *tsc = static_cast<ObLogTableScan *>(ts);
+        if (sort_keys.count() > 0) {
+          (void)tsc->tr_set_sort_key(sort_keys.at(0));
+        }
+        if (nullptr != topn_expr) {
+          tsc->tr_set_topk_limit_expr(topn_expr);
+        } else {
+          const ObDMLStmt *stmt = get_stmt();
+          if (nullptr != stmt && nullptr != stmt->get_limit_expr()) {
+            tsc->tr_set_topk_limit_expr(const_cast<ObRawExpr *>(stmt->get_limit_expr()));
+          }
+        }
+      }
+      OPT_TRACE("[TR-TopK] push topk to TSC and skip logical sort in allocate_sort_as_top");
       return ret;
     }
 

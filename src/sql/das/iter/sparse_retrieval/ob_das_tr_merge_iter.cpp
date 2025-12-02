@@ -105,8 +105,8 @@ int ObDASTRMergeIter::inner_init(ObDASIterParam &param)
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("unexpected null pointer", K(ret), KP_(ir_ctdef), KP_(ir_rtdef));
     } else {
-      is_inited_ = true;
-      LOG_DEBUG("tr merge iter", K_(function_lookup_mode), K_(topk_mode), K_(daat_mode), K_(taat_mode));
+    is_inited_ = true;
+    LOG_DEBUG("tr merge iter", K_(function_lookup_mode), K_(topk_mode), K_(daat_mode), K_(taat_mode));
     }
   }
   return ret;
@@ -143,14 +143,14 @@ int ObDASTRMergeIter::inner_get_next_rows(int64_t &count, int64_t capacity)
           ret = tmp;
           LOG_WARN("phase1 get_next_rows failed", K(ret));
           break;
-        } else {
+  } else {
           ObExpr *id_expr = sr_iter_param_.id_proj_expr_;
           ObExpr *score_expr = sr_iter_param_.relevance_proj_expr_;
           ObEvalCtx *eval_ctx = (OB_NOT_NULL(ir_rtdef_) ? ir_rtdef_->eval_ctx_ : nullptr);
           ObDatum *id_datum = nullptr;
           ObDatum *score_datum = nullptr;
           if (OB_ISNULL(id_expr) || OB_ISNULL(score_expr) || OB_ISNULL(eval_ctx)) {
-            ret = OB_ERR_UNEXPECTED;
+      ret = OB_ERR_UNEXPECTED;
             LOG_WARN("unexpected null expr/ctx for phase1", K(ret), KP(id_expr), KP(score_expr), KP(eval_ctx));
             break;
           } else if (OB_FAIL(id_expr->eval(*eval_ctx, id_datum))) {
@@ -159,7 +159,7 @@ int ObDASTRMergeIter::inner_get_next_rows(int64_t &count, int64_t capacity)
           } else if (OB_FAIL(score_expr->eval(*eval_ctx, score_datum))) {
             LOG_WARN("eval score expr failed", K(ret));
             break;
-          } else {
+    } else {
             double score = 0.0;
             if (OB_NOT_NULL(score_datum) && !score_datum->is_null()) {
               score = score_datum->get_double();
@@ -169,17 +169,17 @@ int ObDASTRMergeIter::inner_get_next_rows(int64_t &count, int64_t capacity)
               got_any = true;
             } else if (score < phase1_min_score_) {
               phase1_min_score_ = score;
-            }
+        }
             if (OB_NOT_NULL(id_datum)) {
               ObDocIdExt id;
               int cv = id.from_datum(*id_datum);
               if (OB_SUCCESS == cv) {
                 (void)phase1_docids_.push_back(id);
-              }
-            }
           }
         }
       }
+    }
+  }
       if (OB_SUCC(ret)) {
         // Phase2: 下推阈值并复扫
         sr_iter_param_.min_score_threshold_ = got_any ? phase1_min_score_ : 0.0;
@@ -191,10 +191,10 @@ int ObDASTRMergeIter::inner_get_next_rows(int64_t &count, int64_t capacity)
           sr_iter_param_.min_score_threshold_ = 0.0;
           (void)rescan();
         }
-      }
     }
+  }
 
-    if (OB_SUCC(ret)) {
+  if (OB_SUCC(ret)) {
       int64_t got = 0;
       int tmp2 = sparse_retrieval_iter_->get_next_rows(capacity, got);
       if (OB_SUCCESS == tmp2 || OB_ITER_END == tmp2) {
@@ -264,7 +264,7 @@ int ObDASTRMergeIter::inner_reuse()
 {
   // 轻量复用：重置标记，但保留迭代器指针
   check_rangekey_inited_ = false;
-  inv_idx_tablet_switched_ = false;
+    inv_idx_tablet_switched_ = false;
   return OB_SUCCESS;
 }
 
@@ -300,9 +300,9 @@ int ObDASTRMergeIter::build_query_tokens(const ObDASIRScanCtDef *ir_ctdef,
   if (OB_ISNULL(ir_ctdef) || OB_ISNULL(ir_rtdef) || OB_ISNULL(ir_ctdef->search_text_) || OB_ISNULL(ir_rtdef->eval_ctx_)) {
     ret = OB_ERR_UNEXPECTED;
   } else {
-    ObExpr *search_text = ir_ctdef->search_text_;
-    ObEvalCtx *eval_ctx = ir_rtdef->eval_ctx_;
-    ObDatum *search_text_datum = nullptr;
+  ObExpr *search_text = ir_ctdef->search_text_;
+  ObEvalCtx *eval_ctx = ir_rtdef->eval_ctx_;
+  ObDatum *search_text_datum = nullptr;
     if (OB_FAIL(search_text->eval(*eval_ctx, search_text_datum))) {
       // 保守返回空
       ret = OB_SUCCESS;
@@ -330,7 +330,7 @@ int ObDASTRMergeIter::build_query_tokens(const ObDASIRScanCtDef *ir_ctdef,
     }
   }
   return ret;
-}
+      }
 
 // 设置子迭代器扫描范围（最小实现：仅标记为已设置）
 int ObDASTRMergeIter::set_children_iter_rangekey(const common::ObIArray<std::pair<ObDocIdExt, int>> &virtual_rangekeys,
@@ -390,9 +390,9 @@ int ObDASTRMergeIter::phase1_collect_docids_kprime(const int64_t kprime,
           ObDocIdExt id;
           if (OB_SUCCESS == id.from_datum(*id_datum)) {
             (void)docids.push_back(id);
-          }
         }
       }
+    }
     }
   }
   return ret;

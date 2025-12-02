@@ -3502,6 +3502,7 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
         }
       }
 
+      // 如果filters中未直接包含FTS，保持 has_fts_filter=false，后续由上层生成阶段补充
       // 如果同时存在FTS和标量条件，强制生成INTERSECT
       if (OB_SUCC(ret) && has_fts_filter && has_scalar_filter) {
         ObIndexMergeNode *root = nullptr;
