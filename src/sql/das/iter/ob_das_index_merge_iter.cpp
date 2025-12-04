@@ -201,7 +201,8 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
     lib::ContextParam context_param;
     context_param.set_mem_attr(MTL_ID(), "DASIndexMerge", ObCtxIds::DEFAULT_CTX_ID)
         .set_properties(lib::USE_TL_PAGE_OPTIONAL);
-    if (OB_UNLIKELY(merge_type_ != INDEX_MERGE_UNION)) {
+    if (OB_UNLIKELY(merge_type_ != INDEX_MERGE_UNION 
+                    && merge_type_ != INDEX_MERGE_INTERSECT)) {
       ret = OB_INVALID_ARGUMENT;
       LOG_WARN("invalid merge type", K(merge_type_));
     } else if (OB_FAIL(CURRENT_CONTEXT->CREATE_CONTEXT(mem_ctx_, context_param))) {

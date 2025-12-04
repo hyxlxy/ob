@@ -3417,8 +3417,9 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
       if (OB_ISNULL(filter)) {
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("get unexpected null filter", K(ret), K(i));
-      } else if (filter->get_expr_type() != T_OP_OR) {
-        // do nothing, only support UNION MERGE now
+      } else if (filter->get_expr_type() != T_OP_OR 
+                 && filter->get_expr_type() != T_OP_AND) {
+        // do nothing, support UNION and INTERSECT MERGE
       } else if (OB_FAIL(generate_candi_index_merge_node(ref_table_id,
                                                          filter,
                                                          valid_index_ids,
@@ -3432,6 +3433,72 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
         LOG_WARN("failed to formalize candi index merge tree", K(ret), KPC(candi_node));
       } else if (OB_FAIL(candi_index_trees.push_back(candi_node))) {
         LOG_WARN("failed to push back candi index tree", K(ret));
+      }
+    }
+    // Fallback: 对于已经被拆平的 AND 谓词（helper.filters_ 中没有 T_OP_AND 根），
+    // 尝试根据所有可走索引的 filter 构造一个 INTERSECT 型的 index_merge 树。
+    //
+    // 典型场景：
+    //   MATCH(fulltext_col) AGAINST(...) AND base_id = ... AND id < ...
+    //
+    // 仅在前面没有成功生成任何 OR/AND 形式的 index_merge 树时再尝试，避免影响已有 UNION MERGE 行为。
+    if (OB_SUCC(ret) && candi_index_trees.empty()) {
+      ObSEArray<ObIndexMergeNode*, 4> child_nodes;
+      bool has_match_filter = false;
+      for (int64_t i = 0; OB_SUCC(ret) && i < filters.count(); ++i) {
+        ObRawExpr *filter = filters.at(i);
+        ObIndexMergeNode *child_node = NULL;
+        bool is_child_valid = false;
+        if (OB_ISNULL(filter)) {
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("get unexpected null filter when build intersect index merge", K(ret), K(i));
+        } else if (!get_tables().equal(filter->get_relation_ids())) {
+          // 只考虑当前基表上的谓词
+        } else if (!(filter->has_flag(IS_SIMPLE_COND)
+                     || filter->has_flag(IS_RANGE_COND)
+                     || filter->has_flag(CNT_MATCH_EXPR))) {
+          // 仅使用简单条件 / range 条件 / MATCH 谓词
+        } else if (OB_FAIL(generate_candi_index_merge_node(ref_table_id,
+                                                           filter,
+                                                           valid_index_ids,
+                                                           valid_index_cols,
+                                                           child_node,
+                                                           is_child_valid))) {
+          LOG_WARN("failed to generate child node for intersect index merge", K(ret), KPC(filter));
+        } else if (!is_child_valid || OB_ISNULL(child_node)) {
+          // 该谓词找不到合适索引，跳过
+        } else if (OB_FAIL(child_nodes.push_back(child_node))) {
+          LOG_WARN("failed to push back child node for intersect index merge", K(ret));
+        } else if (filter->has_flag(CNT_MATCH_EXPR)) {
+          has_match_filter = true;
+        }
+      }
+
+      // 至少需要一个 MATCH 谓词 + 一个以上其他可走索引的谓词，才有意义构造交集 index_merge。
+      if (OB_SUCC(ret) && has_match_filter && child_nodes.count() >= 2) {
+        ObIndexMergeNode *intersect_root = NULL;
+        if (OB_ISNULL(intersect_root = OB_NEWx(ObIndexMergeNode, allocator_))) {
+          ret = OB_ALLOCATE_MEMORY_FAILED;
+          LOG_WARN("failed to allocate intersect index merge node", K(ret));
+        } else {
+          intersect_root->node_type_ = INDEX_MERGE_INTERSECT;
+          // children_ 直接挂所有子节点
+          for (int64_t i = 0; OB_SUCC(ret) && i < child_nodes.count(); ++i) {
+            if (OB_FAIL(intersect_root->children_.push_back(child_nodes.at(i)))) {
+              LOG_WARN("failed to push back child to intersect root", K(ret));
+            }
+          }
+          if (OB_SUCC(ret)) {
+            if (OB_FAIL(intersect_root->formalize_index_merge_tree())) {
+              LOG_WARN("failed to formalize intersect index merge tree", K(ret), KPC(intersect_root));
+            } else if (OB_FAIL(candi_index_trees.push_back(intersect_root))) {
+              LOG_WARN("failed to push back intersect index merge tree", K(ret));
+            } else {
+              OPT_TRACE("generate 1 intersect index merge tree (fallback from flattened AND)");
+              LOG_TRACE("generate intersect candi index merge tree", K(ref_table_id), "child_cnt", child_nodes.count());
+            }
+          }
+        }
       }
     }
   }
@@ -3843,31 +3910,12 @@ int ObJoinOrder::choose_best_selectivity_branch(ObIndexMergeNode* &candi_node)
       }
     }
   } else if (INDEX_MERGE_INTERSECT == candi_node->node_type_) {
-    ObIndexMergeNode* best_child = NULL;
-    double best_selectivity = 1;
+    // For INTERSECT, we need to keep all children and recursively optimize each child
+    // Unlike UNION where we can choose the best branch, INTERSECT requires all branches
     for (int64_t i = 0; OB_SUCC(ret) && i < candi_node->children_.count(); ++i) {
-      ObIndexMergeNode* child_candi_node = candi_node->children_.at(i);
-      double child_selectivity = 1;
-      if (OB_ISNULL(child_candi_node)) {
-        ret = OB_ERR_UNEXPECTED;
-        LOG_WARN("child node is null", K(ret), K(i), KPC(candi_node));
-      } else if (INDEX_MERGE_FTS_INDEX == child_candi_node->node_type_) {
-        best_child = child_candi_node;
-        break;
-      } else if (OB_FAIL(THIS_WORKER.check_status())) {
-        LOG_WARN("check status failed", K(ret));
-      } else if (OB_FAIL(SMART_CALL(choose_best_selectivity_branch(child_candi_node)))) {
-        LOG_WARN("failed to choose best branch for child", K(ret), KPC(child_candi_node));
-      } else if (OB_FAIL(calc_selectivity_for_index_merge_node(child_candi_node,
-                                                               child_selectivity))) {
-        LOG_WARN("failed to calculate selectivity", K(ret));
-      } else if (NULL == best_child || child_selectivity < best_selectivity) {
-        best_child = child_candi_node;
-        best_selectivity = child_selectivity;
+      if (OB_FAIL(SMART_CALL(choose_best_selectivity_branch(candi_node->children_.at(i))))) {
+        LOG_WARN("failed to choose best branch for child", K(ret), KPC(candi_node->children_.at(i)));
       }
-    }
-    if (OB_SUCC(ret)) {
-      candi_node = best_child;
     }
   }
   return ret;
@@ -3895,6 +3943,20 @@ int ObJoinOrder::calc_selectivity_for_index_merge_node(ObIndexMergeNode* node,
           }
         }
         child_selectivity = 1.0 - get_plan()->get_selectivity_ctx().get_correlation_model().combine_filters_selectivity(selectivities);
+        break;
+      }
+      case INDEX_MERGE_INTERSECT: {
+        // For INTERSECT, selectivity is the product of all child selectivities
+        child_selectivity = 1.0;
+        for (int64_t i = 0; OB_SUCC(ret) && i < node->children_.count(); ++i) {
+          double child_sel = 1.0;
+          if (OB_FAIL(SMART_CALL(calc_selectivity_for_index_merge_node(node->children_.at(i),
+                                                                       child_sel)))) {
+            LOG_WARN("failed to calculate child selectivity", K(ret), K(node->children_.at(i)));
+          } else {
+            child_selectivity *= child_sel;
+          }
+        }
         break;
       }
       case INDEX_MERGE_SCAN:

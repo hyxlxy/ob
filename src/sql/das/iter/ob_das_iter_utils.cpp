@@ -966,6 +966,16 @@ int ObDASIterUtils::create_das_scan_with_merge_iter(storage::ObTableScanParam &s
   return ret;
 }
 
+/* 最简单的表扫描场景（如 SELECT * FROM student WHERE id=1，id 为主键）：
+ *
+ * 树结构：
+ *              data_table_iter(ObDASScanIter)
+ *
+ * 说明：
+ * - 当 attach_ctdef 为 null 时，这是最简单的场景，直接在主表上创建扫描迭代器。
+ * - 当 attach_ctdef 不为 null 时，可能涉及索引合并等复杂场景，会调用
+ *   create_das_scan_with_merge_iter 构建更复杂的树结构。
+ */
 int ObDASIterUtils::create_partition_scan_tree(storage::ObTableScanParam &scan_param,
                                                common::ObIAllocator &alloc,
                                                const ObDASScanCtDef *scan_ctdef,
@@ -1118,6 +1128,21 @@ int ObDASIterUtils::create_local_lookup_sub_tree(ObTableScanParam &scan_param,
   return ret;
 }
 
+/* 简单的索引回表场景（如 SELECT * FROM student WHERE id=1，id 为索引）：
+ *
+ * 树结构：
+ *                    local_lookup(ObDASLocalLookupIter)
+ *                          /                    \
+ *                 index_table(ObDASScanIter)  data_table(ObDASScanIter)
+ *
+ * 说明：
+ * - index_table：索引表扫描迭代器，根据查询条件（如 id=1）从索引表中获取 rowkey。
+ * - data_table：主表扫描迭代器，根据 index_table 产出的 rowkey 回表获取完整行数据。
+ * - local_lookup：本地回表迭代器，负责协调 index_table 和 data_table 的执行，
+ *   将索引扫描得到的 rowkey 批量回表到主表，最终产出满足条件的完整行。
+ *
+ * 这是最常见的索引回表场景，适用于通过普通索引（非全文、非向量等）进行查询的情况。
+ */
 int ObDASIterUtils::create_local_lookup_tree(ObTableScanParam &scan_param,
                                              common::ObIAllocator &alloc,
                                              const ObDASScanCtDef *scan_ctdef,
@@ -1145,6 +1170,54 @@ int ObDASIterUtils::create_local_lookup_tree(ObTableScanParam &scan_param,
   return ret;
 }
 
+/* Text retrieval + 域/主表回表场景下迭代器树的大致结构：
+ *
+ * 1. 以“混合标量 + 全文 + 按相关性排序”的典型查询为例：
+ *    SELECT docid_col, MATCH(fulltext_col) AGAINST(XXX) AS _score
+ *    FROM   items1
+ *    WHERE  MATCH(fulltext_col) AGAINST(XXX)
+ *      AND  base_id IN (...)
+ *      AND  id < ...
+ *    ORDER BY _score DESC
+ *    LIMIT  ...
+ *
+ *    在 DAS 层对应的迭代器树可抽象为：
+ *
+ *                    local_lookup / index_proj_lookup
+ *                           |                    |
+ *                    [sort by _score]      main_data_table(items1)
+ *                           |
+ *                text_retrieval_merge(ObDASTRMergeIter)
+ *                     /        |          |          \
+ *                inv_idx   inv_idx_agg  fwd_idx_agg  doc_cnt_agg
+ *
+ *    - text_retrieval_merge：由 create_text_retrieval_sub_tree 构建，基于倒排/正排/聚合表
+ *      计算每个文档的相关性分数 _score，并产出 doc_id/doc_rowkey + _score 的流。
+ *    - sort by _score：由 create_sort_sub_tree 构建，根据 _score 做降序排序并配合 LIMIT 取 TopN。
+ *    - local_lookup / index_proj_lookup + main_data_table：
+ *      将 text_retrieval_merge 产出的 doc_id / rowkey 作为驱动侧，对主表 items1 做本地/投影回表，
+ *      并在回表阶段或更上层算子中继续应用 base_id IN (...)、id < ... 等标量谓词。
+ *
+ * 2. 更一般地（不关心是否存在主表回表或 domain index）可以简化为：
+ *
+ *                domain_lookup / cache_lookup / local_lookup
+ *                            |
+ *                     [optional] sort
+ *                            |
+ *                  text_retrieval_merge(ObDASTRMergeIter)
+ *                       /        |          |          \
+ *                  inv_idx   inv_idx_agg  fwd_idx_agg  doc_cnt_agg
+ *
+ *    - text_retrieval_merge：由 create_text_retrieval_sub_tree 构建，负责将倒排索引扫描结果
+ *      （inv_idx / inv_idx_agg / fwd_idx_agg / doc_cnt_agg 等）按查询语义合并，并计算相关性等。
+ *    - sort（可选）：由 create_sort_sub_tree 构建，对 text_retrieval_merge 的输出做排序（例如按 score）。
+ *    - *_lookup / cache_lookup：根据是否存在 table_lookup / ir_aux_lookup / index_proj_lookup 等节点，
+ *      将 text retrieval 产生的 doc_id / domain_id / rowkey 进一步做本地/缓存回表，最终驱动主表或域表回表。
+ *
+ * 注意：实际运行时，树结构会根据 attach_ctdef 的类型（IR_SCAN / SORT / IR_AUX_LOOKUP /
+ * INDEX_PROJ_LOOKUP 等）以及谓词/投影下推情况有所裁剪或简化，上图仅描述常见“带 sort 的混合标量全文查询”
+ * 及其推广形态。
+ */
 int ObDASIterUtils::create_text_retrieval_tree(ObTableScanParam &scan_param,
                                                common::ObIAllocator &alloc,
                                                const ObDASBaseCtDef *attach_ctdef,
@@ -1613,6 +1686,35 @@ int ObDASIterUtils::create_match_part_score_sub_tree(ObTableScanParam &scan_para
   return ret;
 }
 
+/* 文本检索子树的基础结构：
+ *
+ *               text_retrieval_merge(ObDASTRMergeIter)
+ *                        /       |        |        \
+ *                 inv_idx[*]  inv_idx_agg[*]  fwd_idx_agg[*]  doc_cnt_agg[0/1]
+ *
+ * 说明：
+ * - text_retrieval_merge：
+ *   - 由 create_text_retrieval_sub_tree 构建的根迭代器（tr_merge_iter），负责将各个倒排/正排/
+ *     聚合扫描结果合并，并根据 query_tokens、布尔表达式和模式（DAAT/TAAT/TOPK 等）计算最终
+ *     的检索结果及相关性分数。
+ * - inv_idx[*]：
+ *   - 对应 ir_scan_ctdef->get_inv_idx_scan_ctdef() 创建的一组倒排索引扫描迭代器；
+ *   - 数量为 size（TAAT 模式下为 1，DAAT 模式下为 query_tokens_.count()）。
+ * - inv_idx_agg[*]（可选）：
+ *   - 当 need_inv_idx_agg() 为 true 时，为每个 token 创建对应的倒排聚合扫描迭代器；
+ *   - 用于统计倒排侧的聚合信息（如 token 命中文档数等），辅助相关性计算。
+ * - fwd_idx_agg[*]（可选）：
+ *   - 当 need_fwd_idx_agg() 为 true 时，为每个 token 创建正排/聚合扫描迭代器；
+ *   - 用于从正排/聚合表中获取额外统计或打分信息。
+ * - doc_cnt_agg[0/1]（可选）：
+ *   - 当需要精确文档总数且未走 estimate_total_doc_cnt() 时，创建一个文档总数聚合扫描迭代器；
+ *   - 用于统计整库/整索引的总文档数，参与相关性归一化等。
+ *
+ * 最终：
+ * - 所有子迭代器按上述顺序挂在 ObDASTRMergeIter 节点下面，形成纯“索引侧”的文本检索执行树，
+ *   上层（如 create_text_retrieval_tree / create_function_lookup_tree）再在此基础上叠加排序、
+ *   lookup、domain 回表等节点。
+ */
 int ObDASIterUtils::create_text_retrieval_sub_tree(
     const ObLSID &ls_id,
     common::ObIAllocator &alloc,
@@ -1657,6 +1759,7 @@ int ObDASIterUtils::create_text_retrieval_sub_tree(
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("unexpected pushdown topk in functional lookup mode", K(ret));
   } else {
+    // decide sparse retrieval execution mode: BMW(topk) / DaaT / TaaT
     merge_iter_param.function_lookup_mode_ = is_func_lookup ? 1 : 0;
     if (ir_scan_ctdef->has_pushdown_topk() && !has_duplicate_boolean_tokens) {
       merge_iter_param.topk_mode_ = 1;
@@ -1671,6 +1774,17 @@ int ObDASIterUtils::create_text_retrieval_sub_tree(
       merge_iter_param.taat_mode_ = 1;
     } else {
       merge_iter_param.daat_mode_ = 1;
+    }
+    if (OB_SUCC(ret)) {
+      LOG_INFO("[Text Retrieval] choose sparse retrieval mode",
+                K(merge_iter_param.topk_mode_),
+                K(merge_iter_param.daat_mode_),
+                K(merge_iter_param.taat_mode_),
+                K(is_func_lookup),
+                K(ir_scan_ctdef->has_pushdown_topk()),
+                K(has_duplicate_boolean_tokens),
+                "token_cnt", merge_iter_param.query_tokens_.count(),
+                "mode_flag", ir_scan_ctdef->mode_flag_);
     }
     if (OB_SUCC(ret) && ir_scan_ctdef->has_pushdown_topk() && has_duplicate_boolean_tokens) {
       FLOG_INFO("disable pushdown topk since boolean query has duplicate tokens", K(merge_iter_param.topk_mode_));
