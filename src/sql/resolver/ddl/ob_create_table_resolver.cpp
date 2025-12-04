@@ -1515,45 +1515,45 @@ int ObCreateTableResolver::resolve_table_elements(const ParseNode *node,
     }
 
 
-    if (OB_SUCC(ret)) {
-      // MySQL 模式下：如果存在 AUTO_INCREMENT 列且用户没有显式定义主键，
-      // 则自动将该 AUTO_INCREMENT 列作为 PRIMARY KEY。
-      //
-      // 约束：
-      // - 仅在 MySQL 模式生效；
-      // - 仅当当前还没有任何 primary key（包括约束语法）；
-      // - 不处理 external table、heap table 已显式主键等特殊场景。
-      if (OB_SUCC(ret)
-          && lib::is_mysql_mode()
-          && 0 != autoinc_column_id
-          && 0 == get_primary_key_size()
-          && NULL == primary_node
-          && !table_schema.is_external_table()
-          && !is_organization_set_to_heap()
-          && !primary_key_set_in_heap_table) {
-        ObCreateTableStmt *create_table_stmt = static_cast<ObCreateTableStmt*>(stmt_);
-        ObColumnSchemaV2 *autoinc_col = NULL;
-        if (OB_ISNULL(create_table_stmt)) {
-          ret = OB_ERR_UNEXPECTED;
-          SQL_RESV_LOG(WARN, "unexpected null create_table_stmt when auto add primary key for autoinc",
-                       K(ret));
-        } else if (OB_ISNULL(autoinc_col =
-                    create_table_stmt->get_create_table_arg().schema_.get_column_schema(
-                        autoinc_column_id))) {
-          ret = OB_ERR_UNEXPECTED;
-          SQL_RESV_LOG(WARN, "failed to get autoinc column schema when auto add primary key",
-                       K(ret), K(autoinc_column_id));
-        } else {
-          int64_t pk_data_length = 0;
-          if (OB_FAIL(add_primary_key_part(autoinc_col->get_column_name_str(),
-                                           stats,
-                                           pk_data_length))) {
-            SQL_RESV_LOG(WARN, "failed to auto add primary key for autoinc column",
-                         K(ret), K(autoinc_column_id), K(autoinc_col->get_column_name_str()));
-          }
-        }
-      }
-    }
+    // if (OB_SUCC(ret)) {
+    //   // MySQL 模式下：如果存在 AUTO_INCREMENT 列且用户没有显式定义主键，
+    //   // 则自动将该 AUTO_INCREMENT 列作为 PRIMARY KEY。
+    //   //
+    //   // 约束：
+    //   // - 仅在 MySQL 模式生效；
+    //   // - 仅当当前还没有任何 primary key（包括约束语法）；
+    //   // - 不处理 external table、heap table 已显式主键等特殊场景。
+    //   if (OB_SUCC(ret)
+    //       && lib::is_mysql_mode()
+    //       && 0 != autoinc_column_id
+    //       && 0 == get_primary_key_size()
+    //       && NULL == primary_node
+    //       && !table_schema.is_external_table()
+    //       && !is_organization_set_to_heap()
+    //       && !primary_key_set_in_heap_table) {
+    //     ObCreateTableStmt *create_table_stmt = static_cast<ObCreateTableStmt*>(stmt_);
+    //     ObColumnSchemaV2 *autoinc_col = NULL;
+    //     if (OB_ISNULL(create_table_stmt)) {
+    //       ret = OB_ERR_UNEXPECTED;
+    //       SQL_RESV_LOG(WARN, "unexpected null create_table_stmt when auto add primary key for autoinc",
+    //                    K(ret));
+    //     } else if (OB_ISNULL(autoinc_col =
+    //                 create_table_stmt->get_create_table_arg().schema_.get_column_schema(
+    //                     autoinc_column_id))) {
+    //       ret = OB_ERR_UNEXPECTED;
+    //       SQL_RESV_LOG(WARN, "failed to get autoinc column schema when auto add primary key",
+    //                    K(ret), K(autoinc_column_id));
+    //     } else {
+    //       int64_t pk_data_length = 0;
+    //       if (OB_FAIL(add_primary_key_part(autoinc_col->get_column_name_str(),
+    //                                        stats,
+    //                                        pk_data_length))) {
+    //         SQL_RESV_LOG(WARN, "failed to auto add primary key for autoinc column",
+    //                      K(ret), K(autoinc_column_id), K(autoinc_col->get_column_name_str()));
+    //       }
+    //     }
+    //   }
+    // }
 
     if (OB_SUCC(ret)) {
       if (OB_UNLIKELY(get_primary_key_size() > 0 && NULL != primary_node)) {
