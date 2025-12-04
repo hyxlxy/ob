@@ -1,3 +1,34 @@
+*****************************************2025-12-4（lingchen） *********************************************************
+跑不进index_merge的原因：
+  ObJoinOrder::get_candi_index_merge_trees，调用了之后，并没有产生merge_path。candi_index_trees是空的，所以没有生成出来路径。
+  大概率是因为 ObJoinOrder::generate_candi_index_merge_trees ，没有生成出来。
+
+*****************************************2025-12-3 *********************************************************
+
+有关设置一个filter的代码内容：
+
+        if (scan_param.allocator_ != nullptr) {
+          // 分配一个新的数组对象，使用4作为栈上元素数量（因为最多3个filter）
+          void* buf = scan_param.allocator_->alloc(sizeof(common::ObSEArray<sql::ObExpr*, 4>));
+          if (buf != nullptr) {
+            // 在分配的内存上构造数组对象
+            common::ObSEArray<sql::ObExpr*, 4>* new_filters = 
+                new(buf) common::ObSEArray<sql::ObExpr*, 4>();
+            adlog::DEBUG("new_filters->assign(parent_filters_)");
+            // 将parent_filters_的内容复制到新数组
+            int ret = new_filters->assign(parent_filters_);
+            if (OB_SUCC(ret)) {
+              // 使用const_cast修改const指针
+              const_cast<sql::ObExprPtrIArray*&>(scan_param.op_filters_) = 
+                  static_cast<sql::ObExprPtrIArray*>(new_filters);
+            } else {
+              LOG_WARN("failed to assign parent filters to new array", K(ret));
+            }
+          } else {
+            LOG_WARN("failed to allocate memory for filters");
+          }
+        }
+
 *****************************************2025-12-1 *********************************************************
 TODO：
 要给multipleMerge的Init里面打个日志

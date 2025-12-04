@@ -767,7 +767,7 @@ OB_INLINE int ObTableScanOp::create_one_das_task(ObDASTabletLoc *tablet_loc)
   int ret = OB_SUCCESS;
   ObDASScanOp *scan_op = nullptr;
   bool reuse_das_op = false;
-  adlog::DEBUG("ObTableScanOp::create_one_das_task");
+  // adlog::DEBUG("ObTableScanOp::create_one_das_task");
   if (OB_ISNULL(scan_iter_)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("unexpected nullptr scan iter", K(ret));
@@ -1744,9 +1744,9 @@ int ObTableScanOp::inner_open() {
 
   if (output_->get_type() == ObDASIterType::DAS_ITER_MERGE) {
     // 代表下面这一层是DasMergeIter
-    adlog::DEBUG("output_->get_type() == ObDASIterType::DAS_ITER_MERGE true");
+    // adlog::DEBUG("output_->get_type() == ObDASIterType::DAS_ITER_MERGE true");
     if (auto &&output = dynamic_cast<ObDASMergeIter*>(output_)) {
-      adlog::DEBUG("output set parendt filters ");
+      // adlog::DEBUG("output set parendt filters ");
       // output->parent_filters_ = *MY_SPEC.filters_;
       int ret = output->parent_filters_.assign(MY_SPEC.filters_);
       if (OB_FAIL(ret)) {

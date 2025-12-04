@@ -3097,7 +3097,7 @@ int ObLogPlan::allocate_cte_table_path(CteTablePath *cte_table_path,
   }
   return ret;
 }
-
+// ADVISE
 int ObLogPlan::allocate_access_path(AccessPath *ap,
                                     ObLogicalOperator *&out_access_path_op)
 {
@@ -15681,15 +15681,11 @@ int ObLogPlan::try_push_topn_into_vector_index_scan(ObLogicalOperator *&top,
   return ret;
 }
 
-int ObLogPlan::try_push_topn_into_text_retrieval_scan(ObLogicalOperator *&top,
-                                                      ObRawExpr *topn_expr,
-                                                      ObRawExpr *limit_expr,
-                                                      ObRawExpr *offset_expr,
-                                                      bool is_fetch_with_ties,
-                                                      bool need_exchange,
-                                                      const ObIArray<OrderItem> &sort_keys,
-                                                      bool &need_further_sort)
-{
+int ObLogPlan::try_push_topn_into_text_retrieval_scan(
+    ObLogicalOperator *&top, ObRawExpr *topn_expr, ObRawExpr *limit_expr,
+    ObRawExpr *offset_expr, bool is_fetch_with_ties, bool need_exchange,
+    const ObIArray<OrderItem> &sort_keys, bool &need_further_sort) {
+  adlog::DEBUG("ObLogPlan::try_push_topn_into_text_retrieval_scan");
   int ret = OB_SUCCESS;
   need_further_sort = true;
   ObLogTableScan *table_scan = NULL;

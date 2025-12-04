@@ -633,7 +633,7 @@ int ObDASRef::create_agg_task(ObDASOpType op_type, const ObDASTabletLoc *tablet_
       OB_FAIL(aggregated_tasks_.store_obj(tmp_agg_task))) {
         LOG_WARN("failed to add aggregated tasks", KR(ret));
       } else {
-      adlog::DEBUG("ObDASRef::create_agg_task  aggregated_tasks_.store_obj(tmp_agg_task) ok!");
+      // adlog::DEBUG("ObDASRef::create_agg_task  aggregated_tasks_.store_obj(tmp_agg_task) ok!");
       agg_task = tmp_agg_task;
       agg_task->server_ = tablet_loc->server_;
     }

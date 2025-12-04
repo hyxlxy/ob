@@ -189,7 +189,7 @@ common::ObIAllocator *ObDASMergeIter::get_das_alloc()
 
 int ObDASMergeIter::create_das_task(const ObDASTabletLoc *tablet_loc,
                                     ObDASScanOp *&scan_op, bool &reuse_op) {
-  adlog::DEBUG("ObDASMergeIter::create_das_task");
+  // adlog::DEBUG("ObDASMergeIter::create_das_task");
   int ret = OB_SUCCESS;
   ObIDASTaskOp *task_op = nullptr;
   ObDASOpType op_type = DAS_OP_TABLE_SCAN;
@@ -246,7 +246,7 @@ int ObDASMergeIter::create_das_task(const ObDASTabletLoc *tablet_loc,
         }
       }
     } else {
-      adlog::DEBUG("parent_filters_.count() = 0");
+      // adlog::DEBUG("parent_filters_.count() = 0");
     }
     //       // 1. 首先创建一个新的数组对象
     // sql::ObExprPtrIArray* new_filters = nullptr;

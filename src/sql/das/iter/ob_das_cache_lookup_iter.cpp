@@ -403,6 +403,9 @@ int ObDASCacheLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
             // flag=false;
           // }
         }
+
+        // if()
+
         if (OB_FAIL(do_index_lookup())) {
           LOG_WARN("failed to do index lookup", K(ret));
         } else {
