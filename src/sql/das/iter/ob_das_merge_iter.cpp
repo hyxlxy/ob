@@ -206,48 +206,48 @@ int ObDASMergeIter::create_das_task(const ObDASTabletLoc *tablet_loc,
   if (OB_SUCC(ret)) {
     scan_op = static_cast<ObDASScanOp *>(task_op);
     storage::ObTableScanParam &scan_param = scan_op->get_scan_param();
-    if (parent_filters_.count() > 0 and parent_filters_.count() < 4) {
-      adlog::DEBUG("parent_filters_.count() > 0");
-      if (scan_param.op_filters_ != nullptr) {
-        adlog::DEBUG("scan_param.op_filters_ != nullptr");
-      // 将parent_filters_的内容添加到现有的op_filters_中
-      // 注意：不能直接修改const成员，需要找到正确的方法
-        for (int64_t i = 0; i < parent_filters_.count(); i++) {
-          // 尝试将parent filter添加到现有filters中
-          int ret = const_cast<sql::ObExprPtrIArray*>(scan_param.op_filters_)->push_back(parent_filters_.at(i));
-          if (OB_FAIL(ret)) {
-            LOG_WARN("failed to add parent filter", K(ret));
-            break;
-          }
-        }
-      } else {
-        adlog::DEBUG("scan_param.op_filters_ is nullptr");
-            // 使用scan_param的allocator分配内存
-        if (scan_param.allocator_ != nullptr) {
-          // 分配一个新的数组对象，使用4作为栈上元素数量（因为最多3个filter）
-          void* buf = scan_param.allocator_->alloc(sizeof(common::ObSEArray<sql::ObExpr*, 4>));
-          if (buf != nullptr) {
-            // 在分配的内存上构造数组对象
-            common::ObSEArray<sql::ObExpr*, 4>* new_filters = 
-                new(buf) common::ObSEArray<sql::ObExpr*, 4>();
-            adlog::DEBUG("new_filters->assign(parent_filters_)");
-            // 将parent_filters_的内容复制到新数组
-            int ret = new_filters->assign(parent_filters_);
-            if (OB_SUCC(ret)) {
-              // 使用const_cast修改const指针
-              const_cast<sql::ObExprPtrIArray*&>(scan_param.op_filters_) = 
-                  static_cast<sql::ObExprPtrIArray*>(new_filters);
-            } else {
-              LOG_WARN("failed to assign parent filters to new array", K(ret));
-            }
-          } else {
-            LOG_WARN("failed to allocate memory for filters");
-          }
-        }
-      }
-    } else {
-      // adlog::DEBUG("parent_filters_.count() = 0");
-    }
+    // if (parent_filters_.count() > 0 and parent_filters_.count() < 4) {
+    //   adlog::DEBUG("parent_filters_.count() > 0");
+    //   if (scan_param.op_filters_ != nullptr) {
+    //     adlog::DEBUG("scan_param.op_filters_ != nullptr");
+    //   // 将parent_filters_的内容添加到现有的op_filters_中
+    //   // 注意：不能直接修改const成员，需要找到正确的方法
+    //     for (int64_t i = 0; i < parent_filters_.count(); i++) {
+    //       // 尝试将parent filter添加到现有filters中
+    //       int ret = const_cast<sql::ObExprPtrIArray*>(scan_param.op_filters_)->push_back(parent_filters_.at(i));
+    //       if (OB_FAIL(ret)) {
+    //         LOG_WARN("failed to add parent filter", K(ret));
+    //         break;
+    //       }
+    //     }
+    //   } else {
+    //     adlog::DEBUG("scan_param.op_filters_ is nullptr");
+    //         // 使用scan_param的allocator分配内存
+    //     if (scan_param.allocator_ != nullptr) {
+    //       // 分配一个新的数组对象，使用4作为栈上元素数量（因为最多3个filter）
+    //       void* buf = scan_param.allocator_->alloc(sizeof(common::ObSEArray<sql::ObExpr*, 4>));
+    //       if (buf != nullptr) {
+    //         // 在分配的内存上构造数组对象
+    //         common::ObSEArray<sql::ObExpr*, 4>* new_filters = 
+    //             new(buf) common::ObSEArray<sql::ObExpr*, 4>();
+    //         adlog::DEBUG("new_filters->assign(parent_filters_)");
+    //         // 将parent_filters_的内容复制到新数组
+    //         int ret = new_filters->assign(parent_filters_);
+    //         if (OB_SUCC(ret)) {
+    //           // 使用const_cast修改const指针
+    //           const_cast<sql::ObExprPtrIArray*&>(scan_param.op_filters_) = 
+    //               static_cast<sql::ObExprPtrIArray*>(new_filters);
+    //         } else {
+    //           LOG_WARN("failed to assign parent filters to new array", K(ret));
+    //         }
+    //       } else {
+    //         LOG_WARN("failed to allocate memory for filters");
+    //       }
+    //     }
+    //   }
+    // } else {
+    //   // adlog::DEBUG("parent_filters_.count() = 0");
+    // }
     //       // 1. 首先创建一个新的数组对象
     // sql::ObExprPtrIArray* new_filters = nullptr;
     
@@ -992,7 +992,7 @@ int ObDASMergeIter::get_next_seq_rows(int64_t &count, int64_t capacity)
               }
 
               // 这里是吧filter下推到data_table_iter_里面去
-              if (parent_filters_.count() > 0 and parent_filters_.count() < 3) {
+              if (parent_filters_.count() > 0 and parent_filters_.count() < 3 and false) {
                 //ObDASIter * get_data_table_iter() { return data_table_iter_;}
 
                 ObDASIter *data_iter = cache_iter->get_data_table_iter();

@@ -1,3 +1,35 @@
+*****************************************2025-12-4 *********************************************************
+
+create_access_paths -> create_index_merge_access_paths -> get_candi_index_merge_trees       ->  get_valid_index_merge_indexes
+                                                                                            ->  generate_candi_index_merge_trees
+                                                          !candi_index_trees.empty()        ->  check_candi_index_trees_match_hint
+                                                                                            ->  ......
+                                                                                            ->  get_valid_index_merge_indexes
+                                                                                            ->  generate_candi_index_merge_trees
+                                                                                            ->  prune_candi_index_merge_trees
+
+                                                       -> do_create_index_merge_paths       ->  choose_best_selectivity_branch
+                                                                                            ->  root_node->formalize_index_merge_tree()
+                                                                                            ->  build_access_path_for_scan_node
+                                                                                            ->  create_one_index_merge_path
+                                                                                            ->  ......
+                                                                                            ->  access_paths.push_back(static_cast<AccessPath*>(index_merge_path)))
+
+                                                       -> check_index_merge_paths_contain_fts
+
+                      (!is_match_hint && !contain_fts) -> prune_index_merge_path
+
+
+由于现在是do_create_index_merge_paths -> root_node->formalize_index_merge_tree()之前，发现有问题，root_的child个数是0.
+所以是在这个函数之前有问题。
+
+在generate_candi_index_merge_trees函数结束的时候，还是正常的。
+ObJoinOrder::get_candi_index_merge_trees END
+
+怀疑：
+get_candi_index_merge_trees  ->  prune_candi_index_merge_trees // 没有问题
+do_create_index_merge_paths  ->  choose_best_selectivity_branch // 确实是这里的问题
+
 *****************************************2025-12-4（lingchen） *********************************************************
 跑不进index_merge的原因：
   ObJoinOrder::get_candi_index_merge_trees，调用了之后，并没有产生merge_path。candi_index_trees是空的，所以没有生成出来路径。

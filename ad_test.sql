@@ -9,3 +9,5 @@ WHERE MATCH(fulltext_col) AGAINST('text')
   and id < 1000
 ORDER BY _score DESC
 LIMIT 10;
+
+explain SELECT docid_col, MATCH(fulltext_col) AGAINST('test') as _score FROM test_insert_en WHERE MATCH(fulltext_col) AGAINST('text')   and id < 1000 ORDER BY _score DESC LIMIT 10;

@@ -31,7 +31,7 @@
 #include "storage/tx_storage/ob_ls_service.h"
 #include "storage/ob_value_row_iterator.h"
 #include "share/vector_index/ob_ivf_async_task.h"
-
+#include "common/ad_log.h"
 namespace oceanbase
 {
 using namespace sql;
@@ -501,6 +501,7 @@ int ObVecIndexAsyncTaskUtil::resume_task_from_inner_table(
   if (tenant_id == OB_INVALID_TENANT_ID) {
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("invalid argument", K(ret), K(tenant_id));
+    adlog::DEBUG("ObVecIndexAsyncTaskUtil::resume_task_from_inner_table   invalid argument!!!!");
   } else if (OB_FAIL(construct_read_task_sql(tenant_id, tname, for_update, is_read_tenant_async_task, filters, proxy, sql))) {
     LOG_WARN("fail to construct read task sql", K(ret), K(tenant_id), K(ls->get_ls_id()));
   } else {

@@ -824,6 +824,7 @@ class Path
     common::ObSEArray<uint64_t, 1, common::ModulePageAllocator, true> candicate_index_tids_; // only used when building index merge tree
     AccessPath *ap_;
     int64_t scan_node_idx_;
+    int64_t gen_code_ = 0;
   };
 
   class IndexMergePath : public AccessPath
