@@ -76,6 +76,11 @@ int ObDASTRMergeIter::inner_init(ObDASIterParam &param)
     snapshot_ = merge_param.snapshot_;
     boolean_compute_node_ = merge_param.boolean_compute_node_;
     flags_ = merge_param.flags_;
+    // 强制启用 Top-K 模式以提升混合检索召回（避免 LIMIT 未下推导致候选不足）
+    function_lookup_mode_ = 0;
+    topk_mode_ = 1;
+    daat_mode_ = 0;
+    taat_mode_ = 0;
     for (int64_t i = 0; OB_SUCC(ret) && i < merge_param.query_tokens_.count(); ++i) {
       if (OB_FAIL(query_tokens_.push_back(merge_param.query_tokens_.at(i)))) {
         LOG_WARN("failed to push back query token", K(ret));
@@ -496,9 +501,23 @@ int ObDASTRMergeIter::create_sparse_retrieval_iter()
   sr_iter_param_.filter_expr_ = ir_ctdef_->match_filter_;
   sr_iter_param_.topk_limit_ = topk_limit_;
 
-  const int64_t OB_TR_TOPK_EXPAND_FACTOR = 3; // alpha
-  if (topk_mode_ && topk_limit_ > 0) {
-    const int64_t expanded = topk_limit_ * OB_TR_TOPK_EXPAND_FACTOR;
+  // default alpha; can be overridden by env OB_TR_TOPK_EXPAND_FACTOR (1~1000)
+  const int64_t OB_TR_TOPK_EXPAND_FACTOR = 100;
+  if (topk_mode_) {
+    int64_t base_k = topk_limit_;
+    if (base_k <= 0) {
+      // fallback when LIMIT is not pushed down; protect recall@10 by assuming K=10
+      base_k = 10;
+    }
+    int64_t alpha = OB_TR_TOPK_EXPAND_FACTOR;
+    if (const char *env_alpha = getenv("OB_TR_TOPK_EXPAND_FACTOR")) {
+      char *endptr = nullptr;
+      long v = strtol(env_alpha, &endptr, 10);
+      if (endptr != env_alpha && v > 0 && v <= 1000) {
+        alpha = v;
+      }
+    }
+    const int64_t expanded = base_k * alpha;
     sr_iter_param_.topk_limit_ = expanded;
   } else {
     sr_iter_param_.topk_limit_ = topk_limit_;
