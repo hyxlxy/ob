@@ -20,6 +20,7 @@
 #include "lib/container/ob_heap.h"
 #include "ob_sparse_daat_iter.h"
 #include "ob_sparse_retrieval_util.h"
+#include <cfloat>
 
 namespace oceanbase
 {
@@ -49,9 +50,11 @@ protected:
   int next_pivot_range(int64_t &skip_range_cnt);
   int evaluate_pivot(const int64_t pivot_iter_idx);
   int evaluate_pivot_range(const int64_t pivot_iter_idx, bool &is_candidate);
+  static constexpr double EPS = 1e-9;
   double get_top_k_threshold()
   {
-    return top_k_heap_.empty() ? 0.0 : top_k_heap_.top().relevance_;
+    // If heap not full, treat threshold as -inf so we don't over-prune
+    return top_k_heap_.count() < top_k_count_ ? -DBL_MAX : top_k_heap_.top().relevance_;
   }
 
 private:
@@ -101,6 +104,9 @@ protected:
   TopKItemCmp less_score_cmp_;
   // Maybe domain id not need to be cached within the topk heap since there would be top-n sort with datum store above
   TopKHeap top_k_heap_;
+  // projection buffer built after search finished to guarantee descending score output
+  ObFixedArray<TopKItem, ObIAllocator> result_items_;
+  int64_t result_cursor_;
   int64_t top_k_count_;
   ObDomainIdCmp domain_id_cmp_;
   ObFixedArray<ObDocIdExt, ObIAllocator> id_cache_;
