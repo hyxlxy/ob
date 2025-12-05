@@ -20,6 +20,7 @@
 #include "sql/das/iter/ob_das_iter.h"
 #include "sql/optimizer/ob_join_order.h"
 #include <cstdint>
+#include <cfloat>
 
 namespace oceanbase
 {
@@ -143,13 +144,15 @@ public:
         eval_ctx_(nullptr),
         max_size_(1),
         result_store_("DASIndexMerge"),
-        result_store_iter_()
+        result_store_iter_(),
+        iter_begun_(false)
     {}
     int init(int64_t max_size, ObEvalCtx *eval_ctx, const common::ObIArray<ObExpr*> *exprs, common::ObIAllocator &alloc);
     int add_row();
-    int to_expr(int64_t size);
+    int to_expr(int64_t size); // reads up to `size`; maintains internal iterator; returns OB_ITER_END if no more
     void reuse();
     void reset();
+    int64_t remaining_rows() const { return total_rows_ - consumed_rows_; }
 
   public:
     const common::ObIArray<ObExpr*> *exprs_;
@@ -158,6 +161,9 @@ public:
 
     ObChunkDatumStore result_store_;           // 结果存储区
     ObChunkDatumStore::Iterator result_store_iter_;
+    bool iter_begun_;
+    int64_t total_rows_;
+    int64_t consumed_rows_;
   };
 
 public:
@@ -215,6 +221,7 @@ private:
   int extract_match_against_exprs(const common::ObIArray<ObExpr*> &exprs, common::ObIArray<ObExpr*> &match_against_exprs);
   int fill_default_values_for_union(const common::ObIArray<ObExpr*> &exprs);
   int save_row_to_result_buffer();
+  int update_min_score_from_fts();
 
 private:
   ObIndexMergeType merge_type_;
@@ -246,10 +253,11 @@ public:
       // ADVISE
       bool enable_two_phase_ = false;
       bool has_executed_two_phase_ = false;
-      double first_phase_min_score_;
+      double first_phase_min_score_ = DBL_MAX;
       int64_t top_n_count_ = 114514;
       bool has_fts_iter_ = false;
       ObDASTRMergeIter *fts_iter_;      // FTS迭代器指针
+      bool two_phase_ready_ = false;    // 是否有可替代原路径的有效两阶段结果
   
       int execute_two_phase();
       int first_merge_phase();

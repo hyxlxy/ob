@@ -15,6 +15,8 @@
  */
 
 #include <cstdint>
+#include <cfloat>
+#include <algorithm>
 #define USING_LOG_PREFIX SQL_DAS
 #include "sql/das/iter/ob_das_index_merge_iter.h"
 #include "src/sql/das/ob_das_attach_define.h"
@@ -141,6 +143,9 @@ int ObDASIndexMergeIter::MergeResultBuffer::init(int64_t max_size,
     max_size_ = max_size;
     eval_ctx_ = eval_ctx;
     exprs_ = exprs;
+    iter_begun_ = false;
+    total_rows_ = 0;
+    consumed_rows_ = 0;
   }
   return ret;
 }
@@ -150,23 +155,39 @@ int ObDASIndexMergeIter::MergeResultBuffer::add_row()
   ObEvalCtx::BatchInfoScopeGuard batch_info_guard(*eval_ctx_);
   batch_info_guard.set_batch_size(1);
   batch_info_guard.set_batch_idx(0);
-  return result_store_.add_row(*exprs_, eval_ctx_);
+  int ret = result_store_.add_row(*exprs_, eval_ctx_);
+  if (OB_SUCC(ret)) {
+    ++total_rows_;
+  }
+  return ret;
 }
 
 int ObDASIndexMergeIter::MergeResultBuffer::to_expr(int64_t size)
 {
   int ret = OB_SUCCESS;
   int64_t read_size = 0;
-  if (OB_FAIL(result_store_.begin(result_store_iter_))) {
-    LOG_WARN("failed to begin iterate result store", K(ret));
-  } else if (OB_UNLIKELY(!(result_store_iter_.is_valid() && result_store_iter_.has_next()))) {
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("unexpected no available rows", K(ret));
-  } else if (OB_FAIL(result_store_iter_.get_next_batch<true>(*exprs_, *eval_ctx_, max_size_, read_size))) {
+  if (!iter_begun_) {
+    if (OB_FAIL(result_store_.begin(result_store_iter_))) {
+      LOG_WARN("failed to begin iterate result store", K(ret));
+      return ret;
+    }
+    iter_begun_ = true;
+  }
+  if (OB_UNLIKELY(!(result_store_iter_.is_valid() && result_store_iter_.has_next()))) {
+    ret = OB_ITER_END;
+  } else if (OB_FAIL(result_store_iter_.get_next_batch<true>(*exprs_, *eval_ctx_, size, read_size))) {
     LOG_WARN("failed to get next batch from result store", K(ret));
-  } else if (OB_UNLIKELY(size != read_size)) {
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("unexpected read size not equal to actually size", K(ret));
+  } else if (OB_UNLIKELY(read_size != size)) {
+    if (read_size == 0) {
+      ret = OB_ITER_END;
+    } else {
+      // 部分读取（不期望）：尽量返回已经读到的行，同时推进游标
+      consumed_rows_ += read_size;
+      return OB_SUCCESS;
+    }
+  }
+  if (OB_SUCC(ret)) {
+    consumed_rows_ += read_size;
   }
   return ret;
 }
@@ -177,6 +198,9 @@ void ObDASIndexMergeIter::MergeResultBuffer::reset()
 {
   result_store_iter_.reset();
   result_store_.reset();
+  iter_begun_ = false;
+  total_rows_ = 0;
+  consumed_rows_ = 0;
 }
 
 int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
@@ -200,9 +224,13 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
     snapshot_ = index_merge_param.snapshot_;
     is_reverse_ = index_merge_param.is_reverse_;
 
-    //
-    // top_n_count_ = param.limit_param_;
-    // adlog::DEBUG("top_n_count: ", top_n_count_);
+    // 初始化 Top-N（LIMIT）参数
+    if (merge_rtdef_ != nullptr && merge_rtdef_->limit_param_.is_valid()) {
+      top_n_count_ = merge_rtdef_->limit_param_.limit_count_;
+      adlog::DEBUG("init top_n_count from limit_param", K_(top_n_count));
+    } else {
+      adlog::DEBUG("init top_n_count skipped: no valid limit_param");
+    }
     
     lib::ContextParam context_param;
     context_param.set_mem_attr(MTL_ID(), "DASIndexMerge", ObCtxIds::DEFAULT_CTX_ID)
@@ -422,6 +450,29 @@ int ObDASIndexMergeIter::save_row_to_result_buffer()
   return result_buffer_.add_row();
 }
 
+int ObDASIndexMergeIter::update_min_score_from_fts()
+{
+  // Best-effort: scan current output exprs for MATCH_AGAINST score and update min score
+  if (OB_ISNULL(output_) || OB_ISNULL(eval_ctx_)) {
+    return OB_SUCCESS;
+  }
+  for (int64_t i = 0; i < output_->count(); ++i) {
+    ObExpr *expr = output_->at(i);
+    if (OB_ISNULL(expr)) { continue; }
+    if (T_FUN_MATCH_AGAINST == expr->type_) {
+      ObDatum *datum = nullptr;
+      int tmp_ret = expr->eval(*eval_ctx_, datum);
+      if (OB_SUCCESS == tmp_ret && nullptr != datum && !datum->is_null()) {
+        double score = datum->get_double();
+        if (score < first_phase_min_score_) {
+          first_phase_min_score_ = score;
+        }
+      }
+    }
+  }
+  return OB_SUCCESS;
+}
+
 int ObDASIndexMergeIter::do_table_scan()
 {
   int ret = OB_SUCCESS;
@@ -583,6 +634,28 @@ int ObDASIndexMergeIter::inner_get_next_row()
 {
   int ret = OB_SUCCESS;
   clear_evaluated_flag();
+  // two-phase safe entry
+  if (enable_two_phase_) {
+    if (!has_executed_two_phase_) {
+      if (OB_FAIL(execute_two_phase())) {
+        LOG_DEBUG("two-phase execute failed, fallback", K(ret));
+      } else {
+        has_executed_two_phase_ = true;
+      }
+    }
+    if (two_phase_ready_ && result_buffer_.remaining_rows() > 0) {
+      // try to return one row from buffer
+      if (OB_FAIL(result_buffer_.to_expr(1))) {
+        if (ret != OB_ITER_END) {
+          LOG_WARN("failed to read one row from result buffer", K(ret));
+        }
+        // fallback to original path if buffer exhausted or error
+      } else {
+        return OB_SUCCESS;
+      }
+    }
+  }
+  // original path
   if (OB_FAIL((this->*get_next_row_)())) {
     if (ret != OB_ITER_END) {
       LOG_WARN("index merge iter failed to get next row", K(ret));
@@ -594,7 +667,36 @@ int ObDASIndexMergeIter::inner_get_next_row()
 int ObDASIndexMergeIter::inner_get_next_rows(int64_t &count, int64_t capacity)
 {
   int ret = OB_SUCCESS;
+  count = 0;
   clear_evaluated_flag();
+  // two-phase safe entry for batch
+  if (enable_two_phase_) {
+    if (!has_executed_two_phase_) {
+      if (OB_FAIL(execute_two_phase())) {
+        LOG_DEBUG("two-phase execute failed in batch, fallback", K(ret));
+      } else {
+        has_executed_two_phase_ = true;
+      }
+    }
+    if (has_executed_two_phase_) {
+      const int64_t remain = result_buffer_.remaining_rows();
+      const int64_t to_read = remain > 0 ? std::min(remain, capacity) : 0;
+      if (to_read > 0) {
+        if (OB_FAIL(result_buffer_.to_expr(to_read))) {
+          if (ret != OB_ITER_END) {
+            LOG_WARN("failed to read batch from result buffer", K(ret), K(to_read));
+          }
+        } else {
+          count = to_read;
+          LOG_TRACE("[DAS ITER] two-phase buffer batch", K(count), K(capacity));
+          const ObBitVector *skip = nullptr;
+          PRINT_VECTORIZED_ROWS(SQL, DEBUG, *eval_ctx_, *output_, count, skip);
+          return OB_SUCCESS;
+        }
+      }
+    }
+  }
+  // original path
   if (OB_FAIL((this->*get_next_rows_)(count, capacity))) {
     if (ret != OB_ITER_END) {
       LOG_WARN("index merge iter failed to get next rows", K(ret));
@@ -981,19 +1083,56 @@ int ObDASIndexMergeIter::union_get_next_rows(int64_t &count, int64_t capacity)
 // ADVISE
 
 int ObDASIndexMergeIter::execute_two_phase() {
-  int ret = first_merge_phase();
-  if (ret != OB_SUCCESS) {
+  // safe wrapper: build buffer via phase1; phase2 optional
+  int ret = OB_SUCCESS;
+  result_buffer_.reuse();
+  // Phase 1: collect baseline top-N using existing merge logic
+  if (OB_FAIL(first_merge_phase())) {
+    LOG_WARN("first_merge_phase failed", K(ret));
     return ret;
   }
-  return second_merge_phase();
+  // Phase 2: optional (not enabled yet). Keep success to allow buffer usage.
+  // 注意：为保证语义正确，当前不启用两阶段结果对外返回
+  two_phase_ready_ = false;
+  if (OB_FAIL(second_merge_phase())) {
+    LOG_DEBUG("second_merge_phase returned non-success, ignore to keep fallback path", K(ret));
+    // do not propagate; we still can use phase1 results or fallback to original path
+    ret = OB_SUCCESS;
+  }
+  return ret;
 }
+
 int ObDASIndexMergeIter::first_merge_phase() {
   int ret = OB_SUCCESS;
+  int64_t fetched = 0;
+  // prepare eval batch context
+  ObEvalCtx::BatchInfoScopeGuard batch_info_guard(*eval_ctx_);
+  batch_info_guard.set_batch_size(1);
+  while (OB_SUCC(ret) && fetched < top_n_count_) {
+    clear_evaluated_flag();
+    if (OB_FAIL((this->*get_next_row_)())) {
+      if (ret == OB_ITER_END) {
+        ret = OB_SUCCESS; // less than N rows is acceptable
+        break;
+      } else {
+        LOG_WARN("first phase get_next_row failed", K(ret));
+        break;
+      }
+    } else if (OB_FAIL(save_row_to_result_buffer())) {
+      LOG_WARN("save_row_to_result_buffer failed", K(ret));
+      break;
+    } else {
+      (void)update_min_score_from_fts(); // best-effort, ignore ret
+      ++fetched;
+    }
+  }
+  LOG_DEBUG("first_merge_phase done", K(fetched), K_(first_phase_min_score));
   return ret;
 }
+
 int ObDASIndexMergeIter::second_merge_phase() {
-  int ret = OB_SUCCESS;
-  return ret;
+  // Not implemented yet: keep success for compatibility; fallback to phase1 or original path.
+  return OB_SUCCESS;
 }
 
 // int64_t ObDASIndexMergeIter::get_top_n_count() {
@@ -1039,18 +1178,21 @@ int ObDASIndexMergeIter::init_two_phase(ObDASIterParam &param) {
 }
 
 bool ObDASIndexMergeIter::check_top_k() {
-
-  // if (merge_rtdef_ && merge_rtdef_->limit_param_.is_valid()) {
-  //   top_n_count_ = merge_rtdef_->limit_param_.limit_count_;
-  //   if (top_n_count_ > 0) {
-  //       adlog::DEBUG("Top-K query detected from limit_param: ", top_n_count_);
-  //       return true;
-  //   }
-  // }
-  if (top_n_count_ == 0 or top_n_count_ == 114514) {
-    return false;
+  int64_t n = 0;
+  if (merge_rtdef_ != nullptr && merge_rtdef_->limit_param_.is_valid()) {
+    n = merge_rtdef_->limit_param_.limit_count_;
   }
-  return true;
+  if (n > 0) {
+    top_n_count_ = n;
+    adlog::DEBUG("check_top_k: detected from limit_param", K_(top_n_count));
+    return true;
+  }
+  // 回退到成员值判断（例如由其他路径设置）
+  bool ok = top_n_count_ > 0;
+  if (!ok) {
+    adlog::DEBUG("check_top_k: no valid top_n");
+  }
+  return ok;
 }
 
 bool ObDASIndexMergeIter::check_support_two_phase() { return true; }

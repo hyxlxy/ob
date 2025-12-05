@@ -388,7 +388,7 @@ deps/3rd
 test/tmp
 test/var
 
-
+* .md
 store/
 perf.data
 perf.script

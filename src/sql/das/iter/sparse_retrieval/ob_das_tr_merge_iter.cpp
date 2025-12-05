@@ -18,6 +18,8 @@
 #include "ob_das_tr_merge_iter.h"
 #include "sql/das/ob_das_ir_define.h"
 #include "common/ad_log.h"
+#include <cstdlib>
+#include <strings.h>
 namespace oceanbase
 {
 using namespace share;
@@ -76,11 +78,20 @@ int ObDASTRMergeIter::inner_init(ObDASIterParam &param)
     snapshot_ = merge_param.snapshot_;
     boolean_compute_node_ = merge_param.boolean_compute_node_;
     flags_ = merge_param.flags_;
-    // 强制启用 Top-K 模式以提升混合检索召回（避免 LIMIT 未下推导致候选不足）
-    function_lookup_mode_ = 0;
-    topk_mode_ = 1;
-    daat_mode_ = 0;
-    taat_mode_ = 0;
+    // 根据是否存在TOP-K表达式，自动启用topk_mode_（BMW）以便下推Top-N
+    if (!topk_mode_ && OB_NOT_NULL(ir_ctdef_) && OB_NOT_NULL(ir_ctdef_->topk_limit_expr_)) {
+      topk_mode_ = true; daat_mode_ = false; taat_mode_ = false;
+    }
+    // 允许通过环境变量强制覆盖算法模式，便于测试：OB_TR_MODE=bmw|daat|taat
+    if (const char *env_mode = getenv("OB_TR_MODE")) {
+      if (0 == strcasecmp(env_mode, "bmw")) {
+        topk_mode_ = true; daat_mode_ = false; taat_mode_ = false;
+      } else if (0 == strcasecmp(env_mode, "daat")) {
+        topk_mode_ = false; daat_mode_ = true; taat_mode_ = false;
+      } else if (0 == strcasecmp(env_mode, "taat")) {
+        topk_mode_ = false; daat_mode_ = false; taat_mode_ = true;
+      }
+    }
     for (int64_t i = 0; OB_SUCC(ret) && i < merge_param.query_tokens_.count(); ++i) {
       if (OB_FAIL(query_tokens_.push_back(merge_param.query_tokens_.at(i)))) {
         LOG_WARN("failed to push back query token", K(ret));
@@ -501,23 +512,17 @@ int ObDASTRMergeIter::create_sparse_retrieval_iter()
   sr_iter_param_.filter_expr_ = ir_ctdef_->match_filter_;
   sr_iter_param_.topk_limit_ = topk_limit_;
 
-  // default alpha; can be overridden by env OB_TR_TOPK_EXPAND_FACTOR (1~1000)
-  const int64_t OB_TR_TOPK_EXPAND_FACTOR = 100;
-  if (topk_mode_) {
-    int64_t base_k = topk_limit_;
-    if (base_k <= 0) {
-      // fallback when LIMIT is not pushed down; protect recall@10 by assuming K=10
-      base_k = 10;
+  // 允许通过环境变量覆盖TopK扩容因子，默认=5，与测试场景一致
+  int64_t expand_factor = 5; // default alpha
+  if (const char *env_alpha = getenv("OB_TR_TOPK_EXPAND")) {
+    char *endp = nullptr;
+    long v = strtol(env_alpha, &endp, 10);
+    if (endp != env_alpha && v > 0 && v < 1000) {
+      expand_factor = v;
     }
-    int64_t alpha = OB_TR_TOPK_EXPAND_FACTOR;
-    if (const char *env_alpha = getenv("OB_TR_TOPK_EXPAND_FACTOR")) {
-      char *endptr = nullptr;
-      long v = strtol(env_alpha, &endptr, 10);
-      if (endptr != env_alpha && v > 0 && v <= 1000) {
-        alpha = v;
-      }
-    }
-    const int64_t expanded = base_k * alpha;
+  }
+  if (topk_mode_ && topk_limit_ > 0) {
+    const int64_t expanded = topk_limit_ * expand_factor;
     sr_iter_param_.topk_limit_ = expanded;
   } else {
     sr_iter_param_.topk_limit_ = topk_limit_;
@@ -568,6 +573,7 @@ int ObDASTRMergeIter::create_sparse_retrieval_iter()
       LOG_WARN("failed to init text retrieval bm25 iter", K(ret));
     } else {
       sparse_retrieval_iter_ = bmw_iter;
+      LOG_INFO("have used BMWIterImpl", K_(topk_limit), K(iter_param.base_param_->topk_limit_));
     }
   } else if (daat_mode_) {
     ObTextDaaTParam iter_param;
