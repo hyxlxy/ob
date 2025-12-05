@@ -17,6 +17,7 @@
 #define USING_LOG_PREFIX SQL_DAS
 #include "sql/das/iter/ob_das_index_merge_iter.h"
 #include "src/sql/das/ob_das_attach_define.h"
+#include "sql/das/iter/sparse_retrieval/ob_das_tr_merge_iter.h"
 namespace oceanbase
 {
 using namespace common;
@@ -256,6 +257,15 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
         if (OB_SUCC(ret)) {
           if (OB_FAIL(result_buffer_.init(max_size_, eval_ctx_, output_, mem_ctx_->get_malloc_allocator()))) {
             LOG_WARN("failed to init merge result buffer", K(ret));
+          } else {
+            // Initialize two-phase optimization
+            // Enable two-phase optimization for scalar-filtered fulltext search
+            // Check if we have a fulltext index and scalar filters
+            two_phase_enabled_ = true;  // Can be controlled by a hint or parameter
+            phase1_limit_ = max_size_ * 2;  // Amplify the limit for phase 1
+            phase1_min_score_ = 0.0;
+            phase1_completed_ = false;
+            phase2_started_ = false;
           }
         }
       }
@@ -533,6 +543,12 @@ int ObDASIndexMergeIter::inner_reuse()
     child_stores_.at(i).reuse();
   }
   result_buffer_.reuse();
+  // Reset two-phase optimization state
+  phase1_results_.reuse();
+  phase2_results_.reuse();
+  phase1_min_score_ = 0.0;
+  phase1_completed_ = false;
+  phase2_started_ = false;
   return ret;
 }
 
@@ -869,6 +885,12 @@ int ObDASIndexMergeIter::union_get_next_rows(int64_t &count, int64_t capacity)
 {
   int ret = OB_SUCCESS;
   count = 0;
+  
+  // Use two-phase optimization if enabled
+  if (two_phase_enabled_ && !phase1_completed_) {
+    return union_get_next_rows_two_phase(count, capacity);
+  }
+  
   result_buffer_.reuse();
   while (OB_SUCC(ret) && count < capacity) {
     /* try to fill each child store */
@@ -966,6 +988,267 @@ int ObDASIndexMergeIter::union_get_next_rows(int64_t &count, int64_t capacity)
     }
   }
   return ret;
+}
+
+// Two-phase optimization implementation
+int ObDASIndexMergeIter::union_get_next_rows_two_phase(int64_t &count, int64_t capacity)
+{
+  int ret = OB_SUCCESS;
+  count = 0;
+  
+  // Phase 1: Get top N rows with normal index merge (保底)
+  if (!phase1_completed_) {
+    if (OB_FAIL(phase1_get_top_n_rows(count, capacity))) {
+      LOG_WARN("failed to get phase 1 results", K(ret));
+    } else {
+      phase1_completed_ = true;
+      phase2_started_ = true;
+      return ret;  // Return phase 1 results first
+    }
+  }
+  
+  // Phase 2: Get results with score threshold from BM25 iterator
+  if (phase2_started_ && phase1_completed_) {
+    if (OB_FAIL(phase2_get_with_score_threshold(count, capacity))) {
+      LOG_WARN("failed to run phase2 with score threshold", K(ret));
+    }
+  }
+  
+  return ret;
+}
+
+int ObDASIndexMergeIter::phase1_get_top_n_rows(int64_t &count, int64_t capacity)
+{
+  int ret = OB_SUCCESS;
+  count = 0;
+  result_buffer_.reuse();
+  
+  // Run normal union merge to get top N rows (保底)
+  int64_t phase1_capacity = phase1_limit_;
+  while (OB_SUCC(ret) && count < phase1_capacity) {
+    int64_t output_idx = OB_INVALID_INDEX;
+    int cmp_ret = 0;
+    int64_t child_rows_cnt = 0;
+    
+    for (int64_t i = 0; OB_SUCC(ret) && i < child_stores_.count(); i++) {
+      IndexMergeRowStore &child_store = child_stores_.at(i);
+      child_rows_cnt = 0;
+      if (!child_store.have_data()) {
+        if (!child_store.iter_end_) {
+          ObDASIter *child_iter = child_iters_.at(i);
+          if (OB_ISNULL(child_iter)) {
+            ret = OB_ERR_UNEXPECTED;
+            LOG_WARN("unexpected nullptr", K(i));
+          } else {
+            ret = child_iter->get_next_rows(child_rows_cnt, phase1_capacity - count);
+            if (OB_ITER_END == ret && child_rows_cnt > 0) {
+              ret = OB_SUCCESS;
+            }
+            if (OB_SUCC(ret)) {
+              if (OB_FAIL(child_store.save(true, child_rows_cnt))) {
+                LOG_WARN("failed to save child rows", K(child_rows_cnt), K(ret));
+              } else if (OB_FAIL(compare(i, output_idx, cmp_ret))) {
+                LOG_WARN("index merge failed to compare row", K(i), K(output_idx), K(ret));
+              } else if (child_iter->get_type() == DAS_ITER_SORT) {
+                reset_datum_ptr(child_iter->get_output(), child_rows_cnt);
+              }
+            } else if (OB_ITER_END == ret) {
+              child_store.iter_end_ = true;
+              ret = OB_SUCCESS;
+            } else {
+              LOG_WARN("failed to get next rows from child iter", K(ret));
+            }
+          }
+        }
+      } else if (OB_FAIL(compare(i, output_idx, cmp_ret))) {
+        LOG_WARN("index merge failed to compare row", K(i), K(output_idx), K(ret));
+      }
+    }
+    
+    if (OB_FAIL(ret)) {
+    } else if (output_idx == OB_INVALID_INDEX) {
+      ret = OB_ITER_END;
+    } else {
+      bool need_fill_default_value = false;
+      for (int64_t i = 0; OB_SUCC(ret) && i < child_stores_.count(); i++) {
+        need_fill_default_value = false;
+        if (output_idx == i) {
+          /* skip */
+        } else if (child_stores_.at(i).have_data()) {
+          if (OB_FAIL(compare(i, output_idx, cmp_ret))) {
+            LOG_WARN("index merge failed to compare row", K(i), K(output_idx), K(ret));
+          } else if (cmp_ret == 0) {
+            if (OB_FAIL(child_stores_.at(i).to_expr())) {
+              LOG_WARN("failed to convert store row to expr", K(ret));
+            }
+          } else {
+            need_fill_default_value = true;
+          }
+        } else {
+          need_fill_default_value = true;
+        }
+        if (OB_SUCC(ret) && need_fill_default_value) {
+          if (OB_FAIL(fill_default_values_for_union(child_match_against_exprs_.at(i)))) {
+            LOG_WARN("failed to fill default values for union", K(ret), K(i));
+          }
+        }
+      }
+      if (OB_SUCC(ret)) {
+        if (OB_FAIL(child_stores_.at(output_idx).to_expr())) {
+          LOG_WARN("failed to convert store row to expr", K(ret));
+        } else {
+          // Extract and store the match score
+          double score = extract_match_score_from_row(fts_child_idx_);
+          if (score < phase1_min_score_ || phase1_min_score_ == 0.0) {
+            phase1_min_score_ = score;
+          }
+          if (OB_FAIL(phase1_results_.push_back(std::make_pair(score, count)))) {
+            LOG_WARN("failed to push phase1 result", K(ret));
+          } else if (OB_FAIL(save_row_to_result_buffer())) {
+            LOG_WARN("failed to save row to result buffer", K(ret));
+          } else {
+            count += 1;
+          }
+        }
+      }
+    }
+  }
+  
+  if (OB_ITER_END == ret && count > 0) {
+    ret = OB_SUCCESS;
+  }
+  if (OB_SUCC(ret) && count > 0) {
+    if (OB_FAIL(result_buffer_.to_expr(count))) {
+      LOG_WARN("failed to convert result buffer to exprs", K(ret));
+    }
+  }
+  return ret;
+}
+
+int ObDASIndexMergeIter::phase2_get_with_score_threshold(int64_t &count, int64_t capacity)
+{
+  int ret = OB_SUCCESS;
+  count = 0;
+  result_buffer_.reuse();
+
+  // Require a TR child
+  if (fts_child_idx_ < 0 || fts_child_idx_ >= child_iters_.count()) {
+    return OB_ITER_END;
+  }
+
+  // Downcast and set runtime params
+  ObDASIter *fts_child = child_iters_.at(fts_child_idx_);
+  ObDASTRMergeIter *tr_merge = dynamic_cast<ObDASTRMergeIter *>(fts_child);
+  if (nullptr == tr_merge) {
+    return OB_ITER_END;
+  }
+
+  // Enlarge topk to mitigate post-filter loss; use 2x phase1_limit_ or 4x capacity
+  int64_t nprime = phase1_limit_ > 0 ? (phase1_limit_ * 2) : (capacity * 4);
+  if (nprime <= 0) { nprime = capacity; }
+  (void)tr_merge->set_runtime_topk_limit(nprime);
+  (void)tr_merge->set_min_score_threshold(phase1_min_score_);
+
+  // Pull a batch from TR child and project as our results
+  int64_t child_rows_cnt = 0;
+  if (OB_FAIL(fts_child->get_next_rows(child_rows_cnt, nprime))) {
+    if (OB_ITER_END != ret) {
+      LOG_WARN("phase2 fts child get_next_rows failed", K(ret));
+    } else {
+      ret = OB_SUCCESS;
+    }
+  }
+
+  if (OB_SUCC(ret) && child_rows_cnt > 0) {
+    IndexMergeRowStore &fts_store = child_stores_.at(fts_child_idx_);
+    if (OB_FAIL(fts_store.save(true, child_rows_cnt))) {
+      LOG_WARN("failed to save fts child rows", K(ret));
+    } else {
+      // For each row from TR child, project default values for non-fts children and emit
+      for (int64_t i = 0; OB_SUCC(ret) && i < child_rows_cnt && count < capacity; ++i) {
+        bool need_fill_default = false;
+        for (int64_t c = 0; OB_SUCC(ret) && c < child_stores_.count(); ++c) {
+          need_fill_default = (c != fts_child_idx_);
+          if (c == fts_child_idx_) {
+            if (OB_FAIL(fts_store.to_expr())) {
+              LOG_WARN("failed to convert fts store row to expr", K(ret));
+            }
+          } else {
+            if (OB_FAIL(fill_default_values_for_union(child_match_against_exprs_.at(c)))) {
+              LOG_WARN("failed to fill default values for union (phase2)", K(ret), K(c));
+            }
+          }
+        }
+        if (OB_SUCC(ret)) {
+          if (OB_FAIL(save_row_to_result_buffer())) {
+            LOG_WARN("failed to save row to result buffer (phase2)", K(ret));
+          } else {
+            ++count;
+          }
+        }
+      }
+    }
+  }
+
+  if (OB_SUCC(ret) && count > 0) {
+    if (OB_FAIL(result_buffer_.to_expr(count))) {
+      LOG_WARN("failed to convert result buffer to exprs (phase2)", K(ret));
+    }
+  } else if (count == 0) {
+    ret = OB_ITER_END;
+  }
+
+  return ret;
+}
+
+int ObDASIndexMergeIter::merge_phase_results(int64_t &count, int64_t capacity)
+{
+  int ret = OB_SUCCESS;
+  count = 0;
+  result_buffer_.reuse();
+  
+  // Merge results from phase 1 and phase 2
+  // For now, just return phase 1 results
+  if (phase1_results_.count() > 0) {
+    // Sort phase 1 results by score (descending)
+    std::sort(phase1_results_.begin(), phase1_results_.end(),
+              [](const std::pair<double, int64_t> &a, const std::pair<double, int64_t> &b) {
+                return a.first > b.first;  // Descending order
+              });
+    
+    // Return top capacity results
+    count = std::min((int64_t)phase1_results_.count(), capacity);
+    // Results are already in the buffer, just return the count
+  }
+  
+  return ret;
+}
+
+double ObDASIndexMergeIter::extract_match_score_from_row(int64_t fts_child_idx)
+{
+  double score = 0.0;
+  // 尝试从包含 MATCH AGAINST 的子迭代器输出中获取得分
+  // 优先使用传入的 fts_child_idx；若无效，则扫描子列表中第一个包含 T_FUN_MATCH_AGAINST 的子
+  int64_t target_idx = fts_child_idx;
+  if (target_idx < 0 || target_idx >= child_match_against_exprs_.count() ||
+      child_match_against_exprs_.at(target_idx).count() == 0) {
+    target_idx = -1;
+    for (int64_t i = 0; i < child_match_against_exprs_.count(); ++i) {
+      if (child_match_against_exprs_.at(i).count() > 0) { target_idx = i; break; }
+    }
+  }
+  if (target_idx >= 0) {
+    const ExprFixedArray &arr = child_match_against_exprs_.at(target_idx);
+    if (arr.count() > 0 && OB_NOT_NULL(arr.at(0))) {
+      ObExpr *expr = arr.at(0);
+      ObDatum &d = expr->locate_expr_datum(*eval_ctx_);
+      if (!d.is_null()) {
+        // relevance 是 double
+        score = d.get_double();
+      }
+    }
+  }
+  return score;
 }
 
 

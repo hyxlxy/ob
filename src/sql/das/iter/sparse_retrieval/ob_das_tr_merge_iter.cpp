@@ -59,6 +59,24 @@ ObDASTRMergeIter::ObDASTRMergeIter()
 {
 }
 
+int ObDASTRMergeIter::set_runtime_topk_limit(int64_t limit)
+{
+  sr_iter_param_.topk_limit_ = (limit > 0 ? limit : sr_iter_param_.topk_limit_);
+  if (nullptr != sparse_retrieval_iter_) {
+    sparse_retrieval_iter_->set_topk_limit_runtime(sr_iter_param_.topk_limit_);
+  }
+  return OB_SUCCESS;
+}
+
+int ObDASTRMergeIter::set_min_score_threshold(double threshold)
+{
+  sr_iter_param_.min_score_threshold_ = threshold;
+  if (nullptr != sparse_retrieval_iter_) {
+    sparse_retrieval_iter_->set_external_threshold(threshold);
+  }
+  return OB_SUCCESS;
+}
+
 int ObDASTRMergeIter::inner_init(ObDASIterParam &param)
 {
   int ret = OB_SUCCESS;

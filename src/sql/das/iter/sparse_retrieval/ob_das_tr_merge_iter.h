@@ -93,7 +93,11 @@ protected:
   virtual int inner_release() override;
   virtual int inner_get_next_row() override;
   virtual int inner_get_next_rows(int64_t &count, int64_t capacity) override;
+
 public:
+  // runtime tuning APIs for two-phase optimization
+  int set_runtime_topk_limit(int64_t limit);
+  int set_min_score_threshold(double threshold);
   int set_related_tablet_ids(
       const ObLSID &ls_id,
       const ObDASFTSTabletID &related_tablet_ids)

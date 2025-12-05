@@ -51,8 +51,11 @@ protected:
   int evaluate_pivot_range(const int64_t pivot_iter_idx, bool &is_candidate);
   double get_top_k_threshold()
   {
-    return top_k_heap_.empty() ? 0.0 : top_k_heap_.top().relevance_;
+    double t = top_k_heap_.empty() ? 0.0 : top_k_heap_.top().relevance_;
+    return t < external_threshold_ ? external_threshold_ : t;
   }
+  virtual int set_external_threshold(double t) override { external_threshold_ = t; return common::OB_SUCCESS; }
+  virtual int set_topk_limit_runtime(int64_t c) override { if (c > 0) top_k_count_ = c; return common::OB_SUCCESS; }
 
 private:
   ObISRDimBlockMaxIter *get_iter(const int64_t iter_idx) const
@@ -105,6 +108,7 @@ protected:
   ObDomainIdCmp domain_id_cmp_;
   ObFixedArray<ObDocIdExt, ObIAllocator> id_cache_;
   BMWStatus status_;
+  double external_threshold_ = 0.0;
 };
 
 

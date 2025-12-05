@@ -108,15 +108,17 @@ struct ObSparseRetrievalMergeParam
       filter_expr_(nullptr),
       topk_limit_(0),
       field_boost_(1.0),
-      max_batch_size_(1)
+      max_batch_size_(1),
+      min_score_threshold_(0.0)
   {}
   ~ObSparseRetrievalMergeParam() {}
   bool need_project_relevance() const { return relevance_proj_expr_ != nullptr; }
   bool need_filter() const { return filter_expr_ != nullptr; }
   bool need_pushdown_topk() const { return topk_limit_ > 0; }
+  bool has_min_score_threshold() const { return min_score_threshold_ > 0.0; }
   TO_STRING_KV(KPC_(dim_weights), KPC(limit_param_), KP_(eval_ctx),
       KP_(id_proj_expr), KP_(relevance_expr), KP_(relevance_proj_expr), KP_(filter_expr),
-      K_(topk_limit), K_(max_batch_size));
+      K_(topk_limit), K_(max_batch_size), K_(min_score_threshold));
   const ObIArray<double> *dim_weights_; // score weight for each dimension
   const common::ObLimitParam *limit_param_;
   sql::ObEvalCtx *eval_ctx_;
@@ -127,6 +129,7 @@ struct ObSparseRetrievalMergeParam
   int64_t topk_limit_;
   double field_boost_;
   int64_t max_batch_size_;
+  double min_score_threshold_;
 };
 
 class ObISparseRetrievalMergeIter
@@ -142,6 +145,9 @@ public:
   virtual int get_query_max_score(double &score) {
     return OB_NOT_SUPPORTED;
   }
+  // runtime tuning (optional, default no-op)
+  virtual int set_external_threshold(double) { return OB_SUCCESS; }
+  virtual int set_topk_limit_runtime(int64_t) { return OB_SUCCESS; }
   VIRTUAL_TO_STRING_KV(K_(input_row_cnt), K_(output_row_cnt));
 public:
   inline static void set_datum_int(ObDatum &datum, const sql::ObDocIdExt &id)

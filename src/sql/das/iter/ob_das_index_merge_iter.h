@@ -173,7 +173,15 @@ public:
       snapshot_(nullptr),
       is_reverse_(false),
       child_match_against_exprs_(),
-      result_buffer_()
+      result_buffer_(),
+      two_phase_enabled_(false),
+      phase1_limit_(0),
+      phase1_min_score_(0.0),
+      phase1_results_(),
+      phase2_results_(),
+      phase1_completed_(false),
+      phase2_started_(false),
+      fts_child_idx_(-1)
   {}
 
   virtual ~ObDASIndexMergeIter() {}
@@ -198,6 +206,12 @@ private:
   int intersect_get_next_rows(int64_t &count, int64_t capacity);
   int union_get_next_row();
   int union_get_next_rows(int64_t &count, int64_t capacity);
+  // Two-phase optimization methods
+  int union_get_next_rows_two_phase(int64_t &count, int64_t capacity);
+  int phase1_get_top_n_rows(int64_t &count, int64_t capacity);
+  int phase2_get_with_score_threshold(int64_t &count, int64_t capacity);
+  int merge_phase_results(int64_t &count, int64_t capacity);
+  double extract_match_score_from_row(int64_t fts_child_idx);
   int init_scan_param(const share::ObLSID &ls_id,
                       const common::ObTabletID &tablet_id,
                       const sql::ObDASScanCtDef *ctdef,
@@ -234,6 +248,16 @@ private:
   // only relevance score in fulltext search for now.
   common::ObFixedArray<ExprFixedArray, common::ObIAllocator> child_match_against_exprs_;
   MergeResultBuffer result_buffer_;
+  
+  // Two-phase optimization fields
+  bool two_phase_enabled_;           // Enable two-phase optimization for scalar-filtered fulltext search
+  int64_t phase1_limit_;             // Limit for phase 1 (default: LIMIT value * 2)
+  double phase1_min_score_;          // Minimum score from phase 1 results
+  common::ObArray<std::pair<double, int64_t>> phase1_results_;  // (score, row_idx) pairs from phase 1
+  common::ObArray<std::pair<double, int64_t>> phase2_results_;  // (score, row_idx) pairs from phase 2
+  bool phase1_completed_;            // Whether phase 1 has completed
+  bool phase2_started_;              // Whether phase 2 has started
+  int64_t fts_child_idx_;            // The index of TR child in index merge (if any)
 };
 
 }  // namespace sql

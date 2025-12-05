@@ -396,6 +396,12 @@ int ObSRDaaTIterImpl::filter_on_demand(const int64_t count, const double relevan
   ObEvalCtx *eval_ctx = iter_param_->eval_ctx_;
   ObEvalCtx::BatchInfoScopeGuard guard(*eval_ctx);
 
+  // Apply min score threshold first (works for non-topk/DAAT path as well)
+  if (iter_param_->has_min_score_threshold() && relevance < iter_param_->min_score_threshold_) {
+    need_project = false;
+    return ret;
+  }
+
   if (!iter_param_->need_filter()) {
     need_project = true;
   } else if (eval_ctx->is_vectorized()) {

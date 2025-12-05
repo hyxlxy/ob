@@ -11,6 +11,7 @@
 *.o
 *.orig
 *.patch
+ob-mldr-test/
 *.pyc
 *.pyc
 *.reject
