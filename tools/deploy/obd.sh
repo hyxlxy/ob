@@ -89,7 +89,7 @@ function mirror_create {
     echo $obs_version_info
     return 1
   fi
-  obs_version=$(echo "$obs_version_info" | grep -E "observer \(OceanBase([ \_]SeekDB)? ([.0-9]+)\)" | grep -Eo '([.0-9]+)')
+  obs_version=$(echo "$obs_version_info" | sed -nE 's/.*observer \(OceanBase(_CE)?([ _]SeekDB)? ([0-9.]+)\).*/\3/p' | head -n1); [[ "$obs_version" == "" ]] && obs_version=$(echo "$obs_version_info" | grep -Eo '([0-9]+\.){2,}[0-9]+' | head -n1)
   if [[ "$obs_version" == "" ]]
   then
     echo "can not check observer version"

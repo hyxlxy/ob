@@ -142,7 +142,7 @@ bash build.sh release -DOB_USE_CCACHE=ON --init --make -j3
 ./tools/deploy/obd.sh prepare -p /tmp/obtest
 
 ### 配置文件请参考下面 obcluster.yaml 示例
-./tools/deploy/obd.sh deploy -c /root/ob/data/obcluster3.yaml
+./tools/deploy/obd.sh deploy -c /root/ob/ob/data/obcluster3.yaml
 
 ## 连接 seekdb
 ./deps/3rd/u01/obclient/bin/obclient -h127.0.0.1 -P2881 -uroot -Dtest -A

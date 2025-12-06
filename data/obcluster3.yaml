@@ -4,6 +4,7 @@ seekdb:
       ip: 127.0.0.1
   server1:
     mysql_port: 2881
+    rpc_port: 2882
     home_path: /data/obcluster
     zone: zone1
     # The directory for data storage. The default value is home_path/store.
@@ -17,8 +18,8 @@ seekdb:
     production_mode: false
     devname: lo
     root_password: ""
-    memory_limit: "10G"
+    memory_limit: "2G"
     system_memory: "1G"
-    datafile_size: "20G"
-    cpu_count: "8"
+    datafile_size: "2G"
+    cpu_count: "2"
     __min_full_resource_pool_memory: "1073741824"
