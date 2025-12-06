@@ -18,6 +18,7 @@
 #include "sql/das/iter/ob_das_index_merge_iter.h"
 #include "src/sql/das/ob_das_attach_define.h"
 #include "sql/das/iter/sparse_retrieval/ob_das_tr_merge_iter.h"
+#include <algorithm>
 namespace oceanbase
 {
 using namespace common;
@@ -559,7 +560,9 @@ int ObDASIndexMergeIter::inner_reuse()
   phase1_completed_ = false;
   phase2_started_ = false;
   // Reset phase1 persistent pool
-  phase1_store_.reset();
+  phase1_rows_.reset();
+  phase1_scores_.reset();
+  phase1_docids_.reset();
   phase1_store_size_ = 0;
   phase1_used_.reset();
   phase1_sorted_built_ = false;
