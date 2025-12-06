@@ -259,13 +259,22 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
             LOG_WARN("failed to init merge result buffer", K(ret));
           } else {
             // Initialize two-phase optimization
-            // Enable two-phase optimization for scalar-filtered fulltext search
-            // Check if we have a fulltext index and scalar filters
-            two_phase_enabled_ = true;  // Can be controlled by a hint or parameter
-            phase1_limit_ = max_size_ * 2;  // Amplify the limit for phase 1
+            // Detect FT (Text Retrieval) child and enable two-phase only when present
+            fts_child_idx_ = -1;
+            for (int64_t i = 0; i < child_iters_.count(); ++i) {
+              if (OB_NOT_NULL(child_iters_.at(i)) &&
+                  child_iters_.at(i)->get_type() == ObDASIterType::DAS_ITER_TEXT_RETRIEVAL_MERGE) {
+                fts_child_idx_ = i;
+                break;
+              }
+            }
+            two_phase_enabled_ = (fts_child_idx_ >= 0);
+            // Can be further controlled by hint/variable; keep simple now
+            phase1_limit_ = max_size_ * 2;  // initial oversampling for phase1 buffer
             phase1_min_score_ = 0.0;
             phase1_completed_ = false;
             phase2_started_ = false;
+            LOG_TRACE("[IndexMerge] two-phase init", K(two_phase_enabled_), K_(fts_child_idx), K_(phase1_limit));
           }
         }
       }
@@ -549,6 +558,11 @@ int ObDASIndexMergeIter::inner_reuse()
   phase1_min_score_ = 0.0;
   phase1_completed_ = false;
   phase2_started_ = false;
+  // Reset phase1 persistent pool
+  phase1_store_.reset();
+  phase1_store_size_ = 0;
+  phase1_used_.reset();
+  phase1_sorted_built_ = false;
   return ret;
 }
 
@@ -887,7 +901,7 @@ int ObDASIndexMergeIter::union_get_next_rows(int64_t &count, int64_t capacity)
   count = 0;
   
   // Use two-phase optimization if enabled
-  if (two_phase_enabled_ && !phase1_completed_) {
+  if (two_phase_enabled_ && (!phase1_completed_ || phase2_started_)) {
     return union_get_next_rows_two_phase(count, capacity);
   }
   
@@ -1008,12 +1022,78 @@ int ObDASIndexMergeIter::union_get_next_rows_two_phase(int64_t &count, int64_t c
   }
   
   // Phase 2: Get results with score threshold from BM25 iterator
+  int64_t phase2_cnt = 0;
   if (phase2_started_ && phase1_completed_) {
-    if (OB_FAIL(phase2_get_with_score_threshold(count, capacity))) {
-      LOG_WARN("failed to run phase2 with score threshold", K(ret));
+    if (OB_FAIL(phase2_get_with_score_threshold(phase2_cnt, capacity))) {
+      if (OB_ITER_END != ret) {
+        LOG_WARN("failed to run phase2 with score threshold", K(ret));
+      } else {
+        ret = OB_SUCCESS; // exhausted BMW
+      }
     }
   }
-  
+
+  int64_t total_cnt = phase2_cnt;
+
+  // Supplement from phase1 if BMW produced less than capacity
+  if (OB_SUCC(ret) && phase2_cnt < capacity && phase1_store_size_ > 0) {
+    const int64_t need = capacity - phase2_cnt;
+    int64_t added = 0;
+    // build a simple dedup set from phase2 batch docids
+    auto exists_in_phase2 = [this](const ObString &docid) -> bool {
+      for (int64_t i = 0; i < phase2_batch_docids_.count(); ++i) {
+        if (phase2_batch_docids_.at(i) == docid) return true;
+      }
+      return false;
+    };
+    // sort phase1 by score only once
+    if (!phase1_sorted_built_) {
+      std::sort(phase1_results_.begin(), phase1_results_.end(),
+        [](const std::pair<double, int64_t> &a, const std::pair<double, int64_t> &b){ return a.first > b.first; });
+      phase1_sorted_built_ = true;
+    }
+    for (int64_t i = 0; OB_SUCC(ret) && i < phase1_results_.count() && added < need; ++i) {
+      const int64_t idx = phase1_results_.at(i).second;
+      if (idx < 0 || idx >= phase1_rows_.count()) { continue; }
+      if (idx < phase1_used_.count() && phase1_used_.at(idx)) { continue; }
+      if (idx < phase1_docids_.count() && exists_in_phase2(phase1_docids_.at(idx))) { continue; }
+      // materialize this phase1 row to output & buffer
+      ObChunkDatumStore::LastStoredRow *p = phase1_rows_.at(idx);
+      if (OB_ISNULL(p) || OB_ISNULL(p->store_row_)) { continue; }
+      {
+        ObEvalCtx::BatchInfoScopeGuard guard(*eval_ctx_);
+        guard.set_batch_size(1);
+        guard.set_batch_idx(0);
+        if (OB_FAIL(p->store_row_->to_expr<true>(*output_, *eval_ctx_))) {
+          LOG_WARN("phase1 supplement to_expr failed", K(ret));
+          break;
+        }
+      }
+      if (OB_FAIL(save_row_to_result_buffer())) {
+        LOG_WARN("save supplement row failed", K(ret));
+        break;
+      }
+      if (idx < phase1_used_.count()) {
+        phase1_used_.at(idx) = true;
+      }
+      ++added;
+    }
+    total_cnt += added;
+  }
+
+  // finalize
+  if (OB_SUCC(ret) && total_cnt > 0) {
+    if (OB_FAIL(result_buffer_.to_expr(total_cnt))) {
+      LOG_WARN("failed to convert result buffer to exprs (2phase)", K(ret));
+    }
+  } else if (0 == total_cnt) {
+    ret = OB_ITER_END;
+  }
+
+  count = total_cnt;
+  // clear phase2 batch docids for next call
+  phase2_batch_docids_.reset();
+
   return ret;
 }
 
@@ -1102,12 +1182,63 @@ int ObDASIndexMergeIter::phase1_get_top_n_rows(int64_t &count, int64_t capacity)
           if (score < phase1_min_score_ || phase1_min_score_ == 0.0) {
             phase1_min_score_ = score;
           }
-          if (OB_FAIL(phase1_results_.push_back(std::make_pair(score, count)))) {
-            LOG_WARN("failed to push phase1 result", K(ret));
-          } else if (OB_FAIL(save_row_to_result_buffer())) {
-            LOG_WARN("failed to save row to result buffer", K(ret));
+          // Persist current output row for later supplement
+          ObChunkDatumStore::LastStoredRow *p =
+              static_cast<ObChunkDatumStore::LastStoredRow*>(mem_ctx_->get_arena_allocator().alloc(sizeof(ObChunkDatumStore::LastStoredRow)));
+          if (OB_ISNULL(p)) {
+            ret = OB_ALLOCATE_MEMORY_FAILED;
+            LOG_WARN("alloc last stored row failed", K(ret));
           } else {
-            count += 1;
+            new (p) ObChunkDatumStore::LastStoredRow(mem_ctx_->get_arena_allocator());
+            p->reuse_ = true;
+            if (OB_FAIL(p->save_store_row(*output_, *eval_ctx_))) {
+              LOG_WARN("save store row failed", K(ret));
+            }
+          }
+          if (OB_SUCC(ret)) {
+            if (phase1_used_.get_data() == nullptr) {
+              phase1_used_.set_allocator(&mem_ctx_->get_arena_allocator());
+              (void)phase1_used_.init(16);
+            }
+            if (OB_NOT_NULL(p)) {
+              if (OB_FAIL(phase1_rows_.push_back(p))) {
+                LOG_WARN("push phase1 row failed", K(ret));
+              }
+            }
+            if (OB_SUCC(ret)) {
+              if (OB_FAIL(phase1_scores_.push_back(score))) {
+                LOG_WARN("push phase1 score failed", K(ret));
+              } else if (OB_FAIL(phase1_used_.push_back(false))) {
+                LOG_WARN("push phase1 used flag failed", K(ret));
+              } else if (OB_FAIL(phase1_results_.push_back(std::make_pair(score, phase1_rows_.count() - 1)))) {
+                LOG_WARN("failed to push phase1 result", K(ret));
+              } else {
+                ++phase1_store_size_;
+              }
+            }
+          }
+          if (OB_SUCC(ret)) {
+            // extract and persist docid for dedup
+            ObString docid;
+            if (OB_FAIL(extract_docid_from_output(docid))) {
+              LOG_WARN("extract docid failed", K(ret));
+            } else if (OB_FAIL(phase1_docids_.push_back(docid))) {
+              LOG_WARN("push phase1 docid failed", K(ret));
+            }
+            if (OB_SUCC(ret)) {
+              if (OB_FAIL(save_row_to_result_buffer())) {
+                LOG_WARN("failed to save row to result buffer", K(ret));
+              } else {
+                // mark used in phase1
+                if (phase1_rows_.count() > 0) {
+                  const int64_t idx_mark = phase1_rows_.count() - 1;
+                  if (idx_mark >= 0 && idx_mark < phase1_used_.count()) {
+                    phase1_used_.at(idx_mark) = true;
+                  }
+                }
+                count += 1;
+              }
+            }
           }
         }
       }
@@ -1143,58 +1274,135 @@ int ObDASIndexMergeIter::phase2_get_with_score_threshold(int64_t &count, int64_t
     return OB_ITER_END;
   }
 
-  // Enlarge topk to mitigate post-filter loss; use 2x phase1_limit_ or 4x capacity
+  // Adaptive over-sampling
   int64_t nprime = phase1_limit_ > 0 ? (phase1_limit_ * 2) : (capacity * 4);
   if (nprime <= 0) { nprime = capacity; }
-  (void)tr_merge->set_runtime_topk_limit(nprime);
+  const double growth = 1.5;
+  const int64_t max_candidates = 100000; // hard cap
+
   (void)tr_merge->set_min_score_threshold(phase1_min_score_);
 
-  // Pull a batch from TR child and project as our results
-  int64_t child_rows_cnt = 0;
-  if (OB_FAIL(fts_child->get_next_rows(child_rows_cnt, nprime))) {
-    if (OB_ITER_END != ret) {
-      LOG_WARN("phase2 fts child get_next_rows failed", K(ret));
-    } else {
-      ret = OB_SUCCESS;
-    }
-  }
+  int64_t total_examined = 0;
+  int64_t produced_in_this_call = 0;
 
-  if (OB_SUCC(ret) && child_rows_cnt > 0) {
+  while (OB_SUCC(ret) && count < capacity && total_examined < max_candidates) {
+    const int64_t pull = MIN(nprime, max_candidates - total_examined);
+    (void)tr_merge->set_runtime_topk_limit(pull);
+
+    int64_t child_rows_cnt = 0;
+    if (OB_FAIL(fts_child->get_next_rows(child_rows_cnt, pull))) {
+      if (OB_ITER_END != ret) {
+        LOG_WARN("phase2 fts child get_next_rows failed", K(ret));
+      } else {
+        ret = OB_SUCCESS; // treat as exhausted
+      }
+    }
+
+    if (child_rows_cnt <= 0) {
+      break; // no more candidates from BMW
+    }
+
+    total_examined += child_rows_cnt;
+
     IndexMergeRowStore &fts_store = child_stores_.at(fts_child_idx_);
     if (OB_FAIL(fts_store.save(true, child_rows_cnt))) {
       LOG_WARN("failed to save fts child rows", K(ret));
-    } else {
-      // For each row from TR child, project default values for non-fts children and emit
-      for (int64_t i = 0; OB_SUCC(ret) && i < child_rows_cnt && count < capacity; ++i) {
-        bool need_fill_default = false;
-        for (int64_t c = 0; OB_SUCC(ret) && c < child_stores_.count(); ++c) {
-          need_fill_default = (c != fts_child_idx_);
-          if (c == fts_child_idx_) {
-            if (OB_FAIL(fts_store.to_expr())) {
-              LOG_WARN("failed to convert fts store row to expr", K(ret));
-            }
-          } else {
-            if (OB_FAIL(fill_default_values_for_union(child_match_against_exprs_.at(c)))) {
-              LOG_WARN("failed to fill default values for union (phase2)", K(ret), K(c));
+      break;
+    }
+
+    for (int64_t i = 0; OB_SUCC(ret) && i < child_rows_cnt && count < capacity; ++i) {
+      // set pivot to i-th FT row
+      fts_store.cur_idx_ = i;
+      bool all_matched = true;
+      int64_t pivot_idx = fts_child_idx_;
+      int cmp_ret = 0;
+      for (int64_t c = 0; OB_SUCC(ret) && c < child_stores_.count() && all_matched; ++c) {
+        if (c == fts_child_idx_) { continue; }
+        IndexMergeRowStore &child_store = child_stores_.at(c);
+        // advance child until >= pivot, or exhaust
+        while (OB_SUCC(ret)) {
+          if (!child_store.have_data()) {
+            if (child_store.iter_end_) { all_matched = false; break; }
+            int64_t got = 0;
+            ObDASIter *child_iter = child_iters_.at(c);
+            if (OB_ISNULL(child_iter)) { ret = OB_ERR_UNEXPECTED; LOG_WARN("null child iter", K(c)); break; }
+            if (OB_FAIL(child_iter->get_next_rows(got, 1))) {
+              if (OB_ITER_END == ret) { child_store.iter_end_ = true; ret = OB_SUCCESS; all_matched = false; }
+              else { LOG_WARN("child get_next_rows failed", K(ret)); }
+              break;
+            } else if (got <= 0) {
+              child_store.iter_end_ = true; all_matched = false; break;
+            } else if (OB_FAIL(child_store.save(true, got))) {
+              LOG_WARN("save child rows failed", K(ret));
+              break;
             }
           }
-        }
-        if (OB_SUCC(ret)) {
-          if (OB_FAIL(save_row_to_result_buffer())) {
-            LOG_WARN("failed to save row to result buffer (phase2)", K(ret));
+          // compare child current vs pivot (freeze pivot index)
+          int64_t tmp_idx = pivot_idx;
+          if (OB_FAIL(compare(c, tmp_idx, cmp_ret))) { LOG_WARN("compare failed", K(ret), K(c), K(pivot_idx)); break; }
+          if (cmp_ret == 0) {
+            break; // this child matched
+          } else if (cmp_ret < 0) {
+            // child < pivot, advance child cursor
+            child_store.cur_idx_++;
           } else {
-            ++count;
+            // child > pivot, cannot match
+            all_matched = false; break;
           }
         }
       }
+
+      phase2_examined_++;
+      if (!all_matched) {
+        phase2_filtered_out_++;
+        continue; // skip this FT row, move to next i
+      }
+
+      // project FT row
+      if (OB_FAIL(fts_store.to_expr())) {
+        LOG_WARN("failed to convert fts store row to expr", K(ret));
+      }
+      // fill defaults for non-FT children (only relevance for now)
+      for (int64_t c = 0; OB_SUCC(ret) && c < child_stores_.count(); ++c) {
+        if (c == fts_child_idx_) continue;
+        if (OB_FAIL(fill_default_values_for_union(child_match_against_exprs_.at(c)))) {
+          LOG_WARN("failed to fill default values for union (phase2)", K(ret), K(c));
+        }
+      }
+      // extract and record docid for dedup in supplement
+      if (OB_SUCC(ret)) {
+        ObString docid;
+        if (OB_FAIL(extract_docid_from_output(docid))) {
+          LOG_WARN("extract phase2 docid failed", K(ret));
+        } else if (!docid.empty()) {
+          if (OB_FAIL(phase2_batch_docids_.push_back(docid))) {
+            LOG_WARN("push phase2 docid failed", K(ret));
+          }
+        }
+      }
+      if (OB_SUCC(ret)) {
+        if (OB_FAIL(save_row_to_result_buffer())) {
+          LOG_WARN("failed to save row to result buffer (phase2)", K(ret));
+        } else {
+          ++count;
+          ++produced_in_this_call;
+        }
+      }
+    }
+
+    if (count < capacity) {
+      // not enough, increase nprime and continue pulling if candidates remain
+      nprime = static_cast<int64_t>(nprime * growth);
+      if (nprime <= 0) nprime = capacity; // guard overflow
     }
   }
 
-  if (OB_SUCC(ret) && count > 0) {
-    if (OB_FAIL(result_buffer_.to_expr(count))) {
-      LOG_WARN("failed to convert result buffer to exprs (phase2)", K(ret));
-    }
-  } else if (count == 0) {
+  LOG_TRACE("[IndexMerge][Phase2] stats", K(count), K(capacity), K(total_examined), K_(phase2_examined), K_(phase2_filtered_out));
+
+  // Do not finalize result buffer here; leave to caller for possible supplement merge
+  if (count == 0) {
+    // Exhausted FT candidates; disable two-phase and let normal union path continue in subsequent calls
+    two_phase_enabled_ = false;
     ret = OB_ITER_END;
   }
 
@@ -1249,6 +1457,24 @@ double ObDASIndexMergeIter::extract_match_score_from_row(int64_t fts_child_idx)
     }
   }
   return score;
+}
+
+int ObDASIndexMergeIter::extract_docid_from_output(common::ObString &docid)
+{
+  int ret = OB_SUCCESS;
+  docid.reset();
+  if (OB_ISNULL(output_) || output_->count() <= 0 || OB_ISNULL(output_->at(0))) {
+    ret = OB_ERR_UNEXPECTED;
+  } else {
+    ObExpr *first = output_->at(0);
+    ObDatum &d = first->locate_expr_datum(*eval_ctx_);
+    if (!d.is_null() && first->datum_meta_.type_ == ObVarcharType) {
+      if (OB_FAIL(ob_write_string(mem_ctx_->get_arena_allocator(), d.get_string(), docid))) {
+        // keep ret
+      }
+    }
+  }
+  return ret;
 }
 
 

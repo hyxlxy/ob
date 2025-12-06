@@ -19,6 +19,7 @@
 
 #include "sql/das/iter/ob_das_iter.h"
 #include "sql/optimizer/ob_join_order.h"
+#include "lib/hash/ob_hashset.h"
 
 namespace oceanbase
 {
@@ -181,7 +182,11 @@ public:
       phase2_results_(),
       phase1_completed_(false),
       phase2_started_(false),
-      fts_child_idx_(-1)
+      fts_child_idx_(-1),
+      phase1_store_size_(0),
+      phase1_sorted_built_(false),
+      phase2_examined_(0),
+      phase2_filtered_out_(0)
   {}
 
   virtual ~ObDASIndexMergeIter() {}
@@ -212,6 +217,7 @@ private:
   int phase2_get_with_score_threshold(int64_t &count, int64_t capacity);
   int merge_phase_results(int64_t &count, int64_t capacity);
   double extract_match_score_from_row(int64_t fts_child_idx);
+  int extract_docid_from_output(common::ObString &docid);
   int init_scan_param(const share::ObLSID &ls_id,
                       const common::ObTabletID &tablet_id,
                       const sql::ObDASScanCtDef *ctdef,
@@ -258,6 +264,20 @@ private:
   bool phase1_completed_;            // Whether phase 1 has completed
   bool phase2_started_;              // Whether phase 2 has started
   int64_t fts_child_idx_;            // The index of TR child in index merge (if any)
+  // Phase1 persistent pool for supplement
+  common::ObFixedArray<bool, common::ObIAllocator> phase1_used_;
+  common::ObArray<ObChunkDatumStore::LastStoredRow*> phase1_rows_;
+  common::ObArray<double> phase1_scores_;
+  common::ObArray<common::ObString> phase1_docids_;
+  int64_t phase1_store_size_;
+  bool phase1_sorted_built_;
+  // Temp buffers for a phase2 batch
+  common::ObArray<ObChunkDatumStore::LastStoredRow*> phase2_batch_rows_;
+  common::ObArray<common::ObString> phase2_batch_docids_;
+  common::ObArray<double> phase2_batch_scores_;
+  // Stats for observability
+  int64_t phase2_examined_;
+  int64_t phase2_filtered_out_;
 };
 
 }  // namespace sql
