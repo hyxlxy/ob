@@ -51,7 +51,12 @@ protected:
   int evaluate_pivot_range(const int64_t pivot_iter_idx, bool &is_candidate);
   double get_top_k_threshold()
   {
-    return top_k_heap_.empty() ? 0.0 : top_k_heap_.top().relevance_;
+    double heap_threshold = top_k_heap_.empty() ? 0.0 : top_k_heap_.top().relevance_;
+    if (has_external_min_score_) {
+      return heap_threshold > external_min_score_ ? heap_threshold : external_min_score_;
+    } else {
+      return heap_threshold;
+    }
   }
 
 private:
@@ -105,6 +110,11 @@ protected:
   ObDomainIdCmp domain_id_cmp_;
   ObFixedArray<ObDocIdExt, ObIAllocator> id_cache_;
   BMWStatus status_;
+  // optional external threshold fed from upper layer (e.g. baseline top-N min score).
+  // when has_external_min_score_ is true, BMW top-k search can use external_min_score_
+  // as an initial lower bound for pruning.
+  double external_min_score_;
+  bool has_external_min_score_;
 };
 
 

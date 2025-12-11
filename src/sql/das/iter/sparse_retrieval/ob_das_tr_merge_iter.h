@@ -47,7 +47,9 @@ struct ObDASTRMergeIterParam : public ObDASIterParam
       dim_weights_(),
       max_batch_size_(0),
       boolean_compute_node_(nullptr),
-      flags_(0)
+      flags_(0),
+      external_min_score_(0.0),
+      has_external_min_score_(false)
   {}
 
   virtual bool is_valid() const override
@@ -73,6 +75,9 @@ struct ObDASTRMergeIterParam : public ObDASIterParam
     };
     uint32_t flags_;
   };
+  // optional external minimum score propagated down to sparse retrieval merge param
+  double external_min_score_;
+  bool has_external_min_score_;
 };
 
 class ObDASTRMergeIter : public ObDASIter

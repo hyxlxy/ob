@@ -76,6 +76,9 @@ int ObDASTRMergeIter::inner_init(ObDASIterParam &param)
     snapshot_ = merge_param.snapshot_;
     boolean_compute_node_ = merge_param.boolean_compute_node_;
     flags_ = merge_param.flags_;
+    // external_min_score_ 将在创建 sparse retrieval 参数时继续下传
+    sr_iter_param_.external_min_score_ = merge_param.external_min_score_;
+    sr_iter_param_.has_external_min_score_ = merge_param.has_external_min_score_;
     for (int64_t i = 0; OB_SUCC(ret) && i < merge_param.query_tokens_.count(); ++i) {
       if (OB_FAIL(query_tokens_.push_back(merge_param.query_tokens_.at(i)))) {
         LOG_WARN("failed to push back query token", K(ret));

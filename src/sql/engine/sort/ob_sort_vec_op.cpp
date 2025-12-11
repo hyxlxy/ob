@@ -40,8 +40,18 @@ OB_SERIALIZE_MEMBER((ObSortVecSpec, ObOpSpec), topn_expr_, topk_limit_expr_, top
                     pd_topn_filter_info_, enable_single_col_compare_opt_);
 
 ObSortVecOp::ObSortVecOp(ObExecContext &ctx_, const ObOpSpec &spec, ObOpInput *input) :
-  ObOperator(ctx_, spec, input), sort_op_provider_(op_monitor_info_), sort_row_count_(0),
-  is_first_(true), ret_row_count_(0), sk_row_store_(), addon_row_store_(), sk_row_iter_(),
+  ObOperator(ctx_, spec, input),
+  sort_op_provider_(op_monitor_info_),
+  sort_row_count_(0),
+  is_first_(true),
+  ret_row_count_(0),
+  tp_baseline_inited_(false),
+  tp_baseline_limit_(0),
+  tp_baseline_seen_rows_(0),
+  tp_baseline_min_score_(0.0),
+  sk_row_store_(),
+  addon_row_store_(),
+  sk_row_iter_(),
   addon_row_iter_()
 {}
 
@@ -70,6 +80,10 @@ void ObSortVecOp::reset()
   sort_row_count_ = 0;
   ret_row_count_ = 0;
   is_first_ = true;
+  tp_baseline_inited_ = false;
+  tp_baseline_limit_ = 0;
+  tp_baseline_seen_rows_ = 0;
+  tp_baseline_min_score_ = 0.0;
   sk_row_iter_.reset();
   addon_row_iter_.reset();
   sk_row_store_.reset();
@@ -454,6 +468,12 @@ int ObSortVecOp::inner_get_next_batch(const int64_t max_row_cnt)
       LOG_WARN("failed to init batch sort", K(ret));
     } else if (OB_FAIL(process_sort_batch())) {
       LOG_WARN("process sort failed", K(ret));
+    } else if (topn_cnt > 0 && topn_cnt < INT64_MAX) {
+      // 初始化两阶段 baseline 统计，仅记录前 topn_cnt 行的最小得分
+      tp_baseline_inited_ = true;
+      tp_baseline_limit_ = topn_cnt;
+      tp_baseline_seen_rows_ = 0;
+      tp_baseline_min_score_ = 0.0;
     }
   }
 
@@ -462,6 +482,31 @@ int ObSortVecOp::inner_get_next_batch(const int64_t max_row_cnt)
     if (OB_FAIL(sort_component_next_batch(std::min(max_row_cnt, MY_SPEC.max_batch_size_)))) {
       LOG_WARN("get next row failed");
     } else {
+      // 统计前 top-N 行的最小 _score（假设第一个 sort key 即为全文得分列）
+      if (tp_baseline_inited_ && tp_baseline_seen_rows_ < tp_baseline_limit_) {
+        if (!MY_SPEC.sk_exprs_.empty()) {
+          ObExpr *score_expr = MY_SPEC.sk_exprs_.at(0);
+          ObIVector *vec = nullptr;
+          if (OB_ISNULL(score_expr) || OB_ISNULL(vec = score_expr->get_vector(eval_ctx_))) {
+            // do nothing
+          } else {
+            const int64_t rows = brs_.size_;
+            for (int64_t i = 0;
+                 i < rows && tp_baseline_seen_rows_ < tp_baseline_limit_;
+                 ++i) {
+              if (!brs_.skip_->at(i) && !vec->is_null(i)) {
+                const double score = vec->get_double(i);
+                if (tp_baseline_seen_rows_ == 0) {
+                  tp_baseline_min_score_ = score;
+                } else if (score < tp_baseline_min_score_) {
+                  tp_baseline_min_score_ = score;
+                }
+                ++tp_baseline_seen_rows_;
+              }
+            }
+          }
+        }
+      }
       ret_row_count_ += brs_.size_;
       if (brs_.end_) {
         if (ctx_.get_my_session()->get_ddl_info().is_ddl() && ret_row_count_ != sort_row_count_) {

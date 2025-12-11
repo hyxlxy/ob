@@ -113,6 +113,13 @@ private:
   int64_t sort_row_count_;
   bool is_first_;
   int64_t ret_row_count_;
+  // two-phase FTS top-N baseline stats (experimental, currently only used to
+  // collect the first top-N rows' minimum score; it does NOT change output
+  // behaviour).
+  bool tp_baseline_inited_;
+  int64_t tp_baseline_limit_;
+  int64_t tp_baseline_seen_rows_;
+  double tp_baseline_min_score_;
   ObTempRowStore sk_row_store_;
   ObTempRowStore addon_row_store_;
   ObTempRowStore::Iterator sk_row_iter_;

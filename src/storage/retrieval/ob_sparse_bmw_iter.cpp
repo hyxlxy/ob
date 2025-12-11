@@ -32,7 +32,9 @@ ObSRBMWIterImpl::ObSRBMWIterImpl()
     top_k_count_(0),
     domain_id_cmp_(),
     id_cache_(),
-    status_(BMWStatus::MAX_STATUS)
+    status_(BMWStatus::MAX_STATUS),
+    external_min_score_(0.0),
+    has_external_min_score_(false)
 {}
 
 int ObSRBMWIterImpl::init(
@@ -54,6 +56,9 @@ int ObSRBMWIterImpl::init(
   } else {
     top_k_count_ = iter_param.topk_limit_;
     status_ = BMWStatus::MAX_STATUS;
+    // record optional external threshold for later pruning
+    external_min_score_ = iter_param.external_min_score_;
+    has_external_min_score_ = iter_param.has_external_min_score_;
     id_cache_.set_allocator(&allocator_);
     if (OB_FAIL(domain_id_cmp_.init(iter_param.id_proj_expr_->obj_meta_))) {
       LOG_WARN("failed to init domain id cmp", K(ret));
@@ -75,6 +80,7 @@ void ObSRBMWIterImpl::reuse(const bool switch_tablet)
     top_k_heap_.pop();
   }
   status_ = BMWStatus::MAX_STATUS;
+  has_external_min_score_ = false;
   ObSRDaaTIterImpl::reuse(switch_tablet);
 }
 
@@ -86,6 +92,8 @@ void ObSRBMWIterImpl::reset()
   domain_id_cmp_.reset();
   id_cache_.reset();
   allocator_.reset();
+  external_min_score_ = 0.0;
+  has_external_min_score_ = false;
 }
 
 int ObSRBMWIterImpl::get_next_rows(const int64_t capacity, int64_t &count)

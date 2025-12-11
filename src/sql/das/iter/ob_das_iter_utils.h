@@ -348,6 +348,22 @@ private:
                                             transaction::ObTxReadSnapshot *snapshot,
                                             ObDASIter *&retrieval_result);
 
+  // BMW-only text retrieval subtree helper:
+  // build a pure inverted-index-side text retrieval tree whose root is ObDASTRMergeIter
+  // in TOPK (BMW) mode. This helper is intended for two-phase TOP-N optimization and
+  // does NOT attach any lookup / index merge nodes. The external_min_score parameter
+  // can later be propagated into sparse retrieval merge params to act as an initial
+  // score threshold for BMW.
+  static int create_bmw_text_retrieval_sub_tree(const ObLSID &ls_id,
+                                                common::ObIAllocator &alloc,
+                                                const ObDASIRScanCtDef *ir_scan_ctdef,
+                                                ObDASIRScanRtDef *ir_scan_rtdef,
+                                                const ObDASFTSTabletID &related_tablet_ids,
+                                                transaction::ObTxDesc *trans_desc,
+                                                transaction::ObTxReadSnapshot *snapshot,
+                                                const double external_min_score,
+                                                ObDASIter *&retrieval_result);
+
   static int create_match_sub_tree(ObTableScanParam &scan_param,
                                    common::ObIAllocator &alloc,
                                    const ObDASIREsScoreCtDef *match_ctdef,

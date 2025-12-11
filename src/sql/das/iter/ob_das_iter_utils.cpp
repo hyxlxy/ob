@@ -1860,6 +1860,127 @@ int ObDASIterUtils::create_text_retrieval_sub_tree(
   return ret;
 }
 
+int ObDASIterUtils::create_bmw_text_retrieval_sub_tree(
+    const ObLSID &ls_id,
+    common::ObIAllocator &alloc,
+    const ObDASIRScanCtDef *ir_scan_ctdef,
+    ObDASIRScanRtDef *ir_scan_rtdef,
+    const ObDASFTSTabletID &related_tablet_ids,
+    transaction::ObTxDesc *trans_desc,
+    transaction::ObTxReadSnapshot *snapshot,
+    const double external_min_score,
+    ObDASIter *&retrieval_result)
+{
+  // Note: for now we mostly reuse create_text_retrieval_sub_tree's logic,
+  // but we force TOPK (BMW) mode at DAS level regardless of has_pushdown_topk().
+  // External_min_score will be wired into sparse retrieval merge params in a later step.
+  int ret = OB_SUCCESS;
+  ObDASTRMergeIterParam merge_iter_param;
+  bool has_duplicate_boolean_tokens = false;
+  ObDASTRMergeIter *tr_merge_iter = nullptr;
+  merge_iter_param.max_size_ = ir_scan_rtdef->eval_ctx_->is_vectorized()
+      ? ir_scan_rtdef->eval_ctx_->max_batch_size_
+      : 1;
+  merge_iter_param.eval_ctx_ = ir_scan_rtdef->eval_ctx_;
+  merge_iter_param.exec_ctx_ = &ir_scan_rtdef->eval_ctx_->exec_ctx_;
+  merge_iter_param.output_ = &ir_scan_ctdef->result_output_;
+  merge_iter_param.ir_ctdef_ = ir_scan_ctdef;
+  merge_iter_param.ir_rtdef_ = ir_scan_rtdef;
+  merge_iter_param.tx_desc_ = trans_desc;
+  merge_iter_param.snapshot_ = snapshot;
+  merge_iter_param.max_batch_size_ = merge_iter_param.max_size_;
+  merge_iter_param.flags_ = 0;
+
+  if (0 != merge_iter_param.query_tokens_.count()) {
+    merge_iter_param.query_tokens_.reuse();
+  }
+  if (OB_FAIL(ObDASTRMergeIter::build_query_tokens(ir_scan_ctdef, ir_scan_rtdef, alloc,
+                                                   merge_iter_param.query_tokens_,
+                                                   merge_iter_param.dim_weights_,
+                                                   merge_iter_param.boolean_compute_node_,
+                                                   has_duplicate_boolean_tokens))) {
+    LOG_WARN("failed to get query tokens for text retrieval", K(ret));
+  } else {
+    // For BMW-only subtree, we always run in TOPK + DaaT mode from DAS perspective.
+    merge_iter_param.function_lookup_mode_ = 0;
+    merge_iter_param.topk_mode_ = 1;
+    merge_iter_param.daat_mode_ = 1;
+    merge_iter_param.taat_mode_ = 0;
+    merge_iter_param.external_min_score_ = external_min_score;
+    merge_iter_param.has_external_min_score_ = true;
+  }
+
+  if (FAILEDx(create_das_iter(alloc, merge_iter_param, tr_merge_iter))) {
+    LOG_WARN("failed to create text retrieval merge iter (BMW-only)", K(ret));
+  }
+
+  ObSEArray<ObDASIter *, 16> iters;
+  const int64_t size = merge_iter_param.taat_mode_ ? 1 : merge_iter_param.query_tokens_.count();
+  // inverted index scan iters
+  for (int64_t i = 0; OB_SUCC(ret) && i < size; ++i) {
+    ObDASScanIterParam inv_idx_scan_iter_param;
+    ObDASScanIter *inv_idx_scan_iter = nullptr;
+    init_scan_iter_param(inv_idx_scan_iter_param, ir_scan_ctdef->get_inv_idx_scan_ctdef(), ir_scan_rtdef);
+    inv_idx_scan_iter_param.max_size_ = ir_scan_rtdef->eval_ctx_->max_batch_size_;
+    if (OB_FAIL(create_das_iter(alloc, inv_idx_scan_iter_param, inv_idx_scan_iter))) {
+      LOG_WARN("failed to create inv idx iter", K(ret));
+    } else {
+      iters.push_back(inv_idx_scan_iter);
+    }
+  }
+
+  // optional inv idx agg iters
+  for (int64_t i = 0; ir_scan_ctdef->need_inv_idx_agg() && OB_SUCC(ret) && i < size; ++i) {
+    ObDASScanIterParam inv_idx_agg_iter_param;
+    ObDASScanIter *inv_idx_agg_iter = nullptr;
+    init_scan_iter_param(inv_idx_agg_iter_param, ir_scan_ctdef->get_inv_idx_agg_ctdef(), ir_scan_rtdef);
+    if (OB_FAIL(create_das_iter(alloc, inv_idx_agg_iter_param, inv_idx_agg_iter))) {
+      LOG_WARN("failed to create inv idx agg iter", K(ret));
+    } else {
+      iters.push_back(inv_idx_agg_iter);
+    }
+  }
+
+  // optional fwd idx agg iters
+  for (int64_t i = 0; ir_scan_ctdef->need_fwd_idx_agg() && OB_SUCC(ret) && i < size; ++i) {
+    ObDASScanIterParam fwd_idx_iter_param;
+    ObDASScanIter *fwd_idx_iter = nullptr;
+    init_scan_iter_param(fwd_idx_iter_param, ir_scan_ctdef->get_fwd_idx_agg_ctdef(), ir_scan_rtdef);
+    if (OB_FAIL(create_das_iter(alloc, fwd_idx_iter_param, fwd_idx_iter))) {
+      LOG_WARN("failed to create fwd idx iter", K(ret));
+    } else {
+      iters.push_back(fwd_idx_iter);
+    }
+  }
+
+  // optional doc count agg iter
+  if (OB_FAIL(ret)) {
+  } else if (size > 0 && !ir_scan_ctdef->need_estimate_total_doc_cnt()) {
+    ObDASScanIterParam doc_cnt_agg_param;
+    ObDASScanIter *doc_cnt_agg_iter = nullptr;
+    init_scan_iter_param(doc_cnt_agg_param, ir_scan_ctdef->get_doc_agg_ctdef(), ir_scan_rtdef);
+    doc_cnt_agg_param.max_size_ = ir_scan_rtdef->eval_ctx_->max_batch_size_;
+    if (OB_FAIL(create_das_iter(alloc, doc_cnt_agg_param, doc_cnt_agg_iter))) {
+      LOG_WARN("failed to create doc cnt agg iter", K(ret));
+    } else {
+      iters.push_back(doc_cnt_agg_iter);
+    }
+  }
+
+  if (OB_FAIL(ret)) {
+  } else if (iters.count() > 0 && OB_FAIL(create_iter_children_array(iters.count(), alloc, tr_merge_iter))) {
+    LOG_WARN("failed to alloc text retrieval merge iter children (BMW-only)", K(ret), K(iters.count()));
+  } else {
+    ObDASIter **&tr_merge_children = tr_merge_iter->get_children();
+    for (int64_t i = 0; i < iters.count(); ++i) {
+      tr_merge_children[i] = iters.at(i);
+    }
+    tr_merge_iter->set_related_tablet_ids(ls_id, related_tablet_ids);
+    retrieval_result = tr_merge_iter;
+  }
+  return ret;
+}
+
 int ObDASIterUtils::create_doc_id_scan_sub_tree(
     ObTableScanParam &scan_param,
     common::ObIAllocator &alloc,
