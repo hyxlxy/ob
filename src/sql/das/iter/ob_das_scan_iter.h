@@ -63,11 +63,11 @@ public:
   common::ObNewRowIterator *&get_output_result_iter() { return result_; }
 
   void set_scan_param(storage::ObTableScanParam &scan_param) {
-    // adlog::DEBUG("ObDASScanIter set_scan_param");
+    // //adlog::DEBUG("ObDASScanIter set_scan_param");
     scan_param_ = &scan_param;
   }
   storage::ObTableScanParam &get_scan_param() {
-    adlog::DEBUG("ObDASScanIter get_scan_param");
+    //adlog::DEBUG("ObDASScanIter get_scan_param");
     return *scan_param_;
   }
 

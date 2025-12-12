@@ -767,7 +767,7 @@ OB_INLINE int ObTableScanOp::create_one_das_task(ObDASTabletLoc *tablet_loc)
   int ret = OB_SUCCESS;
   ObDASScanOp *scan_op = nullptr;
   bool reuse_das_op = false;
-  // adlog::DEBUG("ObTableScanOp::create_one_das_task");
+  // //adlog::DEBUG("ObTableScanOp::create_one_das_task");
   if (OB_ISNULL(scan_iter_)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("unexpected nullptr scan iter", K(ret));
@@ -1654,7 +1654,7 @@ int ObTableScanOp::inner_open() {
   // if (first_flag == false) {
   //   first_flag = true;
   //   // std::cout<<"OB_TABLE_SCAN_OP: inner_open"<<std::endl;
-    // adlog::DEBUG("OB_TABLE_SCAN_OP: inner_open");
+    // //adlog::DEBUG("OB_TABLE_SCAN_OP: inner_open");
   // }
   int ret = OB_SUCCESS;
   DASTableLocList &table_locs = ctx_.get_das_ctx().get_table_loc_list();
@@ -1744,13 +1744,13 @@ int ObTableScanOp::inner_open() {
 
   if (output_->get_type() == ObDASIterType::DAS_ITER_MERGE) {
     // 代表下面这一层是DasMergeIter
-    // adlog::DEBUG("output_->get_type() == ObDASIterType::DAS_ITER_MERGE true");
+    // //adlog::DEBUG("output_->get_type() == ObDASIterType::DAS_ITER_MERGE true");
     if (auto &&output = dynamic_cast<ObDASMergeIter*>(output_)) {
-      // adlog::DEBUG("output set parendt filters ");
+      // //adlog::DEBUG("output set parendt filters ");
       // output->parent_filters_ = *MY_SPEC.filters_;
       int ret = output->parent_filters_.assign(MY_SPEC.filters_);
       if (OB_FAIL(ret)) {
-        adlog::DEBUG("pushdown error from tableScanOp to DasMergeIter");
+        //adlog::DEBUG("pushdown error from tableScanOp to DasMergeIter");
       }
     }
     //MY_SPEC.filters_
@@ -1767,7 +1767,7 @@ int ObTableScanOp::inner_open() {
   //         LOG_WARN("fail to prepare scan range", K(ret));
   //     } else {
   //         // 现在 MY_INPUT.key_ranges_ 应该被填充了
-  //         adlog::DEBUG("After prepare_scan_range, key_ranges count: ", MY_INPUT.key_ranges_.count());
+  //         //adlog::DEBUG("After prepare_scan_range, key_ranges count: ", MY_INPUT.key_ranges_.count());
   //     }
   // }
     // 🔥 在 inner_open 的最后，手动调用 prepare_scan_range 来提取范围
@@ -1775,7 +1775,7 @@ int ObTableScanOp::inner_open() {
       if (OB_FAIL(prepare_scan_range())) {
           LOG_WARN("fail to prepare scan range", K(ret));
       } else {
-          adlog::DEBUG("After prepare_scan_range, key_ranges count: ", MY_INPUT.key_ranges_.count());
+          //adlog::DEBUG("After prepare_scan_range, key_ranges count: ", MY_INPUT.key_ranges_.count());
           
           // 🔥 保存范围到备份数组，防止被 reuse() 清空
           if (!MY_INPUT.key_ranges_.empty()) {
@@ -1806,7 +1806,7 @@ int ObTableScanOp::inner_open() {
                               cached_min_pk_val_ = INT64_MIN;
                           }
                           
-                          adlog::DEBUG("Extracted PK range: [", cached_min_pk_val_, ", ", cached_max_pk_val_, ")");
+                          //adlog::DEBUG("Extracted PK range: [", cached_min_pk_val_, ", ", cached_max_pk_val_, ")");
                           has_initialized_pk_range_ = true;
                           break;
                       }
@@ -2441,15 +2441,15 @@ int ObTableScanOp::get_next_batch_with_das(int64_t &count, int64_t capacity)
         static int count1 = 0;
         count1++;
         if(count1 == 1) {
-          adlog::DEBUG("MY_SPEC filter is empty");
+          //adlog::DEBUG("MY_SPEC filter is empty");
         }
       }
       else{
-        adlog::DEBUG("MY_SEPC filter size: ", MY_SPEC.filters_.count()," count: ",count);
+        //adlog::DEBUG("MY_SEPC filter size: ", MY_SPEC.filters_.count()," count: ",count);
       }
       if (!MY_SPEC.filters_.empty() && count > 0) {
         bool all_filtered = false;
-        adlog::DEBUG("filter rows strat");
+        //adlog::DEBUG("filter rows strat");
         if (OB_FAIL(filter_rows(MY_SPEC.filters_,
                                 *brs_.skip_,
                                 count,
@@ -2508,18 +2508,18 @@ int ObTableScanOp::get_next_batch_with_das(int64_t &count, int64_t capacity)
         static int count1 = 0;
         count1++;
         if(count1 == 1) {
-          adlog::DEBUG("MY_SPEC filter is empty");
+          //adlog::DEBUG("MY_SPEC filter is empty");
         }
       }
       else{
-        adlog::DEBUG("MY_SEPC filter size: ", MY_SPEC.filters_.count()," count: ",count," need_final_limit: ",need_final_limit_);
+        //adlog::DEBUG("MY_SEPC filter size: ", MY_SPEC.filters_.count()," count: ",count," need_final_limit: ",need_final_limit_);
 
       }
 
       if (need_final_limit_ && !MY_SPEC.filters_.empty() && count > 0) {
         // if (!MY_SPEC.filters_.empty() && count > 0) {
         bool all_filtered = false;
-        adlog::DEBUG("filter rows strat2");
+        //adlog::DEBUG("filter rows strat2");
 
         if (OB_FAIL(filter_rows(MY_SPEC.filters_,
                                 *brs_.skip_,
@@ -4136,28 +4136,28 @@ int ObTableScanOp::inner_get_next_fts_index_row()
   int ret = OB_SUCCESS;
   blocksstable::ObDatumRow *row = nullptr;
   bool got_row = false;
-  // adlog::DEBUG_ONCE(10000,"OB_TABLE_SCAN_OP: inner_get_next_fts_index_row");
+  // //adlog::DEBUG_ONCE(10000,"OB_TABLE_SCAN_OP: inner_get_next_fts_index_row");
    
 
   // {
   //   static bool first_call = true;
   //   if (first_call) {
-  //       adlog::DEBUG("=== inner_get_next_fts_index_row ===");
-  //       adlog::DEBUG("backup_key_ranges_.count(): ", backup_key_ranges_.count());
-  //       adlog::DEBUG("cached_min_pk_val_ ", cached_min_pk_val_);
-  //       adlog::DEBUG("cached_max_pk_val_ ", cached_max_pk_val_);
-  //       adlog::DEBUG("has_initialized_pk_range_ ", has_initialized_pk_range_);
+  //       //adlog::DEBUG("=== inner_get_next_fts_index_row ===");
+  //       //adlog::DEBUG("backup_key_ranges_.count(): ", backup_key_ranges_.count());
+  //       //adlog::DEBUG("cached_min_pk_val_ ", cached_min_pk_val_);
+  //       //adlog::DEBUG("cached_max_pk_val_ ", cached_max_pk_val_);
+  //       //adlog::DEBUG("has_initialized_pk_range_ ", has_initialized_pk_range_);
         
   //       // 如果还没有初始化范围，尝试从备份中获取
   //       if (!has_initialized_pk_range_ && !backup_key_ranges_.empty()) {
   //           for (int64_t i = 0; i < backup_key_ranges_.count(); ++i) {
   //               const common::ObNewRange &range = backup_key_ranges_.at(i);
-  //               adlog::DEBUG("range.get_end_key().get_obj_cnt() :",range.get_end_key().get_obj_cnt() );
+  //               //adlog::DEBUG("range.get_end_key().get_obj_cnt() :",range.get_end_key().get_obj_cnt() );
   //               if (range.get_end_key().get_obj_cnt() > 0) {
   //                 const common::ObObj &end_obj =
   //                     range.get_end_key().get_obj_ptr()[0];
-  //                   adlog::DEBUG("end_obj.is_integer_type(): ",end_obj.is_integer_type());
-  //                   adlog::DEBUG("end_obj.is_numeric_type(): ",end_obj.is_numeric_type());
+  //                   //adlog::DEBUG("end_obj.is_integer_type(): ",end_obj.is_integer_type());
+  //                   //adlog::DEBUG("end_obj.is_numeric_type(): ",end_obj.is_numeric_type());
   //                   if (end_obj.is_numeric_type()) {
   //                       cached_max_pk_val_ = end_obj.get_int();
                         
@@ -4170,7 +4170,7 @@ int ObTableScanOp::inner_get_next_fts_index_row()
   //                           cached_min_pk_val_ = INT64_MIN;
   //                       }
                         
-  //                       adlog::DEBUG("Extracted PK range from backup: [", cached_min_pk_val_, ", ", cached_max_pk_val_, ")");
+  //                       //adlog::DEBUG("Extracted PK range from backup: [", cached_min_pk_val_, ", ", cached_max_pk_val_, ")");
   //                       has_initialized_pk_range_ = true;
   //                       break;
   //                   }
@@ -4251,7 +4251,7 @@ int ObTableScanOp::inner_get_next_fts_index_row()
       LOG_WARN("fail to fill generate fts cols", K(ret), KPC(row));
       continue;
     }
-    // adlog::DEBUG("After fill_generated_fts_cols, applying filters");
+    // //adlog::DEBUG("After fill_generated_fts_cols, applying filters");
     // clear_evaluated_flag();
 
     // bool filtered = false;
@@ -4259,26 +4259,26 @@ int ObTableScanOp::inner_get_next_fts_index_row()
     //   static int count = 0;
     //   ++count;
     //   if (count % 1000 == 0) {
-    //     adlog::DEBUG("have filter: ", !MY_SPEC.filters_.empty());
-    //     adlog::DEBUG("inner_get_next_fts_index_row::MY_INPUT.key_ranges_.empty() ",MY_INPUT.key_ranges_.empty());
+    //     //adlog::DEBUG("have filter: ", !MY_SPEC.filters_.empty());
+    //     //adlog::DEBUG("inner_get_next_fts_index_row::MY_INPUT.key_ranges_.empty() ",MY_INPUT.key_ranges_.empty());
     //   }
     
     // if (!MY_SPEC.filters_.empty()) {
     //   if (OB_FAIL(filter_row(filtered))) {
-    //     // adlog::DEBUG("filter_row failed: ", ret);
+    //     // //adlog::DEBUG("filter_row failed: ", ret);
     //     continue;
     //   }
     // }
-    // adlog::DEBUG("Filter result: ", (filtered ? "FILTERED" : "PASSED"));
+    // //adlog::DEBUG("Filter result: ", (filtered ? "FILTERED" : "PASSED"));
     // if (filtered) {
     //   if (count % 1000 == 0) {
-    //     adlog::DEBUG("GOOD FILTER");
+    //     //adlog::DEBUG("GOOD FILTER");
     //   }
     //   continue;
     // }
 
     got_row = true;
-    // adlog::DEBUG("Got valid row");
+    // //adlog::DEBUG("Got valid row");
     
   }
 

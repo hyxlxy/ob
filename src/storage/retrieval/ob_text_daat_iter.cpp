@@ -23,7 +23,7 @@ namespace oceanbase
 namespace storage
 {
 int ObTextDaaTIter::init(const ObTextDaaTParam &param) {
-  adlog::DEBUG("ObTextDaaTIter::init");
+  //adlog::DEBUG("ObTextDaaTIter::init");
   int ret = OB_SUCCESS;
   if (OB_ISNULL(param.base_param_) || OB_ISNULL(param.dim_iters_) || OB_ISNULL(param.allocator_)
       || OB_ISNULL(param.relevance_collector_)) {
@@ -109,7 +109,7 @@ void ObTextBMWIter::reset()
 }
 
 int ObTextBMWIter::init(const ObTextDaaTParam &param) {
-  adlog::DEBUG("ObTextBMWIter::init");
+  //adlog::DEBUG("ObTextBMWIter::init");
   
   int ret = OB_SUCCESS;
   if (OB_ISNULL(param.base_param_) || OB_ISNULL(param.dim_iters_) || OB_ISNULL(param.allocator_)
@@ -127,7 +127,7 @@ int ObTextBMWIter::init(const ObTextDaaTParam &param) {
 }
 
 int ObTextBMWIter::get_next_rows(const int64_t capacity, int64_t &count) {
-  adlog::DEBUG("ObTextBMWIter::get_next_rows");
+  //adlog::DEBUG("ObTextBMWIter::get_next_rows");
   
   int ret = OB_SUCCESS;
   if (IS_NOT_INIT) {

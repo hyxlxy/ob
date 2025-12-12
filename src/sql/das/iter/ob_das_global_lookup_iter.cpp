@@ -123,7 +123,7 @@ int ObDASGlobalLookupIter::add_rowkey()
                                                     first_partition_id))) {
       LOG_WARN("failed to get tablet loc by tablet_id", K(ret));
     } else {
-      adlog::DEBUG("merge_iter->create_das_task(tablet_loc, das_scan_op, reuse_das_op)");
+      //adlog::DEBUG("merge_iter->create_das_task(tablet_loc, das_scan_op, reuse_das_op)");
       if (OB_FAIL(merge_iter->create_das_task(tablet_loc, das_scan_op, reuse_das_op))) {
         LOG_WARN("failed to create das task", K(ret));
       } else if (!reuse_das_op) {

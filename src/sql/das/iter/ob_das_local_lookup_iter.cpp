@@ -156,7 +156,7 @@ int ObDASLocalLookupIter::init_scan_param(ObTableScanParam &param, const ObDASSc
       param.tx_id_.reset();
     }
     if (!ctdef->pd_expr_spec_.pushdown_filters_.empty()) {
-      adlog::DEBUG("!!!!!!ctdef->pd_expr_spec_.pushdown_filters_.empty()");
+      //adlog::DEBUG("!!!!!!ctdef->pd_expr_spec_.pushdown_filters_.empty()");
       param.op_filters_ = &ctdef->pd_expr_spec_.pushdown_filters_;
       // 检查是否有 id < 1000 的过滤条件
       const common::ObIArray<ObExpr*> *filters = &ctdef->pd_expr_spec_.pushdown_filters_;
@@ -164,17 +164,17 @@ int ObDASLocalLookupIter::init_scan_param(ObTableScanParam &param, const ObDASSc
           const ObExpr *filter = filters->at(i);
           if (nullptr != filter) {
               // 检查是否是 id < 1000 类型的条件
-              adlog::DEBUG("pushdown filter type: %d", filter->type_);
+              //adlog::DEBUG("pushdown filter type: %d", filter->type_);
               // 可能需要检查 filter 的具体表达式内容
           }
       }
     } else {
-      adlog::DEBUG("ctdef->pd_expr_spec_.pushdown_filters_.empty()");
+      //adlog::DEBUG("ctdef->pd_expr_spec_.pushdown_filters_.empty()");
     }
     param.pd_storage_filters_ = rtdef->p_pd_expr_op_->pd_storage_filters_;
     // 检查 pd_storage_filters_ 中是否有相关过滤条件
     if (nullptr != rtdef->p_pd_expr_op_->pd_storage_filters_) {
-      adlog::DEBUG("pd_storage_filters_ is not null, may contain id < 1000 condition");
+      //adlog::DEBUG("pd_storage_filters_ is not null, may contain id < 1000 condition");
     }
     if (FAILEDx(param.column_ids_.assign(ctdef->access_column_ids_))) {
       LOG_WARN("failed to assign column ids", K(ret));
@@ -258,9 +258,9 @@ int ObDASLocalLookupIter::add_rowkeys(int64_t count)
 }
 
 int ObDASLocalLookupIter::do_index_lookup() {
-  adlog::DEBUG("ObDASLocalLookupIter::do_index_lookup()");
+  //adlog::DEBUG("ObDASLocalLookupIter::do_index_lookup()");
   // 检查当前要回表的 rowkey 数量
-  // adlog::DEBUG("lookup_rowkey_cnt_: %ld", lookup_rowkey_cnt_);
+  // //adlog::DEBUG("lookup_rowkey_cnt_: %ld", lookup_rowkey_cnt_);
 
   int ret = OB_SUCCESS;
   OB_ASSERT(data_table_iter_->get_type() == DAS_ITER_SCAN ||
@@ -275,11 +275,11 @@ int ObDASLocalLookupIter::do_index_lookup() {
     } else {
       // 检查扫描参数是否包含标量过滤条件
       if (lookup_param_.op_filters_) { 
-        adlog::DEBUG("do_index_lookup::scan_param op_filters_:", lookup_param_.op_filters_->count());
+        //adlog::DEBUG("do_index_lookup::scan_param op_filters_:", lookup_param_.op_filters_->count());
       } else {
-        adlog::DEBUG("do_index_lookup::scan_param op_filters_ nonono");
+        //adlog::DEBUG("do_index_lookup::scan_param op_filters_ nonono");
       }
-      // adlog::DEBUG("do_index_lookup::scan_param pd_storage_filters_: ",
+      // //adlog::DEBUG("do_index_lookup::scan_param pd_storage_filters_: ",
       //              lookup_param_.pd_storage_filters_->count());
       
       if (OB_FAIL(data_table_iter_->do_table_scan())) {

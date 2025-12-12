@@ -3226,7 +3226,7 @@ int ObLogPlan::allocate_access_path(AccessPath *ap,
     if (OB_SUCC(ret) && ap->domain_idx_info_.has_es_match()) {
       if (ap->domain_idx_info_.has_func_lookup() || ap->domain_idx_info_.has_ir_scan() || ap->is_index_merge_path()) {
         ret = OB_NOT_SUPPORTED;
-        adlog::DEBUG("NOT SUPORT");
+        //adlog::DEBUG("NOT SUPORT");
         LOG_WARN("not supported", K(ret));
       } else if (OB_FAIL(prepare_text_retrieval_match_score(ap->domain_idx_info_.match_exprs_,
                                                             ap->domain_idx_info_.match_index_ids_,
@@ -3238,12 +3238,12 @@ int ObLogPlan::allocate_access_path(AccessPath *ap,
     // if (ap->is_index_merge_path()) {
 
     // } else { 
-    //   adlog::DEBUG("ap->is_index_merge_path",);
+    //   //adlog::DEBUG("ap->is_index_merge_path",);
     // }
 
     if (OB_SUCC(ret) && ap->is_index_merge_path()) {
       /* prepare text retrieval info for index merge */
-      adlog::DEBUG("ap->is_index_merge_path");
+      //adlog::DEBUG("ap->is_index_merge_path");
 
       ObIndexMergeNode *index_merge_root = static_cast<IndexMergePath*>(ap)->root_;
       ObSEArray<ObRawExpr*, 4> merge_match_exprs;
@@ -15685,7 +15685,7 @@ int ObLogPlan::try_push_topn_into_text_retrieval_scan(
     ObLogicalOperator *&top, ObRawExpr *topn_expr, ObRawExpr *limit_expr,
     ObRawExpr *offset_expr, bool is_fetch_with_ties, bool need_exchange,
     const ObIArray<OrderItem> &sort_keys, bool &need_further_sort) {
-  adlog::DEBUG("ObLogPlan::try_push_topn_into_text_retrieval_scan");
+  //adlog::DEBUG("ObLogPlan::try_push_topn_into_text_retrieval_scan");
   int ret = OB_SUCCESS;
   need_further_sort = true;
   ObLogTableScan *table_scan = NULL;

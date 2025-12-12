@@ -277,14 +277,14 @@ int ObDASCacheLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
   int ret = OB_SUCCESS;
   bool get_next_rows = false;
   const bool need_index_proj = index_proj_rows_.index_scan_proj_exprs_.count() > 0;
-  adlog::DEBUG("ObDASCacheLookupIter::inner_get_next_rows -----begin");
+  //adlog::DEBUG("ObDASCacheLookupIter::inner_get_next_rows -----begin");
   do {
     switch (state_) {
       case INDEX_SCAN: {
         {
           // static bool flag = true;
           // if (flag) {
-            adlog::DEBUG("--------------INDEX_SCAN----------");
+            //adlog::DEBUG("--------------INDEX_SCAN----------");
             // flag=false;
           // }
         }
@@ -295,7 +295,7 @@ int ObDASCacheLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
           storage_count = 0;
           index_capacity = std::min(capacity, std::min(max_size_, default_batch_row_count_ - lookup_rowkey_cnt_));
           index_table_iter_->clear_evaluated_flag();
-          adlog::DEBUG("--------------INDEX_SCAN: index_table_iter_->get_next_rows-----------");
+          //adlog::DEBUG("--------------INDEX_SCAN: index_table_iter_->get_next_rows-----------");
 
           // {
           //   // 在这里去做把data_table_iter的range先放到index_table_iter里面
@@ -303,11 +303,11 @@ int ObDASCacheLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
           // //ObDASTRMergeIter
           // if (auto &&index_table_it =
           //         dynamic_cast<ObDASTRMergeIter *>(index_table_iter_)) {
-          //   adlog::DEBUG(
+          //   //adlog::DEBUG(
           //       "index_table_iter -> index_table_it : ObDASTRMergeIter");
           //   if (auto &&data_table_it =
           //         dynamic_cast<ObDASScanIter *>(data_table_iter_)) {
-          //     adlog::DEBUG("data_table_iter -> data_table_it : ObDASScanIter");
+          //     //adlog::DEBUG("data_table_iter -> data_table_it : ObDASScanIter");
           //     // 代表找到了内层的index_it 和 data_it
           //     // 这里先获得到 index_it 的 底层的merge_iter
           //     storage::ObISparseRetrievalMergeIter *sparse_merge_iter =
@@ -315,11 +315,11 @@ int ObDASCacheLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
 
           //     if (auto &&daat_iter =
           //             dynamic_cast<ObSRDaaTIterImpl *>(sparse_merge_iter)) {
-          //       adlog::DEBUG("have got index_table_iter's sparse_merge_iter, daat_iter's impl");
+          //       //adlog::DEBUG("have got index_table_iter's sparse_merge_iter, daat_iter's impl");
           //       // 打算把id_less的内容挪到 ObSRDaaTIterImpl 里面去，这样reset和reuse可以继续
           //       // get_scan_param
           //       storage::ObTableScanParam &scan_param = data_table_it->get_scan_param();
-          //       adlog::DEBUG("scan_param.key_ranges_.count(): ",scan_param.key_ranges_.count());
+          //       //adlog::DEBUG("scan_param.key_ranges_.count(): ",scan_param.key_ranges_.count());
           //       for (int i = 0; i < scan_param.key_ranges_.count(); i++) {
           //         const ObNewRange &range = scan_param.key_ranges_.at(i);
                   
@@ -345,7 +345,7 @@ int ObDASCacheLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
           //                 int64_t max_id = end_id_obj.get_int();
           //                 daat_iter->set_id_less(max_id + 1); // 应该是不用的，先暂时算上，反正不会错
           //                 // 现在你知道 id 的范围是 [min_id, max_id]
-          //                 adlog::DEBUG("ID range: [", min_id,",  ",
+          //                 //adlog::DEBUG("ID range: [", min_id,",  ",
           //                               max_id,"]");
           //               }
           //           }
@@ -353,14 +353,14 @@ int ObDASCacheLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
 
           //       }
 
-          //       adlog::DEBUG("ID range have over");
+          //       //adlog::DEBUG("ID range have over");
           //     }
               
           //   }
           // }
           
           
-          //   adlog::DEBUG("index or data table iter change end!");
+          //   //adlog::DEBUG("index or data table iter change end!");
           // }
 
 
@@ -399,7 +399,7 @@ int ObDASCacheLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
         {
           // static bool flag = true;
           // if (flag) {
-            adlog::DEBUG("--------------DO_LOOKUP----------");
+            //adlog::DEBUG("--------------DO_LOOKUP----------");
             // flag=false;
           // }
         }
@@ -415,12 +415,12 @@ int ObDASCacheLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
       }
 
       case OUTPUT_ROWS: {
-        adlog::DEBUG("--------------OUTPUT_ROWS----------");
+        //adlog::DEBUG("--------------OUTPUT_ROWS----------");
 
         count = 0;
         data_table_iter_->clear_evaluated_flag();
 
-        adlog::DEBUG("--------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------");
+        //adlog::DEBUG("--------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------");
 
         if (OB_FAIL(data_table_iter_->get_next_rows(count, capacity))) {
           if (OB_LIKELY(OB_ITER_END == ret)) {
@@ -452,14 +452,14 @@ int ObDASCacheLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
       }
 
       case FINISHED: {
-        adlog::DEBUG("--------------FINISHED----------");
+        //adlog::DEBUG("--------------FINISHED----------");
 
         ret = OB_ITER_END;
         break;
       }
     }
   } while (!get_next_rows && OB_SUCC(ret));
-  adlog::DEBUG("ObDASCacheLookupIter::inner_get_next_rows -----end");
+  //adlog::DEBUG("ObDASCacheLookupIter::inner_get_next_rows -----end");
 
   return ret;
 }

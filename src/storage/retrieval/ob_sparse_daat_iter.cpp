@@ -79,7 +79,7 @@ ObSRDaaTIterImpl::ObSRDaaTIterImpl()
   // static int id_count = 0;
   // id_count++;
   // ididid = id_count;
-  // adlog::DEBUG("ObSRDaaTIterImpl::id_count: ",id_count);
+  // //adlog::DEBUG("ObSRDaaTIterImpl::id_count: ",id_count);
 }
 
 int ObSRDaaTIterImpl::init(
@@ -295,13 +295,13 @@ int ObSRDaaTIterImpl::do_one_merge_round(int64_t &count)
   //   ObExpr *filter_expr = iter_param_->filter_expr_;
   //   if (OB_UNLIKELY(!id_less_filter_extracted_flag_)) {
   //     if (OB_NOT_NULL(filter_expr)) { 
-  //       adlog::DEBUG("start try id_less_filter_extract");
+  //       //adlog::DEBUG("start try id_less_filter_extract");
   //       if (OB_FAIL(extract_id_less_filter_from_expr(filter_expr))) {
-  //         adlog::DEBUG("failed to extract id less filter");
+  //         //adlog::DEBUG("failed to extract id less filter");
   //       }
   //       id_less_filter_extracted_flag_ = true;
   //       if (!has_id_less_filter_) {
-  //         adlog::DEBUG("not find id_less_filter");
+  //         //adlog::DEBUG("not find id_less_filter");
   //       }
   //     }
   //   }
@@ -405,11 +405,11 @@ int ObSRDaaTIterImpl::collect_dims_by_id(const ObDatum *&id_datum, double &relev
       //   static int count = 0;
       //   count++;
       //   if (count % 100 == 0) {
-      //     adlog::DEBUG("current_id: ", current_id, " id_less_value_: ",id_less_value_);
+      //     //adlog::DEBUG("current_id: ", current_id, " id_less_value_: ",id_less_value_);
       //     {
       //       auto str = id_datum->get_string();
       //       std::string std_str(str.ptr(), str.length());  // 转换为 std::string
-      //       adlog::DEBUG("current_id_str: ",std_str);
+      //       //adlog::DEBUG("current_id_str: ",std_str);
       //     }
       //   }
       // }
@@ -549,7 +549,7 @@ int ObSRDaaTIterImpl::extract_id_less_filter_from_expr(ObExpr *filter_expr)
 {
   int ret = OB_SUCCESS;
   if (OB_ISNULL(filter_expr)) {
-    adlog::DEBUG("filter_expr is nullptr");
+    //adlog::DEBUG("filter_expr is nullptr");
     return ret;
   }
   
@@ -568,19 +568,19 @@ int ObSRDaaTIterImpl::analyze_and_expr_tree(ObExpr *expr)
     static int dep = 0;
     dep++;
     if (dep >= 10000) {
-      adlog::DEBUG("over dep");
+      //adlog::DEBUG("over dep");
       return ret;
     }
   }
 
   if (OB_ISNULL(expr)) {
-    adlog::DEBUG("expr tree : expr is nullptr");
+    //adlog::DEBUG("expr tree : expr is nullptr");
     return ret;
   }
-  adlog::DEBUG("now expr args cnt: ",expr->arg_cnt_," now expr type: ",expr->type_);
+  //adlog::DEBUG("now expr args cnt: ",expr->arg_cnt_," now expr type: ",expr->type_);
   // 检查当前表达式是否是 id < 数字 的形式
   if (expr->type_ == T_OP_LT && expr->arg_cnt_ == 2) {
-    adlog::DEBUG("right now expr is id < xxx");
+    //adlog::DEBUG("right now expr is id < xxx");
     ObExpr *left = expr->args_[0];
     ObExpr *right = expr->args_[1];
     
@@ -611,14 +611,14 @@ int ObSRDaaTIterImpl::analyze_and_expr_tree(ObExpr *expr)
           
           id_less_value_ = value;
           has_id_less_filter_ = true;
-          adlog::DEBUG("have got id_less_value");
+          //adlog::DEBUG("have got id_less_value");
         }
       }
     }
   }
   // 如果是AND操作，递归处理子表达式
   else if (expr->type_ == T_OP_AND) {
-    adlog::DEBUG("now expr type is T_OP_AND , have",expr->arg_cnt_ ," expr sons");
+    //adlog::DEBUG("now expr type is T_OP_AND , have",expr->arg_cnt_ ," expr sons");
     for (int64_t i = 0; i < expr->arg_cnt_; ++i) {
       ObExpr *child_expr = expr->args_[i];
       if (OB_FAIL(analyze_and_expr_tree(child_expr))) {
@@ -627,7 +627,7 @@ int ObSRDaaTIterImpl::analyze_and_expr_tree(ObExpr *expr)
       }
     }
   } else {
-    adlog::DEBUG("not T_OP_AND and not id < xxx");
+    //adlog::DEBUG("not T_OP_AND and not id < xxx");
     // 尝试递归分析所有子表达式
     for (int64_t i = 0; i < expr->arg_cnt_; ++i) {
       ObExpr *child_expr = expr->args_[i];

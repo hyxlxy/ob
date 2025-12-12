@@ -1619,7 +1619,7 @@ int ObDASIterUtils::create_text_retrieval_sub_tree(
     const ObDASFTSTabletID &related_tablet_ids, const bool is_func_lookup,
     transaction::ObTxDesc *trans_desc, transaction::ObTxReadSnapshot *snapshot,
     ObDASIter *&retrieval_result) {
-  adlog::DEBUG("ObDASIterUtils::create_text_retrieval_sub_tree");
+  //adlog::DEBUG("ObDASIterUtils::create_text_retrieval_sub_tree");
   int ret = OB_SUCCESS;
   ObExpr *search_text = ir_scan_ctdef->search_text_;
   const ObCollationType &cs_type = search_text->datum_meta_.cs_type_;
@@ -2009,7 +2009,7 @@ int ObDASIterUtils::create_domain_lookup_sub_tree(
     const bool &doc_id_lookup_keep_order, const bool &main_lookup_keep_order,
     transaction::ObTxDesc *trans_desc, transaction::ObTxReadSnapshot *snapshot,
     ObDASIter *doc_id_iter, ObDASIter *&domain_lookup_result) {
-  adlog::DEBUG("ObDASIterUtils::create_domain_lookup_sub_tree");
+  //adlog::DEBUG("ObDASIterUtils::create_domain_lookup_sub_tree");
   int ret = OB_SUCCESS;
 
   const ObDASIRAuxLookupCtDef *aux_lookup_ctdef = nullptr;
@@ -2069,11 +2069,11 @@ int ObDASIterUtils::create_function_lookup_tree(
     const ObDASRelatedTabletID &related_tablet_ids,
     transaction::ObTxDesc *trans_desc, transaction::ObTxReadSnapshot *snapshot,
     ObDASIter *&iter_tree) {
-  adlog::DEBUG("ObDASIterUtils::create_function_lookup_tree");
+  //adlog::DEBUG("ObDASIterUtils::create_function_lookup_tree");
   if (scan_param.op_filters_ != nullptr) { 
-    adlog::DEBUG("ObDASIterUtils::scan_param",scan_param.op_filters_->count());
+    //adlog::DEBUG("ObDASIterUtils::scan_param",scan_param.op_filters_->count());
   } else {
-    adlog::DEBUG("ObDASIterUtils::scan_param nullptr"); 
+    //adlog::DEBUG("ObDASIterUtils::scan_param nullptr"); 
   }
   int ret = OB_SUCCESS;
   const ObDASIndexProjLookupCtDef *idx_proj_lookup_ctdef = nullptr;
@@ -2490,11 +2490,11 @@ int ObDASIterUtils::create_functional_lookup_sub_tree(ObTableScanParam &scan_par
                                                       transaction::ObTxReadSnapshot *snapshot,
                                                       ObDASIter *&fun_lookup_result)
 {
-  adlog::DEBUG("create_functional_lookup_sub_tree");
+  //adlog::DEBUG("create_functional_lookup_sub_tree");
   if (scan_param.op_filters_ != nullptr) { 
-    adlog::DEBUG("ObDASIterUtils::create_functional_lookup_sub_tree::scan_param",scan_param.op_filters_->count());
+    //adlog::DEBUG("ObDASIterUtils::create_functional_lookup_sub_tree::scan_param",scan_param.op_filters_->count());
   } else {
-    adlog::DEBUG("ObDASIterUtils::create_functional_lookup_sub_tree::scan_param nullptr"); 
+    //adlog::DEBUG("ObDASIterUtils::create_functional_lookup_sub_tree::scan_param nullptr"); 
   }
   int ret = OB_SUCCESS;
   void *buf = nullptr;
@@ -2669,11 +2669,11 @@ int ObDASIterUtils::create_mvi_lookup_tree(ObTableScanParam &scan_param,
                                            ObDASIter *&iter_tree,
                                            const bool in_vec_pre_filter)
 {
-  adlog::DEBUG("ObDASIterUtils::create_mvi_lookup_tree");
+  //adlog::DEBUG("ObDASIterUtils::create_mvi_lookup_tree");
   if (scan_param.op_filters_ != nullptr) { 
-    adlog::DEBUG("ObDASIterUtils::create_mvi_lookup_tree::scan_param",scan_param.op_filters_->count());
+    //adlog::DEBUG("ObDASIterUtils::create_mvi_lookup_tree::scan_param",scan_param.op_filters_->count());
   } else {
-    adlog::DEBUG("ObDASIterUtils::create_mvi_lookup_tree::scan_param nullptr"); 
+    //adlog::DEBUG("ObDASIterUtils::create_mvi_lookup_tree::scan_param nullptr"); 
   }
   int ret = OB_SUCCESS;
 
@@ -2846,7 +2846,7 @@ int ObDASIterUtils::create_sort_sub_tree(
     common::ObIAllocator &alloc, const ObDASSortCtDef *sort_ctdef,
     ObDASSortRtDef *sort_rtdef, const bool need_rewind,
     const bool need_distinct, ObDASIter *sort_input, ObDASIter *&sort_result) {
-  adlog::DEBUG("ObDASIterUtils::create_sort_sub_tree");
+  //adlog::DEBUG("ObDASIterUtils::create_sort_sub_tree");
   int ret = OB_SUCCESS;
   ObDASSortIterParam sort_iter_param;
   ObDASSortIter *sort_iter = nullptr;
@@ -2876,7 +2876,7 @@ int ObDASIterUtils::create_table_scan_iter_tree(
     ObFixedArray<ObEvalInfo *, ObIAllocator> &eval_infos,
     const ObTableScanSpec &spec, ObDASMergeIter *&scan_iter,
     ObDASIter *&iter_tree) {
-  // adlog::DEBUG("create_table_scan_iter_tree");
+  // //adlog::DEBUG("create_table_scan_iter_tree");
   int ret = OB_SUCCESS;
   ObDASMergeIter *iter = nullptr;
   ObDASMergeIterParam param;
@@ -2952,7 +2952,7 @@ int ObDASIterUtils::create_global_lookup_iter_tree(const ObTableScanCtDef &tsc_c
                                                    ObDASMergeIter *&scan_iter,
                                                    ObDASIter *&iter_tree)
 {
-  adlog::DEBUG("create_global_lookup_iter_tree");
+  //adlog::DEBUG("create_global_lookup_iter_tree");
   int ret = OB_SUCCESS;
   ObDASMergeIter *index_table_iter = nullptr;
   ObDASMergeIter *data_table_iter = nullptr;
@@ -3082,7 +3082,7 @@ int ObDASIterUtils::create_index_merge_iter_tree(ObTableScanParam &scan_param,
                                                  transaction::ObTxReadSnapshot *snapshot,
                                                  ObDASIter *&iter_tree)
 {
-  adlog::DEBUG("create_index_merge_iter_tree");
+  //adlog::DEBUG("create_index_merge_iter_tree");
   int ret = OB_SUCCESS;
   if (OB_ISNULL(attach_ctdef) || OB_ISNULL(attach_rtdef)) {
     ret = OB_ERR_UNEXPECTED;
@@ -3163,7 +3163,7 @@ int ObDASIterUtils::create_local_lookup_sub_tree(ObTableScanParam &scan_param,
                                                  const bool lookup_keep_order,
                                                  const int64_t lookup_batch_size)
 {
-  adlog::DEBUG("create_local_lookup_sub_tree");
+  //adlog::DEBUG("create_local_lookup_sub_tree");
   int ret = OB_SUCCESS;
   ObDASScanIterParam data_table_param;
   ObDASScanIter *data_table_iter = nullptr;
@@ -3215,7 +3215,7 @@ int ObDASIterUtils::create_cache_lookup_sub_tree(
     ObDASIter *index_iter, const ObDASRelatedTabletID &related_tablet_ids,
     ObDASCacheLookupIter *&lookup_iter, const bool lookup_keep_order,
     const int64_t lookup_batch_size) {
-  adlog::DEBUG("ObDASIterUtils::create_cache_lookup_sub_tree");
+  //adlog::DEBUG("ObDASIterUtils::create_cache_lookup_sub_tree");
   int ret = OB_SUCCESS;
   ObDASScanIterParam data_table_param;
   ObDASScanIter *data_table_iter = nullptr;
@@ -3348,7 +3348,7 @@ int ObDASIterUtils::create_index_merge_sub_tree(ObTableScanParam &scan_param,
                                                 transaction::ObTxReadSnapshot *snapshot,
                                                 ObDASIter *&iter)
 {
-  adlog::DEBUG("create_index_merge_sub_tree");
+  //adlog::DEBUG("create_index_merge_sub_tree");
   int ret = OB_SUCCESS;
 if (OB_ISNULL(ctdef) || OB_ISNULL(rtdef) || ctdef->op_type_ != DAS_OP_INDEX_MERGE) {
     ret = OB_INVALID_ARGUMENT;
@@ -3360,15 +3360,15 @@ if (OB_ISNULL(ctdef) || OB_ISNULL(rtdef) || ctdef->op_type_ != DAS_OP_INDEX_MERG
     // { //debug
     //   // 在 create_index_merge_sub_tree 函数开头或合适位置
     //   ObExpr *pk_expr = merge_ctdef->rowkey_exprs_.at(0);
-    //   adlog::DEBUG("rowkey_expr[0] type: ", pk_expr->type_);
+    //   //adlog::DEBUG("rowkey_expr[0] type: ", pk_expr->type_);
 
     //   if (pk_expr->type_ == T_REF_COLUMN) {
     //     const ObColumnRefExtraInfo *col_info = static_cast<const ObColumnRefExtraInfo*>(pk_expr->extra_info_);
     //     uint64_t col_id = col_info->get_column_id();
     //     uint64_t table_id = col_info->get_table_id();
-    //     adlog::DEBUG("rowkey_expr[0] references column_id=", col_id, " table_id=", table_id);
+    //     //adlog::DEBUG("rowkey_expr[0] references column_id=", col_id, " table_id=", table_id);
     //   } else {
-    //     adlog::DEBUG("rowkey_expr[0] is NOT a column ref!");
+    //     //adlog::DEBUG("rowkey_expr[0] is NOT a column ref!");
     //   }
     // }
     ObArray<ObDASIter*> child_iters;
@@ -3575,7 +3575,7 @@ if (OB_ISNULL(ctdef) || OB_ISNULL(rtdef) || ctdef->op_type_ != DAS_OP_INDEX_MERG
 int ObDASIterUtils::create_iter_children_array(const int64_t children_cnt,
                                                common::ObIAllocator &alloc,
                                                ObDASIter *iter) {
-  adlog::DEBUG("create_iter_children_array");
+  //adlog::DEBUG("create_iter_children_array");
   int ret = OB_SUCCESS;
   if (OB_UNLIKELY(children_cnt <= 0) || OB_ISNULL(iter)) {
     ret = OB_INVALID_ARGUMENT;
@@ -3598,7 +3598,7 @@ int ObDASIterUtils::create_vec_lookup_tree(
     const ObDASRelatedTabletID &related_tablet_ids,
     transaction::ObTxDesc *trans_desc, transaction::ObTxReadSnapshot *snapshot,
     ObDASIter *&iter_tree) {
-  adlog::DEBUG("create_vec_lookup_tree");
+  //adlog::DEBUG("create_vec_lookup_tree");
   int ret = OB_SUCCESS;
   bool is_ivf = is_vec_ivf_scan(attach_ctdef, attach_rtdef);
   bool is_spiv = is_vec_spiv_scan(attach_ctdef, attach_rtdef);
@@ -3622,7 +3622,7 @@ int ObDASIterUtils::create_vec_spiv_lookup_tree(
     const ObDASRelatedTabletID &related_tablet_ids,
     transaction::ObTxDesc *trans_desc, transaction::ObTxReadSnapshot *snapshot,
     ObDASIter *&iter_tree) {
-  adlog::DEBUG("create_vec_spiv_lookup_tree");
+  //adlog::DEBUG("create_vec_spiv_lookup_tree");
   int ret = OB_SUCCESS;
 
   const ObDASTableLookupCtDef *lookup_ctdef = nullptr;
@@ -3818,7 +3818,7 @@ int ObDASIterUtils::create_vec_pre_filter_tree(ObTableScanParam &scan_param,
                                               ObDASIter *&pre_iter_tree,
                                               bool& need_index_back)
 {
-  adlog::DEBUG("create_vec_pre_filter_tree");
+  //adlog::DEBUG("create_vec_pre_filter_tree");
   int ret = OB_SUCCESS;
   if (OB_ISNULL(attach_ctdef) || OB_ISNULL(attach_rtdef)
     || OB_ISNULL(inv_idx_ctdef) || OB_ISNULL(inv_idx_rtdef)) {
@@ -3881,7 +3881,7 @@ int ObDASIterUtils::create_vec_func_indexback_sub_tree(
     transaction::ObTxDesc *trans_desc, transaction::ObTxReadSnapshot *snapshot,
     ObDASIter *index_iter, ObDASCacheLookupIter *&lookup_iter,
     const bool lookup_keep_order, const int64_t lookup_batch_size) {
-  adlog::DEBUG("ObDASIterUtils::create_vec_func_indexback_sub_tree");
+  //adlog::DEBUG("ObDASIterUtils::create_vec_func_indexback_sub_tree");
   int ret = OB_SUCCESS;
   ObDASScanIterParam data_table_param;
   ObDASScanIter *data_table_iter = nullptr;

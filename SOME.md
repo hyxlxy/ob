@@ -77,7 +77,7 @@ do_create_index_merge_paths  ->  choose_best_selectivity_branch // 确实是这�
             // 在分配的内存上构造数组对象
             common::ObSEArray<sql::ObExpr*, 4>* new_filters = 
                 new(buf) common::ObSEArray<sql::ObExpr*, 4>();
-            adlog::DEBUG("new_filters->assign(parent_filters_)");
+            //adlog::DEBUG("new_filters->assign(parent_filters_)");
             // 将parent_filters_的内容复制到新数组
             int ret = new_filters->assign(parent_filters_);
             if (OB_SUCC(ret)) {

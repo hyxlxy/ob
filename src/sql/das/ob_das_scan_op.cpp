@@ -1421,7 +1421,7 @@ int ObDASScanOp::get_index_merge_tablet_ids(common::ObIArray<common::ObTabletID>
     }
   }
   if (OB_SUCC(ret) && index_merge_cnt > 0) {
-    adlog::DEBUG("if (OB_SUCC(ret) && index_merge_cnt > 0)");
+    //adlog::DEBUG("if (OB_SUCC(ret) && index_merge_cnt > 0)");
     if (OB_FAIL(index_merge_tablet_ids.prepare_allocate(index_merge_cnt))) {
       LOG_WARN("failed to reserve index merge tablet ids", K(ret));
     }
@@ -1808,7 +1808,7 @@ int ObLocalIndexLookupOp::process_data_table_rowkeys(const int64_t size, const O
 }
 
 int ObLocalIndexLookupOp::do_index_lookup() {
-  adlog::DEBUG("ObLocalIndexLookupOp::do_index_lookup()");
+  //adlog::DEBUG("ObLocalIndexLookupOp::do_index_lookup()");
   int ret = OB_SUCCESS;
   ObITabletScan &tsc_service = get_tsc_service();
   ObNewRowIterator *&storage_iter = get_lookup_storage_iter();

@@ -504,7 +504,7 @@ int ObDASTRMergeIter::create_sparse_retrieval_iter()
   //   sr_iter_param_.topk_limit_ = topk_limit_;
   // }
   // bool topk_mode_res = (topk_mode_)? true:false;
-  // adlog::DEBUG("ObDASTRMergeIter::create_sparse_retrieval_iter(), topl_mode_", topk_mode_res );
+  // //adlog::DEBUG("ObDASTRMergeIter::create_sparse_retrieval_iter(), topl_mode_", topk_mode_res );
 
   if (OB_NOT_NULL(ir_ctdef_->field_boost_expr_)) {
     ObDatum *boost_datum = nullptr;
@@ -1101,7 +1101,7 @@ int ObDASTRMergeIter::inner_get_next_row()
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("sparse retrieval iter is null", K(ret));
   } else {
-    adlog::DEBUG("sparse_retrieval_iter_->get_next_row()");
+    //adlog::DEBUG("sparse_retrieval_iter_->get_next_row()");
     ret = sparse_retrieval_iter_->get_next_row();
   }
   return ret;
@@ -1119,7 +1119,7 @@ int ObDASTRMergeIter::inner_get_next_rows(int64_t &count, int64_t capacity)
   } else if (OB_UNLIKELY(0 == capacity)) {
     count = 0;
   } else {
-    adlog::DEBUG("sparse_retrieval_iter_->get_next_rows()");
+    //adlog::DEBUG("sparse_retrieval_iter_->get_next_rows()");
     ret = sparse_retrieval_iter_->get_next_rows(capacity, count);
   }
   return ret;

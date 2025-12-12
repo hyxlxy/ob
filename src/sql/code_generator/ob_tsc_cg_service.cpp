@@ -54,7 +54,7 @@ int ObTscCgService::generate_tsc_ctdef(ObLogTableScan &op, ObTableScanCtDef &tsc
   OZ(generate_mr_mv_scan_flag(op, query_flag));
   tsc_ctdef.scan_flags_ = query_flag;
   if (op.use_index_merge()) {
-    adlog::DEBUG("if (op.use_index_merge()) {");
+    //adlog::DEBUG("if (op.use_index_merge()) {");
     tsc_ctdef.use_index_merge_ = true;
   }
   if (OB_SUCC(ret) && (op.get_table_type() == share::schema::VIRTUAL_TABLE || op.get_table_type() == share::schema::EXTERNAL_TABLE)) {
@@ -219,9 +219,9 @@ int ObTscCgService::generate_tsc_ctdef(ObLogTableScan &op, ObTableScanCtDef &tsc
     DASScanCGCtx cg_ctx;
     if (OB_UNLIKELY(op.use_index_merge() || op.has_es_match())) {
       // tsc_ctdef.scan_ctdef will not be generated in index merge
-      adlog::DEBUG("OB_UNLIKELY(op.use_index_merge() || op.has_es_match()))");
+      //adlog::DEBUG("OB_UNLIKELY(op.use_index_merge() || op.has_es_match()))");
       if (op.use_index_merge()) {
-        adlog::DEBUG("AHAHAHA index_merge");
+        //adlog::DEBUG("AHAHAHA index_merge");
       }
     } else if (OB_FAIL(generate_das_scan_ctdef(op, cg_ctx, scan_ctdef, has_rowscn))) {
       LOG_WARN("generate das scan ctdef failed", K(ret), K(scan_ctdef.ref_table_id_));
@@ -328,7 +328,7 @@ int ObTscCgService::generate_tsc_ctdef(ObLogTableScan &op, ObTableScanCtDef &tsc
 
   if (OB_SUCC(ret) && op.use_index_merge()) {
     ObDASIndexMergeCtDef *index_merge_ctdef = nullptr;
-    adlog::DEBUG("if (OB_FAIL(generate_index_merge_ctdef(op, tsc_ctdef, index_merge_ctdef)))");
+    //adlog::DEBUG("if (OB_FAIL(generate_index_merge_ctdef(op, tsc_ctdef, index_merge_ctdef)))");
     if (OB_FAIL(generate_index_merge_ctdef(op, tsc_ctdef, index_merge_ctdef))) {
       LOG_WARN("failed to generate index merge ctdef", K(ret));
     } else if (OB_ISNULL(index_merge_ctdef)) {
@@ -899,7 +899,7 @@ int ObTscCgService::extract_fts_das_access_exprs(const ObLogTableScan &op,
   const ObTableID &scan_table_id = scan_ctdef.ref_table_id_;
   const bool use_index_merge = scan_ctdef.is_index_merge_;
   if (use_index_merge) {
-    adlog::DEBUG("use index merge 22222");
+    //adlog::DEBUG("use index merge 22222");
   }
   const bool is_text_retrieval_aux_type = (!op.is_vec_idx_scan() || !op.get_vector_index_info().is_vec_aux_table_id(scan_table_id)) &&
                                           (scan_ctdef.ir_scan_type_ == OB_IR_DOC_ID_IDX_AGG ||
@@ -956,9 +956,9 @@ int ObTscCgService::extract_das_access_exprs(const ObLogTableScan &op,
   const ObTableID &scan_table_id = scan_ctdef.ref_table_id_;
   const bool use_index_merge = scan_ctdef.is_index_merge_;
   if (use_index_merge) {
-    adlog::DEBUG("use index merge");
+    //adlog::DEBUG("use index merge");
   } else {
-    // adlog::DEBUG("NO use index merge");
+    // //adlog::DEBUG("NO use index merge");
   }
   const bool is_func_lookup = cg_ctx.is_func_lookup_;
   const bool is_match = cg_ctx.is_es_match_;

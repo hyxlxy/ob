@@ -401,7 +401,7 @@ int ObLogTableScan::allocate_expr_post(ObAllocExprContext &ctx)
     if (use_index_merge()
         && OB_FAIL(get_index_merge_calc_exprs(tmp_exprs))) {
       LOG_WARN("failed to get index merge calc exprs", K(ret));
-      adlog::DEBUG("index merge first nono");
+      //adlog::DEBUG("index merge first nono");
     }
     else if (is_text_retrieval_scan()
         && OB_FAIL(get_text_retrieval_calc_exprs(get_text_retrieval_info(), tmp_exprs))) {
@@ -1284,7 +1284,7 @@ int ObLogTableScan::allocate_group_id_expr()
 }
 
 int ObLogTableScan::generate_necessary_domain_exprs() {
-  // adlog::DEBUG("ObLogTableScan::generate_necessary_domain_exprs()");
+  // //adlog::DEBUG("ObLogTableScan::generate_necessary_domain_exprs()");
   int ret = OB_SUCCESS;
   if ((need_doc_id_index_back() || need_vec_id_index_back()) && OB_FAIL(extract_domain_id_index_back_expr(domain_exprs_))) {
     LOG_WARN("failed to extract doc id index back exprs", K(ret));

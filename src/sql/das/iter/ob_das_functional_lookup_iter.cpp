@@ -116,7 +116,7 @@ int ObDASFuncLookupIter::inner_release()
 }
 
 int ObDASFuncLookupIter::do_table_scan() {
-  adlog::DEBUG("ObDASFuncLookupIter::do_table_scan()");
+  //adlog::DEBUG("ObDASFuncLookupIter::do_table_scan()");
   int ret = OB_SUCCESS;
   start_table_scan_ = true;
   OB_ASSERT(index_table_iter_->get_type() == DAS_ITER_SCAN);
@@ -184,7 +184,7 @@ int ObDASFuncLookupIter::inner_get_next_row()
 }
 
 int ObDASFuncLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity) {
-  adlog::DEBUG(" ObDASFuncLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)");
+  //adlog::DEBUG(" ObDASFuncLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)");
   int ret = OB_SUCCESS;
   ObDASScanIter *index_table_iter = static_cast<ObDASScanIter *>(index_table_iter_);
   storage::ObTableScanParam &index_scan_param = index_table_iter->get_scan_param();
@@ -234,7 +234,7 @@ int ObDASFuncLookupIter::add_rowkeys(int64_t storage_count)
 }
 
 int ObDASFuncLookupIter::do_index_lookup() {
-  adlog::DEBUG("ObDASFuncLookupIter::do_index_lookup()");
+  //adlog::DEBUG("ObDASFuncLookupIter::do_index_lookup()");
   
   int ret = OB_SUCCESS;
   OB_ASSERT(data_table_iter_->get_type() == DAS_ITER_FUNC_DATA);

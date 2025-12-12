@@ -26,7 +26,7 @@ using namespace sql;
 int ObDDLBlockSampleScanOp::inner_open()
 {
   int ret = OB_SUCCESS;
-  adlog::DEBUG("=== ObDDLBlockSampleScanOp::open called ===");
+  //adlog::DEBUG("=== ObDDLBlockSampleScanOp::open called ===");
   if (OB_FAIL(ObTableScanOp::inner_open())) {
     LOG_WARN("fail to inner open", K(ret));
   } else if (MY_SPEC.use_dist_das()) {

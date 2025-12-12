@@ -137,7 +137,7 @@ int ObTableLoadMergeInsertPhaseOp::switch_next_op(bool is_parent_called)
       }
       case Status::INDEX_MERGE: {
         status_ = Status::COMPLETED;
-        adlog::DEBUG("case Status::INDEX_MERGE: { status_ = Status::COMPLETED");
+        //adlog::DEBUG("case Status::INDEX_MERGE: { status_ = Status::COMPLETED");
         break;
       }
       default: {
@@ -215,7 +215,7 @@ int ObTableLoadMergeDeletePhaseOp::switch_next_op(bool is_parent_called)
       }
       case Status::INDEX_MERGE: {
         status_ = Status::COMPLETED;
-        adlog::DEBUG("case Status::INDEX_MERGE: { status_ = Status::COMPLETED");
+        //adlog::DEBUG("case Status::INDEX_MERGE: { status_ = Status::COMPLETED");
 
         break;
       }

@@ -89,7 +89,7 @@ void ObSRBMWIterImpl::reset()
 }
 
 int ObSRBMWIterImpl::get_next_rows(const int64_t capacity, int64_t &count) {
-  adlog::DEBUG("have used BMWIterImpl");
+  //adlog::DEBUG("have used BMWIterImpl");
   int ret = OB_SUCCESS;
 
   if (IS_NOT_INIT) {

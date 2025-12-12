@@ -2794,22 +2794,22 @@ int ObAccessPathEstimation::classify_paths(ObIArray<AccessPath *> &paths,
     if (OB_ISNULL(paths.at(i))) {
       ret = OB_ERR_UNEXPECTED;
       if(count%1==0){
-        adlog::DEBUG("get null path");
+        //adlog::DEBUG("get null path");
         LOG_WARN("get null path", K(ret));
       }
     } else if (paths.at(i)->is_index_merge_path()) {
-      adlog::DEBUG("there is index merge path");
+      //adlog::DEBUG("there is index merge path");
       if (OB_FAIL(index_merge_paths.push_back(static_cast<IndexMergePath*>(paths.at(i))))) {
         LOG_WARN("failed to push back index merge path", K(ret));
-        adlog::DEBUG("fail to push back index merge path");
+        //adlog::DEBUG("fail to push back index merge path");
       }
       else if (OB_FAIL(static_cast<IndexMergePath *>(paths.at(i))
                            ->get_all_scan_access_paths(normal_paths))) {
         LOG_WARN("failed to get index merge scan path", K(ret));
-        adlog::DEBUG("fail index merge path i", i);
+        //adlog::DEBUG("fail index merge path i", i);
         }
     } else {
-      // adlog::DEBUG("there is normal path");
+      // //adlog::DEBUG("there is normal path");
       if (OB_FAIL(normal_paths.push_back(paths.at(i)))) {
         LOG_WARN("failed to push back normal path", K(ret));
       }

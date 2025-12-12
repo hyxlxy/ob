@@ -3220,7 +3220,7 @@ int ObJoinOrder::create_index_merge_access_paths(
     const uint64_t table_id, const uint64_t ref_table_id,
     const PathHelper &helper, ObIndexInfoCache &index_info_cache,
     ObIArray<AccessPath *> &access_paths, bool &ignore_normal_access_path) {
-  adlog::DEBUG("ObJoinOrder::create_index_merge_access_paths START");
+  //adlog::DEBUG("ObJoinOrder::create_index_merge_access_paths START");
   int ret = OB_SUCCESS;
   const ObDMLStmt *stmt = NULL;
   ObQueryCtx *query_ctx = NULL;
@@ -3245,10 +3245,10 @@ int ObJoinOrder::create_index_merge_access_paths(
                                                  candi_index_trees,
                                                  is_match_hint))) {
     LOG_WARN("failed to get valid index ids", K(ret));
-    adlog::DEBUG("failed ObJoinOrder::get_candi_index_merge_trees");
+    //adlog::DEBUG("failed ObJoinOrder::get_candi_index_merge_trees");
   } else if (candi_index_trees.empty()) {
     // do nothing
-    adlog::DEBUG("ObJoinOrder::create_index_merge_access_paths  candi_index_trees.empty()");
+    //adlog::DEBUG("ObJoinOrder::create_index_merge_access_paths  candi_index_trees.empty()");
   } else if (OB_FAIL(do_create_index_merge_paths(table_id,
                                                  ref_table_id,
                                                  helper,
@@ -3268,7 +3268,7 @@ int ObJoinOrder::create_index_merge_access_paths(
     ignore_normal_access_path = (is_match_hint || contain_fts) && !access_paths.empty();
     LOG_TRACE("finish create index merge path", K(ref_table_id), K(is_match_hint), K(contain_fts), K(access_paths));
   }
-  adlog::DEBUG("ObJoinOrder::create_index_merge_access_paths END");
+  //adlog::DEBUG("ObJoinOrder::create_index_merge_access_paths END");
 
   return ret;
 }
@@ -3277,7 +3277,7 @@ int ObJoinOrder::get_candi_index_merge_trees(
     const uint64_t table_id, const uint64_t ref_table_id,
     const PathHelper &helper, ObIArray<ObIndexMergeNode *> &candi_index_trees,
     bool &is_match_hint) {
-  adlog::DEBUG("ObJoinOrder::get_candi_index_merge_trees START");
+  //adlog::DEBUG("ObJoinOrder::get_candi_index_merge_trees START");
   int ret = OB_SUCCESS;
   ObSEArray<uint64_t, 4> valid_index_ids; // all valid indexes
   ObSEArray<ObSEArray<uint64_t, 4>, 4> valid_index_cols; // column ids in the valid indexes
@@ -3320,23 +3320,23 @@ int ObJoinOrder::get_candi_index_merge_trees(
                                                       valid_index_cols,
                                                       candi_index_trees))) {
     LOG_WARN("failed to generate candi index merge trees", K(ret));
-    adlog::DEBUG("fail generate_candi_index_merge_trees");
+    //adlog::DEBUG("fail generate_candi_index_merge_trees");
   } else if (!candi_index_trees.empty()
              && OB_FAIL(prune_candi_index_merge_trees(candi_index_trees))) {
     LOG_WARN("failed to prune candi index trees", K(ret));
-    adlog::DEBUG("fail prune_candi_index_merge_trees");
+    //adlog::DEBUG("fail prune_candi_index_merge_trees");
 
   } else {
     OPT_TRACE("generate", candi_index_trees.count(), "candi index merge trees");
     LOG_TRACE("generate candi index merge trees", K(table_id),
               K(candi_index_trees));
-    adlog::DEBUG("generate candi index merge trees, count() ",candi_index_trees.count());
+    //adlog::DEBUG("generate candi index merge trees, count() ",candi_index_trees.count());
     if(candi_index_trees.count() > 0){
       auto &&one = candi_index_trees.at(0);
-      adlog::DEBUG("first node type : ", (int64_t) one->node_type_);
+      //adlog::DEBUG("first node type : ", (int64_t) one->node_type_);
     }
   }
-  adlog::DEBUG("ObJoinOrder::get_candi_index_merge_trees END");
+  //adlog::DEBUG("ObJoinOrder::get_candi_index_merge_trees END");
 
   return ret;
 }
@@ -3345,7 +3345,7 @@ int ObJoinOrder::get_valid_index_merge_indexes(
     const uint64_t table_id, const uint64_t ref_table_id,
     ObIArray<uint64_t> &valid_index_ids,
     ObIArray<ObSEArray<uint64_t, 4>> &valid_index_cols, bool ignore_hint) {
-  adlog::DEBUG("ObJoinOrder::get_valid_index_merge_indexes");
+  //adlog::DEBUG("ObJoinOrder::get_valid_index_merge_indexes");
   int ret = OB_SUCCESS;
   ObSqlSchemaGuard *schema_guard = NULL;
   const ObTableSchema *table_schema = NULL;
@@ -3384,8 +3384,8 @@ int ObJoinOrder::get_valid_index_merge_indexes(
   }
 
   // 验证每个候选索引是否真正支持索引合并
-  adlog::DEBUG("检验每一个候选索引是否都支持索引合并");
-  adlog::DEBUG("总共候选索引的个数有 ",index_ids.count());
+  //adlog::DEBUG("检验每一个候选索引是否都支持索引合并");
+  //adlog::DEBUG("总共候选索引的个数有 ",index_ids.count());
   for (int64_t i = 0; OB_SUCC(ret) && i < index_ids.count(); ++i) {
     index_column_ids.reuse();
     const ObTableSchema *index_schema = NULL;
@@ -3394,7 +3394,7 @@ int ObJoinOrder::get_valid_index_merge_indexes(
       LOG_WARN("failed to get index table schema", K(ret), K(index_id));
     } else if (OB_ISNULL(index_schema)) {
       ret = OB_ERR_UNEXPECTED;
-      adlog::DEBUG(i," OB_ISNULL(index_schema)");
+      //adlog::DEBUG(i," OB_ISNULL(index_schema)");
       LOG_WARN("get unexpected null index schema", K(ret));
     } else if (ref_table_id == index_id ||
                (index_schema->is_index_local_storage() &&
@@ -3402,7 +3402,7 @@ int ObJoinOrder::get_valid_index_merge_indexes(
       /* primary table, local normal index and local fts index are available for
        * index merge now */
 
-      adlog::DEBUG(i," 有初步满足条件");
+      //adlog::DEBUG(i," 有初步满足条件");
       
       if (OB_FAIL(index_schema->get_rowkey_column_ids(index_column_ids))) {
         LOG_WARN("failed to get all column ids", K(ret));
@@ -3412,9 +3412,9 @@ int ObJoinOrder::get_valid_index_merge_indexes(
         LOG_WARN("failed to push back index column ids", K(ret), K(index_id), K(index_column_ids));
       }
       if (OB_FAIL(ret)) {
-        adlog::DEBUG("中间出了错误");
+        //adlog::DEBUG("中间出了错误");
       }
-      adlog::DEBUG(i," 有完整满足条件");
+      //adlog::DEBUG(i," 有完整满足条件");
 
     } else if (!ignore_hint) {
       // hint is invalid
@@ -3432,13 +3432,13 @@ int ObJoinOrder::generate_candi_index_merge_trees(
     ObIArray<uint64_t> &valid_index_ids,
     ObIArray<ObSEArray<uint64_t, 4>> &valid_index_cols,
     ObIArray<ObIndexMergeNode *> &candi_index_trees) {
-  adlog::DEBUG("ObJoinOrder::generate_candi_index_merge_trees START");
+  //adlog::DEBUG("ObJoinOrder::generate_candi_index_merge_trees START");
   int ret = OB_SUCCESS;
   if (valid_index_ids.empty()) {
     // do nothing
-    adlog::DEBUG("valid_index_ids 是空的");
+    //adlog::DEBUG("valid_index_ids 是空的");
   } else {
-    adlog::DEBUG("filters.count() = ", filters.count());
+    //adlog::DEBUG("filters.count() = ", filters.count());
     for (int64_t i = 0; OB_SUCC(ret) && i < filters.count(); ++i) {
       ObRawExpr *filter = filters.at(i);
       ObIndexMergeNode *candi_node = NULL;
@@ -3448,8 +3448,8 @@ int ObJoinOrder::generate_candi_index_merge_trees(
         LOG_WARN("get unexpected null filter", K(ret), K(i));
       } else if (filter->get_expr_type() != T_OP_OR and filter->get_expr_type() != T_OP_AND) {
         // do nothing, only support UNION MERGE now // 现在尝试支持了AND
-        adlog::DEBUG("filter->get_expr_type() != T_OP_OR and filter->get_expr_type() != T_OP_AND");
-        adlog::DEBUG("filter[", i, "] type = ", filter->get_expr_type(), " name = ", filter->get_expr_name());
+        //adlog::DEBUG("filter->get_expr_type() != T_OP_OR and filter->get_expr_type() != T_OP_AND");
+        //adlog::DEBUG("filter[", i, "] type = ", filter->get_expr_type(), " name = ", filter->get_expr_name());
       } else if (OB_FAIL(generate_candi_index_merge_node(ref_table_id,
                                                          filter,
                                                          valid_index_ids,
@@ -3459,11 +3459,11 @@ int ObJoinOrder::generate_candi_index_merge_trees(
         LOG_WARN("failed to generate one index merge tree for filter", K(ret), KPC(filter));
       } else if (!is_valid || NULL == candi_node) {
         // do nothing
-        adlog::DEBUG("!is_valid || NULL == candi_node");
+        //adlog::DEBUG("!is_valid || NULL == candi_node");
       } else if (OB_FAIL(candi_node->formalize_index_merge_tree())) {
         LOG_WARN("failed to formalize candi index merge tree", K(ret), KPC(candi_node));
       } else {
-        adlog::DEBUG("candi_index_trees push_back了一个node");
+        //adlog::DEBUG("candi_index_trees push_back了一个node");
         if (OB_FAIL(candi_index_trees.push_back(candi_node))) {
           LOG_WARN("failed to push back candi index tree", K(ret));
         }
@@ -3510,8 +3510,8 @@ int ObJoinOrder::generate_candi_index_merge_trees(
               LOG_WARN("failed to add child to AND root", K(ret));
             }
           }
-          adlog::DEBUG("and_root->node_type_ ",(int64_t)and_root->node_type_);
-          adlog::DEBUG("and_root->children_ count() ",and_root->children_.count());
+          //adlog::DEBUG("and_root->node_type_ ",(int64_t)and_root->node_type_);
+          //adlog::DEBUG("and_root->children_ count() ",and_root->children_.count());
           if (OB_FAIL(and_root->formalize_index_merge_tree())) {
             LOG_WARN("failed to formalize AND tree", K(ret));
           } else {
@@ -3519,16 +3519,16 @@ int ObJoinOrder::generate_candi_index_merge_trees(
               LOG_WARN("failed to push back AND tree", K(ret));
             } else {
               and_root->gen_code_ = 114514;
-              adlog::DEBUG("Added AND merge tree for ", valid_nodes.count(), " conditions");
+              //adlog::DEBUG("Added AND merge tree for ", valid_nodes.count(), " conditions");
             }
           }
-          adlog::DEBUG("and_root->node_type_ ",(int64_t)and_root->node_type_);
-          adlog::DEBUG("and_root->children_ count() ",and_root->children_.count());
+          //adlog::DEBUG("and_root->node_type_ ",(int64_t)and_root->node_type_);
+          //adlog::DEBUG("and_root->children_ count() ",and_root->children_.count());
         }
       }
     }
   }
-  adlog::DEBUG("ObJoinOrder::generate_candi_index_merge_trees END");
+  //adlog::DEBUG("ObJoinOrder::generate_candi_index_merge_trees END");
   return ret;
 }
 
@@ -3668,7 +3668,7 @@ int ObJoinOrder::collect_candicate_indexes(const uint64_t ref_table_id,
       if (OB_NOT_NULL(left_expr) && left_expr->is_column_ref_expr()) {  
         ObColumnRefRawExpr *col_expr = static_cast<ObColumnRefRawExpr*>(left_expr);  
         uint64_t column_id = col_expr->get_column_id();  
-        adlog::DEBUG("extracted column from IN expr", K(column_id));
+        //adlog::DEBUG("extracted column from IN expr", K(column_id));
           
         // 遍历所有索引，查找包含该列的索引  
         for (int64_t i = 0; OB_SUCC(ret) && i < valid_index_ids.count(); ++i) {  
@@ -3698,23 +3698,23 @@ int ObJoinOrder::collect_candicate_indexes(const uint64_t ref_table_id,
       if (OB_FAIL(ObRawExprUtils::extract_column_ids(filter, column_ids))) {
         LOG_WARN("failed to extract column ids", K(filter), K(ret));
       } else if (OB_UNLIKELY(column_ids.count() != 1)) {
-        adlog::DEBUG("!=1: ", K(column_ids.count()));
+        //adlog::DEBUG("!=1: ", K(column_ids.count()));
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("invalid filter node for index merge", K(filter), K(ret));
-        adlog::DEBUG("invalid filter node for index merge", K(ret));
+        //adlog::DEBUG("invalid filter node for index merge", K(ret));
       } else {
-        adlog::DEBUG("column_ids.at(0): ",column_ids.at(0));
-        adlog::DEBUG(K(valid_index_ids.count()));
+        //adlog::DEBUG("column_ids.at(0): ",column_ids.at(0));
+        //adlog::DEBUG(K(valid_index_ids.count()));
 
         for (int64_t i = 0; OB_SUCC(ret) && i < valid_index_ids.count(); ++i) {
           const uint64_t index_id = valid_index_ids.at(i);
-          adlog::DEBUG("index_id : ", index_id);
+          //adlog::DEBUG("index_id : ", index_id);
           const ObIArray<uint64_t> &index_column_ids = valid_index_cols.at(i);
           if (OB_UNLIKELY(index_column_ids.empty())) {
             ret = OB_ERR_UNEXPECTED;
             LOG_WARN("invalid index column ids", K(ret), K(index_id), K(index_column_ids));
           } else if (index_column_ids.at(0) == column_ids.at(0)) {
-            adlog::DEBUG("NO FTS NO IN : column_ids.at(0): ",column_ids.at(0));
+            //adlog::DEBUG("NO FTS NO IN : column_ids.at(0): ",column_ids.at(0));
             if (OB_FAIL(candicate_index_tids.push_back(index_id))) {
               LOG_WARN("failed to push back index id", K(index_id), K(ret));
             }
@@ -3729,7 +3729,7 @@ int ObJoinOrder::collect_candicate_indexes(const uint64_t ref_table_id,
 int ObIndexMergeNode::formalize_index_merge_tree()
 {
   int ret = OB_SUCCESS;
-  adlog::DEBUG("ObIndexMergeNode::formalize_index_merge_tree start");
+  //adlog::DEBUG("ObIndexMergeNode::formalize_index_merge_tree start");
 
   if (is_merge_node()) {
     ObSEArray<ObIndexMergeNode*, 2> new_children;
@@ -3737,7 +3737,7 @@ int ObIndexMergeNode::formalize_index_merge_tree()
       if (OB_ISNULL(children_.at(i))) {
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("get unexpected null child", K(ret), K(i), K(children_));
-        adlog::DEBUG("get unexpected null child");
+        //adlog::DEBUG("get unexpected null child");
       } else if (OB_FAIL(SMART_CALL(children_.at(i)->formalize_index_merge_tree()))) {
         LOG_WARN("failed to formalize child node", K(ret), K(i), KPC(children_.at(i)));
       } else if (children_.at(i)->node_type_ == node_type_) {
@@ -3754,7 +3754,7 @@ int ObIndexMergeNode::formalize_index_merge_tree()
       LOG_WARN("failed to assign new children", K(ret), K(new_children));
     }
   }
-  adlog::DEBUG("ObIndexMergeNode::formalize_index_merge_tree end");
+  //adlog::DEBUG("ObIndexMergeNode::formalize_index_merge_tree end");
 
   return ret;
 }
@@ -3932,7 +3932,7 @@ int ObJoinOrder::do_create_index_merge_paths(
     const PathHelper &helper, ObIndexInfoCache &index_info_cache,
     ObIArray<ObIndexMergeNode *> &candi_index_trees,
     ObIArray<AccessPath *> &access_paths) {
-  adlog::DEBUG("ObJoinOrder::do_create_index_merge_paths START");
+  //adlog::DEBUG("ObJoinOrder::do_create_index_merge_paths START");
   int ret = OB_SUCCESS;
   for (int64_t i = 0; OB_SUCC(ret) && i < candi_index_trees.count(); ++i) {
     ObIndexMergeNode* root_node = candi_index_trees.at(i);
@@ -3972,42 +3972,42 @@ int ObJoinOrder::do_create_index_merge_paths(
       LOG_TRACE("generate one index merge path", KPC(index_merge_path));
     }
   }
-  adlog::DEBUG("ObJoinOrder::do_create_index_merge_paths END");
+  //adlog::DEBUG("ObJoinOrder::do_create_index_merge_paths END");
 
   return ret;
 }
 
 int ObJoinOrder::choose_best_selectivity_branch(ObIndexMergeNode *&candi_node) {
-  adlog::DEBUG("ObJoinOrder::choose_best_selectivity_branch START");
+  //adlog::DEBUG("ObJoinOrder::choose_best_selectivity_branch START");
   int ret = OB_SUCCESS;
 
 
   if (OB_ISNULL(candi_node)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("get unexpected null", K(ret), KPC(candi_node));
-    adlog::DEBUG("choose_best_selectivity_branch:: get unexpected null");
+    //adlog::DEBUG("choose_best_selectivity_branch:: get unexpected null");
   } else if (INDEX_MERGE_UNION == candi_node->node_type_) {
-    adlog::DEBUG("choose_best_selectivity_branch:: INDEX_MERGE_UNION == candi_node->node_type_");
+    //adlog::DEBUG("choose_best_selectivity_branch:: INDEX_MERGE_UNION == candi_node->node_type_");
     for (int64_t i = 0; OB_SUCC(ret) && i < candi_node->children_.count(); ++i) {
       if (OB_FAIL(SMART_CALL(choose_best_selectivity_branch(candi_node->children_.at(i))))) {
         LOG_WARN("failed to choose best branch for child", K(ret), KPC(candi_node->children_.at(i)));
       }
     }
   } else if (INDEX_MERGE_INTERSECT == candi_node->node_type_) {
-    adlog::DEBUG("choose_best_selectivity_branch:: INDEX_MERGE_INTERSECT == candi_node->node_type_");
+    //adlog::DEBUG("choose_best_selectivity_branch:: INDEX_MERGE_INTERSECT == candi_node->node_type_");
 
     bool has_scan_children = true;  
     for (int64_t i = 0; i < candi_node->children_.count(); ++i) {
       if (OB_NOT_NULL(candi_node->children_.at(i)) &&
           (candi_node->children_.at(i)->node_type_ != INDEX_MERGE_SCAN and
            candi_node->children_.at(i)->node_type_ != INDEX_MERGE_FTS_INDEX)) {
-        adlog::DEBUG("candi_node->children_.at(i)->node_type_ is error idx: ",i," type : ",(int64_t)candi_node->children_.at(i)->node_type_);
+        //adlog::DEBUG("candi_node->children_.at(i)->node_type_ is error idx: ",i," type : ",(int64_t)candi_node->children_.at(i)->node_type_);
         has_scan_children = false;
         break;
       }
     }
-    adlog::DEBUG("choose_best_selectivity_branch::  candi_node->children_.count() ",candi_node->children_.count());
-    adlog::DEBUG("choose_best_selectivity_branch::  has_scan_children ",has_scan_children);
+    //adlog::DEBUG("choose_best_selectivity_branch::  candi_node->children_.count() ",candi_node->children_.count());
+    //adlog::DEBUG("choose_best_selectivity_branch::  has_scan_children ",has_scan_children);
 
     bool go_index_merge_path_flag = true;
 
@@ -4058,7 +4058,7 @@ int ObJoinOrder::choose_best_selectivity_branch(ObIndexMergeNode *&candi_node) {
 
 
   }
-  adlog::DEBUG("ObJoinOrder::choose_best_selectivity_branch END");
+  //adlog::DEBUG("ObJoinOrder::choose_best_selectivity_branch END");
 
   return ret;
 }
@@ -4316,8 +4316,8 @@ int ObJoinOrder::create_one_index_merge_path(const uint64_t table_id,
 }
 
 int ObJoinOrder::prune_index_merge_path(ObIArray<AccessPath *> &access_paths) {
-  adlog::DEBUG("ObJoinOrder::prune_index_merge_path start!!");
-  adlog::DEBUG("access_paths count() ", access_paths.count());
+  //adlog::DEBUG("ObJoinOrder::prune_index_merge_path start!!");
+  //adlog::DEBUG("access_paths count() ", access_paths.count());
   int ret = OB_SUCCESS;
   ObSEArray<AccessPath*, 4> tmp_paths;
   for (int64_t i = 0; OB_SUCC(ret) && i < access_paths.count(); ++i) {
@@ -4329,43 +4329,43 @@ int ObJoinOrder::prune_index_merge_path(ObIArray<AccessPath *> &access_paths) {
         || OB_UNLIKELY(!access_paths.at(i)->is_index_merge_path())) {
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("get unexpected index merge path", K(ret), K(i), KPC(access_paths.at(i)));
-      adlog::DEBUG("get unexpected index merge path");
+      //adlog::DEBUG("get unexpected index merge path");
       
     } else if (OB_FAIL(static_cast<IndexMergePath*>(access_paths.at(i))->get_all_scan_access_paths(scan_paths))) {
       LOG_WARN("failed to get all scan access paths", K(ret));
-      adlog::DEBUG("failed to get all scan access paths");
+      //adlog::DEBUG("failed to get all scan access paths");
     }else {
       // 检查根节点是否是INTERSECT节点（AND操作）
       IndexMergePath* index_merge_path = static_cast<IndexMergePath*>(access_paths.at(i));
       if (OB_NOT_NULL(index_merge_path->root_)) {
         // 添加详细调试信息
-        adlog::DEBUG("root node_type: ", (int64_t)index_merge_path->root_->node_type_);
-        adlog::DEBUG("INDEX_MERGE_INTERSECT value: ",(int64_t) INDEX_MERGE_INTERSECT);
-        adlog::DEBUG("INDEX_MERGE_UNION value: ",(int64_t) INDEX_MERGE_UNION);
-        adlog::DEBUG("INDEX_MERGE_FTS_INDEX value: ", (int64_t)INDEX_MERGE_FTS_INDEX);
+        //adlog::DEBUG("root node_type: ", (int64_t)index_merge_path->root_->node_type_);
+        //adlog::DEBUG("INDEX_MERGE_INTERSECT value: ",(int64_t) INDEX_MERGE_INTERSECT);
+        //adlog::DEBUG("INDEX_MERGE_UNION value: ",(int64_t) INDEX_MERGE_UNION);
+        //adlog::DEBUG("INDEX_MERGE_FTS_INDEX value: ", (int64_t)INDEX_MERGE_FTS_INDEX);
 
 
         // 用字符串判断类型
         if (index_merge_path->root_->node_type_ == INDEX_MERGE_INTERSECT) {
-          adlog::DEBUG("root node_type is INDEX_MERGE_INTERSECT");
+          //adlog::DEBUG("root node_type is INDEX_MERGE_INTERSECT");
           is_intersect_node = true;
         } else if (index_merge_path->root_->node_type_ == INDEX_MERGE_UNION) {
-          adlog::DEBUG("root node_type is INDEX_MERGE_UNION");
+          //adlog::DEBUG("root node_type is INDEX_MERGE_UNION");
         } else if (index_merge_path->root_->node_type_ == INDEX_MERGE_FTS_INDEX) {
-          adlog::DEBUG("root node_type is INDEX_MERGE_FTS_INDEX");
+          //adlog::DEBUG("root node_type is INDEX_MERGE_FTS_INDEX");
         } else {
-          adlog::DEBUG("root node_type is UNKNOWN, value: ", (int64_t)index_merge_path->root_->node_type_);
+          //adlog::DEBUG("root node_type is UNKNOWN, value: ", (int64_t)index_merge_path->root_->node_type_);
         }
         
         // 检查是否是INTERSECT节点
         is_intersect_node = (index_merge_path->root_->node_type_ == INDEX_MERGE_INTERSECT);
-        adlog::DEBUG("is_intersect_node status: ", is_intersect_node);
+        //adlog::DEBUG("is_intersect_node status: ", is_intersect_node);
         
         // 检查子节点数量
-        adlog::DEBUG("root children count: ", index_merge_path->root_->children_.count());
+        //adlog::DEBUG("root children count: ", index_merge_path->root_->children_.count());
         
       } else {
-        adlog::DEBUG("is_intersect_node status: nullptr");
+        //adlog::DEBUG("is_intersect_node status: nullptr");
         
       }
     }
@@ -4391,15 +4391,15 @@ int ObJoinOrder::prune_index_merge_path(ObIArray<AccessPath *> &access_paths) {
   } else if (OB_FAIL(access_paths.assign(tmp_paths))) {
     LOG_WARN("failed to assign access paths", K(ret));
   }
-  adlog::DEBUG("access_paths count() ",access_paths.count());
-  adlog::DEBUG("ObJoinOrder::prune_index_merge_path end!!");
+  //adlog::DEBUG("access_paths count() ",access_paths.count());
+  //adlog::DEBUG("ObJoinOrder::prune_index_merge_path end!!");
   
   return ret;
 }
 
 int ObJoinOrder::check_index_merge_paths_contain_fts(
     ObIArray<AccessPath *> &access_paths, bool &contain_fts) {
-  adlog::DEBUG("ObJoinOrder::check_index_merge_paths_contain_fts start");
+  //adlog::DEBUG("ObJoinOrder::check_index_merge_paths_contain_fts start");
   int ret = OB_SUCCESS;
   ObIndexMergeNode *root_node = NULL;
   contain_fts = false;
@@ -4409,24 +4409,24 @@ int ObJoinOrder::check_index_merge_paths_contain_fts(
       || OB_ISNULL(root_node = static_cast<IndexMergePath*>(access_paths.at(0))->root_)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("get unexpected index merge path", K(ret), K(access_paths), K(root_node));
-    adlog::DEBUG("get unexpected index merge path");
+    //adlog::DEBUG("get unexpected index merge path");
 
   }
-  adlog::DEBUG("root_node->children_.count() ",root_node->children_.count());
+  //adlog::DEBUG("root_node->children_.count() ",root_node->children_.count());
   for (int64_t i = 0; OB_SUCC(ret) && i < root_node->children_.count(); ++i) {
     ObIndexMergeNode *child_node = root_node->children_.at(i);
     if (OB_ISNULL(child_node)
         || OB_UNLIKELY(!child_node->is_scan_node())) {
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("get unexpected index merge node", K(ret), K(i), K(root_node));
-      adlog::DEBUG("get unexpected index merge node");
+      //adlog::DEBUG("get unexpected index merge node");
     } else if (INDEX_MERGE_FTS_INDEX == child_node->node_type_) {
       contain_fts = true;
       break;
     }
   }
-  adlog::DEBUG("contain_fts: ",contain_fts);
-  adlog::DEBUG("ObJoinOrder::check_index_merge_paths_contain_fts end");
+  //adlog::DEBUG("contain_fts: ",contain_fts);
+  //adlog::DEBUG("ObJoinOrder::check_index_merge_paths_contain_fts end");
 
   return ret;
 }
@@ -4557,7 +4557,7 @@ int IndexMergePath::estimate_cost()
     OPT_TRACE_COST_MODEL("index_merge_cost (", cost_, ") +=", KV(filter_cost));
   }
   // cost_ = 0;
-  adlog::DEBUG("set index merge path cost = 0 ?");
+  //adlog::DEBUG("set index merge path cost = 0 ?");
   DISABLE_OPT_TRACE_COST_MODEL;
   return ret;
 }
@@ -5284,7 +5284,7 @@ int ObJoinOrder::extract_interesting_column_ids(const ObIArray<ObRawExpr*> &keys
 int ObJoinOrder::is_join_match(const ObIArray<OrderItem> &ordering,
                                int64_t &prefix_count, // max join match prefix
                                bool &sort_match) {
-  // adlog::DEBUG("is_join_macth start");
+  // //adlog::DEBUG("is_join_macth start");
   int ret = OB_SUCCESS;
   sort_match = false;
   prefix_count = 0;

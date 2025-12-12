@@ -189,7 +189,7 @@ common::ObIAllocator *ObDASMergeIter::get_das_alloc()
 
 int ObDASMergeIter::create_das_task(const ObDASTabletLoc *tablet_loc,
                                     ObDASScanOp *&scan_op, bool &reuse_op) {
-  // adlog::DEBUG("ObDASMergeIter::create_das_task");
+  // //adlog::DEBUG("ObDASMergeIter::create_das_task");
   int ret = OB_SUCCESS;
   ObIDASTaskOp *task_op = nullptr;
   ObDASOpType op_type = DAS_OP_TABLE_SCAN;
@@ -207,9 +207,9 @@ int ObDASMergeIter::create_das_task(const ObDASTabletLoc *tablet_loc,
     scan_op = static_cast<ObDASScanOp *>(task_op);
     storage::ObTableScanParam &scan_param = scan_op->get_scan_param();
     // if (parent_filters_.count() > 0 and parent_filters_.count() < 4) {
-    //   adlog::DEBUG("parent_filters_.count() > 0");
+    //   //adlog::DEBUG("parent_filters_.count() > 0");
     //   if (scan_param.op_filters_ != nullptr) {
-    //     adlog::DEBUG("scan_param.op_filters_ != nullptr");
+    //     //adlog::DEBUG("scan_param.op_filters_ != nullptr");
     //   // 将parent_filters_的内容添加到现有的op_filters_中
     //   // 注意：不能直接修改const成员，需要找到正确的方法
     //     for (int64_t i = 0; i < parent_filters_.count(); i++) {
@@ -221,7 +221,7 @@ int ObDASMergeIter::create_das_task(const ObDASTabletLoc *tablet_loc,
     //       }
     //     }
     //   } else {
-    //     adlog::DEBUG("scan_param.op_filters_ is nullptr");
+    //     //adlog::DEBUG("scan_param.op_filters_ is nullptr");
     //         // 使用scan_param的allocator分配内存
     //     if (scan_param.allocator_ != nullptr) {
     //       // 分配一个新的数组对象，使用4作为栈上元素数量（因为最多3个filter）
@@ -230,7 +230,7 @@ int ObDASMergeIter::create_das_task(const ObDASTabletLoc *tablet_loc,
     //         // 在分配的内存上构造数组对象
     //         common::ObSEArray<sql::ObExpr*, 4>* new_filters = 
     //             new(buf) common::ObSEArray<sql::ObExpr*, 4>();
-    //         adlog::DEBUG("new_filters->assign(parent_filters_)");
+    //         //adlog::DEBUG("new_filters->assign(parent_filters_)");
     //         // 将parent_filters_的内容复制到新数组
     //         int ret = new_filters->assign(parent_filters_);
     //         if (OB_SUCC(ret)) {
@@ -246,7 +246,7 @@ int ObDASMergeIter::create_das_task(const ObDASTabletLoc *tablet_loc,
     //     }
     //   }
     // } else {
-    //   // adlog::DEBUG("parent_filters_.count() = 0");
+    //   // //adlog::DEBUG("parent_filters_.count() = 0");
     // }
     //       // 1. 首先创建一个新的数组对象
     // sql::ObExprPtrIArray* new_filters = nullptr;
@@ -918,18 +918,18 @@ int ObDASMergeIter::get_next_seq_rows(int64_t &count, int64_t capacity)
                 scan_op->get_output_result_iter();
             if (auto &&cache_iter =
                     dynamic_cast<ObDASCacheLookupIter *>(new_row_iter)) {
-              adlog::DEBUG("change new_rot_iter to ObDASCacheLookupIter");
+              //adlog::DEBUG("change new_rot_iter to ObDASCacheLookupIter");
               // 接下来要把filter传到cache_lookup_iter的lookup_param的filter里面去
               
               //这里是先尝试下推到cache_lookup_iter的lookup_param去
               if (parent_filters_.count() > 0 and parent_filters_.count() < 3 and false) {
                 storage::ObTableScanParam& param = cache_iter->get_lookup_param();
-                adlog::DEBUG("222 parent_filters_.count() > 0");
+                //adlog::DEBUG("222 parent_filters_.count() > 0");
 
                 bool valid = true;
                 for (int64_t i = 0; i < parent_filters_.count(); i++) {
                   if (parent_filters_.at(i) == nullptr) {
-                    adlog::DEBUG("Found null expr pointer at index", K(i));
+                    //adlog::DEBUG("Found null expr pointer at index", K(i));
                     valid = false;
                     break;
                   }
@@ -939,7 +939,7 @@ int ObDASMergeIter::get_next_seq_rows(int64_t &count, int64_t capacity)
                 } else {
                   
                   if (param.op_filters_ != nullptr) {
-                    adlog::DEBUG("222 param.op_filters_ != nullptr");
+                    //adlog::DEBUG("222 param.op_filters_ != nullptr");
                   // 将parent_filters_的内容添加到现有的op_filters_中
                   // 注意：不能直接修改const成员，需要找到正确的方法
                     for (int64_t i = 0; i < parent_filters_.count(); i++) {
@@ -951,7 +951,7 @@ int ObDASMergeIter::get_next_seq_rows(int64_t &count, int64_t capacity)
                       }
                     }
                   } else {
-                    adlog::DEBUG("222 param.op_filters_ is nullptr");
+                    //adlog::DEBUG("222 param.op_filters_ is nullptr");
                         // 使用param的allocator分配内存
                     if (param.allocator_ != nullptr) {
                       // 分配一个新的数组对象，使用4作为栈上元素数量（因为最多3个filter）
@@ -960,7 +960,7 @@ int ObDASMergeIter::get_next_seq_rows(int64_t &count, int64_t capacity)
                         // 在分配的内存上构造数组对象
                         common::ObSEArray<sql::ObExpr*, 4>* new_filters = 
                             new(buf) common::ObSEArray<sql::ObExpr*, 4>();
-                        adlog::DEBUG("222 new_filters->assign(parent_filters_)");
+                        //adlog::DEBUG("222 new_filters->assign(parent_filters_)");
                         // 将parent_filters_的内容复制到新数组
                         int ret = new_filters->assign(parent_filters_);
                         // int ret = OB_SUCCESS;
@@ -969,15 +969,15 @@ int ObDASMergeIter::get_next_seq_rows(int64_t &count, int64_t capacity)
                           if (auto &&one = dynamic_cast<sql::ObExprPtrIArray *>(
                                   new_filters)) {
                             const_cast<sql::ObExprPtrIArray*&>(param.op_filters_) = one;
-                            adlog::DEBUG("success to assign parent filters to new array");
+                            //adlog::DEBUG("success to assign parent filters to new array");
                           } else {
-                            adlog::DEBUG("can not cast to ObExprPtrIArray");
+                            //adlog::DEBUG("can not cast to ObExprPtrIArray");
                           }
                           // const_cast<sql::ObExprPtrIArray*&>(param.op_filters_) = 
                           //     static_cast<sql::ObExprPtrIArray*>(new_filters);
 
                         } else {
-                          adlog::DEBUG("failed to assign parent filters to new array");
+                          //adlog::DEBUG("failed to assign parent filters to new array");
                           LOG_WARN("failed to assign parent filters to new array", K(ret));
                         }
                       } else {
@@ -988,7 +988,7 @@ int ObDASMergeIter::get_next_seq_rows(int64_t &count, int64_t capacity)
                 }
 
               } else {
-                adlog::DEBUG("222 parent_filters_.count() = 0");
+                //adlog::DEBUG("222 parent_filters_.count() = 0");
               }
 
               // 这里是吧filter下推到data_table_iter_里面去
@@ -1003,9 +1003,9 @@ int ObDASMergeIter::get_next_seq_rows(int64_t &count, int64_t capacity)
                     storage::ObTableScanParam& param = func_lookup_iter->get_lookup_param();
 
                     if (param.op_filters_ != nullptr) {
-                      adlog::DEBUG("333 param.op_filters_ != nullptr");
+                      //adlog::DEBUG("333 param.op_filters_ != nullptr");
                     } else {
-                      adlog::DEBUG("333 param.op_filters_ is nullptr");
+                      //adlog::DEBUG("333 param.op_filters_ is nullptr");
                           // 使用param的allocator分配内存
                       if (param.allocator_ != nullptr) {
                         // 分配一个新的数组对象，使用4作为栈上元素数量（因为最多3个filter）
@@ -1014,7 +1014,7 @@ int ObDASMergeIter::get_next_seq_rows(int64_t &count, int64_t capacity)
                           // 在分配的内存上构造数组对象
                           common::ObSEArray<sql::ObExpr*, 4>* new_filters = 
                               new(buf) common::ObSEArray<sql::ObExpr*, 4>();
-                          adlog::DEBUG("333 new_filters->assign(parent_filters_)");
+                          //adlog::DEBUG("333 new_filters->assign(parent_filters_)");
                           // 将parent_filters_的内容复制到新数组
                           int ret = new_filters->assign(parent_filters_);
                           // int ret = OB_SUCCESS;
@@ -1023,12 +1023,12 @@ int ObDASMergeIter::get_next_seq_rows(int64_t &count, int64_t capacity)
                             if (auto &&one = dynamic_cast<sql::ObExprPtrIArray *>(
                                     new_filters)) {
                               const_cast<sql::ObExprPtrIArray*&>(param.op_filters_) = one;
-                              adlog::DEBUG("success to assign parent filters to new array");
+                              //adlog::DEBUG("success to assign parent filters to new array");
                             } else {
-                              adlog::DEBUG("can not cast to ObExprPtrIArray");
+                              //adlog::DEBUG("can not cast to ObExprPtrIArray");
                             }
                           } else {
-                            adlog::DEBUG("failed to assign parent filters to new array");
+                            //adlog::DEBUG("failed to assign parent filters to new array");
                             LOG_WARN("failed to assign parent filters to new array", K(ret));
                           }
                         } else {
@@ -1046,9 +1046,9 @@ int ObDASMergeIter::get_next_seq_rows(int64_t &count, int64_t capacity)
                               storage::ObTableScanParam& param = iter->get_scan_param();
 
                               if (param.op_filters_ != nullptr) {
-                                adlog::DEBUG("444 param.op_filters_ != nullptr");
+                                //adlog::DEBUG("444 param.op_filters_ != nullptr");
                               } else {
-                                adlog::DEBUG("444 param.op_filters_ is nullptr");
+                                //adlog::DEBUG("444 param.op_filters_ is nullptr");
                                     // 使用param的allocator分配内存
                                 if (param.allocator_ != nullptr) {
                                   // 分配一个新的数组对象，使用4作为栈上元素数量（因为最多3个filter）
@@ -1057,7 +1057,7 @@ int ObDASMergeIter::get_next_seq_rows(int64_t &count, int64_t capacity)
                                     // 在分配的内存上构造数组对象
                                     common::ObSEArray<sql::ObExpr*, 4>* new_filters = 
                                         new(buf) common::ObSEArray<sql::ObExpr*, 4>();
-                                    adlog::DEBUG("444 new_filters->assign(parent_filters_)");
+                                    //adlog::DEBUG("444 new_filters->assign(parent_filters_)");
                                     // 将parent_filters_的内容复制到新数组
                                     int ret = new_filters->assign(parent_filters_);
                                     // int ret = OB_SUCCESS;
@@ -1066,12 +1066,12 @@ int ObDASMergeIter::get_next_seq_rows(int64_t &count, int64_t capacity)
                                       if (auto &&one = dynamic_cast<sql::ObExprPtrIArray *>(
                                               new_filters)) {
                                         const_cast<sql::ObExprPtrIArray*&>(param.op_filters_) = one;
-                                        adlog::DEBUG("success to assign parent filters to new array");
+                                        //adlog::DEBUG("success to assign parent filters to new array");
                                       } else {
-                                        adlog::DEBUG("can not cast to ObExprPtrIArray");
+                                        //adlog::DEBUG("can not cast to ObExprPtrIArray");
                                       }
                                     } else {
-                                      adlog::DEBUG("failed to assign parent filters to new array");
+                                      //adlog::DEBUG("failed to assign parent filters to new array");
                                       LOG_WARN("failed to assign parent filters to new array", K(ret));
                                     }
                                   } else {
@@ -1080,18 +1080,18 @@ int ObDASMergeIter::get_next_seq_rows(int64_t &count, int64_t capacity)
                                 }
                               } 
                     } else {
-                      adlog::DEBUG("out 's data_table_iter 's lookup_iter 's data_table_iter is not das_scan_iter");
+                      //adlog::DEBUG("out 's data_table_iter 's lookup_iter 's data_table_iter is not das_scan_iter");
                     }
                     // 测试类型
                     {
                       if(auto && iter = dynamic_cast<ObDASLocalLookupIter*>(data_iter)){
-                        adlog::DEBUG("good2");
+                        //adlog::DEBUG("good2");
                       }
                       if(auto && iter = dynamic_cast<ObDASLookupIter*>(data_iter)){
-                        adlog::DEBUG("good3");
+                        //adlog::DEBUG("good3");
                       }
                       if(auto && iter = dynamic_cast<ObDASCacheLookupIter*>(data_iter)){
-                        adlog::DEBUG("good4");
+                        //adlog::DEBUG("good4");
                       }
 
                     }

@@ -553,8 +553,8 @@ protected:
       }
       // extract_pk_range_from_plan();
       // 确保过滤条件存在
-      // adlog::DEBUG("Filter count: ", MY_SPEC.filters_.count());
-      // adlog::DEBUG("Need final limit: ", need_final_limit_);
+      // //adlog::DEBUG("Filter count: ", MY_SPEC.filters_.count());
+      // //adlog::DEBUG("Need final limit: ", need_final_limit_);
 
       return ret;
   }
@@ -581,15 +581,15 @@ protected:
                     // }
                     cached_max_pk_val_ = range_end + 2;
                     cached_min_pk_val_ = INT64_MIN; // 设置合理的默认值
-                    adlog::DEBUG("Extracted PK range max: ", cached_max_pk_val_);
+                    //adlog::DEBUG("Extracted PK range max: ", cached_max_pk_val_);
                     break;
                 }
             }
         }
     }
-      adlog::DEBUG("cached_min_pk_val_ ",cached_min_pk_val_);
-      adlog::DEBUG("cached_max_pk_val_ ",cached_max_pk_val_);
-      adlog::DEBUG("MY_INPUT.key_ranges_.empty(): ",MY_INPUT.key_ranges_.empty());
+      //adlog::DEBUG("cached_min_pk_val_ ",cached_min_pk_val_);
+      //adlog::DEBUG("cached_max_pk_val_ ",cached_max_pk_val_);
+      //adlog::DEBUG("MY_INPUT.key_ranges_.empty(): ",MY_INPUT.key_ranges_.empty());
     
     return ret;
   }

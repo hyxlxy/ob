@@ -75,7 +75,7 @@ int ObDASScanIter::inner_release()
 int ObDASScanIter::do_table_scan() {
   static int count = 0;count++;
   if (count % 1000 == 0) { 
-    adlog::DEBUG("ObDASScanIter::do_table_scan()");
+    //adlog::DEBUG("ObDASScanIter::do_table_scan()");
   }
   int ret = OB_SUCCESS;
   if (OB_ISNULL(scan_param_)) {
@@ -120,7 +120,7 @@ int ObDASScanIter::inner_get_next_row()
 {
   int ret = OB_SUCCESS;
   common::ObASHTabletIdSetterGuard ash_tablet_id_guard(scan_param_ != nullptr? scan_param_->index_id_ : 0);
-  // adlog::DEBUG("ObDASScanIter::inner_get_next_row()");
+  // //adlog::DEBUG("ObDASScanIter::inner_get_next_row()");
   if (OB_ISNULL(result_)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("unexpected nullptr scan iter", K(ret));
