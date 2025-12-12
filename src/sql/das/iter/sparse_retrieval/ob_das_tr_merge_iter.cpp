@@ -496,15 +496,15 @@ int ObDASTRMergeIter::create_sparse_retrieval_iter()
   sr_iter_param_.filter_expr_ = ir_ctdef_->match_filter_;
   sr_iter_param_.topk_limit_ = topk_limit_;
 
-  const int64_t OB_TR_TOPK_EXPAND_FACTOR = 3; // alpha
-  if (topk_mode_ && topk_limit_ > 0) {
-    const int64_t expanded = topk_limit_ * OB_TR_TOPK_EXPAND_FACTOR;
-    sr_iter_param_.topk_limit_ = expanded;
-  } else {
-    sr_iter_param_.topk_limit_ = topk_limit_;
-  }
-  bool topk_mode_res = (topk_mode_)? true:false;
-  adlog::DEBUG("ObDASTRMergeIter::create_sparse_retrieval_iter(), topl_mode_", topk_mode_res );
+  // const int64_t OB_TR_TOPK_EXPAND_FACTOR = 3; // alpha
+  // if (topk_mode_ && topk_limit_ > 0) {
+  //   const int64_t expanded = topk_limit_ * OB_TR_TOPK_EXPAND_FACTOR;
+  //   sr_iter_param_.topk_limit_ = expanded;
+  // } else {
+  //   sr_iter_param_.topk_limit_ = topk_limit_;
+  // }
+  // bool topk_mode_res = (topk_mode_)? true:false;
+  // adlog::DEBUG("ObDASTRMergeIter::create_sparse_retrieval_iter(), topl_mode_", topk_mode_res );
 
   if (OB_NOT_NULL(ir_ctdef_->field_boost_expr_)) {
     ObDatum *boost_datum = nullptr;

@@ -3355,7 +3355,22 @@ if (OB_ISNULL(ctdef) || OB_ISNULL(rtdef) || ctdef->op_type_ != DAS_OP_INDEX_MERG
     LOG_WARN("invalid argument", K(ctdef), K(rtdef));
   } else {
     const ObDASIndexMergeCtDef *merge_ctdef = static_cast<const ObDASIndexMergeCtDef*>(ctdef);
-    ObDASIndexMergeRtDef *merge_rtdef = static_cast<ObDASIndexMergeRtDef*>(rtdef);
+    ObDASIndexMergeRtDef *merge_rtdef =
+        static_cast<ObDASIndexMergeRtDef *>(rtdef);
+    // { //debug
+    //   // 在 create_index_merge_sub_tree 函数开头或合适位置
+    //   ObExpr *pk_expr = merge_ctdef->rowkey_exprs_.at(0);
+    //   adlog::DEBUG("rowkey_expr[0] type: ", pk_expr->type_);
+
+    //   if (pk_expr->type_ == T_REF_COLUMN) {
+    //     const ObColumnRefExtraInfo *col_info = static_cast<const ObColumnRefExtraInfo*>(pk_expr->extra_info_);
+    //     uint64_t col_id = col_info->get_column_id();
+    //     uint64_t table_id = col_info->get_table_id();
+    //     adlog::DEBUG("rowkey_expr[0] references column_id=", col_id, " table_id=", table_id);
+    //   } else {
+    //     adlog::DEBUG("rowkey_expr[0] is NOT a column ref!");
+    //   }
+    // }
     ObArray<ObDASIter*> child_iters;
     ObArray<ObDASScanIter*> child_scan_iters;
     ObArray<ObDASScanRtDef*> child_scan_rtdefs;

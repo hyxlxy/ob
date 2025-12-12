@@ -76,10 +76,10 @@ ObSRDaaTIterImpl::ObSRDaaTIterImpl()
       merge_heap_(nullptr), relevance_collector_(nullptr), iter_domain_ids_(),
       buffered_domain_ids_(), buffered_relevances_(), next_round_iter_idxes_(),
       next_round_cnt_(0), set_datum_func_(nullptr) {
-  static int id_count = 0;
-  id_count++;
-  ididid = id_count;
-  adlog::DEBUG("ObSRDaaTIterImpl::id_count: ",id_count);
+  // static int id_count = 0;
+  // id_count++;
+  // ididid = id_count;
+  // adlog::DEBUG("ObSRDaaTIterImpl::id_count: ",id_count);
 }
 
 int ObSRDaaTIterImpl::init(

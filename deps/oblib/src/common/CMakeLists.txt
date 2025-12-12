@@ -1,4 +1,5 @@
 ob_set_subtarget(oblib_common common
+  ad_log.cpp
   data_buffer.cpp
   ob_accuracy.cpp
   ob_balance_filter.cpp

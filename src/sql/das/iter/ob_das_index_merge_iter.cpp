@@ -207,10 +207,11 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
     lib::ContextParam context_param;
     context_param.set_mem_attr(MTL_ID(), "DASIndexMerge", ObCtxIds::DEFAULT_CTX_ID)
         .set_properties(lib::USE_TL_PAGE_OPTIONAL);
-    if (OB_UNLIKELY(merge_type_ != INDEX_MERGE_UNION and merge_type_ != INDEX_MERGE_INTERSECT)) {
-      ret = OB_INVALID_ARGUMENT;
-      LOG_WARN("invalid merge type", K(merge_type_));
-    } else if (OB_FAIL(CURRENT_CONTEXT->CREATE_CONTEXT(mem_ctx_, context_param))) {
+    // if (OB_UNLIKELY(merge_type_ != INDEX_MERGE_UNION and merge_type_ != INDEX_MERGE_INTERSECT)) {
+    //   ret = OB_INVALID_ARGUMENT;
+    //   LOG_WARN("invalid merge type", K(merge_type_));
+    // } else
+      if (OB_FAIL(CURRENT_CONTEXT->CREATE_CONTEXT(mem_ctx_, context_param))) {
       LOG_WARN("failed to create index merge memctx", K(ret));
     } else {
       common::ObArenaAllocator &alloc = mem_ctx_->get_arena_allocator();
@@ -385,7 +386,7 @@ int ObDASIndexMergeIter::extract_match_against_exprs(const common::ObIArray<ObEx
   for (int64_t i = 0; OB_SUCC(ret) && i < exprs.count(); ++i) {
     ObExpr *expr = exprs.at(i);
     if (OB_ISNULL(expr)) {
-      ret = OB_ERR_UNEXPECTED;
+      ret = OB_ERR_UNEXPECTED;  
       LOG_WARN("unexpected nullptr expr", K(ret));
     } else if (T_FUN_MATCH_AGAINST == expr->type_) {
       if (OB_FAIL(match_against_exprs.push_back(expr))) {
@@ -721,17 +722,23 @@ int ObDASIndexMergeIter::intersect_get_next_row()
   return ret;
 }
 
-int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacity)
-{
-  int ret = OB_SUCCESS;
-  bool got_row = false;
-  while (OB_SUCC(ret) && count < capacity) {
-      /* try to fill each child store */
-    int64_t output_idx = OB_INVALID_INDEX;
-    int cmp_ret = 0;
-    int64_t child_rows_cnt = 0;
+
+int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacity)  
+{  
+  int ret = OB_SUCCESS;  
+  count = 0;  
+  result_buffer_.reuse();
+
+  
+  while (OB_SUCC(ret) && count < capacity) {  
+    /* try to fill each child store */  
+    int64_t output_idx = OB_INVALID_INDEX;  
+    int cmp_ret = 0;  
+    int64_t child_rows_cnt = 0;  
+      
     for (int64_t i = 0; OB_SUCC(ret) && i < child_stores_.count(); i++) {
       IndexMergeRowStore &child_store = child_stores_.at(i);
+      child_rows_cnt = 0;
       if (!child_store.have_data()) {
         if (!child_store.iter_end_) {
           ObDASIter *child_iter = child_iters_.at(i);
@@ -763,43 +770,69 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
         LOG_WARN("index merge failed to compare row", K(i), K(output_idx), K(ret));
       }
     }
-
-    if (OB_FAIL(ret)) {
-    } else if (output_idx == OB_INVALID_INDEX) {
-      /* no available row, stop the entire process */
-      ret = OB_ITER_END;
-    } else {
-      /* find all available rows */
+  
+    if (OB_FAIL(ret)) {  
+    } else if (output_idx == OB_INVALID_INDEX) {  
+      /* no available row, stop the entire process */  
+      ret = OB_ITER_END;  
+    } else {  
+      /* INTERSECT逻辑：检查所有child是否都有这个rowkey */  
       bool all_matched = true;
       for (int64_t i = 0; OB_SUCC(ret) && i < child_stores_.count(); i++) {
-        if (output_idx == i) {
+        IndexMergeRowStore &child_store = child_stores_.at(i);  
+        
+        if (output_idx == i) {  
           /* skip */
-        } else if (child_stores_.at(i).iter_end_ || !child_stores_.at(i).have_data()) {
-          ret = OB_ITER_END;
-        } else if (OB_FAIL(compare(i, output_idx, cmp_ret))) {
-            LOG_WARN("index merge failed to compare row", K(i), K(output_idx), K(ret));
-        } else if (cmp_ret == 0) {
-          child_stores_.at(i).cur_idx_++;
-        } else {
-          all_matched = false;
-        }
-      }
+        } else if ((!child_stores_.at(i).have_data())) {
+            all_matched = false;  // 这个child没有数据，不匹配  
+        } else if (OB_FAIL(compare(i, output_idx, cmp_ret))) {  
+          LOG_WARN("index merge failed to compare row", K(i), K(output_idx), K(ret));  
+        } else if (cmp_ret != 0) {  
+          all_matched = false;  // rowkey不匹配  
+        }  
+      }  
+        
       if (OB_SUCC(ret)) {
         if (all_matched) {
-          /* found available row in each child store, output */
-          if (OB_FAIL(child_stores_.at(output_idx).to_expr())) {
-            LOG_WARN("index merge failed to convert row to expr", K(ret));
-          } else {
-            count += 1;
-          }
-        } else {
-          child_stores_.at(output_idx).cur_idx_++;
-        }
-      }
-    }
-  }
 
-  return ret;
+          /* 所有child都有这个rowkey，输出结果 */  
+          if (OB_FAIL(child_stores_.at(output_idx).to_expr())) {  
+            LOG_WARN("failed to convert store row to expr", K(ret));  
+          } else {  
+            // 保存到result buffer  
+            if (OB_FAIL(save_row_to_result_buffer())) {  
+              LOG_WARN("failed to save row to result buffer", K(ret)); 
+              adlog::DEBUG("failed to save row to result buffer", K(ret)); 
+            } else {  
+              count += 1;
+            }
+
+            for (int64_t i = 0; OB_SUCC(ret) && i < child_stores_.count(); i++) {
+              if(output_idx == i){
+                continue;
+              }
+              child_stores_.at(i).to_expr();
+            }
+          }  
+        } else {  
+          /* 不是所有child都有这个rowkey，前进最小的rowkey */  
+          // child_stores_.at(output_idx).cur_idx_++;  
+          child_stores_.at(output_idx).to_expr();
+
+        }  
+      }  
+    }  
+  }  
+  
+  if (OB_ITER_END == ret && count > 0) {  
+    ret = OB_SUCCESS;  
+  }  
+  if (OB_SUCC(ret) && count > 0) {  
+    if (OB_FAIL(result_buffer_.to_expr(count))) {  
+      LOG_WARN("failed to convert result buffer to exprs", K(ret));  
+    }  
+  }  
+  return ret;  
 }
 
 int ObDASIndexMergeIter::union_get_next_row()
