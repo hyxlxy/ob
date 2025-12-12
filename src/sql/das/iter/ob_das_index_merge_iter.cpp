@@ -779,48 +779,35 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
       /* INTERSECT逻辑：检查所有child是否都有这个rowkey */  
       bool all_matched = true;
       for (int64_t i = 0; OB_SUCC(ret) && i < child_stores_.count(); i++) {
-        IndexMergeRowStore &child_store = child_stores_.at(i);  
-        
         if (output_idx == i) {  
-          /* skip */
-        } else if ((!child_stores_.at(i).have_data())) {
+          continue;
+        }
+        if ((!child_stores_.at(i).have_data())) {
             all_matched = false;  // 这个child没有数据，不匹配  
         } else if (OB_FAIL(compare(i, output_idx, cmp_ret))) {  
-          LOG_WARN("index merge failed to compare row", K(i), K(output_idx), K(ret));  
-        } else if (cmp_ret != 0) {  
+          adlog::DEBUG("index merge failed to compare row", K(i), K(output_idx), K(ret));  
+        } else if (cmp_ret == 0) {  
+          child_stores_.at(i).cur_idx_++;
+        } else { 
           all_matched = false;  // rowkey不匹配  
-        }  
-      }  
-        
-      if (OB_SUCC(ret)) {
-        if (all_matched) {
+        }
+      }
 
-          /* 所有child都有这个rowkey，输出结果 */  
-          if (OB_FAIL(child_stores_.at(output_idx).to_expr())) {  
-            LOG_WARN("failed to convert store row to expr", K(ret));  
-          } else {  
-            // 保存到result buffer  
-            if (OB_FAIL(save_row_to_result_buffer())) {  
-              LOG_WARN("failed to save row to result buffer", K(ret)); 
-              adlog::DEBUG("failed to save row to result buffer", K(ret)); 
-            } else {  
-              count += 1;
-            }
+      if (OB_FAIL(ret)) {
+        continue;
+      }
+      if (!all_matched) {
+        child_stores_.at(output_idx).cur_idx_++;  
+        continue;
+      }
 
-            for (int64_t i = 0; OB_SUCC(ret) && i < child_stores_.count(); i++) {
-              if(output_idx == i){
-                continue;
-              }
-              child_stores_.at(i).to_expr();
-            }
-          }  
-        } else {  
-          /* 不是所有child都有这个rowkey，前进最小的rowkey */  
-          // child_stores_.at(output_idx).cur_idx_++;  
-          child_stores_.at(output_idx).to_expr();
+      child_stores_.at(output_idx).to_expr();
+      if (OB_FAIL(save_row_to_result_buffer())) {  
+        adlog::DEBUG("failed to save row to result buffer", K(ret)); 
+      } else {  
+        count += 1;
+      }
 
-        }  
-      }  
     }  
   }  
   

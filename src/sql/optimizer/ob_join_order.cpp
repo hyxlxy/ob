@@ -3662,23 +3662,62 @@ int ObJoinOrder::collect_candicate_indexes(const uint64_t ref_table_id,
       }
     }
   } else {
-    /* record all indexes which satisfy the index prefix condition */
-    ObSEArray<uint64_t, 4> column_ids;
-    if (OB_FAIL(ObRawExprUtils::extract_column_ids(filter, column_ids))) {
-      LOG_WARN("failed to extract column ids", K(filter), K(ret));
-    } else if (OB_UNLIKELY(column_ids.count() != 1)) {
-      ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("invalid filter node for index merge", K(filter), K(ret));
-    } else {
-      for (int64_t i = 0; OB_SUCC(ret) && i < valid_index_ids.count(); ++i) {
-        const uint64_t index_id = valid_index_ids.at(i);
-        const ObIArray<uint64_t> &index_column_ids = valid_index_cols.at(i);
-        if (OB_UNLIKELY(index_column_ids.empty())) {
-          ret = OB_ERR_UNEXPECTED;
-          LOG_WARN("invalid index column ids", K(ret), K(index_id), K(index_column_ids));
-        } else if (index_column_ids.at(0) == column_ids.at(0)) {
-          if (OB_FAIL(candicate_index_tids.push_back(index_id))) {
-            LOG_WARN("failed to push back index id", K(index_id), K(ret));
+
+    if (T_OP_IN == filter->get_expr_type()) {  
+      ObRawExpr *left_expr = filter->get_param_expr(0);  
+      if (OB_NOT_NULL(left_expr) && left_expr->is_column_ref_expr()) {  
+        ObColumnRefRawExpr *col_expr = static_cast<ObColumnRefRawExpr*>(left_expr);  
+        uint64_t column_id = col_expr->get_column_id();  
+        adlog::DEBUG("extracted column from IN expr", K(column_id));
+          
+        // 遍历所有索引，查找包含该列的索引  
+        for (int64_t i = 0; OB_SUCC(ret) && i < valid_index_ids.count(); ++i) {  
+          const ObSEArray<uint64_t, 4> &index_cols = valid_index_cols.at(i);  
+          bool has_column = false;  
+            
+          for (int64_t j = 0; j < index_cols.count(); ++j) {  
+            if (index_cols.at(j) == column_id and column_id == 16) {  
+              has_column = true;  
+              break;  
+            }  
+          }  
+            
+          if (has_column) {  
+            if (OB_FAIL(candicate_index_tids.push_back(valid_index_ids.at(i)))) {  
+              LOG_WARN("failed to push back index id", K(ret));  
+            }  
+          }  
+        }  
+      }  
+    }
+    else {
+      
+      
+      /* record all indexes which satisfy the index prefix condition */
+      ObSEArray<uint64_t, 4> column_ids;
+      if (OB_FAIL(ObRawExprUtils::extract_column_ids(filter, column_ids))) {
+        LOG_WARN("failed to extract column ids", K(filter), K(ret));
+      } else if (OB_UNLIKELY(column_ids.count() != 1)) {
+        adlog::DEBUG("!=1: ", K(column_ids.count()));
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("invalid filter node for index merge", K(filter), K(ret));
+        adlog::DEBUG("invalid filter node for index merge", K(ret));
+      } else {
+        adlog::DEBUG("column_ids.at(0): ",column_ids.at(0));
+        adlog::DEBUG(K(valid_index_ids.count()));
+
+        for (int64_t i = 0; OB_SUCC(ret) && i < valid_index_ids.count(); ++i) {
+          const uint64_t index_id = valid_index_ids.at(i);
+          adlog::DEBUG("index_id : ", index_id);
+          const ObIArray<uint64_t> &index_column_ids = valid_index_cols.at(i);
+          if (OB_UNLIKELY(index_column_ids.empty())) {
+            ret = OB_ERR_UNEXPECTED;
+            LOG_WARN("invalid index column ids", K(ret), K(index_id), K(index_column_ids));
+          } else if (index_column_ids.at(0) == column_ids.at(0)) {
+            adlog::DEBUG("NO FTS NO IN : column_ids.at(0): ",column_ids.at(0));
+            if (OB_FAIL(candicate_index_tids.push_back(index_id))) {
+              LOG_WARN("failed to push back index id", K(index_id), K(ret));
+            }
           }
         }
       }
