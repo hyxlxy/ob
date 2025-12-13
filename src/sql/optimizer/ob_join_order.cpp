@@ -4121,6 +4121,100 @@ int ObJoinOrder::create_one_index_merge_path(const uint64_t table_id,
       LOG_WARN("failed to append func lookup index id", K(ret));
     }
   }
+  
+  // Initialize two-phase FTS optimization if applicable
+  if (OB_SUCC(ret)) {
+    if (OB_FAIL(init_two_phase_fts_opt(table_id, stmt, root_node, index_merge_path))) {
+      LOG_WARN("failed to init two phase fts opt", K(ret));
+    }
+  }
+  
+  return ret;
+}
+
+int ObJoinOrder::init_two_phase_fts_opt(const uint64_t table_id,
+                                        const ObDMLStmt *stmt,
+                                        ObIndexMergeNode* root_node,
+                                        IndexMergePath* index_merge_path)
+{
+  int ret = OB_SUCCESS;
+  if (OB_ISNULL(stmt) || OB_ISNULL(root_node) || OB_ISNULL(index_merge_path)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("unexpected null", K(ret), KP(stmt), KP(root_node), KP(index_merge_path));
+  } else {
+    // Check if this is a FTS index merge with scalar filters and TopN
+    // Condition 1: Root node must contain FTS index
+    bool has_fts = false;
+    ObSEArray<ObIndexMergeNode*, 4> node_stack;
+    if (OB_FAIL(node_stack.push_back(root_node))) {
+      LOG_WARN("failed to push back node", K(ret));
+    }
+    while (OB_SUCC(ret) && !node_stack.empty() && !has_fts) {
+      ObIndexMergeNode *node = node_stack.at(node_stack.count() - 1);
+      node_stack.pop_back();
+      if (OB_ISNULL(node)) {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("unexpected null node", K(ret));
+      } else if (node->is_merge_node()) {
+        for (int64_t i = 0; OB_SUCC(ret) && i < node->children_.count(); ++i) {
+          if (OB_FAIL(node_stack.push_back(node->children_.at(i)))) {
+            LOG_WARN("failed to push back child node", K(ret));
+          }
+        }
+      } else if (INDEX_MERGE_FTS_INDEX == node->node_type_) {
+        has_fts = true;
+      }
+    }
+    
+    if (OB_SUCC(ret) && has_fts) {
+      // Condition 2: Check if there are scalar filters (non-FTS filters)
+      bool has_scalar_filters = false;
+      for (int64_t i = 0; i < index_merge_path->filter_.count(); ++i) {
+        ObRawExpr *filter = index_merge_path->filter_.at(i);
+        if (OB_NOT_NULL(filter) && !filter->has_flag(CNT_MATCH_EXPR)) {
+          has_scalar_filters = true;
+          break;
+        }
+      }
+      
+      // Condition 3: Check if query has LIMIT clause
+      const ObSelectStmt *select_stmt = NULL;
+      int64_t limit_count = 0;
+      if (has_scalar_filters && OB_NOT_NULL(select_stmt = dynamic_cast<const ObSelectStmt*>(stmt))) {
+        if (select_stmt->get_limit_expr() != NULL) {
+          ObObj limit_obj;
+          bool got_result = false;
+          // Try to get limit value
+          if (OB_FAIL(ObSQLUtils::calc_const_or_calculable_expr(OPT_CTX.get_exec_ctx(),
+                                                                select_stmt->get_limit_expr(),
+                                                                limit_obj,
+                                                                got_result,
+                                                                *allocator_))) {
+            // If we can't calculate limit, assume optimization not applicable
+            LOG_TRACE("failed to calc limit expr, skip two phase opt", K(ret));
+            ret = OB_SUCCESS;
+          } else if (got_result && limit_obj.is_int()) {
+            limit_count = limit_obj.get_int();
+            if (limit_count > 0 && limit_count <= 100) {  // Only optimize for small LIMIT values
+              // Enable two-phase optimization
+              index_merge_path->enable_two_phase_fts_opt_ = true;
+              index_merge_path->fts_topn_limit_ = limit_count;
+              // Set amplification factor: 3x for LIMIT <= 10, 2x for LIMIT <= 50, 1.5x for LIMIT <= 100
+              if (limit_count <= 10) {
+                index_merge_path->fts_topn_amplify_factor_ = 3;
+              } else if (limit_count <= 50) {
+                index_merge_path->fts_topn_amplify_factor_ = 2;
+              } else {
+                index_merge_path->fts_topn_amplify_factor_ = 1;
+              }
+              LOG_TRACE("enable two phase fts opt", K(limit_count), 
+                       K(index_merge_path->fts_topn_amplify_factor_));
+            }
+          }
+        }
+      }
+    }
+  }
   return ret;
 }
 
@@ -4315,6 +4409,26 @@ int IndexMergePath::estimate_cost()
     cost_ += filter_cost;
     OPT_TRACE_COST_MODEL("index_merge_cost (", cost_, ") +=", KV(filter_cost));
   }
+  
+  // Apply two-phase FTS optimization cost reduction
+  if (OB_SUCC(ret) && enable_two_phase_fts_opt_) {
+    // Two-phase optimization reduces:
+    // 1. Sort cost (eliminated by BMW ordering)
+    // 2. Filter cost (reduced by early termination)
+    // Apply a cost reduction factor based on LIMIT value
+    double cost_reduction_factor = 0.5;  // Base 50% reduction
+    if (fts_topn_limit_ <= 10) {
+      cost_reduction_factor = 0.4;  // 60% reduction for small LIMIT
+    } else if (fts_topn_limit_ <= 50) {
+      cost_reduction_factor = 0.5;  // 50% reduction for medium LIMIT
+    } else {
+      cost_reduction_factor = 0.6;  // 40% reduction for larger LIMIT
+    }
+    cost_ *= cost_reduction_factor;
+    OPT_TRACE_COST_MODEL("two_phase_fts_opt: reduced cost from", cost_ / cost_reduction_factor, "to", cost_, 
+                         "with factor", cost_reduction_factor);
+  }
+  
   DISABLE_OPT_TRACE_COST_MODEL;
   return ret;
 }
