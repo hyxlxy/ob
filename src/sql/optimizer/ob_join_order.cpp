@@ -111,6 +111,83 @@ int ObJoinOrder::fill_query_range_info(const QueryRangeInfo &range_info,
       }
       est_cost_info.at_most_one_range_ = at_most_one_range;
     }
+    // If no candi trees constructed from OR/AND, try to synthesize an INTERSECT tree for FTS + scalar filters
+    if (OB_SUCC(ret) && candi_index_trees.empty()) {
+      ObRawExpr *match_filter = NULL;
+      ObSEArray<ObRawExpr*, 8> candidate_scalar_filters;
+      // 1) find one match expr and scalar filters that can use index prefix
+      for (int64_t i = 0; OB_SUCC(ret) && i < filters.count(); ++i) {
+        ObRawExpr *f = filters.at(i);
+        if (OB_ISNULL(f)) {
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("null filter", K(ret));
+        } else if (f->has_flag(CNT_MATCH_EXPR)) {
+          // prefer first match expr
+          if (NULL == match_filter) { match_filter = f; }
+        } else if (f->has_flag(IS_SIMPLE_COND) || f->has_flag(IS_RANGE_COND)) {
+          ObSEArray<uint64_t, 2> cand_idx_tids;
+          if (OB_FAIL(collect_candicate_indexes(ref_table_id,
+                                                f,
+                                                valid_index_ids,
+                                                valid_index_cols,
+                                                cand_idx_tids))) {
+            LOG_WARN("failed to check scalar filter candicate indexes", K(ret));
+          } else if (!cand_idx_tids.empty()) {
+            if (OB_FAIL(candidate_scalar_filters.push_back(f))) {
+              LOG_WARN("failed to push scalar filter", K(ret));
+            }
+          }
+        }
+      }
+      // 2) build intersect tree if both FTS and at least one scalar filter exist
+      if (OB_SUCC(ret) && OB_NOT_NULL(match_filter) && !candidate_scalar_filters.empty()) {
+        ObIndexMergeNode *root = OB_NEWx(ObIndexMergeNode, allocator_);
+        if (OB_ISNULL(root)) {
+          ret = OB_ALLOCATE_MEMORY_FAILED;
+          LOG_WARN("failed to alloc intersect root", K(ret));
+        } else {
+          root->node_type_ = INDEX_MERGE_INTERSECT;
+          // add FTS child
+          ObIndexMergeNode *fts_child = NULL; bool valid = false;
+          if (OB_FAIL(generate_candi_index_merge_node(ref_table_id,
+                                                      match_filter,
+                                                      valid_index_ids,
+                                                      valid_index_cols,
+                                                      fts_child,
+                                                      valid))) {
+            LOG_WARN("failed to build fts child", K(ret));
+          } else if (!valid || OB_ISNULL(fts_child)) {
+            // give up if FTS child invalid
+          } else if (OB_FAIL(root->children_.push_back(fts_child))) {
+            LOG_WARN("failed to add fts child", K(ret));
+          } else {
+            int64_t added = 0;
+            for (int64_t i = 0; OB_SUCC(ret) && i < candidate_scalar_filters.count(); ++i) {
+              ObIndexMergeNode *scalar_child = NULL; bool s_valid = false;
+              if (OB_FAIL(generate_candi_index_merge_node(ref_table_id,
+                                                          candidate_scalar_filters.at(i),
+                                                          valid_index_ids,
+                                                          valid_index_cols,
+                                                          scalar_child,
+                                                          s_valid))) {
+                LOG_WARN("failed to build scalar child", K(ret));
+              } else if (!s_valid || OB_ISNULL(scalar_child)) {
+                // skip
+              } else if (OB_FAIL(root->children_.push_back(scalar_child))) {
+                LOG_WARN("failed to add scalar child", K(ret));
+              } else { ++added; }
+            }
+            if (OB_SUCC(ret) && root->children_.count() >= 2) {
+              if (OB_FAIL(root->formalize_index_merge_tree())) {
+                LOG_WARN("failed to formalize synthesized intersect tree", K(ret));
+              } else if (OB_FAIL(candi_index_trees.push_back(root))) {
+                LOG_WARN("failed to push back synthesized intersect tree", K(ret));
+              }
+            }
+          }
+        }
+      }
+    }
   }
   return ret;
 }
@@ -3417,8 +3494,8 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
       if (OB_ISNULL(filter)) {
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("get unexpected null filter", K(ret), K(i));
-      } else if (filter->get_expr_type() != T_OP_OR) {
-        // do nothing, only support UNION MERGE now
+      } else if (!(filter->get_expr_type() == T_OP_OR || filter->get_expr_type() == T_OP_AND)) {
+        // do nothing, only support UNION/INTERSECT MERGE on OR/AND expressions
       } else if (OB_FAIL(generate_candi_index_merge_node(ref_table_id,
                                                          filter,
                                                          valid_index_ids,
@@ -4119,100 +4196,6 @@ int ObJoinOrder::create_one_index_merge_path(const uint64_t table_id,
       LOG_WARN("failed to append func lookup exprs", K(ret), KPC(cur_expr));
     } else if (OB_FAIL(index_merge_path->domain_idx_info_.func_lookup_index_ids_.push_back(match_expr_info->inv_idx_id_))) {
       LOG_WARN("failed to append func lookup index id", K(ret));
-    }
-  }
-  
-  // Initialize two-phase FTS optimization if applicable
-  if (OB_SUCC(ret)) {
-    if (OB_FAIL(init_two_phase_fts_opt(table_id, stmt, root_node, index_merge_path))) {
-      LOG_WARN("failed to init two phase fts opt", K(ret));
-    }
-  }
-  
-  return ret;
-}
-
-int ObJoinOrder::init_two_phase_fts_opt(const uint64_t table_id,
-                                        const ObDMLStmt *stmt,
-                                        ObIndexMergeNode* root_node,
-                                        IndexMergePath* index_merge_path)
-{
-  int ret = OB_SUCCESS;
-  if (OB_ISNULL(stmt) || OB_ISNULL(root_node) || OB_ISNULL(index_merge_path)) {
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("unexpected null", K(ret), KP(stmt), KP(root_node), KP(index_merge_path));
-  } else {
-    // Check if this is a FTS index merge with scalar filters and TopN
-    // Condition 1: Root node must contain FTS index
-    bool has_fts = false;
-    ObSEArray<ObIndexMergeNode*, 4> node_stack;
-    if (OB_FAIL(node_stack.push_back(root_node))) {
-      LOG_WARN("failed to push back node", K(ret));
-    }
-    while (OB_SUCC(ret) && !node_stack.empty() && !has_fts) {
-      ObIndexMergeNode *node = node_stack.at(node_stack.count() - 1);
-      node_stack.pop_back();
-      if (OB_ISNULL(node)) {
-        ret = OB_ERR_UNEXPECTED;
-        LOG_WARN("unexpected null node", K(ret));
-      } else if (node->is_merge_node()) {
-        for (int64_t i = 0; OB_SUCC(ret) && i < node->children_.count(); ++i) {
-          if (OB_FAIL(node_stack.push_back(node->children_.at(i)))) {
-            LOG_WARN("failed to push back child node", K(ret));
-          }
-        }
-      } else if (INDEX_MERGE_FTS_INDEX == node->node_type_) {
-        has_fts = true;
-      }
-    }
-    
-    if (OB_SUCC(ret) && has_fts) {
-      // Condition 2: Check if there are scalar filters (non-FTS filters)
-      bool has_scalar_filters = false;
-      for (int64_t i = 0; i < index_merge_path->filter_.count(); ++i) {
-        ObRawExpr *filter = index_merge_path->filter_.at(i);
-        if (OB_NOT_NULL(filter) && !filter->has_flag(CNT_MATCH_EXPR)) {
-          has_scalar_filters = true;
-          break;
-        }
-      }
-      
-      // Condition 3: Check if query has LIMIT clause
-      const ObSelectStmt *select_stmt = NULL;
-      int64_t limit_count = 0;
-      if (has_scalar_filters && OB_NOT_NULL(select_stmt = dynamic_cast<const ObSelectStmt*>(stmt))) {
-        if (select_stmt->get_limit_expr() != NULL) {
-          ObObj limit_obj;
-          bool got_result = false;
-          // Try to get limit value
-          if (OB_FAIL(ObSQLUtils::calc_const_or_calculable_expr(OPT_CTX.get_exec_ctx(),
-                                                                select_stmt->get_limit_expr(),
-                                                                limit_obj,
-                                                                got_result,
-                                                                *allocator_))) {
-            // If we can't calculate limit, assume optimization not applicable
-            LOG_TRACE("failed to calc limit expr, skip two phase opt", K(ret));
-            ret = OB_SUCCESS;
-          } else if (got_result && limit_obj.is_int()) {
-            limit_count = limit_obj.get_int();
-            if (limit_count > 0 && limit_count <= 100) {  // Only optimize for small LIMIT values
-              // Enable two-phase optimization
-              index_merge_path->enable_two_phase_fts_opt_ = true;
-              index_merge_path->fts_topn_limit_ = limit_count;
-              // Set amplification factor: 3x for LIMIT <= 10, 2x for LIMIT <= 50, 1.5x for LIMIT <= 100
-              if (limit_count <= 10) {
-                index_merge_path->fts_topn_amplify_factor_ = 3;
-              } else if (limit_count <= 50) {
-                index_merge_path->fts_topn_amplify_factor_ = 2;
-              } else {
-                index_merge_path->fts_topn_amplify_factor_ = 1;
-              }
-              LOG_TRACE("enable two phase fts opt", K(limit_count), 
-                       K(index_merge_path->fts_topn_amplify_factor_));
-            }
-          }
-        }
-      }
     }
   }
   return ret;
