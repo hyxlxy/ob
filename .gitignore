@@ -387,6 +387,7 @@ deps/3rd
 ############# test #############
 test/tmp
 test/var
+ob-mldr-test/
 
 
 * .md
