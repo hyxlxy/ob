@@ -107,7 +107,8 @@ int ObCreateTableResolver::add_primary_key_part(const ObString &column_name,
       ret = OB_ERR_PRIMARY_CANT_HAVE_NULL;
     }
   }
-  return ret;
+  // Do not block CREATE TABLE even if auto-index append failed; just log above and continue.
+  return OB_SUCCESS;
 }
 
 int ObCreateTableResolver::add_hidden_tablet_seq_col()
@@ -2222,10 +2223,50 @@ int ObCreateTableResolver::add_auto_indexes_for_index_merge()
     return false;
   };
 
+  // helper: reuse resolver pipeline to build a complete local normal index
+  auto build_and_push_local_normal_index = [&](const ObIArray<ObColumnSortItem> &cols,
+                                               const ObString &idx_name) -> int {
+    int lret = OB_SUCCESS;
+    if (has_index_with_columns(cols)) {
+      return OB_SUCCESS; // already exists in arg list
+    }
+    reset();
+    index_attributes_set_ = OB_DEFAULT_INDEX_ATTRIBUTES_SET;
+    index_arg_.reset();
+    index_keyname_ = NORMAL_KEY;
+    // add columns via resolver API to fill column ids and check constraints
+    for (int64_t i = 0; OB_SUCC(lret) && i < cols.count(); ++i) {
+      lret = add_sort_column(cols.at(i));
+    }
+    // generate full index arg (name, option, index_schema for global index, etc.)
+    if (OB_SUCC(lret)) {
+      index_name_ = idx_name;
+      name_generated_type_ = GENERATED_TYPE_SYSTEM;
+      const bool process_heap_table_primary_key = false;
+      if (OB_FAIL(generate_index_arg(process_heap_table_primary_key))) {
+        SQL_RESV_LOG(WARN, "generate index arg failed for auto index", K(lret), K(idx_name));
+      } else {
+        // CRITICAL: set index_key to NORMAL_KEY value, otherwise set_index_arg_list validation will fail
+        index_arg_.index_key_ = static_cast<int64_t>(NORMAL_KEY);
+        HEAP_VARS_2((ObCreateIndexStmt, create_index_stmt), (ObPartitionResolveResult, resolve_result)) {
+          ObCreateIndexArg &create_index_arg = create_index_stmt.get_create_index_arg();
+          ObSArray<ObPartitionResolveResult> &resolve_results = create_table_stmt->get_index_partition_resolve_results();
+          if (OB_FAIL(create_index_arg.assign(index_arg_))) {
+            SQL_RESV_LOG(WARN, "assign auto index arg failed", K(lret), K(idx_name));
+          } else if (OB_FAIL(resolve_results.push_back(resolve_result))) {
+            SQL_RESV_LOG(WARN, "push resolve result failed", K(lret));
+          } else if (OB_FAIL(index_arg_list.push_back(create_index_arg))) {
+            SQL_RESV_LOG(WARN, "push auto index arg failed", K(lret), K(idx_name));
+          }
+        }
+      }
+    }
+    return lret;
+  };
+
   // 1) 保证存在 id 的二级索引
   {
-    const char *col_name = "id";
-    ObString col_name_str(col_name);
+    ObString col_name_str = ObString::make_string("id");
     ObColumnSchemaV2 *col_schema = table_schema.get_column_schema(col_name_str);
     if (!OB_ISNULL(col_schema)) {
       ObSEArray<ObColumnSortItem, 2> cols;
@@ -2236,31 +2277,10 @@ int ObCreateTableResolver::add_auto_indexes_for_index_merge()
       sort_item.is_func_index_ = false;
       if (OB_FAIL(cols.push_back(sort_item))) {
         SQL_RESV_LOG(WARN, "push id sort item failed", K(ret));
-      } else if (has_index_with_columns(cols)) {
-        SQL_RESV_LOG(DEBUG, "id secondary index already exists, skip");
+      } else if (OB_FAIL(build_and_push_local_normal_index(cols, ObString::make_string("auto_idx_id")))) {
+        SQL_RESV_LOG(WARN, "build id auto index failed", K(ret));
       } else {
-        ObCreateIndexArg new_index_arg;
-        new_index_arg.reset();
-        new_index_arg.index_type_ = INDEX_TYPE_NORMAL_LOCAL;
-        new_index_arg.index_option_.index_status_ = INDEX_STATUS_AVAILABLE;
-        new_index_arg.index_option_.index_attributes_set_ = OB_DEFAULT_INDEX_ATTRIBUTES_SET;
-        new_index_arg.sql_mode_ = session_info_->get_sql_mode();
-        new_index_arg.is_index_scope_specified_ = false;
-        new_index_arg.index_using_type_ = USING_BTREE;
-        new_index_arg.index_key_ = static_cast<int64_t>(NORMAL_KEY);
-        if (OB_FAIL(new_index_arg.index_columns_.assign(cols))) {
-          SQL_RESV_LOG(WARN, "assign id index columns failed", K(ret));
-        } else {
-          ObString idx_name;
-          const char *name = "auto_idx_id";
-          if (OB_FAIL(ob_write_string(*allocator_, ObString::make_string(name), new_index_arg.index_name_))) {
-            SQL_RESV_LOG(WARN, "write id index name failed", K(ret));
-          } else if (OB_FAIL(index_arg_list.push_back(new_index_arg))) {
-            SQL_RESV_LOG(WARN, "push id index arg failed", K(ret));
-          } else {
-            SQL_RESV_LOG(INFO, "Auto-created secondary index on id for IndexMerge");
-          }
-        }
+        SQL_RESV_LOG(INFO, "Auto-created secondary index on id for IndexMerge");
       }
     }
   }
@@ -2271,36 +2291,16 @@ int ObCreateTableResolver::add_auto_indexes_for_index_merge()
     ObString id_str("id");
     ObColumnSchemaV2 *base_col = table_schema.get_column_schema(base_id_str);
     ObColumnSchemaV2 *id_col = table_schema.get_column_schema(id_str);
-    if (OB_NOT_NULL(base_col) && OB_NOT_NULL(id_col)) {
+    if (!OB_ISNULL(base_col) && !OB_ISNULL(id_col)) {
       ObSEArray<ObColumnSortItem, 2> cols;
       ObColumnSortItem s1; s1.column_name_ = base_id_str; s1.prefix_len_ = 0; s1.order_type_ = common::ObOrderType::ASC; s1.is_func_index_ = false;
       ObColumnSortItem s2; s2.column_name_ = id_str;      s2.prefix_len_ = 0; s2.order_type_ = common::ObOrderType::ASC; s2.is_func_index_ = false;
       if (OB_FAIL(cols.push_back(s1)) || OB_FAIL(cols.push_back(s2))) {
         SQL_RESV_LOG(WARN, "push composite columns failed", K(ret));
-      } else if (has_index_with_columns(cols)) {
-        SQL_RESV_LOG(DEBUG, "composite (base_id,id) already exists, skip");
+      } else if (OB_FAIL(build_and_push_local_normal_index(cols, ObString::make_string("auto_idx_base_id_id")))) {
+        SQL_RESV_LOG(WARN, "build composite auto index failed", K(ret));
       } else {
-        ObCreateIndexArg new_index_arg;
-        new_index_arg.reset();
-        new_index_arg.index_type_ = INDEX_TYPE_NORMAL_LOCAL;
-        new_index_arg.index_option_.index_status_ = INDEX_STATUS_AVAILABLE;
-        new_index_arg.index_option_.index_attributes_set_ = OB_DEFAULT_INDEX_ATTRIBUTES_SET;
-        new_index_arg.sql_mode_ = session_info_->get_sql_mode();
-        new_index_arg.is_index_scope_specified_ = false;
-        new_index_arg.index_using_type_ = USING_BTREE;
-        new_index_arg.index_key_ = static_cast<int64_t>(NORMAL_KEY);
-        if (OB_FAIL(new_index_arg.index_columns_.assign(cols))) {
-          SQL_RESV_LOG(WARN, "assign composite index columns failed", K(ret));
-        } else {
-          const char *name = "auto_idx_base_id_id";
-          if (OB_FAIL(ob_write_string(*allocator_, ObString::make_string(name), new_index_arg.index_name_))) {
-            SQL_RESV_LOG(WARN, "write composite index name failed", K(ret));
-          } else if (OB_FAIL(index_arg_list.push_back(new_index_arg))) {
-            SQL_RESV_LOG(WARN, "push composite index arg failed", K(ret));
-          } else {
-            SQL_RESV_LOG(INFO, "Auto-created composite index (base_id, id) for IndexMerge");
-          }
-        }
+        SQL_RESV_LOG(INFO, "Auto-created composite index (base_id, id) for IndexMerge");
       }
     }
   }
