@@ -150,7 +150,7 @@ bash build.sh release -DOB_USE_CCACHE=ON --init --make -j3
 # 如有需要重启集群，可执行下面命令
 ./tools/deploy/obd.sh restart obcluster
 # 停止集群
-./tools/deploy/obd.sh stop obcluster
+./tools/deploy/obd.sh stop -n obcluster
 # 销毁集群
 ./tools/deploy/obd.sh destroy obcluster
 ```

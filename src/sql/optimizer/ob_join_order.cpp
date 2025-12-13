@@ -3263,7 +3263,37 @@ int ObJoinOrder::create_index_merge_access_paths(const uint64_t table_id,
              && OB_FAIL(prune_index_merge_path(access_paths))) {
     LOG_WARN("failed to prune index merge path", K(ret));
   } else {
-    ignore_normal_access_path = (is_match_hint || contain_fts) && !access_paths.empty();
+    // PREFERENCE RULE: For FTS + small LIMIT scenarios, prefer INDEX MERGE over normal TR path
+    // This aligns with the two-phase BMW strategy: FTS first, then scalar AND filtering
+    bool small_limit = false;
+    if (contain_fts && !access_paths.empty()) {
+      // Check if query has a small LIMIT (<=20 is typical for top-K retrieval)
+      const ObSelectStmt *select_stmt = NULL;
+      if (OB_NOT_NULL(stmt) && stmt->is_select_stmt()) {
+        select_stmt = static_cast<const ObSelectStmt*>(stmt);
+        if (select_stmt->has_limit() && OB_NOT_NULL(select_stmt->get_limit_expr())) {
+          bool is_null_value = false;
+          int64_t limit_val = 0;
+          if (OB_SUCC(ObTransformUtils::get_limit_value(select_stmt->get_limit_expr(),
+                                                        OPT_CTX.get_params(),
+                                                        OPT_CTX.get_exec_ctx(),
+                                                        &OPT_CTX.get_allocator(),
+                                                        limit_val,
+                                                        is_null_value))
+              && !is_null_value
+              && limit_val > 0 && limit_val <= 20) {
+            small_limit = true;
+            OPT_TRACE("FTS + small LIMIT detected (limit=", limit_val, "), prefer INDEX MERGE");
+          }
+        }
+      }
+      // For FTS queries, always prefer INDEX MERGE (with or without small LIMIT)
+      // because FTS index provides the most selective filtering
+      ignore_normal_access_path = true;
+      LOG_TRACE("prefer INDEX MERGE for FTS query", K(ref_table_id), K(contain_fts), K(small_limit), K(access_paths.count()));
+    } else {
+      ignore_normal_access_path = is_match_hint && !access_paths.empty();
+    }
     LOG_TRACE("finish create index merge path", K(ref_table_id), K(is_match_hint), K(contain_fts), K(access_paths));
   }
   return ret;
@@ -3464,6 +3494,7 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
 
     // Case 2 (fallback): filters are split as simple conditions (common in WHERE a AND b AND MATCH(...)).
     // Build an INTERSECT index-merge tree by combining eligible simple filters.
+    // This fallback is critical for FTS + scalar AND scenarios where Case 1 doesn't generate candidates.
     if (OB_SUCC(ret) && candi_index_trees.empty() && filters.count() >= 2) {
       ObSEArray<ObIndexMergeNode*, 4> child_nodes;
       bool contain_fts = false;
@@ -3497,7 +3528,12 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
           }
         }
       }
-      if (OB_SUCC(ret) && contain_fts && has_multi_index && child_nodes.count() >= 2) {
+      // CRITICAL: Build INTERSECT tree if we have FTS + at least 2 valid child nodes (from different indexes)
+      // This ensures FTS + scalar AND scenarios always generate an INDEX MERGE candidate
+      if (OB_SUCC(ret) && contain_fts && child_nodes.count() >= 2) {
+        // For FTS + scalar AND, we don't strictly require has_multi_index; 
+        // even if some children use the same index, the INTERSECT can still be valid.
+        // However, prefer multi-index case for better selectivity.
         ObIndexMergeNode *root = OB_NEWx(ObIndexMergeNode, allocator_);
         if (OB_ISNULL(root)) {
           ret = OB_ALLOCATE_MEMORY_FAILED;
@@ -3511,7 +3547,8 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
           } else if (OB_FAIL(candi_index_trees.push_back(root))) {
             LOG_WARN("failed to push back fallback index merge tree", K(ret));
           } else {
-            OPT_TRACE("fallback: build INTERSECT index merge tree from split filters");
+            OPT_TRACE("fallback: build INTERSECT index merge tree from split filters with FTS");
+            LOG_TRACE("fallback: build INTERSECT index merge tree", K(contain_fts), K(child_nodes.count()), K(has_multi_index));
           }
         }
       }
