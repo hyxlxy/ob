@@ -102,6 +102,8 @@ private:
       const common::ObString &first_column_name,
       bool is_unique,
       ObString &uk_name);
+  // Auto-create indexes for specific columns to support IndexMerge optimization
+  int add_auto_indexes_for_index_merge();
   int resolve_table_level_constraint_for_mysql(
       const ParseNode* node, ObArray<int> &constraint_position_list);
   int build_partition_key_info(share::schema::ObTableSchema &table_schema,

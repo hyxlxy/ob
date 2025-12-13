@@ -3269,6 +3269,16 @@ int ObJoinOrder::create_index_merge_access_paths(const uint64_t table_id,
   return ret;
 }
 
+static bool is_match_expr_filter(ObRawExpr *expr)
+{
+  bool bret = false;
+  if (expr != NULL && expr->get_expr_type() == T_OP_BOOL && expr->has_flag(CNT_MATCH_EXPR)) {
+    ObRawExpr *param_expr = expr->get_param_expr(0);
+    bret = (param_expr != NULL && param_expr->has_flag(IS_MATCH_EXPR));
+  }
+  return bret;
+}
+
 int ObJoinOrder::get_candi_index_merge_trees(const uint64_t table_id,
                                              const uint64_t ref_table_id,
                                              const PathHelper &helper,
@@ -3320,6 +3330,22 @@ int ObJoinOrder::get_candi_index_merge_trees(const uint64_t table_id,
   } else if (!candi_index_trees.empty()
              && OB_FAIL(prune_candi_index_merge_trees(candi_index_trees))) {
     LOG_WARN("failed to prune candi index trees", K(ret));
+  } else if (candi_index_trees.empty()) {
+    // After prune, try a final fallback: build INTERSECT tree from simple filters
+    // NOTE: try_build_intersect_from_simple_filters is not yet implemented
+    // ObSEArray<ObIndexMergeNode*, 4> fallback_trees;
+    // if (OB_FAIL(try_build_intersect_from_simple_filters(ref_table_id,
+    //                                                      helper.filters_,
+    //                                                      valid_index_ids,
+    //                                                      valid_index_cols,
+    //                                                      fallback_trees))) {
+    //   LOG_WARN("failed to build fallback intersect tree", K(ret));
+    // } else if (!fallback_trees.empty() && OB_FAIL(candi_index_trees.assign(fallback_trees))) {
+    //   LOG_WARN("failed to assign fallback trees", K(ret));
+    // } else {
+    //   OPT_TRACE("fallback: build intersect trees after prune, count:", candi_index_trees.count());
+    // }
+    OPT_TRACE("fallback: no intersect trees after prune");
   } else {
     OPT_TRACE("generate", candi_index_trees.count(), "candi index merge trees");
     LOG_TRACE("generate candi index merge trees", K(table_id), K(candi_index_trees));
@@ -3410,6 +3436,7 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
   if (valid_index_ids.empty()) {
     // do nothing
   } else {
+    // Case 1: try to build index merge trees from composite filters (OR/AND)
     for (int64_t i = 0; OB_SUCC(ret) && i < filters.count(); ++i) {
       ObRawExpr *filter = filters.at(i);
       ObIndexMergeNode *candi_node = NULL;
@@ -3418,7 +3445,7 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("get unexpected null filter", K(ret), K(i));
       } else if (!(filter->get_expr_type() == T_OP_OR || filter->get_expr_type() == T_OP_AND)) {
-        // do nothing, only support UNION/INTERSECT MERGE on OR/AND expressions
+        // do nothing, only support UNION/INTERSECT MERGE on OR/AND expressions here
       } else if (OB_FAIL(generate_candi_index_merge_node(ref_table_id,
                                                          filter,
                                                          valid_index_ids,
@@ -3432,6 +3459,61 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
         LOG_WARN("failed to formalize candi index merge tree", K(ret), KPC(candi_node));
       } else if (OB_FAIL(candi_index_trees.push_back(candi_node))) {
         LOG_WARN("failed to push back candi index tree", K(ret));
+      }
+    }
+
+    // Case 2 (fallback): filters are split as simple conditions (common in WHERE a AND b AND MATCH(...)).
+    // Build an INTERSECT index-merge tree by combining eligible simple filters.
+    if (OB_SUCC(ret) && candi_index_trees.empty() && filters.count() >= 2) {
+      ObSEArray<ObIndexMergeNode*, 4> child_nodes;
+      bool contain_fts = false;
+      uint64_t first_index_id = OB_INVALID_ID;
+      bool has_multi_index = false;
+      for (int64_t i = 0; OB_SUCC(ret) && i < filters.count(); ++i) {
+        ObRawExpr *filter = filters.at(i);
+        ObIndexMergeNode *leaf = NULL;
+        bool is_valid = false;
+        if (OB_ISNULL(filter)) {
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("get unexpected null filter", K(ret), K(i));
+        } else if (OB_FAIL(generate_candi_index_merge_node(ref_table_id,
+                                                           filter,
+                                                           valid_index_ids,
+                                                           valid_index_cols,
+                                                           leaf,
+                                                           is_valid))) {
+          LOG_WARN("failed to generate candi node for simple filter", K(ret), KPC(filter));
+        } else if (!is_valid || NULL == leaf) {
+          // skip this filter
+        } else {
+          contain_fts = contain_fts || (leaf->node_type_ == INDEX_MERGE_FTS_INDEX);
+          if (OB_INVALID_ID == first_index_id) {
+            first_index_id = leaf->index_tid_;
+          } else if (first_index_id != leaf->index_tid_) {
+            has_multi_index = true;
+          }
+          if (OB_FAIL(child_nodes.push_back(leaf))) {
+            LOG_WARN("failed to push back child node", K(ret));
+          }
+        }
+      }
+      if (OB_SUCC(ret) && contain_fts && has_multi_index && child_nodes.count() >= 2) {
+        ObIndexMergeNode *root = OB_NEWx(ObIndexMergeNode, allocator_);
+        if (OB_ISNULL(root)) {
+          ret = OB_ALLOCATE_MEMORY_FAILED;
+          LOG_WARN("failed to allocate index merge root node", K(ret));
+        } else {
+          root->node_type_ = INDEX_MERGE_INTERSECT; // AND semantics
+          if (OB_FAIL(root->children_.assign(child_nodes))) {
+            LOG_WARN("failed to assign children for index merge root", K(ret));
+          } else if (OB_FAIL(root->formalize_index_merge_tree())) {
+            LOG_WARN("failed to formalize fallback index merge tree", K(ret));
+          } else if (OB_FAIL(candi_index_trees.push_back(root))) {
+            LOG_WARN("failed to push back fallback index merge tree", K(ret));
+          } else {
+            OPT_TRACE("fallback: build INTERSECT index merge tree from split filters");
+          }
+        }
       }
     }
   }

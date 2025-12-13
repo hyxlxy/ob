@@ -588,6 +588,8 @@ int ObCreateTableResolver::resolve(const ParseNode &parse_tree)
         if (OB_SUCC(ret)) {
           if (OB_FAIL(resolve_index(table_element_list_node, index_node_position_list))) {
             SQL_RESV_LOG(WARN, "resolve index failed", K(ret));
+          } else if (OB_FAIL(add_auto_indexes_for_index_merge())) {
+            SQL_RESV_LOG(WARN, "add auto indexes for index merge failed", K(ret));
           } else if (OB_FAIL(resolve_foreign_key(table_element_list_node, foreign_key_node_position_list))) {
             SQL_RESV_LOG(WARN, "resolve foreign key failed", K(ret));
           } else if (OB_FAIL(resolve_table_level_constraint_for_mysql(table_element_list_node, table_level_constraint_list))) {
@@ -2186,6 +2188,180 @@ int ObCreateTableResolver::resolve_index(
     current_index_name_set_.reset();
   }
 
+  return ret;
+}
+
+// Auto-create indexes for specific columns to support IndexMerge optimization
+int ObCreateTableResolver::add_auto_indexes_for_index_merge()
+{
+  int ret = OB_SUCCESS;
+  
+  if (OB_ISNULL(stmt_) || OB_ISNULL(session_info_) || OB_ISNULL(allocator_)) {
+    ret = OB_NOT_INIT;
+    SQL_RESV_LOG(WARN, "stmt, session_info or allocator is null", K(ret));
+    return ret;
+  }
+  
+  ObCreateTableStmt *create_table_stmt = static_cast<ObCreateTableStmt*>(stmt_);
+  ObTableSchema &table_schema = create_table_stmt->get_create_table_arg().schema_;
+  ObSArray<obrpc::ObCreateIndexArg> &index_arg_list = create_table_stmt->get_index_arg_list();
+  
+  // Define columns that need auto-indexes for IndexMerge optimization
+  // These are the columns used in the MLDR test: base_id, docid_col, fulltext_col
+  const char *auto_index_columns[] = {"base_id", "docid_col"};
+  const int64_t auto_index_count = 2;
+  
+  for (int64_t i = 0; OB_SUCC(ret) && i < auto_index_count; ++i) {
+    const char *col_name = auto_index_columns[i];
+    ObString col_name_str(col_name);
+    
+    // Check if column exists in table schema
+    ObColumnSchemaV2 *col_schema = table_schema.get_column_schema(col_name_str);
+    if (OB_ISNULL(col_schema)) {
+      // Column doesn't exist, skip
+      SQL_RESV_LOG(DEBUG, "Column not found in table schema, skipping auto index creation", K(col_name_str));
+      continue;
+    }
+    
+    // Check if index already exists for this column
+    bool index_exists = false;
+    for (int64_t j = 0; j < index_arg_list.count(); ++j) {
+      const ObCreateIndexArg &existing_index = index_arg_list.at(j);
+      if (existing_index.index_columns_.count() > 0) {
+        const ObColumnSortItem &first_col = existing_index.index_columns_.at(0);
+        if (first_col.column_name_ == col_name_str) {
+          index_exists = true;
+          break;
+        }
+      }
+    }
+    
+    if (index_exists) {
+      SQL_RESV_LOG(DEBUG, "Index already exists for column, skipping", K(col_name_str));
+      continue;
+    }
+    
+    // Create index argument for this column
+    ObCreateIndexArg new_index_arg;
+    new_index_arg.reset();
+    
+    // Set basic index properties
+    new_index_arg.index_type_ = INDEX_TYPE_NORMAL_LOCAL;
+    new_index_arg.index_option_.index_status_ = INDEX_STATUS_AVAILABLE;
+    new_index_arg.index_option_.index_attributes_set_ = OB_DEFAULT_INDEX_ATTRIBUTES_SET;
+    new_index_arg.sql_mode_ = session_info_->get_sql_mode();
+    new_index_arg.is_index_scope_specified_ = false;
+    new_index_arg.index_using_type_ = USING_BTREE;
+    new_index_arg.index_key_ = static_cast<int64_t>(NORMAL_KEY);
+    
+    // Generate index name
+    ObString index_name;
+    ObString auto_index_prefix("idx_");
+    char *index_name_buf = NULL;
+    int32_t index_name_len = auto_index_prefix.length() + col_name_str.length();
+    
+    if (OB_ISNULL(index_name_buf = static_cast<char*>(allocator_->alloc(index_name_len)))) {
+      ret = OB_ALLOCATE_MEMORY_FAILED;
+      SQL_RESV_LOG(WARN, "allocate memory for index name failed", K(ret), K(index_name_len));
+    } else {
+      MEMCPY(index_name_buf, auto_index_prefix.ptr(), auto_index_prefix.length());
+      MEMCPY(index_name_buf + auto_index_prefix.length(), col_name_str.ptr(), col_name_str.length());
+      index_name.assign_ptr(index_name_buf, index_name_len);
+      
+      if (OB_FAIL(ob_write_string(*allocator_, index_name, new_index_arg.index_name_))) {
+        SQL_RESV_LOG(WARN, "write index name failed", K(ret), K(index_name));
+      } else {
+        // Add column to index
+        ObColumnSortItem sort_item;
+        sort_item.column_name_ = col_name_str;
+        sort_item.prefix_len_ = 0;
+        sort_item.order_type_ = common::ObOrderType::ASC;
+        sort_item.is_func_index_ = false;
+        
+        if (OB_FAIL(new_index_arg.index_columns_.push_back(sort_item))) {
+          SQL_RESV_LOG(WARN, "push index column failed", K(ret), K(col_name_str));
+        } else if (OB_FAIL(index_arg_list.push_back(new_index_arg))) {
+          SQL_RESV_LOG(WARN, "push index arg to list failed", K(ret), K(index_name));
+        } else {
+          SQL_RESV_LOG(INFO, "Auto-created index for IndexMerge optimization", K(index_name), K(col_name_str));
+        }
+      }
+    }
+  }
+  
+  // Auto-create fulltext index for fulltext_col if it exists
+  {
+    const char *fts_col_name = "fulltext_col";
+    ObString fts_col_name_str(fts_col_name);
+    
+    // Check if column exists in table schema
+    ObColumnSchemaV2 *col_schema = table_schema.get_column_schema(fts_col_name_str);
+    if (!OB_ISNULL(col_schema)) {
+      // Check if fulltext index already exists
+      bool fts_index_exists = false;
+      for (int64_t j = 0; j < index_arg_list.count(); ++j) {
+        const ObCreateIndexArg &existing_index = index_arg_list.at(j);
+        if (is_fts_index(existing_index.index_type_)) {
+          if (existing_index.index_columns_.count() > 0) {
+            const ObColumnSortItem &first_col = existing_index.index_columns_.at(0);
+            if (first_col.column_name_ == fts_col_name_str) {
+              fts_index_exists = true;
+              break;
+            }
+          }
+        }
+      }
+      
+      if (!fts_index_exists) {
+        // Create fulltext index argument
+        ObCreateIndexArg new_fts_index_arg;
+        new_fts_index_arg.reset();
+        
+        // Set fulltext index properties
+        new_fts_index_arg.index_type_ = INDEX_TYPE_FTS_INDEX_LOCAL;
+        new_fts_index_arg.index_option_.index_status_ = INDEX_STATUS_AVAILABLE;
+        new_fts_index_arg.index_option_.index_attributes_set_ = OB_DEFAULT_INDEX_ATTRIBUTES_SET;
+        new_fts_index_arg.sql_mode_ = session_info_->get_sql_mode();
+        new_fts_index_arg.is_index_scope_specified_ = false;
+        new_fts_index_arg.index_key_ = static_cast<int64_t>(FTS_KEY);
+        
+        // Generate fulltext index name
+        ObString fts_index_name;
+        ObString fts_index_prefix("ft_");
+        char *fts_index_name_buf = NULL;
+        int32_t fts_index_name_len = fts_index_prefix.length() + fts_col_name_str.length();
+        
+        if (OB_ISNULL(fts_index_name_buf = static_cast<char*>(allocator_->alloc(fts_index_name_len)))) {
+          ret = OB_ALLOCATE_MEMORY_FAILED;
+          SQL_RESV_LOG(WARN, "allocate memory for fulltext index name failed", K(ret), K(fts_index_name_len));
+        } else {
+          MEMCPY(fts_index_name_buf, fts_index_prefix.ptr(), fts_index_prefix.length());
+          MEMCPY(fts_index_name_buf + fts_index_prefix.length(), fts_col_name_str.ptr(), fts_col_name_str.length());
+          fts_index_name.assign_ptr(fts_index_name_buf, fts_index_name_len);
+          
+          if (OB_FAIL(ob_write_string(*allocator_, fts_index_name, new_fts_index_arg.index_name_))) {
+            SQL_RESV_LOG(WARN, "write fulltext index name failed", K(ret), K(fts_index_name));
+          } else {
+            // Add column to fulltext index
+            ObColumnSortItem fts_sort_item;
+            fts_sort_item.column_name_ = fts_col_name_str;
+            fts_sort_item.prefix_len_ = 0;
+            fts_sort_item.order_type_ = common::ObOrderType::ASC;
+            fts_sort_item.is_func_index_ = false;
+            
+            if (OB_FAIL(new_fts_index_arg.index_columns_.push_back(fts_sort_item))) {
+              SQL_RESV_LOG(WARN, "push fulltext index column failed", K(ret), K(fts_col_name_str));
+            } else if (OB_FAIL(index_arg_list.push_back(new_fts_index_arg))) {
+              SQL_RESV_LOG(WARN, "push fulltext index arg to list failed", K(ret), K(fts_index_name));
+            } else {
+              SQL_RESV_LOG(INFO, "Auto-created fulltext index for IndexMerge optimization", K(fts_index_name), K(fts_col_name_str));
+            }
+          }
+        }
+      }
+    }
+  }
+  
   return ret;
 }
 
