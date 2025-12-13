@@ -834,10 +834,14 @@ class Path
                    ObJoinOrder* parent)
       : AccessPath(table_id, ref_table_id, ref_table_id, parent, NULLS_FIRST_ASC),
         root_(NULL),
-        index_cnt_(0)
+        index_cnt_(0),
+        enable_two_phase_fts_opt_(false),
+        fts_limit_count_(0),
+        fts_amplify_factor_(3)
     {}
 
-    INHERIT_TO_STRING_KV("AccessPath", AccessPath, KPC_(root), K_(index_cnt));
+    INHERIT_TO_STRING_KV("AccessPath", AccessPath, KPC_(root), K_(index_cnt), 
+                         K_(enable_two_phase_fts_opt), K_(fts_limit_count), K_(fts_amplify_factor));
 
     virtual int estimate_cost() override;
     virtual int re_estimate_cost(EstimateCostInfo &param, double &card, double &cost) override;
@@ -847,6 +851,10 @@ class Path
   public:
     ObIndexMergeNode *root_;
     int64_t index_cnt_;
+    // Two-phase FTS optimization flags
+    bool enable_two_phase_fts_opt_;      // Enable two-phase FTS optimization
+    int64_t fts_limit_count_;            // Original LIMIT count from query
+    int64_t fts_amplify_factor_;         // Amplification factor for second phase (default: 3)
 
   private:
     DISALLOW_COPY_AND_ASSIGN(IndexMergePath);
