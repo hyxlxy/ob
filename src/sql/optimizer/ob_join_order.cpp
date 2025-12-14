@@ -3996,15 +3996,15 @@ int ObJoinOrder::choose_best_selectivity_branch(ObIndexMergeNode *&candi_node) {
     adlog::DEBUG("choose_best_selectivity_branch:: INDEX_MERGE_INTERSECT == candi_node->node_type_");
 
     bool has_scan_children = true;  
-    for (int64_t i = 0; i < candi_node->children_.count(); ++i) {
-      if (OB_NOT_NULL(candi_node->children_.at(i)) &&
-          (candi_node->children_.at(i)->node_type_ != INDEX_MERGE_SCAN and
-           candi_node->children_.at(i)->node_type_ != INDEX_MERGE_FTS_INDEX)) {
-        adlog::DEBUG("candi_node->children_.at(i)->node_type_ is error idx: ",i," type : ",(int64_t)candi_node->children_.at(i)->node_type_);
-        has_scan_children = false;
-        break;
-      }
-    }
+    // for (int64_t i = 0; i < candi_node->children_.count(); ++i) {
+    //   if (OB_NOT_NULL(candi_node->children_.at(i)) &&
+    //       (candi_node->children_.at(i)->node_type_ != INDEX_MERGE_SCAN and
+    //        candi_node->children_.at(i)->node_type_ != INDEX_MERGE_FTS_INDEX)) {
+    //     adlog::DEBUG("candi_node->children_.at(i)->node_type_ is error idx: ",i," type : ",(int64_t)candi_node->children_.at(i)->node_type_);
+    //     has_scan_children = false;
+    //     break;
+    //   }
+    // }
     adlog::DEBUG("choose_best_selectivity_branch::  candi_node->children_.count() ",candi_node->children_.count());
     adlog::DEBUG("choose_best_selectivity_branch::  has_scan_children ",has_scan_children);
 
@@ -4334,17 +4334,16 @@ int ObJoinOrder::prune_index_merge_path(ObIArray<AccessPath *> &access_paths) {
       LOG_WARN("failed to get all scan access paths", K(ret));
       adlog::DEBUG("failed to get all scan access paths");
     }else {
-      // 检查根节点是否是INTERSECT节点（AND操作）
+      
       IndexMergePath* index_merge_path = static_cast<IndexMergePath*>(access_paths.at(i));
       if (OB_NOT_NULL(index_merge_path->root_)) {
-        // 添加详细调试信息
+
         adlog::DEBUG("root node_type: ", (int64_t)index_merge_path->root_->node_type_);
         adlog::DEBUG("INDEX_MERGE_INTERSECT value: ",(int64_t) INDEX_MERGE_INTERSECT);
         adlog::DEBUG("INDEX_MERGE_UNION value: ",(int64_t) INDEX_MERGE_UNION);
         adlog::DEBUG("INDEX_MERGE_FTS_INDEX value: ", (int64_t)INDEX_MERGE_FTS_INDEX);
 
 
-        // 用字符串判断类型
         if (index_merge_path->root_->node_type_ == INDEX_MERGE_INTERSECT) {
           adlog::DEBUG("root node_type is INDEX_MERGE_INTERSECT");
           is_intersect_node = true;
@@ -4355,12 +4354,10 @@ int ObJoinOrder::prune_index_merge_path(ObIArray<AccessPath *> &access_paths) {
         } else {
           adlog::DEBUG("root node_type is UNKNOWN, value: ", (int64_t)index_merge_path->root_->node_type_);
         }
-        
-        // 检查是否是INTERSECT节点
+
         is_intersect_node = (index_merge_path->root_->node_type_ == INDEX_MERGE_INTERSECT);
         adlog::DEBUG("is_intersect_node status: ", is_intersect_node);
-        
-        // 检查子节点数量
+
         adlog::DEBUG("root children count: ", index_merge_path->root_->children_.count());
         
       } else {
