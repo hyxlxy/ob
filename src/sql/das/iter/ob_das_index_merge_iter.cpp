@@ -207,10 +207,10 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
     lib::ContextParam context_param;
     context_param.set_mem_attr(MTL_ID(), "DASIndexMerge", ObCtxIds::DEFAULT_CTX_ID)
         .set_properties(lib::USE_TL_PAGE_OPTIONAL);
-    // if (OB_UNLIKELY(merge_type_ != INDEX_MERGE_UNION and merge_type_ != INDEX_MERGE_INTERSECT)) {
-    //   ret = OB_INVALID_ARGUMENT;
-    //   LOG_WARN("invalid merge type", K(merge_type_));
-    // } else
+    if (OB_UNLIKELY(merge_type_ != INDEX_MERGE_UNION and merge_type_ != INDEX_MERGE_INTERSECT)) {
+      ret = OB_INVALID_ARGUMENT;
+      LOG_WARN("invalid merge type", K(merge_type_));
+    } else
       if (OB_FAIL(CURRENT_CONTEXT->CREATE_CONTEXT(mem_ctx_, context_param))) {
       LOG_WARN("failed to create index merge memctx", K(ret));
     } else {
@@ -724,8 +724,32 @@ int ObDASIndexMergeIter::intersect_get_next_row() {
 
 
 int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacity)  
-{  
-  int ret = OB_SUCCESS;  
+{
+  int ret = OB_SUCCESS;
+  adlog::DEBUG("ObDASIndexMergeIter::intersect_get_next_rows start");
+  {
+    // 在 intersect_get_next_rows 开始处添加  
+    adlog::DEBUG("INTERSECT rowkey_exprs_ count", K(rowkey_exprs_->count()));  
+    for (int64_t i = 0; i < rowkey_exprs_->count(); i++) {
+      // adlog::DEBUG("rowkey_expr", i, std::to_string(*rowkey_exprs_->at(i)));
+      {
+        char buf[1024];  
+        int64_t pos = 0;  
+        pos = rowkey_exprs_->at(i)->to_string(buf, sizeof(buf));  
+        adlog::DEBUG("rowkey_expr", i, std::string(buf, pos));
+      }
+    }
+    // // 检查 rowkey_exprs_ 是否包含主键表达式  
+    // for (int64_t i = 0; i < rowkey_exprs_->count(); i++) {  
+    //   ObExpr *expr = rowkey_exprs_->at(i);  
+    //   if (expr->type_ == T_REF_COLUMN) {  
+    //     // Work with ObExpr directly  
+    //     // Use expr->get_expr_name() or other ObExpr methods  
+    //     LOG_INFO("Column expr", K(expr->get_expr_name()));  
+    //   }
+    // }  
+  }
+  
   count = 0;  
   result_buffer_.reuse();
   
@@ -743,20 +767,25 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
           ObDASIter *child_iter = child_iters_.at(i);
           if (OB_ISNULL(child_iter)) {
             ret = OB_ERR_UNEXPECTED;
-            LOG_WARN("unexpected nullptr", K(i));
+            adlog::DEBUG("unexpected nullptr", K(i));
           } else {
 
             ret = child_iter->get_next_rows(child_rows_cnt, capacity);
-              
+
+            if (OB_FAIL(ret)) {
+              if (OB_ITER_END != ret) {
+                adlog::DEBUG("WARNING child_iter->get_next_rows(child_rows_cnt, capacity);");
+              }
+            }
 
             if (OB_ITER_END == ret && child_rows_cnt > 0) {
               ret = OB_SUCCESS;
             }
             if (OB_SUCC(ret)) {
               if (OB_FAIL(child_store.save(true, child_rows_cnt))) {
-                LOG_WARN("failed to save child rows", K(child_rows_cnt), K(ret));
+                adlog::DEBUG("WARNING failed to save child rows", K(child_rows_cnt), K(ret));
               } else if (OB_FAIL(compare(i, output_idx, cmp_ret))) {
-                LOG_WARN("index merge failed to compare row", K(i), K(output_idx), K(ret));
+                adlog::DEBUG("WARNING index merge failed to compare row", K(i), K(output_idx), K(ret));
               } else if (child_iter->get_type() == DAS_ITER_SORT) {
                 adlog::DEBUG("i: ",i,"child_iter->get_type() == DAS_ITER_SORT" );
                 reset_datum_ptr(child_iter->get_output(), child_rows_cnt);
@@ -765,19 +794,21 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
               child_store.iter_end_ = true;
               ret = OB_SUCCESS;
             } else {
-              LOG_WARN("failed to get next rows from child iter", K(ret));
+              adlog::DEBUG("WARNING failed to get next rows from child iter", K(ret));
             }
           }
         }
       } else if (OB_FAIL(compare(i, output_idx, cmp_ret))) {
-        LOG_WARN("index merge failed to compare row", K(i), K(output_idx), K(ret));
+        adlog::DEBUG("WARNING index merge failed to compare row", K(i), K(output_idx), K(ret));
       }
     }
-  
-    if (OB_FAIL(ret)) {  
+
+    if (OB_FAIL(ret)) {
+      adlog::DEBUG("WARNING OB_FAIL(RET)");
     } else if (output_idx == OB_INVALID_INDEX) {  
-      /* no available row, stop the entire process */  
-      ret = OB_ITER_END;  
+      /* no available row, stop the entire process */
+      ret = OB_ITER_END;
+      adlog::DEBUG("ret = OB_ITER_END");
     } else {  
       /* INTERSECT逻辑：检查所有child是否都有这个rowkey */  
       bool all_matched = true;
@@ -790,6 +821,7 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
         } else if (OB_FAIL(compare(i, output_idx, cmp_ret))) {  
           adlog::DEBUG("index merge failed to compare row", K(i), K(output_idx), K(ret));  
         } else if (cmp_ret == 0) {  
+          child_stores_.at(i).to_expr();
           
         } else { 
           all_matched = false;  // rowkey不匹配  
@@ -797,19 +829,15 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
       }
 
       if (OB_FAIL(ret)) {
+        adlog::DEBUG("OB_FAIL(ret)");
         continue;
       }
       if (!all_matched) {
         child_stores_.at(output_idx).cur_idx_++;  
         continue;
       }
-
+      child_stores_.at(output_idx).to_expr();
       // child_stores_.at(output_idx).to_expr();
-      for (int64_t i = 0; i < child_stores_.count(); i++) {
-        if(i == output_idx) continue;
-        child_stores_.at(i).to_expr();
-      }
-      child_stores_.at(output_idx).cur_idx_++;  
       // if (false) {  
       if (OB_FAIL(save_row_to_result_buffer())) {  
         adlog::DEBUG("failed to save row to result buffer", K(ret)); 
@@ -821,15 +849,20 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
   }
 
   if(OB_FAIL(ret)){
-    adlog::DEBUG("intersect_get_next_rows : OB_FAIL(ret)");
+    if (ret == OB_ITER_END) {
+      adlog::DEBUG("intersect_get_next_rows : OB_FAIL(ret) ret == OB_ITER_END");
+    } else {
+      adlog::DEBUG("intersect_get_next_rows : OB_FAIL(ret)");
+    }
   }
   adlog::DEBUG("intersect_get_next_rows :",K(count));
   
   if (OB_ITER_END == ret && count > 0) {  
     ret = OB_SUCCESS;  
   }  
-  if (OB_SUCC(ret) && count > 0) {  
-    if (OB_FAIL(result_buffer_.to_expr(count))) {  
+  if (OB_SUCC(ret) && count > 0) {
+    if (OB_FAIL(result_buffer_.to_expr(count))) {
+      adlog::DEBUG("failed to convert result buffer to exprs", K(ret));  
       LOG_WARN("failed to convert result buffer to exprs", K(ret));  
     }  
   }  
@@ -935,8 +968,9 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
 //   return ret;  
 // }
 
-int ObDASIndexMergeIter::union_get_next_row()
-{
+int ObDASIndexMergeIter::union_get_next_row() {
+  adlog::DEBUG("ObDASIndexMergeIter::union_get_next_row");
+  
   int ret = OB_SUCCESS;
   /* try to fill each child store */
   int64_t output_idx = OB_INVALID_INDEX;
@@ -1009,9 +1043,34 @@ int ObDASIndexMergeIter::union_get_next_row()
   return ret;
 }
 
-int ObDASIndexMergeIter::union_get_next_rows(int64_t &count, int64_t capacity)
-{
+int ObDASIndexMergeIter::union_get_next_rows(int64_t &count, int64_t capacity) {
+  adlog::DEBUG("ObDASIndexMergeIter::union_get_next_rows");
   int ret = OB_SUCCESS;
+
+  {
+    {
+      // 在 intersect_get_next_rows 开始处添加  
+      adlog::DEBUG("UNION rowkey_exprs_ count", K(rowkey_exprs_->count()));  
+      for (int64_t i = 0; i < rowkey_exprs_->count(); i++) {
+        // adlog::DEBUG("rowkey_expr", i, std::to_string(*rowkey_exprs_->at(i)));
+        {
+          char buf[1024];  
+          int64_t pos = 0;  
+          pos = rowkey_exprs_->at(i)->to_string(buf, sizeof(buf));  
+          adlog::DEBUG("UNION rowkey_expr", i, std::string(buf, pos));
+        }
+      }
+      // // 检查 rowkey_exprs_ 是否包含主键表达式  
+      // for (int64_t i = 0; i < rowkey_exprs_->count(); i++) {  
+      //   ObExpr *expr = rowkey_exprs_->at(i);  
+      //   if (expr->type_ == T_REF_COLUMN) {  
+      //     ObColumnRefRawExpr *col_expr = static_cast<ObColumnRefRawExpr*>(expr);  
+      //     adlog::DEBUG("UNION Column name ",i," ", K(col_expr->get_column_name()));  
+      //   }  
+      // }  
+    }
+  }
+
   count = 0;
   result_buffer_.reuse();
   while (OB_SUCC(ret) && count < capacity) {
