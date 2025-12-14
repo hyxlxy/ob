@@ -3263,9 +3263,12 @@ int ObJoinOrder::create_index_merge_access_paths(const uint64_t table_id,
              && OB_FAIL(prune_index_merge_path(access_paths))) {
     LOG_WARN("failed to prune index merge path", K(ret));
   } else {
-    // PREFERENCE RULE: For FTS + small LIMIT scenarios, prefer INDEX MERGE over normal TR path
+    // PATCH 2: PREFERENCE RULE for FTS + small LIMIT scenarios
+    // Prefer INDEX MERGE over normal TEXT RETRIEVAL path
     // This aligns with the two-phase BMW strategy: FTS first, then scalar AND filtering
     bool small_limit = false;
+    int64_t limit_val = 0;
+    
     if (contain_fts && !access_paths.empty()) {
       // Check if query has a small LIMIT (<=20 is typical for top-K retrieval)
       const ObSelectStmt *select_stmt = NULL;
@@ -3273,7 +3276,6 @@ int ObJoinOrder::create_index_merge_access_paths(const uint64_t table_id,
         select_stmt = static_cast<const ObSelectStmt*>(stmt);
         if (select_stmt->has_limit() && OB_NOT_NULL(select_stmt->get_limit_expr())) {
           bool is_null_value = false;
-          int64_t limit_val = 0;
           if (OB_SUCC(ObTransformUtils::get_limit_value(select_stmt->get_limit_expr(),
                                                         OPT_CTX.get_params(),
                                                         OPT_CTX.get_exec_ctx(),
@@ -3283,18 +3285,31 @@ int ObJoinOrder::create_index_merge_access_paths(const uint64_t table_id,
               && !is_null_value
               && limit_val > 0 && limit_val <= 20) {
             small_limit = true;
-            OPT_TRACE("FTS + small LIMIT detected (limit=", limit_val, "), prefer INDEX MERGE");
           }
         }
       }
-      // For FTS queries, always prefer INDEX MERGE (with or without small LIMIT)
-      // because FTS index provides the most selective filtering
-      ignore_normal_access_path = true;
-      LOG_TRACE("prefer INDEX MERGE for FTS query", K(ref_table_id), K(contain_fts), K(small_limit), K(access_paths.count()));
+      
+      // CRITICAL PATCH 2: For FTS queries with small LIMIT, always prefer INDEX MERGE
+      // Rationale:
+      // 1. FTS index provides the most selective filtering for text queries
+      // 2. Small LIMIT (<=20) means we only need top-K results
+      // 3. INDEX MERGE (INTERSECT) can efficiently combine FTS + scalar AND filters
+      // 4. This avoids the expensive top-N sort on large result sets from TEXT RETRIEVAL
+      if (small_limit) {
+        ignore_normal_access_path = true;
+        OPT_TRACE("PATCH 2: FTS + small LIMIT (", limit_val, ") detected, prefer INDEX MERGE over TEXT RETRIEVAL");
+        LOG_TRACE("prefer INDEX MERGE for FTS + small LIMIT query", K(ref_table_id), K(limit_val), K(access_paths.count()));
+      } else {
+        // Do NOT force INDEX MERGE for general FTS queries without small LIMIT
+        // Keep original path competition to avoid regressions/crashes
+        ignore_normal_access_path = is_match_hint && !access_paths.empty();
+      }
     } else {
+      // For non-FTS queries, only prefer INDEX MERGE if hint is specified
       ignore_normal_access_path = is_match_hint && !access_paths.empty();
     }
-    LOG_TRACE("finish create index merge path", K(ref_table_id), K(is_match_hint), K(contain_fts), K(access_paths));
+    
+    LOG_TRACE("finish create index merge path", K(ref_table_id), K(is_match_hint), K(contain_fts), K(small_limit), K(access_paths));
   }
   return ret;
 }
@@ -3495,11 +3510,15 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
     // Case 2 (fallback): filters are split as simple conditions (common in WHERE a AND b AND MATCH(...)).
     // Build an INTERSECT index-merge tree by combining eligible simple filters.
     // This fallback is critical for FTS + scalar AND scenarios where Case 1 doesn't generate candidates.
+    // PATCH 1: Enhanced fallback to stably construct INTERSECT tree for FTS + scalar AND
     if (OB_SUCC(ret) && candi_index_trees.empty() && filters.count() >= 2) {
       ObSEArray<ObIndexMergeNode*, 4> child_nodes;
       bool contain_fts = false;
       uint64_t first_index_id = OB_INVALID_ID;
       bool has_multi_index = false;
+      int64_t fts_filter_idx = -1;
+      
+      // First pass: identify FTS filter and collect all valid leaf nodes
       for (int64_t i = 0; OB_SUCC(ret) && i < filters.count(); ++i) {
         ObRawExpr *filter = filters.at(i);
         ObIndexMergeNode *leaf = NULL;
@@ -3515,21 +3534,32 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
                                                            is_valid))) {
           LOG_WARN("failed to generate candi node for simple filter", K(ret), KPC(filter));
         } else if (!is_valid || NULL == leaf) {
-          // skip this filter
+          // skip this filter - it doesn't have a corresponding index
+          OPT_TRACE("skip filter (no valid index): ", filter);
         } else {
-          contain_fts = contain_fts || (leaf->node_type_ == INDEX_MERGE_FTS_INDEX);
+          // Track FTS filter
+          if (leaf->node_type_ == INDEX_MERGE_FTS_INDEX) {
+            contain_fts = true;
+            fts_filter_idx = i;
+            OPT_TRACE("found FTS filter at index ", i);
+          }
+          
+          // Track index diversity
           if (OB_INVALID_ID == first_index_id) {
             first_index_id = leaf->index_tid_;
           } else if (first_index_id != leaf->index_tid_) {
             has_multi_index = true;
           }
+          
           if (OB_FAIL(child_nodes.push_back(leaf))) {
             LOG_WARN("failed to push back child node", K(ret));
           }
         }
       }
-      // CRITICAL: Build INTERSECT tree if we have FTS + at least 2 valid child nodes (from different indexes)
+      
+      // CRITICAL PATCH 1: Build INTERSECT tree if we have FTS + at least one scalar index leaf
       // This ensures FTS + scalar AND scenarios always generate an INDEX MERGE candidate
+      // Key insight: FTS leaf + one scalar leaf (e.g., id < 1000) is sufficient for INTERSECT
       if (OB_SUCC(ret) && contain_fts && child_nodes.count() >= 2) {
         // For FTS + scalar AND, we don't strictly require has_multi_index; 
         // even if some children use the same index, the INTERSECT can still be valid.
@@ -3547,10 +3577,18 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
           } else if (OB_FAIL(candi_index_trees.push_back(root))) {
             LOG_WARN("failed to push back fallback index merge tree", K(ret));
           } else {
-            OPT_TRACE("fallback: build INTERSECT index merge tree from split filters with FTS");
+            OPT_TRACE("PATCH 1: fallback build INTERSECT index merge tree from split filters with FTS");
+            OPT_TRACE("  - FTS filter index: ", fts_filter_idx);
+            OPT_TRACE("  - Total child nodes: ", child_nodes.count());
+            OPT_TRACE("  - Has multi-index: ", has_multi_index);
             LOG_TRACE("fallback: build INTERSECT index merge tree", K(contain_fts), K(child_nodes.count()), K(has_multi_index));
           }
         }
+      } else if (OB_SUCC(ret) && contain_fts && child_nodes.count() == 1) {
+        // Edge case: FTS filter exists but only one valid leaf node
+        // This might happen if other scalar filters don't have matching indexes
+        OPT_TRACE("FTS filter found but insufficient scalar index leaves (count=", child_nodes.count(), "), skip INTERSECT");
+        LOG_TRACE("FTS filter found but insufficient scalar index leaves", K(child_nodes.count()));
       }
     }
   }
@@ -3579,6 +3617,9 @@ int ObJoinOrder::generate_candi_index_merge_node(const uint64_t ref_table_id,
       candi_node->node_type_ = (T_OP_OR == filter->get_expr_type()) ? INDEX_MERGE_UNION : INDEX_MERGE_INTERSECT;
       is_valid_node = (T_OP_OR == filter->get_expr_type()) ? true : false;
     }
+    // For AND: track if we have at least one valid indexed child
+    // Also collect non-indexed conditions to be applied as table-level filters
+    bool has_valid_indexed_child = false;
     for (int64_t i = 0; OB_SUCC(ret) && i < filter->get_param_count(); ++i) {
       ObIndexMergeNode *child = NULL;
       bool is_child_valid = false;
@@ -3596,14 +3637,30 @@ int ObJoinOrder::generate_candi_index_merge_node(const uint64_t ref_table_id,
           is_valid_node = false;
           break;
         }
+        // For AND: if child is not valid (no index found), treat it as a table-level filter
+        // and continue processing other children. This allows partial index merge with table filters.
+        // Add this non-indexed condition to the root node's filter list
+        if (T_OP_AND == filter->get_expr_type() && OB_SUCC(ret)) {
+          if (OB_FAIL(candi_node->filter_.push_back(filter->get_param_expr(i)))) {
+            LOG_WARN("failed to push back non-indexed filter to AND node", K(ret));
+          }
+        }
       } else if (OB_ISNULL(child)) {
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("child node is null", K(ret), KPC(filter));
       } else if (OB_FAIL(candi_node->children_.push_back(child))) {
         LOG_WARN("failed to push back child node", K(ret));
-      } else if (T_OP_AND == filter->get_expr_type()) {
-        is_valid_node = true;
+      } else {
+        has_valid_indexed_child = true;
+        if (T_OP_AND == filter->get_expr_type()) {
+          is_valid_node = true;
+        }
       }
+    }
+    // For AND: if we have at least one valid indexed child, mark the AND tree as valid
+    // The non-indexed conditions will be applied as table-level filters
+    if (OB_SUCC(ret) && T_OP_AND == filter->get_expr_type() && has_valid_indexed_child) {
+      is_valid_node = true;
     }
   } else {
     ObSEArray<uint64_t, 1> candicate_index_tids;
@@ -3680,20 +3737,25 @@ int ObJoinOrder::collect_candicate_indexes(const uint64_t ref_table_id,
     }
   } else {
     /* record all indexes which satisfy the index prefix condition */
+    /* ENHANCED: Support both single-column and multi-column filters (e.g., IN lists, range conditions) */
     ObSEArray<uint64_t, 4> column_ids;
     if (OB_FAIL(ObRawExprUtils::extract_column_ids(filter, column_ids))) {
       LOG_WARN("failed to extract column ids", K(filter), K(ret));
-    } else if (OB_UNLIKELY(column_ids.count() != 1)) {
+    } else if (OB_UNLIKELY(column_ids.empty())) {
       ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("invalid filter node for index merge", K(filter), K(ret));
+      LOG_WARN("invalid filter node for index merge - no columns found", K(filter), K(ret));
     } else {
+      // For scalar filters (range, comparison, IN), we only care about the first column
+      // as it determines which index can be used for this filter
+      uint64_t filter_col_id = column_ids.at(0);
       for (int64_t i = 0; OB_SUCC(ret) && i < valid_index_ids.count(); ++i) {
         const uint64_t index_id = valid_index_ids.at(i);
         const ObIArray<uint64_t> &index_column_ids = valid_index_cols.at(i);
         if (OB_UNLIKELY(index_column_ids.empty())) {
           ret = OB_ERR_UNEXPECTED;
           LOG_WARN("invalid index column ids", K(ret), K(index_id), K(index_column_ids));
-        } else if (index_column_ids.at(0) == column_ids.at(0)) {
+        } else if (index_column_ids.at(0) == filter_col_id) {
+          // This index can be used for this filter (first column matches)
           if (OB_FAIL(candicate_index_tids.push_back(index_id))) {
             LOG_WARN("failed to push back index id", K(index_id), K(ret));
           }
