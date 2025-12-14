@@ -777,6 +777,7 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
                 adlog::DEBUG("WARNING child_iter->get_next_rows(child_rows_cnt, capacity);");
               }
             }
+            adlog::DEBUG("child_iter: ",K(i),"  ", K(child_rows_cnt));
 
             if (OB_ITER_END == ret && child_rows_cnt > 0) {
               ret = OB_SUCCESS;
@@ -817,12 +818,12 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
           continue;
         }
         if ((!child_stores_.at(i).have_data())) {
-            all_matched = false;  // 这个child没有数据，不匹配  
+            all_matched = false;  // 这个child没有数据，不匹配
+            ret = OB_ITER_END;
         } else if (OB_FAIL(compare(i, output_idx, cmp_ret))) {  
           adlog::DEBUG("index merge failed to compare row", K(i), K(output_idx), K(ret));  
         } else if (cmp_ret == 0) {  
           child_stores_.at(i).to_expr();
-          
         } else { 
           all_matched = false;  // rowkey不匹配  
         }
@@ -1092,6 +1093,7 @@ int ObDASIndexMergeIter::union_get_next_rows(int64_t &count, int64_t capacity) {
             if (OB_ITER_END == ret && child_rows_cnt > 0) {
               ret = OB_SUCCESS;
             }
+            adlog::DEBUG("child_iter: ",K(i),"  ", K(child_rows_cnt));
             if (OB_SUCC(ret)) {
               if (OB_FAIL(child_store.save(true, child_rows_cnt))) {
                 LOG_WARN("failed to save child rows", K(child_rows_cnt), K(ret));
