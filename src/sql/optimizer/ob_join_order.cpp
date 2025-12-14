@@ -3229,6 +3229,7 @@ int ObJoinOrder::create_index_merge_access_paths(const uint64_t table_id,
   bool contain_fts = false;
   ignore_normal_access_path = false;
   LOG_TRACE("check can use index merge begin", K(ref_table_id), K(helper.filters_));
+  LOG_INFO("[INDEX_MERGE_DECISION] START create_index_merge_access_paths", K(table_id), K(ref_table_id), K(helper.filters_.count()));
   OPT_TRACE_TITLE("BEGIN CREATE INDEX MERGE PATHS");
   OPT_TRACE("table_id: ", table_id, "ref_table_id: ", ref_table_id);
   OPT_TRACE("full query filters: ", helper.filters_);
@@ -3239,14 +3240,16 @@ int ObJoinOrder::create_index_merge_access_paths(const uint64_t table_id,
     LOG_WARN("get unexpected null", K(ret), K(get_plan()), K(stmt), K(query_ctx));
   } else if (is_virtual_table(ref_table_id)) {
     OPT_TRACE("can not create index merge paths for virtual table");
+    LOG_TRACE("[INDEX_MERGE_DECISION] virtual table, skip INDEX MERGE");
   } else if (OB_FAIL(get_candi_index_merge_trees(table_id,
                                                  ref_table_id,
                                                  helper,
                                                  candi_index_trees,
                                                  is_match_hint))) {
     LOG_WARN("failed to get valid index ids", K(ret));
+    LOG_TRACE("[INDEX_MERGE_DECISION] failed to get candi trees", K(ret));
   } else if (candi_index_trees.empty()) {
-    // do nothing
+    LOG_TRACE("[INDEX_MERGE_DECISION] no candi trees generated");
   } else if (OB_FAIL(do_create_index_merge_paths(table_id,
                                                  ref_table_id,
                                                  helper,
@@ -3254,14 +3257,18 @@ int ObJoinOrder::create_index_merge_access_paths(const uint64_t table_id,
                                                  candi_index_trees,
                                                  access_paths))) {
     LOG_WARN("failed to create index merge paths", K(ret));
+    LOG_TRACE("[INDEX_MERGE_DECISION] failed to create paths from candi trees", K(ret));
   } else if (OB_UNLIKELY(EN_FORCE_INDEX_MERGE_PLAN)) {
     ignore_normal_access_path = true;
     LOG_TRACE("[EN_FORCE_INDEX_MERGE_PLAN] finish create index merge path ", K(ref_table_id), K(is_match_hint), K(contain_fts), K(access_paths));
+    LOG_TRACE("[INDEX_MERGE_DECISION] created INDEX MERGE paths (force plan)", K(access_paths.count()));
   } else if (OB_FAIL(check_index_merge_paths_contain_fts(access_paths, contain_fts))) {
     LOG_WARN("failed to check index merge paths contain FTS", K(ret));
+    LOG_TRACE("[INDEX_MERGE_DECISION] failed to check FTS in paths", K(ret));
   } else if (!is_match_hint && !contain_fts
              && OB_FAIL(prune_index_merge_path(access_paths))) {
     LOG_WARN("failed to prune index merge path", K(ret));
+    LOG_TRACE("[INDEX_MERGE_DECISION] failed to prune paths", K(ret));
   } else {
     // PATCH 2: PREFERENCE RULE for FTS + small LIMIT scenarios
     // Prefer INDEX MERGE over normal TEXT RETRIEVAL path
@@ -3309,8 +3316,10 @@ int ObJoinOrder::create_index_merge_access_paths(const uint64_t table_id,
       ignore_normal_access_path = is_match_hint && !access_paths.empty();
     }
     
+    LOG_TRACE("[INDEX_MERGE_DECISION] created INDEX MERGE paths", K(access_paths.count()), K(contain_fts), K(is_match_hint), K(ignore_normal_access_path));
     LOG_TRACE("finish create index merge path", K(ref_table_id), K(is_match_hint), K(contain_fts), K(small_limit), K(access_paths));
   }
+  LOG_TRACE("[INDEX_MERGE_DECISION] END create_index_merge_access_paths", K(access_paths.count()));
   return ret;
 }
 
@@ -3335,6 +3344,7 @@ int ObJoinOrder::get_candi_index_merge_trees(const uint64_t table_id,
   ObSEArray<ObSEArray<uint64_t, 4>, 4> valid_index_cols; // column ids in the valid indexes
   omt::ObTenantConfigGuard tenant_config(TENANT_CONF(MTL_ID()));
   is_match_hint = false;
+  LOG_TRACE("[INDEX_MERGE_DECISION] START get_candi_index_merge_trees", K(table_id), K(ref_table_id), K(helper.filters_.count()));
   if (OB_ISNULL(get_plan()) || OB_UNLIKELY(!tenant_config.is_valid())) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("get invalid plan or tenant config", K(ret), K(get_plan()), K(tenant_config.is_valid()));
@@ -3344,57 +3354,59 @@ int ObJoinOrder::get_candi_index_merge_trees(const uint64_t table_id,
                                                    valid_index_cols,
                                                    false /* ignore_hint */ ))) {
     LOG_WARN("failed to get valid index merge ids with hint", K(ret));
-  } else if (OB_FAIL(generate_candi_index_merge_trees(ref_table_id,
-                                                      helper.filters_,
-                                                      valid_index_ids,
-                                                      valid_index_cols,
-                                                      candi_index_trees))) {
-    LOG_WARN("failed to generate candi index merge trees", K(ret));
-  } else if (!candi_index_trees.empty()
-             && OB_FAIL(check_candi_index_trees_match_hint(table_id, candi_index_trees))) {
-    LOG_WARN("failed to check candi index trees match hint", K(ret));
-  } else if (!candi_index_trees.empty()) {
-    is_match_hint = true;
-    OPT_TRACE("generate", candi_index_trees.count(), "candi index merge trees using hint");
-    LOG_TRACE("generate candi index merge trees using hint", K(table_id), K(candi_index_trees));
-  } else if (get_plan()->get_log_plan_hint().is_outline_data_
-             || (!tenant_config->_enable_index_merge && OB_LIKELY(!EN_FORCE_INDEX_MERGE_PLAN))) {
-    OPT_TRACE("can not create index merge paths due to outline or tenant config");
-  } else if (OB_FAIL(get_valid_index_merge_indexes(table_id,
-                                                   ref_table_id,
-                                                   valid_index_ids,
-                                                   valid_index_cols,
-                                                   true /* ignore_hint */ ))) {
-    LOG_WARN("failed to get valid index merge ids", K(ret));
-  } else if (OB_FAIL(generate_candi_index_merge_trees(ref_table_id,
-                                                      helper.filters_,
-                                                      valid_index_ids,
-                                                      valid_index_cols,
-                                                      candi_index_trees))) {
-    LOG_WARN("failed to generate candi index merge trees", K(ret));
-  } else if (!candi_index_trees.empty()
-             && OB_FAIL(prune_candi_index_merge_trees(candi_index_trees))) {
-    LOG_WARN("failed to prune candi index trees", K(ret));
-  } else if (candi_index_trees.empty()) {
-    // After prune, try a final fallback: build INTERSECT tree from simple filters
-    // NOTE: try_build_intersect_from_simple_filters is not yet implemented
-    // ObSEArray<ObIndexMergeNode*, 4> fallback_trees;
-    // if (OB_FAIL(try_build_intersect_from_simple_filters(ref_table_id,
-    //                                                      helper.filters_,
-    //                                                      valid_index_ids,
-    //                                                      valid_index_cols,
-    //                                                      fallback_trees))) {
-    //   LOG_WARN("failed to build fallback intersect tree", K(ret));
-    // } else if (!fallback_trees.empty() && OB_FAIL(candi_index_trees.assign(fallback_trees))) {
-    //   LOG_WARN("failed to assign fallback trees", K(ret));
-    // } else {
-    //   OPT_TRACE("fallback: build intersect trees after prune, count:", candi_index_trees.count());
-    // }
-    OPT_TRACE("fallback: no intersect trees after prune");
   } else {
-    OPT_TRACE("generate", candi_index_trees.count(), "candi index merge trees");
-    LOG_TRACE("generate candi index merge trees", K(table_id), K(candi_index_trees));
+    LOG_TRACE("[INDEX_MERGE_DECISION] got valid indexes from hint", K(valid_index_ids.count()));
+    if (OB_FAIL(generate_candi_index_merge_trees(ref_table_id,
+                                                        helper.filters_,
+                                                        valid_index_ids,
+                                                        valid_index_cols,
+                                                        candi_index_trees))) {
+      LOG_WARN("failed to generate candi index merge trees", K(ret));
+      LOG_TRACE("[INDEX_MERGE_DECISION] failed to generate candi trees from hint", K(ret));
+    } else if (!candi_index_trees.empty()
+               && OB_FAIL(check_candi_index_trees_match_hint(table_id, candi_index_trees))) {
+      LOG_WARN("failed to check candi index trees match hint", K(ret));
+      LOG_TRACE("[INDEX_MERGE_DECISION] failed to check hint match", K(ret));
+    } else if (!candi_index_trees.empty()) {
+      is_match_hint = true;
+      OPT_TRACE("generate", candi_index_trees.count(), "candi index merge trees using hint");
+      LOG_TRACE("generate candi index merge trees using hint", K(table_id), K(candi_index_trees));
+      LOG_TRACE("[INDEX_MERGE_DECISION] generated candi trees from hint", K(candi_index_trees.count()));
+    } else if (get_plan()->get_log_plan_hint().is_outline_data_
+               || (!tenant_config->_enable_index_merge && OB_LIKELY(!EN_FORCE_INDEX_MERGE_PLAN))) {
+      OPT_TRACE("can not create index merge paths due to outline or tenant config");
+      LOG_TRACE("[INDEX_MERGE_DECISION] cannot create INDEX MERGE", K(get_plan()->get_log_plan_hint().is_outline_data_), K(tenant_config->_enable_index_merge));
+    } else if (OB_FAIL(get_valid_index_merge_indexes(table_id,
+                                                     ref_table_id,
+                                                     valid_index_ids,
+                                                     valid_index_cols,
+                                                     true /* ignore_hint */ ))) {
+      LOG_WARN("failed to get valid index merge ids", K(ret));
+      LOG_TRACE("[INDEX_MERGE_DECISION] failed to get valid indexes (ignore_hint=true)", K(ret));
+    } else {
+      LOG_TRACE("[INDEX_MERGE_DECISION] got valid indexes (ignore_hint=true)", K(valid_index_ids.count()));
+      if (OB_FAIL(generate_candi_index_merge_trees(ref_table_id,
+                                                          helper.filters_,
+                                                          valid_index_ids,
+                                                          valid_index_cols,
+                                                          candi_index_trees))) {
+        LOG_WARN("failed to generate candi index merge trees", K(ret));
+        LOG_TRACE("[INDEX_MERGE_DECISION] failed to generate candi trees (ignore_hint=true)", K(ret));
+      } else if (!candi_index_trees.empty()
+                 && OB_FAIL(prune_candi_index_merge_trees(candi_index_trees))) {
+        LOG_WARN("failed to prune candi index trees", K(ret));
+        LOG_TRACE("[INDEX_MERGE_DECISION] failed to prune candi trees", K(ret));
+      } else if (candi_index_trees.empty()) {
+        OPT_TRACE("fallback: no intersect trees after prune");
+        LOG_TRACE("[INDEX_MERGE_DECISION] no candi trees after prune (ignore_hint=true)");
+      } else {
+        OPT_TRACE("generate", candi_index_trees.count(), "candi index merge trees");
+        LOG_TRACE("generate candi index merge trees", K(table_id), K(candi_index_trees));
+        LOG_TRACE("[INDEX_MERGE_DECISION] generated candi trees (ignore_hint=true)", K(candi_index_trees.count()));
+      }
+    }
   }
+  LOG_TRACE("[INDEX_MERGE_DECISION] END get_candi_index_merge_trees", K(candi_index_trees.count()));
   return ret;
 }
 
@@ -3411,6 +3423,7 @@ int ObJoinOrder::get_valid_index_merge_indexes(const uint64_t table_id,
   ObSEArray<uint64_t, 4> index_column_ids;
   valid_index_ids.reuse();
   valid_index_cols.reuse();
+  LOG_TRACE("[INDEX_MERGE_DECISION] get_valid_index_merge_indexes", K(table_id), K(ref_table_id), K(ignore_hint));
   if (OB_ISNULL(get_plan()) ||
       OB_ISNULL(schema_guard = get_plan()->get_optimizer_context().get_sql_schema_guard())) {
     ret = OB_ERR_UNEXPECTED;
@@ -3426,6 +3439,8 @@ int ObJoinOrder::get_valid_index_merge_indexes(const uint64_t table_id,
       LOG_WARN("get unexpected null table schema", K(ret), K(ref_table_id));
     } else if (OB_FAIL(table_schema->get_simple_index_infos(simple_index_infos))) {
       LOG_WARN("failed to get simple index infos", K(ret));
+    } else {
+      LOG_TRACE("[INDEX_MERGE_DECISION] found simple indexes", K(simple_index_infos.count()), K(ref_table_id));
     }
     for (int64_t i = 0; OB_SUCC(ret) && i < simple_index_infos.count(); ++i) {
       if (OB_FAIL(index_ids.push_back(simple_index_infos.at(i).table_id_))) {
@@ -3435,11 +3450,14 @@ int ObJoinOrder::get_valid_index_merge_indexes(const uint64_t table_id,
   } else {
     const LogTableHint *log_table_hint = get_plan()->get_log_plan_hint().get_log_table_hint(table_id);
     if (NULL == log_table_hint || 2 > log_table_hint->union_merge_list_.count()) {
-      // do nothing
+      LOG_TRACE("[INDEX_MERGE_DECISION] no hint or hint count < 2");
     } else if (OB_FAIL(index_ids.assign(log_table_hint->union_merge_list_))) {
       LOG_WARN("failed to assign union merge list", K(ret));
+    } else {
+      LOG_TRACE("[INDEX_MERGE_DECISION] got indexes from hint", K(index_ids.count()));
     }
   }
+  LOG_TRACE("[INDEX_MERGE_DECISION] processing candidate indexes", K(index_ids.count()));
   for (int64_t i = 0; OB_SUCC(ret) && i < index_ids.count(); ++i) {
     index_column_ids.reuse();
     const ObTableSchema *index_schema = NULL;
@@ -3453,20 +3471,32 @@ int ObJoinOrder::get_valid_index_merge_indexes(const uint64_t table_id,
                (index_schema->is_index_local_storage() &&
                 (index_schema->is_normal_index() || index_schema->is_fts_index()))) {
       /* primary table, local normal index and local fts index are available for index merge now */
+      // NOTE: For secondary index tables in OceanBase, the rowkey column order starts with index key columns,
+      // so get_rowkey_column_ids() is sufficient to obtain the leading index key for matching filter columns.
       if (OB_FAIL(index_schema->get_rowkey_column_ids(index_column_ids))) {
-        LOG_WARN("failed to get all column ids", K(ret));
-      } else if (OB_FAIL(valid_index_ids.push_back(index_id))) {
-        LOG_WARN("failed to push back index id", K(ret), K(index_id));
-      } else if (OB_FAIL(valid_index_cols.push_back(index_column_ids))) {
-        LOG_WARN("failed to push back index column ids", K(ret), K(index_id), K(index_column_ids));
+        LOG_WARN("failed to get rowkey column ids", K(ret));
+      }
+      
+      if (OB_SUCC(ret)) {
+        if (OB_FAIL(valid_index_ids.push_back(index_id))) {
+          LOG_WARN("failed to push back index id", K(ret), K(index_id));
+        } else if (OB_FAIL(valid_index_cols.push_back(index_column_ids))) {
+          LOG_WARN("failed to push back index column ids", K(ret), K(index_id), K(index_column_ids));
+        } else {
+          LOG_TRACE("[INDEX_MERGE_DECISION] added valid index", K(index_id), K(index_schema->is_fts_index()), K(index_schema->is_normal_index()), K(index_column_ids));
+        }
       }
     } else if (!ignore_hint) {
       // hint is invalid
+      LOG_TRACE("[INDEX_MERGE_DECISION] index invalid for hint", K(index_id));
       valid_index_ids.reuse();
       valid_index_cols.reuse();
       break;
+    } else {
+      LOG_TRACE("[INDEX_MERGE_DECISION] skipping index", K(index_id));
     }
   }
+  LOG_TRACE("[INDEX_MERGE_DECISION] get_valid_index_merge_indexes result", K(valid_index_ids.count()));
   LOG_TRACE("get all valid indexes for index merge", K(table_id), K(ref_table_id), K(ignore_hint), K(valid_index_ids), K(valid_index_cols));
   return ret;
 }
@@ -3478,10 +3508,12 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
                                                   ObIArray<ObIndexMergeNode *> &candi_index_trees)
 {
   int ret = OB_SUCCESS;
+  LOG_TRACE("[INDEX_MERGE_DECISION] generate_candi_index_merge_trees", K(valid_index_ids.count()), K(filters.count()));
   if (valid_index_ids.empty()) {
-    // do nothing
+    LOG_TRACE("[INDEX_MERGE_DECISION] no valid indexes, cannot generate candi trees");
   } else {
     // Case 1: try to build index merge trees from composite filters (OR/AND)
+    LOG_TRACE("[INDEX_MERGE_DECISION] Case 1: trying to build from composite filters");
     for (int64_t i = 0; OB_SUCC(ret) && i < filters.count(); ++i) {
       ObRawExpr *filter = filters.at(i);
       ObIndexMergeNode *candi_node = NULL;
@@ -3491,6 +3523,7 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
         LOG_WARN("get unexpected null filter", K(ret), K(i));
       } else if (!(filter->get_expr_type() == T_OP_OR || filter->get_expr_type() == T_OP_AND)) {
         // do nothing, only support UNION/INTERSECT MERGE on OR/AND expressions here
+        LOG_TRACE("[INDEX_MERGE_DECISION] filter is not OR/AND, skip", K(i));
       } else if (OB_FAIL(generate_candi_index_merge_node(ref_table_id,
                                                          filter,
                                                          valid_index_ids,
@@ -3499,11 +3532,13 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
                                                          is_valid))) {
         LOG_WARN("failed to generate one index merge tree for filter", K(ret), KPC(filter));
       } else if (!is_valid || NULL == candi_node) {
-        // do nothing
+        LOG_TRACE("[INDEX_MERGE_DECISION] filter not valid or null node", K(i));
       } else if (OB_FAIL(candi_node->formalize_index_merge_tree())) {
         LOG_WARN("failed to formalize candi index merge tree", K(ret), KPC(candi_node));
       } else if (OB_FAIL(candi_index_trees.push_back(candi_node))) {
         LOG_WARN("failed to push back candi index tree", K(ret));
+      } else {
+        LOG_TRACE("[INDEX_MERGE_DECISION] Case 1: generated candi tree from composite filter", K(i));
       }
     }
 
@@ -3511,7 +3546,9 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
     // Build an INTERSECT index-merge tree by combining eligible simple filters.
     // This fallback is critical for FTS + scalar AND scenarios where Case 1 doesn't generate candidates.
     // PATCH 1: Enhanced fallback to stably construct INTERSECT tree for FTS + scalar AND
+    LOG_TRACE("[INDEX_MERGE_DECISION] Case 2: fallback check", K(candi_index_trees.count()), K(filters.count()));
     if (OB_SUCC(ret) && candi_index_trees.empty() && filters.count() >= 2) {
+      LOG_TRACE("[INDEX_MERGE_DECISION] Case 2: entering fallback for FTS + scalar AND");
       ObSEArray<ObIndexMergeNode*, 4> child_nodes;
       bool contain_fts = false;
       uint64_t first_index_id = OB_INVALID_ID;
@@ -3536,12 +3573,14 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
         } else if (!is_valid || NULL == leaf) {
           // skip this filter - it doesn't have a corresponding index
           OPT_TRACE("skip filter (no valid index): ", filter);
+          LOG_TRACE("[INDEX_MERGE_DECISION] Case 2: filter has no valid index", K(i));
         } else {
           // Track FTS filter
           if (leaf->node_type_ == INDEX_MERGE_FTS_INDEX) {
             contain_fts = true;
             fts_filter_idx = i;
             OPT_TRACE("found FTS filter at index ", i);
+            LOG_TRACE("[INDEX_MERGE_DECISION] Case 2: found FTS filter", K(i));
           }
           
           // Track index diversity
@@ -3553,6 +3592,8 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
           
           if (OB_FAIL(child_nodes.push_back(leaf))) {
             LOG_WARN("failed to push back child node", K(ret));
+          } else {
+            LOG_TRACE("[INDEX_MERGE_DECISION] Case 2: added child node", K(i), K(leaf->node_type_));
           }
         }
       }
@@ -3560,6 +3601,7 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
       // CRITICAL PATCH 1: Build INTERSECT tree if we have FTS + at least one scalar index leaf
       // This ensures FTS + scalar AND scenarios always generate an INDEX MERGE candidate
       // Key insight: FTS leaf + one scalar leaf (e.g., id < 1000) is sufficient for INTERSECT
+      LOG_TRACE("[INDEX_MERGE_DECISION] Case 2: status", K(contain_fts), K(child_nodes.count()), K(has_multi_index));
       if (OB_SUCC(ret) && contain_fts && child_nodes.count() >= 2) {
         // For FTS + scalar AND, we don't strictly require has_multi_index; 
         // even if some children use the same index, the INTERSECT can still be valid.
@@ -3582,6 +3624,7 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
             OPT_TRACE("  - Total child nodes: ", child_nodes.count());
             OPT_TRACE("  - Has multi-index: ", has_multi_index);
             LOG_TRACE("fallback: build INTERSECT index merge tree", K(contain_fts), K(child_nodes.count()), K(has_multi_index));
+            LOG_TRACE("[INDEX_MERGE_DECISION] Case 2: successfully built INTERSECT tree", K(child_nodes.count()));
           }
         }
       } else if (OB_SUCC(ret) && contain_fts && child_nodes.count() == 1) {
@@ -3589,9 +3632,13 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
         // This might happen if other scalar filters don't have matching indexes
         OPT_TRACE("FTS filter found but insufficient scalar index leaves (count=", child_nodes.count(), "), skip INTERSECT");
         LOG_TRACE("FTS filter found but insufficient scalar index leaves", K(child_nodes.count()));
+        LOG_TRACE("[INDEX_MERGE_DECISION] Case 2: FTS found but insufficient child nodes", K(child_nodes.count()));
+      } else if (OB_SUCC(ret) && !contain_fts) {
+        LOG_TRACE("[INDEX_MERGE_DECISION] Case 2: no FTS filter found, skip INTERSECT");
       }
     }
   }
+  LOG_TRACE("[INDEX_MERGE_DECISION] generate_candi_index_merge_trees result", K(candi_index_trees.count()));
   return ret;
 }
 
@@ -3669,6 +3716,7 @@ int ObJoinOrder::generate_candi_index_merge_node(const uint64_t ref_table_id,
     } else if (!(filter->has_flag(IS_SIMPLE_COND)
                  || filter->has_flag(IS_RANGE_COND)
                  || filter->has_flag(CNT_MATCH_EXPR))) {
+      // 仅接受简单条件/范围条件/FTS 条件作为索引候选，其余作为表级过滤
       is_valid_node = false;
     } else if (OB_FAIL(collect_candicate_indexes(ref_table_id,
                                                  filter,
@@ -3677,6 +3725,7 @@ int ObJoinOrder::generate_candi_index_merge_node(const uint64_t ref_table_id,
                                                  candicate_index_tids))) {
       LOG_WARN("failed to choose candi index for filter", K(ret), K(filter));
     } else if (candicate_index_tids.empty()) {
+      // No matching index found for this filter; treat as non-indexed condition
       is_valid_node = false;
     } else if (OB_ISNULL(candi_node = OB_NEWx(ObIndexMergeNode, allocator_))) {
       ret = OB_ALLOCATE_MEMORY_FAILED;
@@ -4024,31 +4073,51 @@ int ObJoinOrder::choose_best_selectivity_branch(ObIndexMergeNode* &candi_node)
       }
     }
   } else if (INDEX_MERGE_INTERSECT == candi_node->node_type_) {
-    ObIndexMergeNode* best_child = NULL;
-    double best_selectivity = 1;
+    // Reorder children to put FTS first, then by ascending selectivity.
+    // DO NOT drop other children; we need all leaves to form a real INTERSECT.
+    ObSEArray<ObIndexMergeNode*, 8> new_children;
+    ObSEArray<std::pair<ObIndexMergeNode*, double>, 8> child_with_sel;
+    ObIndexMergeNode* fts_child = NULL;
     for (int64_t i = 0; OB_SUCC(ret) && i < candi_node->children_.count(); ++i) {
       ObIndexMergeNode* child_candi_node = candi_node->children_.at(i);
-      double child_selectivity = 1;
+      double child_selectivity = 1.0;
       if (OB_ISNULL(child_candi_node)) {
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("child node is null", K(ret), K(i), KPC(candi_node));
       } else if (INDEX_MERGE_FTS_INDEX == child_candi_node->node_type_) {
-        best_child = child_candi_node;
-        break;
+        // Prefer to evaluate FTS child first
+        fts_child = child_candi_node;
       } else if (OB_FAIL(THIS_WORKER.check_status())) {
         LOG_WARN("check status failed", K(ret));
       } else if (OB_FAIL(SMART_CALL(choose_best_selectivity_branch(child_candi_node)))) {
         LOG_WARN("failed to choose best branch for child", K(ret), KPC(child_candi_node));
-      } else if (OB_FAIL(calc_selectivity_for_index_merge_node(child_candi_node,
-                                                               child_selectivity))) {
+      } else if (OB_FAIL(calc_selectivity_for_index_merge_node(child_candi_node, child_selectivity))) {
         LOG_WARN("failed to calculate selectivity", K(ret));
-      } else if (NULL == best_child || child_selectivity < best_selectivity) {
-        best_child = child_candi_node;
-        best_selectivity = child_selectivity;
+      } else if (OB_FAIL(child_with_sel.push_back(std::make_pair(child_candi_node, child_selectivity)))) {
+        LOG_WARN("failed to push back child with selectivity", K(ret));
       }
     }
+    // Sort non-FTS children by ascending selectivity (more selective first)
     if (OB_SUCC(ret)) {
-      candi_node = best_child;
+      std::sort(child_with_sel.begin(), child_with_sel.end(), [](const std::pair<ObIndexMergeNode*, double>& a,
+                                                                 const std::pair<ObIndexMergeNode*, double>& b) {
+        return a.second < b.second;
+      });
+      if (NULL != fts_child) {
+        if (OB_FAIL(new_children.push_back(fts_child))) {
+          LOG_WARN("failed to push back fts child", K(ret));
+        }
+      }
+      for (int64_t i = 0; OB_SUCC(ret) && i < child_with_sel.count(); ++i) {
+        if (OB_FAIL(new_children.push_back(child_with_sel.at(i).first))) {
+          LOG_WARN("failed to push back reordered child", K(ret));
+        }
+      }
+      if (OB_SUCC(ret)) {
+        if (OB_FAIL(candi_node->children_.assign(new_children))) {
+          LOG_WARN("failed to assign reordered children", K(ret));
+        }
+      }
     }
   }
   return ret;
@@ -4303,10 +4372,11 @@ int ObJoinOrder::create_one_index_merge_path(const uint64_t table_id,
     }
   }
   
-  // Initialize two-phase FTS optimization if applicable
+  // Initialize two-phase FTS optimization if applicable (best-effort, do not block plan)
   if (OB_SUCC(ret)) {
-    if (OB_FAIL(init_two_phase_fts_opt(table_id, stmt, root_node, index_merge_path))) {
-      LOG_WARN("failed to init two phase fts opt", K(ret));
+    int tmp_ret = init_two_phase_fts_opt(table_id, stmt, root_node, index_merge_path);
+    if (OB_SUCCESS != tmp_ret) {
+      LOG_TRACE("skip two-phase fts opt init", K(tmp_ret));
     }
   }
   
