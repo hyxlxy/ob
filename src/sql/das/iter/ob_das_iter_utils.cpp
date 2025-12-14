@@ -3502,7 +3502,14 @@ if (OB_ISNULL(ctdef) || OB_ISNULL(rtdef) || ctdef->op_type_ != DAS_OP_INDEX_MERG
         if ((merge_ctdef->merge_node_types_.at(i) == INDEX_MERGE_SCAN
              || (merge_ctdef->merge_node_types_.at(i) == INDEX_MERGE_FTS_INDEX && need_sort))
             && child_ctdef->op_type_ == DAS_OP_SORT) {
-          // insert a sort iter, data rows are deep copied in index merge thus the sort iter doesn't need to hold the memory
+          // insert a sort iter, data rows are deep copied in index merge thus
+          // the sort iter doesn't need to hold the memory
+          if (merge_ctdef->merge_node_types_.at(i) == INDEX_MERGE_SCAN) {
+            adlog::DEBUG("merge_ctdef->merge_node_types_.at(i) == INDEX_MERGE_SCAN");
+          } else {
+            adlog::DEBUG("(merge_ctdef->merge_node_types_.at(i) == INDEX_MERGE_FTS_INDEX && need_sort)");
+          }
+          adlog::DEBUG("init sort iter and child_ctdef->op_type_ == DAS_OP_SORT");
           const bool need_rewind = false;
           const bool need_distinct = false;
           ObDASIter *sort_iter = nullptr;

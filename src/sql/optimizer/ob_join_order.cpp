@@ -3439,38 +3439,42 @@ int ObJoinOrder::generate_candi_index_merge_trees(
     adlog::DEBUG("valid_index_ids 是空的");
   } else {
     adlog::DEBUG("filters.count() = ", filters.count());
-    for (int64_t i = 0; OB_SUCC(ret) && i < filters.count(); ++i) {
-      ObRawExpr *filter = filters.at(i);
-      ObIndexMergeNode *candi_node = NULL;
-      bool is_valid = false;
-      if (OB_ISNULL(filter)) {
-        ret = OB_ERR_UNEXPECTED;
-        LOG_WARN("get unexpected null filter", K(ret), K(i));
-      } else if (filter->get_expr_type() != T_OP_OR and filter->get_expr_type() != T_OP_AND) {
-        // do nothing, only support UNION MERGE now // 现在尝试支持了AND
-        adlog::DEBUG("filter->get_expr_type() != T_OP_OR and filter->get_expr_type() != T_OP_AND");
-        adlog::DEBUG("filter[", i, "] type = ", filter->get_expr_type(), " name = ", filter->get_expr_name());
-      } else if (OB_FAIL(generate_candi_index_merge_node(ref_table_id,
+
+    if (filters.count() <= 1) {
+      // 处理的是OR的
+      for (int64_t i = 0; OB_SUCC(ret) && i < filters.count(); ++i) {
+        ObRawExpr *filter = filters.at(i);
+        ObIndexMergeNode *candi_node = NULL;
+        bool is_valid = false;
+        if (OB_ISNULL(filter)) {
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("get unexpected null filter", K(ret), K(i));
+        } else if (filter->get_expr_type() != T_OP_OR and filter->get_expr_type() != T_OP_AND) {
+          // do nothing, only support UNION MERGE now // 现在尝试支持了AND
+          adlog::DEBUG("filter->get_expr_type() != T_OP_OR and filter->get_expr_type() != T_OP_AND");
+          adlog::DEBUG("filter[", i, "] type = ", filter->get_expr_type(), " name = ", filter->get_expr_name());
+        } else if (OB_FAIL(generate_candi_index_merge_node(ref_table_id,
                                                          filter,
                                                          valid_index_ids,
                                                          valid_index_cols,
                                                          candi_node,
                                                          is_valid))) {
-        LOG_WARN("failed to generate one index merge tree for filter", K(ret), KPC(filter));
-      } else if (!is_valid || NULL == candi_node) {
-        // do nothing
-        adlog::DEBUG("!is_valid || NULL == candi_node");
-      } else if (OB_FAIL(candi_node->formalize_index_merge_tree())) {
-        LOG_WARN("failed to formalize candi index merge tree", K(ret), KPC(candi_node));
-      } else {
-        adlog::DEBUG("candi_index_trees push_back了一个node");
-        if (OB_FAIL(candi_index_trees.push_back(candi_node))) {
-          LOG_WARN("failed to push back candi index tree", K(ret));
+          LOG_WARN("failed to generate one index merge tree for filter", K(ret), KPC(filter));
+        } else if (!is_valid || NULL == candi_node) {
+          // do nothing
+          adlog::DEBUG("!is_valid || NULL == candi_node");
+        } else if (OB_FAIL(candi_node->formalize_index_merge_tree())) {
+          LOG_WARN("failed to formalize candi index merge tree", K(ret), KPC(candi_node));
+        } else {
+          adlog::DEBUG("candi_index_trees push_back了一个node");
+          if (OB_FAIL(candi_index_trees.push_back(candi_node))) {
+            LOG_WARN("failed to push back candi index tree", K(ret));
+          }
         }
       }
     }
 
-    // 【新增】检查是否可以构建AND树（多个独立条件的AND组合）
+    // 多个独立条件的AND组合
     if (candi_index_trees.empty() && filters.count() > 1) {
       // 检查所有filters是否都是可索引的简单条件
       ObSEArray<ObIndexMergeNode*, 4> valid_nodes;
@@ -3481,7 +3485,7 @@ int ObJoinOrder::generate_candi_index_merge_trees(
         if (OB_ISNULL(filter) || 
             filter->get_expr_type() == T_OP_OR || 
             filter->get_expr_type() == T_OP_AND) {
-          continue; // 跳过已处理的或无效的条件
+          continue; 
         }
         
         ObIndexMergeNode *candi_node = NULL;
@@ -3594,7 +3598,7 @@ int ObJoinOrder::generate_candi_index_merge_node(const uint64_t ref_table_id,
     } else if (!(filter->has_flag(IS_SIMPLE_COND) ||
                  filter->has_flag(IS_RANGE_COND) ||
                  filter->has_flag(CNT_MATCH_EXPR) ||
-                 (filter->get_expr_type() == T_OP_IN))) {
+                 (filter->has_flag(IS_IN) ))) {
       is_valid_node = false;
     } else if (OB_FAIL(collect_candicate_indexes(ref_table_id,
                                                  filter,
@@ -3663,35 +3667,25 @@ int ObJoinOrder::collect_candicate_indexes(const uint64_t ref_table_id,
     }
   } else {
 
-    if (T_OP_IN == filter->get_expr_type()) {  
-      ObRawExpr *left_expr = filter->get_param_expr(0);  
-      if (OB_NOT_NULL(left_expr) && left_expr->is_column_ref_expr()) {  
-        ObColumnRefRawExpr *col_expr = static_cast<ObColumnRefRawExpr*>(left_expr);  
-        uint64_t column_id = col_expr->get_column_id();  
-        adlog::DEBUG("extracted column from IN expr", K(column_id));
-          
-        // 遍历所有索引，查找包含该列的索引  
-        for (int64_t i = 0; OB_SUCC(ret) && i < valid_index_ids.count(); ++i) {  
-          const ObSEArray<uint64_t, 4> &index_cols = valid_index_cols.at(i);  
-          bool has_column = false;  
-            
-          for (int64_t j = 0; j < index_cols.count(); ++j) {  
-            if (index_cols.at(j) == column_id and column_id == 16) {  
-              has_column = true;  
-              break;  
-            }  
-          }  
-            
-          if (has_column) {  
-            if (OB_FAIL(candicate_index_tids.push_back(valid_index_ids.at(i)))) {  
-              LOG_WARN("failed to push back index id", K(ret));  
-            }  
-          }  
-        }  
-      }  
+    if (T_OP_IN == filter->get_expr_type() ) {
+      ObRawExpr *left_expr = filter->get_param_expr(0);
+      if (OB_ISNULL(left_expr) || !left_expr->is_column_ref_expr()) {
+        // skip
+      } else {
+        ObColumnRefRawExpr *col_expr = static_cast<ObColumnRefRawExpr*>(left_expr);
+        uint64_t column_id = col_expr->get_column_id();
+    
+        for (int64_t i = 0; OB_SUCC(ret) && i < valid_index_ids.count(); ++i) {
+          const ObIArray<uint64_t> &index_cols = valid_index_cols.at(i);
+          if (!index_cols.empty() && index_cols.at(0) == column_id) {
+            if (OB_FAIL(candicate_index_tids.push_back(valid_index_ids.at(i)))) {
+              LOG_WARN("failed to push back index id", K(ret));
+            }
+          }
+        }
+      }
     }
     else {
-      
       
       /* record all indexes which satisfy the index prefix condition */
       ObSEArray<uint64_t, 4> column_ids;
@@ -3704,12 +3698,17 @@ int ObJoinOrder::collect_candicate_indexes(const uint64_t ref_table_id,
         adlog::DEBUG("invalid filter node for index merge", K(ret));
       } else {
         adlog::DEBUG("column_ids.at(0): ",column_ids.at(0));
-        adlog::DEBUG(K(valid_index_ids.count()));
+        adlog::DEBUG("valid index num: ", K(valid_index_ids.count()));
 
         for (int64_t i = 0; OB_SUCC(ret) && i < valid_index_ids.count(); ++i) {
           const uint64_t index_id = valid_index_ids.at(i);
           adlog::DEBUG("index_id : ", index_id);
           const ObIArray<uint64_t> &index_column_ids = valid_index_cols.at(i);
+          adlog::DEBUG("index_column_ids.count() : ", index_column_ids.count());  
+
+          for (int64_t j = 0; j < index_column_ids.count(); ++j) {  
+            adlog::DEBUG("index_column_id : ", index_column_ids.at(j));  
+          }  
           if (OB_UNLIKELY(index_column_ids.empty())) {
             ret = OB_ERR_UNEXPECTED;
             LOG_WARN("invalid index column ids", K(ret), K(index_id), K(index_column_ids));
@@ -4556,7 +4555,7 @@ int IndexMergePath::estimate_cost()
     cost_ += filter_cost;
     OPT_TRACE_COST_MODEL("index_merge_cost (", cost_, ") +=", KV(filter_cost));
   }
-  // cost_ = 0;
+  cost_ = 0;
   adlog::DEBUG("set index merge path cost = 0 ?");
   DISABLE_OPT_TRACE_COST_MODEL;
   return ret;

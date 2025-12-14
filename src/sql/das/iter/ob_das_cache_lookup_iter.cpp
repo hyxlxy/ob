@@ -293,7 +293,10 @@ int ObDASCacheLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
         int64_t index_capacity = 0;
         while (OB_SUCC(ret) && !index_end_ && lookup_rowkey_cnt_ < default_batch_row_count_) {
           storage_count = 0;
-          index_capacity = std::min(capacity, std::min(max_size_, default_batch_row_count_ - lookup_rowkey_cnt_));
+          index_capacity =
+              std::min(capacity, std::min(max_size_, default_batch_row_count_ -
+                                                         lookup_rowkey_cnt_));
+          // index_capacity = 1;
           index_table_iter_->clear_evaluated_flag();
           adlog::DEBUG("--------------INDEX_SCAN: index_table_iter_->get_next_rows-----------");
 

@@ -29,7 +29,7 @@
 #include "sql/engine/expr/ob_geo_expr_utils.h"
 #include "sql/ob_sql_utils.h"
 #include "sql/rewrite/ob_range_generator.h"
-
+#include "common/ad_log.h"
 namespace oceanbase
 {
 using namespace common;
@@ -994,8 +994,10 @@ int ObExprRangeConverter::build_decode_like_expr(ObRawExpr *pattern,
 /**
  * convert `c1 in (xxx)` or `(c1,c2) in (xxx)` to range node
 */
-int ObExprRangeConverter::convert_in_expr(const ObRawExpr *expr, int64_t expr_depth, ObRangeNode *&range_node)
-{
+int ObExprRangeConverter::convert_in_expr(const ObRawExpr *expr,
+                                          int64_t expr_depth,
+                                          ObRangeNode *&range_node) {
+  adlog::DEBUG("ObExprRangeConverter::convert_in_expr start");
   int ret = OB_SUCCESS;
   const ObRawExpr* l_expr = nullptr;
   const ObRawExpr* r_expr = nullptr;
@@ -1009,10 +1011,12 @@ int ObExprRangeConverter::convert_in_expr(const ObRawExpr *expr, int64_t expr_de
   } else if (OB_FAIL(ObOptimizerUtil::get_expr_without_lossless_cast(l_expr, l_expr, use_implicit_cast_feature))) {
     LOG_WARN("failed to get expr without lossless cast", K(ret));
   } else if (l_expr->get_expr_type() == T_OP_ROW) {
+    adlog::DEBUG("l_expr->get_expr_type() == T_OP_ROW");
     if (OB_FAIL(get_row_in_range_ndoe(*l_expr, *r_expr, expr->get_result_type(), expr_depth, range_node))) {
       LOG_WARN("failed to get row in range node");
     }
   } else if (l_expr->is_column_ref_expr()) {
+    adlog::DEBUG("l_expr->is_column_ref_expr()");
     if (OB_FAIL(get_single_in_range_node(static_cast<const ObColumnRefRawExpr *>(l_expr),
                                          r_expr, expr->get_param_expr(0)->get_result_type(),
                                          expr_depth, range_node))) {
@@ -1032,6 +1036,8 @@ int ObExprRangeConverter::convert_in_expr(const ObRawExpr *expr, int64_t expr_de
       LOG_WARN("failed to generate always true or fasle node");
     }
   }
+  adlog::DEBUG("ObExprRangeConverter::convert_in_expr end");
+
   return ret;
 }
 
@@ -1052,12 +1058,16 @@ int ObExprRangeConverter::get_single_in_range_node(const ObColumnRefRawExpr *col
     LOG_WARN("get unexpected param", KPC(column_expr), KPC(r_expr));
   } else if (!is_range_key(column_expr->get_column_id(), key_idx)) {
     always_true = true;
+    adlog::DEBUG("!is_range_key(column_expr->get_column_id(), key_idx)");
   } else if ((ctx_.column_flags_[key_idx] & (RANGE_EXPR_EQUAL | RANGE_EXPR_IN)) != 0) {
     always_true = true;
+    adlog::DEBUG("ctx_.column_flags_[key_idx] & (RANGE_EXPR_EQUAL | RANGE_EXPR_IN)) != 0");
   } else if (OB_ISNULL(column_meta = get_column_meta(key_idx))) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("get null column meta");
+    adlog::DEBUG("get null column meta");
   } else {
+    adlog::DEBUG("r_expr->get_param_count(): ", r_expr->get_param_count());
     for (int64_t i = 0; OB_SUCC(ret) && !always_true && i < r_expr->get_param_count(); ++i) {
       const ObRawExpr *const_expr = r_expr->get_param_expr(i);
       bool cur_can_be_extract = true;
@@ -1117,10 +1127,12 @@ int ObExprRangeConverter::get_single_in_range_node(const ObColumnRefRawExpr *col
     } else {
       range_node->contain_in_ = true;
       range_node->in_param_count_ = val_idxs.count();
+      adlog::DEBUG("range_node->in_param_count_ ", range_node->in_param_count_);
     }
   }
   return ret;
 }
+
 
 int ObExprRangeConverter::get_row_in_range_ndoe(const ObRawExpr &l_expr,
                                                 const ObRawExpr &r_expr,

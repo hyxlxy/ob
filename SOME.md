@@ -1,3 +1,58 @@
+*****************************************2025-12-14  *********************************************************
+
+目前已知：
+- 
+
+
+
+*****************************************2025-12-14 (lingchen) *********************************************************
+
+bclient [test]> explain  select id , base_id from test_insert_en where id < 1000 or base_id in ('base_id_2', 'base_id_1') order by id limit 20;
++------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Query Plan                                                                                                                                                       |
++------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| ===========================================================================================                                                                      |
+| |ID|OPERATOR                    |NAME                               |EST.ROWS|EST.TIME(us)|                                                                      |
+| -------------------------------------------------------------------------------------------                                                                      |
+| |0 |DISTRIBUTED INDEX MERGE SCAN|test_insert_en(primary,idx_base_id)|6838    |0           |                                                                      |
+| ===========================================================================================                                                                      |
+| Outputs & filters:                                                                                                                                               |
+| -------------------------------------                                                                                                                            |
+|   0 - output([test_insert_en.id], [test_insert_en.base_id]), filter([test_insert_en.id < 1000 OR test_insert_en.base_id IN (cast('base_id_2', VARCHAR(1048576)), |
+|        cast('base_id_1', VARCHAR(1048576)))]), rowset=256                                                                                                        |
+|       access([test_insert_en.id], [test_insert_en.base_id]), partitions(p0)                                                                                      |
+|       limit(20), offset(nil), is_index_back=true, is_global_index=false, keep_ordering=true, use_index_merge=true, filter_before_indexback[false],               |
+|       index_name: primary, range_cond([test_insert_en.id < 1000]), filter(nil)                                                                                   |
+|       index_name: idx_base_id, range_cond([test_insert_en.base_id IN (cast('base_id_2', VARCHAR(1048576)), cast('base_id_1', VARCHAR(1048576)))]), filter(nil)   |
+|       lookup_filter([test_insert_en.id < 1000 OR test_insert_en.base_id IN (cast('base_id_2', VARCHAR(1048576)), cast('base_id_1', VARCHAR(1048576)))])          |
++------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+14 rows in set (0.005 sec)
+
+obclient [test]> explain  select id , base_id from test_insert_en where id < 1000 and base_id in ('base_id_2', 'base_id_1') order by id;
++------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Query Plan                                                                                                                                                       |
++------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| ===========================================================================================                                                                      |
+| |ID|OPERATOR                    |NAME                               |EST.ROWS|EST.TIME(us)|                                                                      |
+| -------------------------------------------------------------------------------------------                                                                      |
+| |0 |DISTRIBUTED INDEX MERGE SCAN|test_insert_en(primary,idx_base_id)|666     |0           |                                                                      |
+| ===========================================================================================                                                                      |
+| Outputs & filters:                                                                                                                                               |
+| -------------------------------------                                                                                                                            |
+|   0 - output([test_insert_en.id], [test_insert_en.base_id]), filter([test_insert_en.id < 1000], [test_insert_en.base_id IN (cast('base_id_2', VARCHAR(1048576)), |
+|        cast('base_id_1', VARCHAR(1048576)))]), rowset=256                                                                                                        |
+|       access([test_insert_en.id], [test_insert_en.base_id]), partitions(p0)                                                                                      |
+|       is_index_back=true, is_global_index=false, keep_ordering=true, use_index_merge=true, filter_before_indexback[false,false],                                 |
+|       index_name: primary, range_cond([test_insert_en.id < 1000]), filter(nil)                                                                                   |
+|       index_name: idx_base_id, range_cond([test_insert_en.base_id IN (cast('base_id_2', VARCHAR(1048576)), cast('base_id_1', VARCHAR(1048576)))]), filter(nil)   |
+|       lookup_filter([test_insert_en.id < 1000], [test_insert_en.base_id IN (cast('base_id_2', VARCHAR(1048576)), cast('base_id_1', VARCHAR(1048576)))])          |
++------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+14 rows in set (0.003 sec)
+
+obclient [test]> 
+
+
+
 *****************************************2025-12-12 *********************************************************
 obclient [test]> SELECT id, docid_col, MATCH(fulltext_col) AGAINST('text') as _score FROM test_insert_en WHERE  MATCH(fulltext_col) AGAINST('text')   and id < 1000   and base_id in ('base_id_1','base_id_2','base_id_3') ORDER BY _score DESC LIMIT 20;
 +-----+--------------+--------------------+
