@@ -3444,6 +3444,8 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
     // 仅在前面没有成功生成任何 OR/AND 形式的 index_merge 树时再尝试，避免影响已有 UNION MERGE 行为。
     if (OB_SUCC(ret) && candi_index_trees.empty()) {
       ObSEArray<ObIndexMergeNode*, 4> child_nodes;
+      ObSEArray<ObIndexMergeNode*, 4> fts_nodes;  // FTS 索引节点
+      ObSEArray<ObIndexMergeNode*, 4> scalar_nodes;  // 标量条件节点
       bool has_match_filter = false;
       for (int64_t i = 0; OB_SUCC(ret) && i < filters.count(); ++i) {
         ObRawExpr *filter = filters.at(i);
@@ -3471,6 +3473,15 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
           LOG_WARN("failed to push back child node for intersect index merge", K(ret));
         } else if (filter->has_flag(CNT_MATCH_EXPR)) {
           has_match_filter = true;
+          // 分离 FTS 节点和标量条件节点
+          if (OB_FAIL(fts_nodes.push_back(child_node))) {
+            LOG_WARN("failed to push back fts node", K(ret));
+          }
+        } else {
+          // 标量条件节点
+          if (OB_FAIL(scalar_nodes.push_back(child_node))) {
+            LOG_WARN("failed to push back scalar node", K(ret));
+          }
         }
       }
 
@@ -3482,12 +3493,60 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
           LOG_WARN("failed to allocate intersect index merge node", K(ret));
         } else {
           intersect_root->node_type_ = INDEX_MERGE_INTERSECT;
-          // children_ 直接挂所有子节点
-          for (int64_t i = 0; OB_SUCC(ret) && i < child_nodes.count(); ++i) {
-            if (OB_FAIL(intersect_root->children_.push_back(child_nodes.at(i)))) {
-              LOG_WARN("failed to push back child to intersect root", K(ret));
+          // INTERSECT 执行器只处理两个 children (left 和 right)
+          // 在两阶段优化中，需要确保只有两个 children：
+          // 1. left: FTS 索引节点（全文搜索）
+          // 2. right: 标量条件节点（普通索引扫描）或其他 INTERSECT 节点
+          // 
+          // 关键：INTERSECT 执行器使用 is_match() 标记来防止重复
+          // - 从 left 构建哈希表，每行初始 is_match() = false
+          // - 从 right 扫描，只返回在哈希表中存在且 is_match() = false 的行
+          // - 返回后标记为 is_match() = true，防止重复
+          
+          // 为了支持多个 children（如有多个标量条件），需要将它们合并为一个 INTERSECT 树
+          // 但 INTERSECT 执行器本身只处理两个 children，所以需要递归构造
+          if (fts_nodes.count() > 0 && scalar_nodes.count() > 0) {
+            // 有 FTS 节点和标量条件节点
+            // left: FTS 节点（通常只有一个）
+            if (OB_FAIL(intersect_root->children_.push_back(fts_nodes.at(0)))) {
+              LOG_WARN("failed to push back fts node to intersect root", K(ret));
+            } else {
+              // right: 标量条件节点
+              if (scalar_nodes.count() == 1) {
+                // 只有一个标量条件
+                if (OB_FAIL(intersect_root->children_.push_back(scalar_nodes.at(0)))) {
+                  LOG_WARN("failed to push back scalar node to intersect root", K(ret));
+                }
+              } else {
+                // 多个标量条件，需要递归构造 INTERSECT 树
+                ObIndexMergeNode *scalar_intersect = NULL;
+                if (OB_ISNULL(scalar_intersect = OB_NEWx(ObIndexMergeNode, allocator_))) {
+                  ret = OB_ALLOCATE_MEMORY_FAILED;
+                  LOG_WARN("failed to allocate scalar intersect node", K(ret));
+                } else {
+                  scalar_intersect->node_type_ = INDEX_MERGE_INTERSECT;
+                  for (int64_t i = 0; OB_SUCC(ret) && i < scalar_nodes.count(); ++i) {
+                    if (OB_FAIL(scalar_intersect->children_.push_back(scalar_nodes.at(i)))) {
+                      LOG_WARN("failed to push back scalar node", K(ret));
+                    }
+                  }
+                  if (OB_SUCC(ret)) {
+                    if (OB_FAIL(intersect_root->children_.push_back(scalar_intersect))) {
+                      LOG_WARN("failed to push back scalar intersect to root", K(ret));
+                    }
+                  }
+                }
+              }
+            }
+          } else {
+            // 没有分离出 FTS 和标量节点，直接使用原始逻辑
+            for (int64_t i = 0; OB_SUCC(ret) && i < child_nodes.count(); ++i) {
+              if (OB_FAIL(intersect_root->children_.push_back(child_nodes.at(i)))) {
+                LOG_WARN("failed to push back child to intersect root", K(ret));
+              }
             }
           }
+          
           if (OB_SUCC(ret)) {
             if (OB_FAIL(intersect_root->formalize_index_merge_tree())) {
               LOG_WARN("failed to formalize intersect index merge tree", K(ret), KPC(intersect_root));
@@ -3496,6 +3555,11 @@ int ObJoinOrder::generate_candi_index_merge_trees(const uint64_t ref_table_id,
             } else {
               OPT_TRACE("generate 1 intersect index merge tree (fallback from flattened AND)");
               LOG_TRACE("generate intersect candi index merge tree", K(ref_table_id), "child_cnt", child_nodes.count());
+              // 记录两阶段优化的使用情况
+              LOG_INFO("TEXT RETRIEVAL INTERSECT plan with dedup",
+                       K(ref_table_id), K(child_nodes.count()), 
+                       "fts_nodes", fts_nodes.count(), "scalar_nodes", scalar_nodes.count(),
+                       "plan_type", "intersect_with_is_match_dedup");
             }
           }
         }
@@ -3525,7 +3589,7 @@ int ObJoinOrder::generate_candi_index_merge_node(const uint64_t ref_table_id,
       LOG_WARN("failed to allocate index merge node", K(ret));
     } else {
       candi_node->node_type_ = (T_OP_OR == filter->get_expr_type()) ? INDEX_MERGE_UNION : INDEX_MERGE_INTERSECT;
-      is_valid_node = (T_OP_OR == filter->get_expr_type()) ? true : false;
+      is_valid_node = (T_OP_OR == filter->get_expr_type()) ? true : true;
     }
     for (int64_t i = 0; OB_SUCC(ret) && i < filter->get_param_count(); ++i) {
       ObIndexMergeNode *child = NULL;
@@ -3543,14 +3607,14 @@ int ObJoinOrder::generate_candi_index_merge_node(const uint64_t ref_table_id,
         if (T_OP_OR == filter->get_expr_type()) {
           is_valid_node = false;
           break;
+        } else if (T_OP_AND == filter->get_expr_type()) {
+          is_valid_node = false;
         }
       } else if (OB_ISNULL(child)) {
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("child node is null", K(ret), KPC(filter));
       } else if (OB_FAIL(candi_node->children_.push_back(child))) {
         LOG_WARN("failed to push back child node", K(ret));
-      } else if (T_OP_AND == filter->get_expr_type()) {
-        is_valid_node = true;
       }
     }
   } else {

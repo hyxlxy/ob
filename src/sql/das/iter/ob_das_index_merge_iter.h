@@ -208,6 +208,10 @@ private:
   int extract_match_against_exprs(const common::ObIArray<ObExpr*> &exprs, common::ObIArray<ObExpr*> &match_against_exprs);
   int fill_default_values_for_union(const common::ObIArray<ObExpr*> &exprs);
   int save_row_to_result_buffer();
+  // 去重辅助：基于rowkey的保序去重（first-wins）
+  int build_rowkey_for_store(int64_t store_idx, common::ObIArray<ObObj> &rowkey_objs);
+  bool is_rowkey_equal(const common::ObIArray<ObObj> &a, const common::ObIArray<ObObj> &b) const;
+  int remember_rowkey_if_new(int64_t store_idx, bool &is_duplicate);
 
 private:
   ObIndexMergeType merge_type_;
@@ -234,6 +238,8 @@ private:
   // only relevance score in fulltext search for now.
   common::ObFixedArray<ExprFixedArray, common::ObIAllocator> child_match_against_exprs_;
   MergeResultBuffer result_buffer_;
+  // 已输出rowkey集合（小顶堆TopN场景，行数很小，使用SEArray存储）
+  common::ObSEArray<common::ObSEArray<ObObj, 4>, 32> emitted_rowkeys_;
 };
 
 }  // namespace sql

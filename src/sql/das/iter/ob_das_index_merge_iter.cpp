@@ -534,6 +534,7 @@ int ObDASIndexMergeIter::inner_reuse()
     child_stores_.at(i).reuse();
   }
   result_buffer_.reuse();
+  emitted_rowkeys_.reset();
   return ret;
 }
 
@@ -638,6 +639,82 @@ int ObDASIndexMergeIter::compare(int64_t cur_idx, int64_t &output_idx, int &cmp_
   return ret;
 }
 
+int ObDASIndexMergeIter::build_rowkey_for_store(int64_t store_idx, common::ObIArray<ObObj> &rowkey_objs)
+{
+  int ret = OB_SUCCESS;
+  rowkey_objs.reuse();
+  if (OB_UNLIKELY(store_idx < 0 || store_idx >= child_stores_.count())) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("invalid store idx", K(store_idx), K(child_stores_.count()));
+  } else if (OB_ISNULL(rowkey_exprs_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("unexpected null rowkey exprs", K(ret));
+  } else {
+    const ObDatum *datums = child_stores_.at(store_idx).cur_datums();
+    if (OB_ISNULL(datums)) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("unexpected null datums", K(ret), K(store_idx));
+    } else {
+      for (int64_t i = 0; OB_SUCC(ret) && i < rowkey_exprs_->count(); ++i) {
+        const ObExpr *expr = rowkey_exprs_->at(i);
+        ObObj obj;
+        if (OB_ISNULL(expr)) {
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("unexpected null rowkey expr", K(ret));
+        } else if (OB_FAIL(datums[i].to_obj(obj, expr->obj_meta_, expr->obj_datum_map_))) {
+          LOG_WARN("failed to convert datum to obj", K(ret), K(i));
+        } else {
+          ObObj deep_obj;
+          if (OB_FAIL(ob_write_obj(mem_ctx_->get_arena_allocator(), obj, deep_obj))) {
+            LOG_WARN("failed to deep copy obj", K(ret));
+          } else if (OB_FAIL(rowkey_objs.push_back(deep_obj))) {
+            LOG_WARN("failed to push back rowkey obj", K(ret));
+          }
+        }
+      }
+    }
+  }
+  return ret;
+}
+
+bool ObDASIndexMergeIter::is_rowkey_equal(const common::ObIArray<ObObj> &a, const common::ObIArray<ObObj> &b) const
+{
+  if (a.count() != b.count()) {
+    return false;
+  }
+  int cmp = 0;
+  for (int64_t i = 0; i < a.count(); ++i) {
+    if (OB_SUCCESS != a.at(i).check_collation_free_and_compare(b.at(i), cmp)) {
+      // conservative, treat as not equal
+      return false;
+    }
+    if (cmp != 0) return false;
+  }
+  return true;
+}
+
+int ObDASIndexMergeIter::remember_rowkey_if_new(int64_t store_idx, bool &is_duplicate)
+{
+  int ret = OB_SUCCESS;
+  is_duplicate = false;
+  ObSEArray<ObObj, 4> rk;
+  if (OB_FAIL(build_rowkey_for_store(store_idx, rk))) {
+    LOG_WARN("failed to build rowkey for store", K(ret), K(store_idx));
+  } else {
+    for (int64_t i = 0; i < emitted_rowkeys_.count() && !is_duplicate; ++i) {
+      if (is_rowkey_equal(emitted_rowkeys_.at(i), rk)) {
+        is_duplicate = true;
+      }
+    }
+    if (!is_duplicate) {
+      if (OB_FAIL(emitted_rowkeys_.push_back(rk))) {
+        LOG_WARN("failed to remember rowkey", K(ret));
+      }
+    }
+  }
+  return ret;
+}
+
 int ObDASIndexMergeIter::intersect_get_next_row()
 {
   int ret = OB_SUCCESS;
@@ -695,13 +772,23 @@ int ObDASIndexMergeIter::intersect_get_next_row()
       }
       if (OB_SUCC(ret)) {
         if (all_matched) {
-          /* found available row in each child store, output */
-          if (OB_FAIL(child_stores_.at(output_idx).to_expr())) {
+          // 去重：同一rowkey只输出一次
+          bool is_dup = false;
+          if (OB_FAIL(remember_rowkey_if_new(output_idx, is_dup))) {
+            LOG_WARN("failed to remember rowkey", K(ret), K(output_idx));
+          } else if (is_dup) {
+            // 已输出过该rowkey，跳过并推进
+            child_stores_.at(output_idx).cur_idx_++;
+          } else if (OB_FAIL(child_stores_.at(output_idx).to_expr())) {
             LOG_WARN("index merge failed to convert row to expr", K(ret));
           } else {
+            // advance the output child to avoid re-emitting the same row
+            child_stores_.at(output_idx).cur_idx_++;
             got_row = true;
           }
         } else {
+          // When not all matched, we need to advance the output_idx to find next potential match
+          // Do NOT advance other stores that have already been advanced in the matching loop
           child_stores_.at(output_idx).cur_idx_++;
         }
       }
@@ -777,12 +864,22 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
       if (OB_SUCC(ret)) {
         if (all_matched) {
           /* found available row in each child store, output */
-          if (OB_FAIL(child_stores_.at(output_idx).to_expr())) {
+          bool is_dup = false;
+          if (OB_FAIL(remember_rowkey_if_new(output_idx, is_dup))) {
+            LOG_WARN("failed to remember rowkey", K(ret), K(output_idx));
+          } else if (is_dup) {
+            // duplicate rowkey, skip emission and advance output child only
+            child_stores_.at(output_idx).cur_idx_++;
+          } else if (OB_FAIL(child_stores_.at(output_idx).to_expr())) {
             LOG_WARN("index merge failed to convert row to expr", K(ret));
           } else {
+            // advance the output child to avoid re-emitting the same row
+            child_stores_.at(output_idx).cur_idx_++;
             count += 1;
           }
         } else {
+          // When not all matched, we need to advance the output_idx to find next potential match
+          // Do NOT advance other stores that have already been advanced in the matching loop
           child_stores_.at(output_idx).cur_idx_++;
         }
       }
@@ -795,71 +892,89 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
 int ObDASIndexMergeIter::union_get_next_row()
 {
   int ret = OB_SUCCESS;
-  /* try to fill each child store */
-  int64_t output_idx = OB_INVALID_INDEX;
-  int cmp_ret = 0;
-  for (int64_t i = 0; OB_SUCC(ret) && i < child_stores_.count(); i++) {
-    IndexMergeRowStore &child_store = child_stores_.at(i);
-    if (!child_store.have_data()) {
-      if (!child_store.iter_end_) {
-        ObDASIter *child_iter = child_iters_.at(i);
-        if (OB_ISNULL(child_iter)) {
-          ret = OB_ERR_UNEXPECTED;
-          LOG_WARN("unexpected nullptr", K(i));
-        } else if (OB_FAIL(child_iter->get_next_row())) {
-          if (OB_ITER_END == ret) {
-            child_store.iter_end_ = true;
-            ret = OB_SUCCESS;
-          } else {
-            LOG_WARN("failed to get next row from child iter", K(ret));
-          }
-        } else if (OB_FAIL(child_store.save(false, 1))) {
-          LOG_WARN("failed to save child row", K(ret));
-        } else if (OB_FAIL(compare(i, output_idx, cmp_ret))) {
-          LOG_WARN("index merge failed to compare row", K(i), K(output_idx), K(ret));
-        }
-      }
-    } else if (OB_FAIL(compare(i, output_idx, cmp_ret))) {
-      LOG_WARN("index merge failed to compare row", K(i), K(output_idx), K(ret));
-    }
-  }
-
-  // TODO: use min-heap optimization
-  if (OB_FAIL(ret)) {
-  } else if (output_idx == OB_INVALID_INDEX) {
-    /* no available row, stop the entire process */
-    ret = OB_ITER_END;
-  } else {
-    /* find all available rows */
-    bool need_fill_default_value = false;
+  bool got_row = false;
+  while (OB_SUCC(ret) && !got_row) {
+    /* try to fill each child store */
+    int64_t output_idx = OB_INVALID_INDEX;
+    int cmp_ret = 0;
     for (int64_t i = 0; OB_SUCC(ret) && i < child_stores_.count(); i++) {
-      need_fill_default_value = false;
-      if (output_idx == i) {
-        /* skip */
-      } else if (child_stores_.at(i).have_data()) {
-        if (OB_FAIL(compare(i, output_idx, cmp_ret))) {
-          LOG_WARN("index merge failed to compare row", K(i), K(output_idx), K(ret));
-        } else if (cmp_ret == 0) {
-          if (OB_FAIL(child_stores_.at(i).to_expr())) {
-            LOG_WARN("failed to convert store row to expr", K(ret));
+      IndexMergeRowStore &child_store = child_stores_.at(i);
+      if (!child_store.have_data()) {
+        if (!child_store.iter_end_) {
+          ObDASIter *child_iter = child_iters_.at(i);
+          if (OB_ISNULL(child_iter)) {
+            ret = OB_ERR_UNEXPECTED;
+            LOG_WARN("unexpected nullptr", K(i));
+          } else if (OB_FAIL(child_iter->get_next_row())) {
+            if (OB_ITER_END == ret) {
+              child_store.iter_end_ = true;
+              ret = OB_SUCCESS;
+            } else {
+              LOG_WARN("failed to get next row from child iter", K(ret));
+            }
+          } else if (OB_FAIL(child_store.save(false, 1))) {
+            LOG_WARN("failed to save child row", K(ret));
+          } else if (OB_FAIL(compare(i, output_idx, cmp_ret))) {
+            LOG_WARN("index merge failed to compare row", K(i), K(output_idx), K(ret));
+          }
+        }
+      } else if (OB_FAIL(compare(i, output_idx, cmp_ret))) {
+        LOG_WARN("index merge failed to compare row", K(i), K(output_idx), K(ret));
+      }
+    }
+
+    // TODO: use min-heap optimization
+    if (OB_FAIL(ret)) {
+    } else if (output_idx == OB_INVALID_INDEX) {
+      /* no available row, stop the entire process */
+      ret = OB_ITER_END;
+    } else {
+      /* find all available rows */
+      bool need_fill_default_value = false;
+      for (int64_t i = 0; OB_SUCC(ret) && i < child_stores_.count(); i++) {
+        need_fill_default_value = false;
+        if (output_idx == i) {
+          /* skip */
+        } else if (child_stores_.at(i).have_data()) {
+          if (OB_FAIL(compare(i, output_idx, cmp_ret))) {
+            LOG_WARN("index merge failed to compare row", K(i), K(output_idx), K(ret));
+          } else if (cmp_ret == 0) {
+            if (OB_FAIL(child_stores_.at(i).to_expr())) {
+              LOG_WARN("failed to convert store row to expr", K(ret));
+            } else {
+              // advance matched child to avoid emitting the same row again in next iterations
+              child_stores_.at(i).cur_idx_++;
+            }
+          } else {
+            // this child does not have a corresponding rowkey
+            need_fill_default_value = true;
           }
         } else {
-          // this child does not have a corresponding rowkey
+          // this child does not have available rows
           need_fill_default_value = true;
         }
-      } else {
-        // this child does not have available rows
-        need_fill_default_value = true;
-      }
-      if (OB_SUCC(ret) && need_fill_default_value) {
-        if (OB_FAIL(fill_default_values_for_union(child_match_against_exprs_.at(i)))) {
-          LOG_WARN("failed to fill default values for union", K(ret), K(i));
+        if (OB_SUCC(ret) && need_fill_default_value) {
+          if (OB_FAIL(fill_default_values_for_union(child_match_against_exprs_.at(i)))) {
+            LOG_WARN("failed to fill default values for union", K(ret), K(i));
+          }
         }
       }
-    }
-    if (OB_SUCC(ret)) {
-      if (OB_FAIL(child_stores_.at(output_idx).to_expr())) {
-        LOG_WARN("failed to convert store row to expr", K(ret));
+      if (OB_SUCC(ret)) {
+        // 去重：同一rowkey只输出一次
+        bool is_dup = false;
+        if (OB_FAIL(remember_rowkey_if_new(output_idx, is_dup))) {
+          LOG_WARN("failed to remember rowkey", K(ret), K(output_idx));
+        } else if (is_dup) {
+          // duplicate rowkey, skip emission and advance output child only
+          child_stores_.at(output_idx).cur_idx_++;
+          continue; // try next candidate in while loop
+        } else if (OB_FAIL(child_stores_.at(output_idx).to_expr())) {
+          LOG_WARN("failed to convert store row to expr", K(ret));
+        } else {
+          // advance output child to avoid re-emitting the same row
+          child_stores_.at(output_idx).cur_idx_++;
+          got_row = true;
+        }
       }
     }
   }
@@ -928,6 +1043,9 @@ int ObDASIndexMergeIter::union_get_next_rows(int64_t &count, int64_t capacity)
           } else if (cmp_ret == 0) {
             if (OB_FAIL(child_stores_.at(i).to_expr())) {
               LOG_WARN("failed to convert store row to expr", K(ret));  
+            } else {
+              // advance matched child to avoid emitting the same row again in next iterations
+              child_stores_.at(i).cur_idx_++;
             }
           } else {
             // this child does not have a corresponding rowkey
@@ -947,6 +1065,8 @@ int ObDASIndexMergeIter::union_get_next_rows(int64_t &count, int64_t capacity)
         if (OB_FAIL(child_stores_.at(output_idx).to_expr())) {
           LOG_WARN("failed to convert store row to expr", K(ret));
         } else {
+          // advance output child to avoid re-emitting the same row
+          child_stores_.at(output_idx).cur_idx_++;
           // now we get a available result row, save it to result buffer
           if (OB_FAIL(save_row_to_result_buffer())) {
             LOG_WARN("failed to save row to result buffer", K(ret));

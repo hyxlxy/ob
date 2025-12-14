@@ -159,6 +159,23 @@ int ObHashIntersectOp::inner_get_next_row()
         // exists & not return
         got_row = true;
         part_cols->store_row_->set_is_match(true);
+        // FIX: 两阶段优化中的去重问题
+        // INTERSECT 执行器的去重机制：
+        // 1. 从 left 子树构建哈希表，每行初始 is_match() = false
+        // 2. 从 right 子树逐行扫描，在哈希表中查找
+        // 3. 如果行存在且 is_match() = false，则返回该行，并标记为 true
+        // 4. 如果行存在且 is_match() = true，则跳过（已被返回）
+        // 
+        // 在两阶段优化中（BMW + 保底）：
+        // - left: BMW 阶段返回的行（按得分排序）
+        // - right: 保底阶段返回的行（普通 Index Merge）
+        // - 通过 is_match() 标记，确保同一行只被返回一次
+        LOG_DEBUG("INTERSECT: mark row as matched to prevent duplicate",
+                  K(got_row), K(part_cols->store_row_->is_match()));
+      } else {
+        // 该行已在前面被返回过，跳过（去重）
+        LOG_DEBUG("INTERSECT: skip duplicate row that was already returned",
+                  K(part_cols->store_row_->is_match()));
       }
     } else {
       // row is not exists in hash table

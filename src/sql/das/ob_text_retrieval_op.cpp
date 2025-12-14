@@ -19,6 +19,11 @@
 #include "share/text_analysis/ob_text_analyzer.h"
 #include "storage/fts/ob_fts_plugin_helper.h"
 #include "storage/tx_storage/ob_access_service.h"
+#include "lib/hash/ob_hashset.h"
+
+static __thread oceanbase::sql::ObExpr *g_tr_docid_expr_tls = nullptr;
+static __thread oceanbase::sql::ObEvalCtx *g_tr_eval_ctx_tls = nullptr;
+static __thread oceanbase::hash::ObHashSet<uint64_t, oceanbase::hash::NoPthreadDefendMode> *g_tr_docid_set_tls = nullptr;
 
 namespace oceanbase
 {
