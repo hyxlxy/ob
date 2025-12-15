@@ -19,6 +19,9 @@
 #include "ob_das_scan_iter.h"
 #include "sql/das/ob_das_ir_define.h"
 #include "sql/engine/expr/ob_expr_bm25.h"
+#include "storage/retrieval/ob_ft_term_stat_cache.h"
+#include "lib/hash_func/murmur_hash.h"
+#include "lib/time/ob_time_utility.h"
 
 namespace oceanbase
 {
@@ -586,6 +589,37 @@ int ObDASTextRetrievalIter::init_base_idx_scan_param(
 int ObDASTextRetrievalIter::do_doc_cnt_agg()
 {
   int ret = OB_SUCCESS;
+
+  // 0) 先尝试从Term-Stat缓存命中，避免触发一次倒排聚合
+  do {
+    if (inv_idx_agg_param_.key_ranges_.count() <= 0) { break; }
+    const ObNewRange &range = inv_idx_agg_param_.key_ranges_.at(0);
+    const ObObj *start_objs = range.start_key_.get_obj_ptr();
+    if (nullptr == start_objs) { break; }
+    ObString token_str;
+    if (start_objs[0].get_type() == ObVarcharType || start_objs[0].get_type() == ObCharType) {
+      token_str = start_objs[0].get_string();
+    } else { break; }
+    if (token_str.length() <= 0) { break; }
+    uint64_t token_hash = murmurhash(token_str.ptr(), token_str.length(), 0);
+    storage::ObFTTermStatKey key(MTL_ID(),
+                                 inv_idx_agg_param_.index_id_,
+                                 inv_idx_agg_param_.schema_version_,
+                                 0 /*cs_type*/, token_hash,
+                                 static_cast<int32_t>(token_str.length()));
+    const storage::ObFTTermStatValue *val = nullptr;
+    common::ObKVCacheHandle handle;
+    if (storage::ObFTTermStatCache::get_instance().get_stat(key, val, handle) == OB_SUCCESS && val != nullptr) {
+      // 命中缓存，直接写入 expr，跳过聚合读取
+      token_doc_cnt_ = val->doc_freq_;
+      if (OB_FAIL(fill_token_doc_cnt())) {
+        LOG_WARN("failed to fill token doc cnt from cache", K(ret));
+      }
+      return ret;
+    }
+  } while (false);
+
+  // 1) 未命中缓存，走存储层聚合
   if (OB_UNLIKELY(!static_cast<sql::ObStoragePushdownFlag>(inv_idx_agg_param_.pd_storage_flag_).is_aggregate_pushdown())) {
     ret = OB_NOT_SUPPORTED;
     LOG_ERROR("aggregate without pushdown not supported", K(ret));
@@ -603,6 +637,28 @@ int ObDASTextRetrievalIter::do_doc_cnt_agg()
       LOG_WARN("failed to evaluate aggregated expr", K(ret));
     } else {
       token_doc_cnt_ = doc_cnt_datum->get_int();
+
+      // 2) 回填缓存
+      if (inv_idx_agg_param_.key_ranges_.count() > 0) {
+        const ObNewRange &range = inv_idx_agg_param_.key_ranges_.at(0);
+        const ObObj *start_objs = range.start_key_.get_obj_ptr();
+        if (nullptr != start_objs
+            && (start_objs[0].get_type() == ObVarcharType || start_objs[0].get_type() == ObCharType)) {
+          ObString token_str = start_objs[0].get_string();
+          if (token_str.length() > 0) {
+            uint64_t token_hash = murmurhash(token_str.ptr(), token_str.length(), 0);
+            storage::ObFTTermStatKey key(MTL_ID(), inv_idx_agg_param_.index_id_, inv_idx_agg_param_.schema_version_,
+                                         0, token_hash, static_cast<int32_t>(token_str.length()));
+            storage::ObFTTermStatValue val(token_doc_cnt_, common::ObTimeUtility::current_time());
+            const storage::ObFTTermStatValue *out = nullptr;
+            common::ObKVCacheHandle handle;
+            int tmp_ret = storage::ObFTTermStatCache::get_instance().put_and_fetch_stat(key, val, out, handle);
+            if (OB_SUCCESS != tmp_ret) {
+              LOG_DEBUG("put term stat cache failed", K(tmp_ret), K(key), K(val));
+            }
+          }
+        }
+      }
     }
   }
   return ret;

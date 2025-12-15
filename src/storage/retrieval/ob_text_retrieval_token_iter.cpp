@@ -19,6 +19,10 @@
 #include "ob_text_retrieval_token_iter.h"
 #include "sql/engine/expr/ob_expr_bm25.h"
 #include "sql/das/iter/sparse_retrieval/ob_das_tr_merge_iter.h"
+#include "storage/retrieval/ob_ft_term_stat_cache.h"
+#include "share/cache/ob_kv_storecache.h"
+#include "lib/hash_func/murmur_hash.h"
+#include "lib/time/ob_time_utility.h"
 
 namespace oceanbase
 {
@@ -586,6 +590,52 @@ int ObTextRetrievalTokenIter::set_decimal_int_by_precision(ObDatum &result_datum
 int ObTextRetrievalTokenIter::estimate_token_doc_cnt()
 {
   int ret = OB_SUCCESS;
+  // 1) 尝试从Term-Stat缓存获取 doc_freq
+  if (OB_NOT_NULL(inv_idx_agg_param_) && inv_idx_agg_param_->key_ranges_.count() > 0) {
+    const ObNewRange &range = inv_idx_agg_param_->key_ranges_.at(0);
+    const ObObj *start_objs = range.start_key_.get_obj_ptr();
+    if (OB_NOT_NULL(start_objs)) {
+      ObString token_str;
+      if (start_objs[0].get_type() == ObVarcharType || start_objs[0].get_type() == ObCharType) {
+        token_str = start_objs[0].get_string();
+      }
+      if (token_str.length() > 0) {
+        uint64_t token_hash = murmurhash(token_str.ptr(), token_str.length(), 0);
+        storage::ObFTTermStatKey key(MTL_ID(),
+                                     inv_idx_agg_param_->index_id_,
+                                     inv_idx_agg_param_->schema_version_,
+                                     0 /*cs_type unknown here*/,
+                                     token_hash,
+                                     static_cast<int32_t>(token_str.length()));
+        const storage::ObFTTermStatValue *val = nullptr;
+        common::ObKVCacheHandle handle;
+        if (storage::ObFTTermStatCache::get_instance().get_stat(key, val, handle) == OB_SUCCESS && val != nullptr) {
+          token_doc_cnt_ = val->doc_freq_;
+          token_doc_cnt_calculated_ = true;
+          // 计算该term的理论最大权重，用于Block-Max等上界
+          if (OB_NOT_NULL(relevance_expr_)) {
+            sql::ObExpr *total_doc_cnt_param_expr = relevance_expr_->args_[sql::ObExprBM25::TOTAL_DOC_CNT_PARAM_IDX];
+            if (OB_ISNULL(total_doc_cnt_param_expr)) {
+              ret = OB_ERR_UNEXPECTED;
+              LOG_WARN("unexpected null total doc cnt expr", K(ret));
+            } else {
+              int64_t total_doc_cnt = 0;
+              if (total_doc_cnt_param_expr->enable_rich_format()
+                  && is_valid_format(total_doc_cnt_param_expr->get_format(*eval_ctx_))) {
+                total_doc_cnt = total_doc_cnt_param_expr->get_vector(*eval_ctx_)->get_int(0);
+              } else {
+                total_doc_cnt = total_doc_cnt_param_expr->locate_expr_datum(*eval_ctx_, 0).get_int();
+              }
+              max_token_relevance_ = sql::ObExprBM25::query_token_weight(token_doc_cnt_, total_doc_cnt);
+            }
+          }
+          return ret; // 命中缓存直接返回
+        }
+      }
+    }
+  }
+
+  // 2) 未命中缓存，走原存储层行数估算
   int64_t logical_row_cnt = 0;
   int64_t physical_row_cnt = 0;
   ObSEArray<ObEstRowCountRecord, 1> est_records;
@@ -619,6 +669,34 @@ int ObTextRetrievalTokenIter::estimate_token_doc_cnt()
   } else {
     token_doc_cnt_ = logical_row_cnt;
     token_doc_cnt_calculated_ = true;
+    // 回填缓存
+    if (OB_NOT_NULL(inv_idx_agg_param_) && inv_idx_agg_param_->key_ranges_.count() > 0) {
+      const ObNewRange &range = inv_idx_agg_param_->key_ranges_.at(0);
+      const ObObj *start_objs = range.start_key_.get_obj_ptr();
+      if (OB_NOT_NULL(start_objs)) {
+        ObString token_str;
+        if (start_objs[0].get_type() == ObVarcharType || start_objs[0].get_type() == ObCharType) {
+          token_str = start_objs[0].get_string();
+        }
+        if (token_str.length() > 0) {
+          uint64_t token_hash = murmurhash(token_str.ptr(), token_str.length(), 0);
+          storage::ObFTTermStatKey key(MTL_ID(),
+                                       inv_idx_agg_param_->index_id_,
+                                       inv_idx_agg_param_->schema_version_,
+                                       0 /*cs_type*/,
+                                       token_hash,
+                                       static_cast<int32_t>(token_str.length()));
+          storage::ObFTTermStatValue val(token_doc_cnt_, common::ObTimeUtility::current_time());
+          const storage::ObFTTermStatValue *out = nullptr;
+          common::ObKVCacheHandle handle;
+          int tmp_ret = storage::ObFTTermStatCache::get_instance().put_and_fetch_stat(key, val, out, handle);
+          if (OB_SUCCESS != tmp_ret) {
+            LOG_DEBUG("put term stat cache failed", K(tmp_ret), K(key), K(val));
+          }
+        }
+      }
+    }
+
     sql::ObExpr *total_doc_cnt_param_expr = relevance_expr_->args_[sql::ObExprBM25::TOTAL_DOC_CNT_PARAM_IDX];
     if (OB_ISNULL(total_doc_cnt_param_expr)) {
       ret = OB_ERR_UNEXPECTED;
