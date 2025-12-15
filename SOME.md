@@ -1,8 +1,170 @@
-*****************************************2025-12-14  *********************************************************
+*****************************************2025-12-15  *********************************************************
 
-目前已知：
+需要创建:
+- ob_das_two_phase_index_merge_iter.h: 创建出来二阶段迭代器。
+- 在das_iter_utils.cpp 里面 需要创建出来对应的二阶段tree
 - 
 
+join_order.cpp:
+- ObJoinOrder::do_create_index_merge_paths 这个函数是对于and_root进行创建IndexMergePath的。
+  所以我们也应该在这去创建two_phase_index_merge_path. 
+
+  关于检验是否满足执行二阶段的时候：参考init_two_phase_fts_opt函数
+
+
+```c++
+int ObJoinOrder::create_two_phase_index_merge_path(  
+    const uint64_t ref_table_id,  
+    const ObIArray<ObRawExpr*> &filters,  
+    AccessPath *&two_phase_path)  
+{  
+  int ret = OB_SUCCESS;  
+  two_phase_path = nullptr;  
+    
+  // 检查是否满足两阶段优化条件  
+  bool need_two_phase = false;  
+  if (OB_FAIL(check_need_two_phase_optimization(filters, need_two_phase))) {  
+    LOG_WARN("failed to check need two phase optimization", K(ret));  
+  } else if (!need_two_phase) {  
+    // 不需要两阶段优化  
+  } else if (OB_ISNULL(two_phase_path = OB_NEWx(AccessPath, allocator_))) {  
+    ret = OB_ALLOCATE_MEMORY_FAILED;  
+    LOG_WARN("failed to allocate access path", K(ret));  
+  } else {  
+    // 设置两阶段路径属性  
+    two_phase_path->type_ = AccessPath::TWO_PHASE_INDEX_MERGE;  
+    two_phase_path->table_id_ = table_id_;  
+    two_phase_path->ref_table_id_ = ref_table_id;  
+    two_phase_path->is_index_merge_ = true;  
+    two_phase_path->two_phase_info_.enable_ = true;  
+    two_phase_path->two_phase_info_.backup_limit_ = 1000;  // 保底数量  
+    two_phase_path->two_phase_info_.topk_limit_ = get_limit_value();  // 最终TOP-N数量  
+    // 创建子路径  
+    if (OB_FAIL(create_backup_merge_path(filters, two_phase_path->backup_merge_path_))) {  
+      LOG_WARN("failed to create backup merge path", K(ret));  
+    } else if (OB_FAIL(create_bmw_scan_path(filters, two_phase_path->bmw_scan_path_))) {  
+      LOG_WARN("failed to create bmw scan path", K(ret));  
+    }  
+  }  
+    
+  return ret;  
+}
+
+int ObJoinOrder::do_create_index_merge_paths(const uint64_t table_id,  
+                                            const uint64_t ref_table_id,  
+                                            const PathHelper &helper,  
+                                            ObIndexInfoCache &index_info_cache,  
+                                            ObIArray<ObIndexMergeNode*> &candi_index_trees,  
+                                            ObIArray<AccessPath*> &access_paths)  
+{  
+  int ret = OB_SUCCESS;  
+    
+  // 现有的单阶段索引合并逻辑  
+  if (OB_FAIL(generate_normal_index_merge_paths(...))) {  
+    LOG_WARN("failed to generate normal index merge paths", K(ret));  
+  }  
+    
+  // 新增：生成两阶段优化路径  
+  if (OB_SUCC(ret)) {  
+    AccessPath *two_phase_path = nullptr;  
+    if (OB_FAIL(create_two_phase_index_merge_path(ref_table_id, helper.filters_, two_phase_path))) {  
+      LOG_WARN("failed to create two phase index merge path", K(ret));  
+    } else if (OB_NOT_NULL(two_phase_path)) {  
+      if (OB_FAIL(access_paths.push_back(two_phase_path))) {  
+        LOG_WARN("failed to push back two phase path", K(ret));  
+      }  
+    }  
+  }  
+    
+  return ret;  
+}
+
+
+
+int ObJoinOrder::init_two_phase_fts_opt(const uint64_t table_id,
+                                        const ObDMLStmt *stmt,
+                                        ObIndexMergeNode* root_node,
+                                        IndexMergePath* index_merge_path)
+{
+  int ret = OB_SUCCESS;
+  bool has_fts_index = false;
+  bool has_scalar_filter = false;
+  int64_t limit_count = -1;
+  
+  if (OB_ISNULL(stmt) || OB_ISNULL(root_node) || OB_ISNULL(index_merge_path)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("get unexpected null", K(ret), KP(stmt), KP(root_node), KP(index_merge_path));
+  } else {
+    // Check if index merge contains FTS index
+    ObSEArray<ObIndexMergeNode*, 8> node_stack;
+    if (OB_FAIL(node_stack.push_back(root_node))) {
+      LOG_WARN("failed to push back root node", K(ret));
+    }
+    
+    while (OB_SUCC(ret) && !node_stack.empty() && !has_fts_index) {
+      ObIndexMergeNode *node = node_stack.at(node_stack.count() - 1);
+      node_stack.pop_back();
+      
+      if (OB_ISNULL(node)) {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("get unexpected null node", K(ret));
+      } else if (node->is_merge_node()) {
+        for (int64_t i = 0; OB_SUCC(ret) && i < node->children_.count(); ++i) {
+          if (OB_FAIL(node_stack.push_back(node->children_.at(i)))) {
+            LOG_WARN("failed to push back child node", K(ret));
+          }
+        }
+      } else if (INDEX_MERGE_FTS_INDEX == node->node_type_) {
+        has_fts_index = true;
+      }
+    }
+    
+    // Check if there are scalar filters (non-FTS filters)
+    if (OB_SUCC(ret) && has_fts_index) {
+      // Count scalar filters (filters that are not MATCH expressions)
+      for (int64_t i = 0; i < index_merge_path->filter_.count(); ++i) {
+        ObRawExpr *filter = index_merge_path->filter_.at(i);
+        if (OB_NOT_NULL(filter) && !filter->has_flag(CNT_MATCH_EXPR)) {
+          has_scalar_filter = true;
+          break;
+        }
+      }
+    }
+    
+    // Check if query has LIMIT clause
+    if (OB_SUCC(ret) && has_fts_index && has_scalar_filter && (NULL != stmt->get_limit_expr())) {
+      // Extract LIMIT value using ObTransformUtils
+      ObOptimizerContext *opt_ctx = NULL;
+      const ParamStore *param_store = NULL;
+      ObExecContext *exec_ctx = NULL;
+      int64_t limit_value = -1;
+      bool is_null_value = false;
+      if (OB_ISNULL(get_plan()) || OB_ISNULL(opt_ctx = &get_plan()->get_optimizer_context()) ||
+          OB_ISNULL(param_store = opt_ctx->get_params()) || OB_ISNULL(exec_ctx = opt_ctx->get_exec_ctx())) {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("unexpected null optimizer context", K(ret), KP(get_plan()), KP(opt_ctx), KP(param_store), KP(exec_ctx));
+      } else if (OB_FAIL(ObTransformUtils::get_limit_value(const_cast<ObRawExpr *>(stmt->get_limit_expr()),
+                                                           param_store,
+                                                           exec_ctx,
+                                                           allocator_,
+                                                           limit_value,
+                                                           is_null_value))) {
+        LOG_WARN("failed to get limit value", K(ret));
+      } else if (!is_null_value && limit_value > 0 && limit_value <= 100) { // Only optimize small LIMIT
+        limit_count = limit_value;
+        index_merge_path->enable_two_phase_fts_opt_ = true;
+        index_merge_path->fts_limit_count_ = limit_count;
+        // Amplify factor: default 3x
+        index_merge_path->fts_amplify_factor_ = 3;
+        LOG_TRACE("Enable two-phase FTS optimization", K(table_id), K(limit_count), K(index_merge_path->fts_amplify_factor_));
+      }
+    }
+  }
+  
+  return ret;
+}
+
+```
 
 
 *****************************************2025-12-14 (lingchen) *********************************************************

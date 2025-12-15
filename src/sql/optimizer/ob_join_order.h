@@ -728,6 +728,7 @@ class Path
                                   const ObIArray<ObAddr> &server_list,
                                   int64_t &server_cnt);
     virtual bool is_index_merge_path() const { return false; }
+    virtual bool is_two_phase_index_merge_path() const { return false; }
     TO_STRING_KV(K_(table_id),
                  K_(ref_table_id),
                  K_(index_id),
@@ -851,6 +852,40 @@ class Path
 
   private:
     DISALLOW_COPY_AND_ASSIGN(IndexMergePath);
+  };
+  //ADVISE
+  class TwoPhaseIndexMergePath : public AccessPath  
+  {  
+  public:
+    TwoPhaseIndexMergePath(uint64_t table_id, uint64_t ref_table_id,
+                           ObJoinOrder *parent)
+        : AccessPath(table_id, ref_table_id, ref_table_id, parent,
+                     NULLS_FIRST_ASC),
+          first_phase_merge_path_(NULL), bmw_scan_path_(NULL) {}
+    
+      
+    virtual ~TwoPhaseIndexMergePath() {}  
+        
+    virtual int estimate_cost() override;  
+    virtual int re_estimate_cost(EstimateCostInfo &param, double &card, double &cost) override;  
+    virtual bool is_index_merge_path() const override { return true; }  
+    virtual bool is_two_phase_index_merge_path() const override{ return true; }
+
+    
+  private:  
+    bool enable_{false};                   
+    int64_t first_phase_limit_{0};          
+    int64_t topk_limit_{0};            
+    double min_score_threshold_{0};    
+      
+    AccessPath *first_phase_merge_path_;    // 第一阶段
+    AccessPath *bmw_scan_path_;                 // 第二阶段 
+      
+
+    double first_phase_cost_;  
+    double bmw_cost_;
+    double merge_cost_;
+    
   };
 
   class JoinPath : public Path
@@ -1423,6 +1458,9 @@ struct NullAwareAntiJoinInfo {
       bool force_inner_nl_;
       bool is_semi_anti_join_;
       bool is_index_merge_;
+
+      mutable bool no_two_phase_flag_ = false;
+
       ObSelectStmt *child_stmt_;
       // when generate inner access path, save all pushdown filters
       // when generate subquery path, save all pushdown filters after rename
@@ -3047,6 +3085,16 @@ struct NullAwareAntiJoinInfo {
                                   PathHelper &helper,
                                   ObIArray<uint64_t> &valid_hint_index_ids);
     int has_valid_match_filter_on_index(PathHelper &helper, uint64_t tid, bool &is_valid);
+
+      // ADVISE
+
+    int create_two_phase_index_merge_path(const uint64_t table_id,  
+                                            const uint64_t ref_table_id,  
+                                            const PathHelper &helper,  
+                                            ObIndexInfoCache &index_info_cache,  
+                                            ObIArray<ObIndexMergeNode*> &candi_index_trees, AccessPath *&two_phase_path);
+
+
     friend class ::test::TestJoinOrder_ob_join_order_param_check_Test;
     friend class ::test::TestJoinOrder_ob_join_order_src_Test;
   private:

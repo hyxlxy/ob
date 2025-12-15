@@ -1,699 +1,128 @@
-[2025-12-15 00:37:18.986 DEBUG] create_iter_children_array
-[2025-12-15 00:37:18.986 DEBUG] --------------ObDASLookupIter::next_rows begin----------
-[2025-12-15 00:37:18.986 DEBUG] --------------ObDASLookupIter::next_rows INDEX_SCAN----------
-[2025-12-15 00:37:18.986 DEBUG] --------------ObDASLookupIter::next_rows INDEX_SCAN get_next_rows----------
-[2025-12-15 00:37:18.986 DEBUG] --------------ObDASLookupIter::next_rows end----------
-[2025-12-15 00:37:19.563 DEBUG] ObExprRangeConverter::convert_in_expr start
-[2025-12-15 00:37:19.563 DEBUG] l_expr->is_column_ref_expr()
-[2025-12-15 00:37:19.563 DEBUG] r_expr->get_param_count(): 1
-[2025-12-15 00:37:19.563 DEBUG] range_node->in_param_count_ 1
-[2025-12-15 00:37:19.563 DEBUG] ObExprRangeConverter::convert_in_expr end
-[2025-12-15 00:37:19.563 DEBUG] ObJoinOrder::create_index_merge_access_paths START
-[2025-12-15 00:37:19.563 DEBUG] ObJoinOrder::get_candi_index_merge_trees START
-[2025-12-15 00:37:19.563 DEBUG] ObJoinOrder::get_valid_index_merge_indexes
-[2025-12-15 00:37:19.563 DEBUG] 检验每一个候选索引是否都支持索引合并
-[2025-12-15 00:37:19.563 DEBUG] 总共候选索引的个数有 0
-[2025-12-15 00:37:19.563 DEBUG] ObJoinOrder::generate_candi_index_merge_trees START
-[2025-12-15 00:37:19.563 DEBUG] valid_index_ids 是空的
-[2025-12-15 00:37:19.563 DEBUG] ObJoinOrder::generate_candi_index_merge_trees END
-[2025-12-15 00:37:19.563 DEBUG] ObJoinOrder::get_valid_index_merge_indexes
-[2025-12-15 00:37:19.563 DEBUG] 检验每一个候选索引是否都支持索引合并
-[2025-12-15 00:37:19.563 DEBUG] 总共候选索引的个数有 7
-[2025-12-15 00:37:19.563 DEBUG] 0 有初步满足条件
-[2025-12-15 00:37:19.563 DEBUG] 0 有完整满足条件
-[2025-12-15 00:37:19.563 DEBUG] 1 有初步满足条件
-[2025-12-15 00:37:19.563 DEBUG] 1 有完整满足条件
-[2025-12-15 00:37:19.563 DEBUG] 2 有初步满足条件
-[2025-12-15 00:37:19.563 DEBUG] 2 有完整满足条件
-[2025-12-15 00:37:19.563 DEBUG] 3 有初步满足条件
-[2025-12-15 00:37:19.563 DEBUG] 3 有完整满足条件
-[2025-12-15 00:37:19.563 DEBUG] 4 有初步满足条件
-[2025-12-15 00:37:19.563 DEBUG] 4 有完整满足条件
-[2025-12-15 00:37:19.563 DEBUG] 5 有初步满足条件
-[2025-12-15 00:37:19.563 DEBUG] 5 有完整满足条件
-[2025-12-15 00:37:19.563 DEBUG] 6 有初步满足条件
-[2025-12-15 00:37:19.563 DEBUG] 6 有完整满足条件
-[2025-12-15 00:37:19.563 DEBUG] ObJoinOrder::generate_candi_index_merge_trees START
-[2025-12-15 00:37:19.563 DEBUG] filters.count() = 1
-[2025-12-15 00:37:19.563 DEBUG] column_ids.at(0): 16
-[2025-12-15 00:37:19.563 DEBUG] valid index num: valid_index_ids.count()7
-[2025-12-15 00:37:19.563 DEBUG] index_id : 500059
-[2025-12-15 00:37:19.563 DEBUG] index_column_ids.count() : 1
-[2025-12-15 00:37:19.563 DEBUG] index_column_id : 16
-[2025-12-15 00:37:19.563 DEBUG] NO FTS NO IN : column_ids.at(0): 16
-[2025-12-15 00:37:19.563 DEBUG] index_id : 500062
-[2025-12-15 00:37:19.563 DEBUG] index_column_ids.count() : 2
-[2025-12-15 00:37:19.563 DEBUG] index_column_id : 17
-[2025-12-15 00:37:19.563 DEBUG] index_column_id : 16
-[2025-12-15 00:37:19.563 DEBUG] index_id : 500063
-[2025-12-15 00:37:19.563 DEBUG] index_column_ids.count() : 2
-[2025-12-15 00:37:19.563 DEBUG] index_column_id : 18
-[2025-12-15 00:37:19.563 DEBUG] index_column_id : 16
-[2025-12-15 00:37:19.563 DEBUG] index_id : 500064
-[2025-12-15 00:37:19.563 DEBUG] index_column_ids.count() : 1
-[2025-12-15 00:37:19.563 DEBUG] index_column_id : 16
-[2025-12-15 00:37:19.563 DEBUG] NO FTS NO IN : column_ids.at(0): 16
-[2025-12-15 00:37:19.563 DEBUG] index_id : 500065
-[2025-12-15 00:37:19.563 DEBUG] index_column_ids.count() : 1
-[2025-12-15 00:37:19.563 DEBUG] index_column_id : 20
-[2025-12-15 00:37:19.563 DEBUG] index_id : 500066
-[2025-12-15 00:37:19.563 DEBUG] index_column_ids.count() : 2
-[2025-12-15 00:37:19.563 DEBUG] index_column_id : 21
-[2025-12-15 00:37:19.563 DEBUG] index_column_id : 20
-[2025-12-15 00:37:19.563 DEBUG] index_id : 500067
-[2025-12-15 00:37:19.563 DEBUG] index_column_ids.count() : 2
-[2025-12-15 00:37:19.563 DEBUG] index_column_id : 20
-[2025-12-15 00:37:19.563 DEBUG] index_column_id : 21
-[2025-12-15 00:37:19.563 DEBUG] ObIndexMergeNode::formalize_index_merge_tree start
-[2025-12-15 00:37:19.563 DEBUG] ObIndexMergeNode::formalize_index_merge_tree start
-[2025-12-15 00:37:19.563 DEBUG] ObIndexMergeNode::formalize_index_merge_tree end
-[2025-12-15 00:37:19.563 DEBUG] ObIndexMergeNode::formalize_index_merge_tree start
-[2025-12-15 00:37:19.563 DEBUG] ObIndexMergeNode::formalize_index_merge_tree end
-[2025-12-15 00:37:19.563 DEBUG] ObIndexMergeNode::formalize_index_merge_tree start
-[2025-12-15 00:37:19.563 DEBUG] ObIndexMergeNode::formalize_index_merge_tree end
-[2025-12-15 00:37:19.563 DEBUG] ObIndexMergeNode::formalize_index_merge_tree end
-[2025-12-15 00:37:19.563 DEBUG] candi_index_trees push_back了一个node
-[2025-12-15 00:37:19.563 DEBUG] ObJoinOrder::generate_candi_index_merge_trees END
-[2025-12-15 00:37:19.563 DEBUG] generate candi index merge trees, count() 1
+```c++
 
+int ObJoinOrder::create_one_index_merge_path(const uint64_t table_id,
+                                             const uint64_t ref_table_id,
+                                             const PathHelper &helper,
+                                             const ObIArray<ObExprConstraint> &range_expr_constraint,
+                                             ObIndexMergeNode* root_node,
+                                             IndexMergePath* &index_merge_path)
+{
+  int ret = OB_SUCCESS;
+  const ObDMLStmt *stmt = NULL;
+  const TableItem *table_item = NULL;
+  ObSEArray<ObRawExpr*, 4> all_match_exprs;
+  ObSEArray<ObRawExpr*, 4> rowkey_exprs;
+  if (OB_ISNULL(root_node)|| OB_ISNULL(allocator_)
+      || OB_ISNULL(get_plan()) || OB_ISNULL(stmt = get_plan()->get_stmt())
+      || OB_ISNULL(table_item = stmt->get_table_item_by_id(table_id))) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("get unexpected null", K(ret), K(root_node), K(allocator_), K(get_plan()), K(stmt), K(table_item));
+  } else if (OB_ISNULL(index_merge_path = reinterpret_cast<IndexMergePath*>(allocator_->alloc(sizeof(IndexMergePath))))) {
+    ret = OB_ALLOCATE_MEMORY_FAILED;
+    LOG_WARN("failed to new a index merge path", K(ret));
+  } else if (OB_FALSE_IT(index_merge_path = new(index_merge_path) IndexMergePath(table_id, ref_table_id, this))) {
+  } else if (OB_FALSE_IT(index_merge_path->root_ = root_node)) {
+  } else if (OB_FAIL(stmt->get_match_expr_on_table(table_id, all_match_exprs))) {
+    LOG_WARN("failed to get all match exprs", K(ret), K(table_id));
+  } else if (OB_FAIL(index_merge_path->est_cost_info_.table_filters_.assign(helper.filters_))) {
+    LOG_WARN("failed to assign filters", K(ret));
+  } else if (OB_FAIL(index_merge_path->filter_.assign(helper.filters_))) {
+    LOG_WARN("failed to assign filters", K(ret));
+  } else if (OB_FAIL(index_merge_path->subquery_exprs_.assign(helper.subquery_exprs_))) {
+    LOG_WARN("failed to assign subquery exprs", K(ret));
+  } else if (OB_FAIL(get_plan()->get_rowkey_exprs(table_id, ref_table_id, rowkey_exprs))) {
+    LOG_WARN("failed to get rowkey exprs", K(ret));
+  } else if (OB_FAIL(get_index_scan_direction(rowkey_exprs, stmt, get_plan()->get_equal_sets(), index_merge_path->order_direction_))) {
+    LOG_WARN("failed to get index scan direction", K(ret));
+  } else if (OB_FAIL(root_node->set_scan_direction(index_merge_path->order_direction_))) {
+    LOG_WARN("failed to set scan direction for index merge path", K(ret), KPC(index_merge_path));
+  } else if (OB_FAIL(ObOptimizerUtil::make_sort_keys(rowkey_exprs,
+                                                     index_merge_path->order_direction_,
+                                                     index_merge_path->ordering_))) {
+    LOG_WARN("failed to make rowkey ordering for index merge path", K(ret));
+  } else if (OB_FAIL(stmt->get_column_items(table_id, index_merge_path->est_cost_info_.access_column_items_))) {
+    LOG_WARN("failed to get column items", K(ret));
+  } else if (OB_FAIL(index_merge_path->equal_param_constraints_.assign(helper.equal_param_constraints_))) {
+    LOG_WARN("failed to assign equal param constraints", K(ret));
+  } else if (OB_FAIL(index_merge_path->const_param_constraints_.assign(helper.const_param_constraints_))) {
+    LOG_WARN("failed to assign equal param constraints", K(ret));
+  } else if (OB_FAIL(index_merge_path->expr_constraints_.assign(helper.expr_constraints_))) {
+    LOG_WARN("failed to assign expr constraints", K(ret));
+  } else if (OB_FAIL(append(index_merge_path->expr_constraints_, range_expr_constraint))) {
+    LOG_WARN("failed to append range expr constraints", K(ret));
+  } else {
+    index_merge_path->table_id_ = table_id;
+    index_merge_path->ref_table_id_ = ref_table_id;
+    index_merge_path->index_id_ = ref_table_id;
+    index_merge_path->use_das_ = true;
+    index_merge_path->use_skip_scan_ = OptSkipScanState::SS_DISABLE;
+    index_merge_path->table_opt_info_ = helper.table_opt_info_;
+    index_merge_path->is_inner_path_ = helper.is_inner_path_;
+    index_merge_path->for_update_ = table_item->for_update_;
+    index_merge_path->use_column_store_ = false;
+    index_merge_path->contain_das_op_ = index_merge_path->use_das_;
+    index_merge_path->is_ordered_by_pk_ = true;
+    index_merge_path->can_batch_rescan_ = false;
+    index_merge_path->parent_ = this;
+    index_merge_path->est_cost_info_.index_meta_info_.is_index_back_ = true;
+    index_merge_path->est_cost_info_.is_virtual_table_ = is_virtual_table(ref_table_id);
+    index_merge_path->est_cost_info_.table_metas_ = &get_plan()->get_basic_table_metas();
+    index_merge_path->est_cost_info_.sel_ctx_ = &get_plan()->get_selectivity_ctx();
+    index_merge_path->est_cost_info_.rescan_server_list_ = &index_merge_path->server_list_;
+    index_merge_path->est_cost_info_.is_rescan_ = helper.is_inner_path_ || get_plan()->get_is_rescan_subplan();
+    index_merge_path->est_cost_info_.use_column_store_ = index_merge_path->use_column_store_;
+    index_merge_path->domain_idx_info_.set_domain_idx_type(DomainIndexType::FTS_INDEX);
+    if (NULL == table_partition_info_) {
+      // generate table location for main table
+      if (OB_FAIL(compute_table_location(table_id,
+                                         ref_table_id,
+                                         false,
+                                         index_merge_path->table_partition_info_))) {
+        LOG_WARN("failed to compute table location", K(ret), K(table_id), K(ref_table_id));
+      }
+    } else {
+      index_merge_path->table_partition_info_ = table_partition_info_;
+    }
+  }
 
-
-[2025-12-15 00:37:19.563 DEBUG] first node type : 1
-[2025-12-15 00:37:19.563 DEBUG] ObJoinOrder::get_candi_index_merge_trees END
-[2025-12-15 00:37:19.563 DEBUG] ObJoinOrder::do_create_index_merge_paths START
-[2025-12-15 00:37:19.563 DEBUG] ObJoinOrder::choose_best_selectivity_branch START
-[2025-12-15 00:37:19.563 DEBUG] choose_best_selectivity_branch:: INDEX_MERGE_UNION == candi_node->node_type_
-[2025-12-15 00:37:19.563 DEBUG] ObJoinOrder::choose_best_selectivity_branch START
-[2025-12-15 00:37:19.563 DEBUG] ObJoinOrder::choose_best_selectivity_branch END
-[2025-12-15 00:37:19.563 DEBUG] ObJoinOrder::choose_best_selectivity_branch START
-[2025-12-15 00:37:19.563 DEBUG] ObJoinOrder::choose_best_selectivity_branch END
-[2025-12-15 00:37:19.563 DEBUG] ObJoinOrder::choose_best_selectivity_branch START
-[2025-12-15 00:37:19.563 DEBUG] ObJoinOrder::choose_best_selectivity_branch END
-[2025-12-15 00:37:19.563 DEBUG] ObJoinOrder::choose_best_selectivity_branch END
-[2025-12-15 00:37:19.563 DEBUG] ObIndexMergeNode::formalize_index_merge_tree start
-[2025-12-15 00:37:19.563 DEBUG] ObIndexMergeNode::formalize_index_merge_tree start
-[2025-12-15 00:37:19.563 DEBUG] ObIndexMergeNode::formalize_index_merge_tree end
-[2025-12-15 00:37:19.563 DEBUG] ObIndexMergeNode::formalize_index_merge_tree start
-[2025-12-15 00:37:19.563 DEBUG] ObIndexMergeNode::formalize_index_merge_tree end
-[2025-12-15 00:37:19.563 DEBUG] ObIndexMergeNode::formalize_index_merge_tree start
-[2025-12-15 00:37:19.563 DEBUG] ObIndexMergeNode::formalize_index_merge_tree end
-[2025-12-15 00:37:19.563 DEBUG] ObIndexMergeNode::formalize_index_merge_tree end
-[2025-12-15 00:37:19.563 DEBUG] ObExprRangeConverter::convert_in_expr start
-[2025-12-15 00:37:19.563 DEBUG] l_expr->is_column_ref_expr()
-[2025-12-15 00:37:19.563 DEBUG] r_expr->get_param_count(): 3
-[2025-12-15 00:37:19.563 DEBUG] range_node->in_param_count_ 3
-[2025-12-15 00:37:19.563 DEBUG] ObExprRangeConverter::convert_in_expr end
-[2025-12-15 00:37:19.563 DEBUG] ObJoinOrder::do_create_index_merge_paths END
-[2025-12-15 00:37:19.563 DEBUG] ObJoinOrder::check_index_merge_paths_contain_fts start
-[2025-12-15 00:37:19.563 DEBUG] root_node->children_.count() 3
-[2025-12-15 00:37:19.563 DEBUG] contain_fts: 1
-[2025-12-15 00:37:19.563 DEBUG] ObJoinOrder::check_index_merge_paths_contain_fts end
-[2025-12-15 00:37:19.563 DEBUG] ObJoinOrder::create_index_merge_access_paths END
-
-
-
-[2025-12-15 00:37:19.563 DEBUG] there is index merge path
-[2025-12-15 00:37:19.564 DEBUG] set index merge path cost = 0 ?
-[2025-12-15 00:37:19.564 DEBUG] ap->is_index_merge_path
-[2025-12-15 00:37:19.564 DEBUG] if (op.use_index_merge()) {
-[2025-12-15 00:37:19.564 DEBUG] OB_UNLIKELY(op.use_index_merge() || op.has_es_match()))
-[2025-12-15 00:37:19.564 DEBUG] AHAHAHA index_merge
-[2025-12-15 00:37:19.564 DEBUG] if (OB_FAIL(generate_index_merge_ctdef(op, tsc_ctdef, index_merge_ctdef)))
-[2025-12-15 00:37:19.564 DEBUG] use index merge
-[2025-12-15 00:37:19.564 DEBUG] use index merge
-[2025-12-15 00:37:19.564 DEBUG] use index merge
-[2025-12-15 00:37:19.564 DEBUG] use index merge 22222
-[2025-12-15 00:37:19.564 DEBUG] if (OB_SUCC(ret) && index_merge_cnt > 0)
-[2025-12-15 00:37:19.564 DEBUG] create_index_merge_iter_tree
-[2025-12-15 00:37:19.564 DEBUG] create_index_merge_sub_tree
-[2025-12-15 00:37:19.564 DEBUG] ObDASIterUtils::create_text_retrieval_sub_tree
-[2025-12-15 00:37:19.564 DEBUG] create_iter_children_array
-[2025-12-15 00:37:19.564 DEBUG] ObDASIterUtils::create_cache_lookup_sub_tree
-[2025-12-15 00:37:19.564 DEBUG] create_iter_children_array
-[2025-12-15 00:37:19.564 DEBUG] (merge_ctdef->merge_node_types_.at(i) == INDEX_MERGE_FTS_INDEX && need_sort)
-[2025-12-15 00:37:19.564 DEBUG] init sort iter and child_ctdef->op_type_ == DAS_OP_SORT
-[2025-12-15 00:37:19.564 DEBUG] ObDASIterUtils::create_sort_sub_tree
-[2025-12-15 00:37:19.564 DEBUG] create_iter_children_array
-[2025-12-15 00:37:19.564 DEBUG] index merge iter use!!!
-[2025-12-15 00:37:19.564 DEBUG] check_init_two_phase: no and
-[2025-12-15 00:37:19.564 DEBUG] create_iter_children_array
-[2025-12-15 00:37:19.564 DEBUG] ObDASIterUtils::create_cache_lookup_sub_tree
-[2025-12-15 00:37:19.564 DEBUG] create_iter_children_array
-[2025-12-15 00:37:19.564 DEBUG] ObTextDaaTIter::init
-[2025-12-15 00:37:19.564 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.564 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.564 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.564 DEBUG] --------------INDEX_SCAN----------
-[2025-12-15 00:37:19.564 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.564 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.565 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.565 DEBUG] --------------INDEX_SCAN----------
-[2025-12-15 00:37:19.565 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.565 DEBUG] sparse_retrieval_iter_->get_next_rows()
-[2025-12-15 00:37:19.565 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.565 DEBUG] sparse_retrieval_iter_->get_next_rows()
-[2025-12-15 00:37:19.565 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.565 DEBUG] sparse_retrieval_iter_->get_next_rows()
-[2025-12-15 00:37:19.565 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.565 DEBUG] sparse_retrieval_iter_->get_next_rows()
-[2025-12-15 00:37:19.565 DEBUG] --------------DO_LOOKUP----------
-[2025-12-15 00:37:19.565 DEBUG] ObDASLocalLookupIter::do_index_lookup()
-[2025-12-15 00:37:19.565 DEBUG] ctdef->pd_expr_spec_.pushdown_filters_.empty()
-[2025-12-15 00:37:19.565 DEBUG] do_index_lookup::scan_param op_filters_ nonono
-[2025-12-15 00:37:19.565 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.565 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.566 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.566 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.566 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.566 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.566 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.566 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.566 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.566 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.567 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.567 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.567 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.567 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.567 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.567 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.567 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.567 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.567 DEBUG] --------------INDEX_SCAN----------
-[2025-12-15 00:37:19.567 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.567 DEBUG] sparse_retrieval_iter_->get_next_rows()
-[2025-12-15 00:37:19.567 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.567 DEBUG] sparse_retrieval_iter_->get_next_rows()
-[2025-12-15 00:37:19.568 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.568 DEBUG] sparse_retrieval_iter_->get_next_rows()
-[2025-12-15 00:37:19.568 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.568 DEBUG] sparse_retrieval_iter_->get_next_rows()
-[2025-12-15 00:37:19.568 DEBUG] --------------DO_LOOKUP----------
-[2025-12-15 00:37:19.568 DEBUG] ObDASLocalLookupIter::do_index_lookup()
-[2025-12-15 00:37:19.568 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.568 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.568 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.568 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.568 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.568 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.568 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.568 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.568 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.568 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.569 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.569 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.569 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.569 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.569 DEBUG] --------------INDEX_SCAN----------
-[2025-12-15 00:37:19.569 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.569 DEBUG] sparse_retrieval_iter_->get_next_rows()
-[2025-12-15 00:37:19.569 DEBUG] --------------FINISHED----------
-[2025-12-15 00:37:19.569 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.569 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.569 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.569 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.569 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.569 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.569 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.569 DEBUG] --------------DO_LOOKUP----------
-[2025-12-15 00:37:19.569 DEBUG] ObDASLocalLookupIter::do_index_lookup()
-[2025-12-15 00:37:19.569 DEBUG] ctdef->pd_expr_spec_.pushdown_filters_.empty()
-[2025-12-15 00:37:19.569 DEBUG] do_index_lookup::scan_param op_filters_ nonono
-[2025-12-15 00:37:19.569 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.569 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.570 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.570 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.570 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.570 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.570 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.570 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.570 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.570 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.570 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.570 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.570 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.570 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.570 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.570 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.570 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.570 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.571 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.571 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.571 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.571 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.571 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.571 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.571 DEBUG] MY_SEPC filter size: 1 count: 232 need_final_limit: 0
-[2025-12-15 00:37:19.571 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.571 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.571 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.571 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.571 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.571 DEBUG] --------------INDEX_SCAN----------
-[2025-12-15 00:37:19.571 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.571 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.571 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.571 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.571 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.571 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.571 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.571 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.571 DEBUG] --------------DO_LOOKUP----------
-[2025-12-15 00:37:19.571 DEBUG] ObDASLocalLookupIter::do_index_lookup()
-[2025-12-15 00:37:19.571 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.571 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.572 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.572 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.572 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.572 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.572 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.572 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.572 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.572 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.572 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.572 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.572 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.572 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.572 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.572 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.572 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.572 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.572 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.572 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.572 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.572 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.572 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.573 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.573 DEBUG] MY_SEPC filter size: 1 count: 232 need_final_limit: 0
-[2025-12-15 00:37:19.573 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.573 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.573 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.573 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.573 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.573 DEBUG] --------------INDEX_SCAN----------
-[2025-12-15 00:37:19.573 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.573 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.573 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.573 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.573 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.573 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.573 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.573 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.573 DEBUG] --------------DO_LOOKUP----------
-[2025-12-15 00:37:19.573 DEBUG] ObDASLocalLookupIter::do_index_lookup()
-[2025-12-15 00:37:19.573 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.573 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.573 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.573 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.573 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.573 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.573 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.573 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.573 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.574 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.574 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.574 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.574 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.574 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.574 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.574 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.574 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.574 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.574 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.574 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.574 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.574 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.574 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.574 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.574 DEBUG] MY_SEPC filter size: 1 count: 232 need_final_limit: 0
-[2025-12-15 00:37:19.575 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.575 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.575 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.575 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.575 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.575 DEBUG] --------------INDEX_SCAN----------
-[2025-12-15 00:37:19.575 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.575 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.575 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.575 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.575 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.575 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.575 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.575 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.575 DEBUG] --------------DO_LOOKUP----------
-[2025-12-15 00:37:19.575 DEBUG] ObDASLocalLookupIter::do_index_lookup()
-[2025-12-15 00:37:19.575 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.575 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.575 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.575 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.575 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.575 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.575 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.575 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.575 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.576 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.576 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.576 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.576 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.576 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.576 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.576 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.576 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.576 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.576 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.576 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.576 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.576 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.576 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.576 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.576 DEBUG] MY_SEPC filter size: 1 count: 232 need_final_limit: 0
-[2025-12-15 00:37:19.576 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.576 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.576 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.576 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.576 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.576 DEBUG] --------------INDEX_SCAN----------
-[2025-12-15 00:37:19.576 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.576 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.576 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.576 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.577 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.577 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.577 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.577 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.577 DEBUG] --------------DO_LOOKUP----------
-[2025-12-15 00:37:19.577 DEBUG] ObDASLocalLookupIter::do_index_lookup()
-[2025-12-15 00:37:19.577 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.577 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.577 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.577 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.577 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.577 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.577 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.577 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.577 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.578 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.578 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.578 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.578 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.578 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.578 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.578 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.578 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.578 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.578 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.578 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.578 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.578 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.578 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.579 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.579 DEBUG] MY_SEPC filter size: 1 count: 232 need_final_limit: 0
-[2025-12-15 00:37:19.579 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.579 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.579 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.579 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.579 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.579 DEBUG] --------------INDEX_SCAN----------
-[2025-12-15 00:37:19.579 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.579 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.579 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.579 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.579 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.579 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.579 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.579 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.579 DEBUG] --------------DO_LOOKUP----------
-[2025-12-15 00:37:19.579 DEBUG] ObDASLocalLookupIter::do_index_lookup()
-[2025-12-15 00:37:19.579 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.579 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.580 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.580 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.580 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.580 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.580 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.580 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.580 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.580 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.580 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.580 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.580 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.580 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.580 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.580 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.580 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.580 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.580 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.580 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.580 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.580 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.580 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.581 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.581 DEBUG] MY_SEPC filter size: 1 count: 232 need_final_limit: 0
-[2025-12-15 00:37:19.581 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.581 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.581 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.581 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.581 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.581 DEBUG] --------------INDEX_SCAN----------
-[2025-12-15 00:37:19.581 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.581 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.581 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.581 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.581 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.581 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.581 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.581 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.581 DEBUG] --------------DO_LOOKUP----------
-[2025-12-15 00:37:19.581 DEBUG] ObDASLocalLookupIter::do_index_lookup()
-[2025-12-15 00:37:19.581 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.581 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.581 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.581 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.581 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.581 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.581 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.581 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.581 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.582 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.582 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.582 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.582 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.582 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.582 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.582 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.582 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.582 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.582 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.582 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.582 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.582 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.582 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.582 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.582 DEBUG] MY_SEPC filter size: 1 count: 232 need_final_limit: 0
-[2025-12-15 00:37:19.582 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.582 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.582 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.582 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.582 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.582 DEBUG] --------------INDEX_SCAN----------
-[2025-12-15 00:37:19.582 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.582 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.583 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.583 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.583 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.583 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.583 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.583 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.583 DEBUG] --------------DO_LOOKUP----------
-[2025-12-15 00:37:19.583 DEBUG] ObDASLocalLookupIter::do_index_lookup()
-[2025-12-15 00:37:19.583 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.583 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.583 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.583 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.583 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.583 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.583 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.583 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.583 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.584 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.584 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.584 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.584 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.584 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.584 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.584 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.584 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.584 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.584 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.584 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.584 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.584 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.584 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.584 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.584 DEBUG] MY_SEPC filter size: 1 count: 232 need_final_limit: 0
-[2025-12-15 00:37:19.584 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.584 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.584 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.584 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.584 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.584 DEBUG] --------------INDEX_SCAN----------
-[2025-12-15 00:37:19.584 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.584 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.585 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.585 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.585 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.585 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.585 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.585 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.585 DEBUG] --------------DO_LOOKUP----------
-[2025-12-15 00:37:19.585 DEBUG] ObDASLocalLookupIter::do_index_lookup()
-[2025-12-15 00:37:19.585 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.585 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.585 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.585 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.585 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.585 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.585 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.585 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.585 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.586 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.586 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.586 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.586 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.586 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.586 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.586 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.586 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.586 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.586 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.586 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.586 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.586 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.586 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.586 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.586 DEBUG] MY_SEPC filter size: 1 count: 232 need_final_limit: 0
-[2025-12-15 00:37:19.586 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.586 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.586 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.586 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.586 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.586 DEBUG] --------------INDEX_SCAN----------
-[2025-12-15 00:37:19.586 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.586 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.586 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.586 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.586 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.586 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.587 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.587 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.587 DEBUG] --------------DO_LOOKUP----------
-[2025-12-15 00:37:19.587 DEBUG] ObDASLocalLookupIter::do_index_lookup()
-[2025-12-15 00:37:19.587 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.587 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.587 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.587 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.587 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.587 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.587 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.587 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.587 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.587 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.587 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.587 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.587 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.587 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.587 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.587 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.588 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.588 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.588 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.588 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.588 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.588 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.588 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.588 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.588 DEBUG] MY_SEPC filter size: 1 count: 232 need_final_limit: 0
-[2025-12-15 00:37:19.588 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.588 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.588 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.588 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.588 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.588 DEBUG] --------------INDEX_SCAN----------
-[2025-12-15 00:37:19.588 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.588 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.588 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.588 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.588 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.588 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.588 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.588 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.588 DEBUG] --------------DO_LOOKUP----------
-[2025-12-15 00:37:19.588 DEBUG] ObDASLocalLookupIter::do_index_lookup()
-[2025-12-15 00:37:19.588 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.588 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.589 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.589 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.589 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.589 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.589 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.589 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.589 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.589 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.589 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.589 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.589 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.589 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.589 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.589 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.590 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.590 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.590 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.590 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.590 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.590 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.590 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.590 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.590 DEBUG] MY_SEPC filter size: 1 count: 232 need_final_limit: 0
-[2025-12-15 00:37:19.590 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.590 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.590 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.590 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.590 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.590 DEBUG] --------------INDEX_SCAN----------
-[2025-12-15 00:37:19.590 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.590 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.590 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.590 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.590 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.590 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.590 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.590 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.590 DEBUG] --------------DO_LOOKUP----------
-[2025-12-15 00:37:19.590 DEBUG] ObDASLocalLookupIter::do_index_lookup()
-[2025-12-15 00:37:19.590 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.590 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.591 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.591 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.591 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.591 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.591 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.591 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.591 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.591 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.591 DEBUG] MY_SEPC filter size: 1 count: 256 need_final_limit: 0
-[2025-12-15 00:37:19.591 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.591 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.591 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.591 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.591 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.591 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
-[2025-12-15 00:37:19.591 DEBUG] MY_SEPC filter size: 1 count: 117 need_final_limit: 0
-[2025-12-15 00:37:19.591 DEBUG] change new_rot_iter to ObDASCacheLookupIter
-[2025-12-15 00:37:19.591 DEBUG] 222 parent_filters_.count() = 0
-[2025-12-15 00:37:19.591 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----begin
-[2025-12-15 00:37:19.591 DEBUG] --------------OUTPUT_ROWS----------
-[2025-12-15 00:37:19.591 DEBUG] --------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------
-[2025-12-15 00:37:19.591 DEBUG] --------------INDEX_SCAN----------
-[2025-12-15 00:37:19.591 DEBUG] --------------INDEX_SCAN: index_table_iter_->get_next_rows-----------
-[2025-12-15 00:37:19.591 DEBUG] ObDASIndexMergeIter::union_get_next_rows
-[2025-12-15 00:37:19.591 DEBUG] --------------FINISHED----------
-[2025-12-15 00:37:19.591 DEBUG] ObDASCacheLookupIter::inner_get_next_rows -----end
+  // prepare func lookup tr_infos for index merge path, we only need match exprs which is not in index.
+  ObSEArray<ObRawExpr*, 4> match_exprs_in_index;
+  for (int64_t i = 0; OB_SUCC(ret) && i < root_node->filter_.count(); ++i) {
+    ObRawExpr *filter = root_node->filter_.at(i);
+    if (OB_ISNULL(filter)) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("get unexpected null filter", K(ret), K(i), KPC(root_node));
+    } else if (filter->get_expr_type() == T_OP_BOOL && filter->has_flag(CNT_MATCH_EXPR)) {
+      ObRawExpr *param_expr = NULL;
+      if (OB_UNLIKELY(0 >= filter->get_param_count()) || OB_ISNULL(param_expr = filter->get_param_expr(0))) {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("unexpected null param expr for bool op", K(ret), KPC(filter));
+      } else if (!param_expr->has_flag(IS_MATCH_EXPR)) {
+        // do nothing
+      } else if (OB_FAIL(match_exprs_in_index.push_back(param_expr))) {
+        LOG_WARN("failed to append match expr to array", K(ret));
+      }
+    }
+  }
+  for (int64_t i = 0; OB_SUCC(ret) && i < all_match_exprs.count(); ++i) {
+    ObRawExpr *cur_expr = all_match_exprs.at(i);
+    const MatchExprInfo *match_expr_info = NULL;
+    if (OB_ISNULL(cur_expr)) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("unexpected null match expr", K(ret), K(i));
+    } else if (ObOptimizerUtil::find_item(match_exprs_in_index, cur_expr)) {
+      // do nothing
+    } else if (OB_FAIL(find_match_expr_info(helper.match_expr_infos_, cur_expr, match_expr_info))) {
+      LOG_WARN("failed to find match expr info", K(ret), KPC(cur_expr));
+    } else if (OB_ISNULL(match_expr_info)) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("unexpected null match expr info", K(ret));
+    } else if (OB_FAIL(index_merge_path->domain_idx_info_.func_lookup_exprs_.push_back(cur_expr))) {
+      LOG_WARN("failed to append func lookup exprs", K(ret), KPC(cur_expr));
+    } else if (OB_FAIL(index_merge_path->domain_idx_info_.func_lookup_index_ids_.push_back(match_expr_info->inv_idx_id_))) {
+      LOG_WARN("failed to append func lookup index id", K(ret));
+    }
+  }
+  return ret;
+}
+```
