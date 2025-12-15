@@ -952,6 +952,26 @@ bool ObDASUtils::is_index_merge(const ObDASBaseCtDef *attach_ctdef)
   return bret;
 }
 
+bool ObDASUtils::is_two_phase_index_merge(const ObDASBaseCtDef *attach_ctdef) {
+  bool bret = false;
+  if (attach_ctdef != nullptr) {
+    // const ObDASBaseCtDef *rowkey_scan_ctdef = nullptr;
+    if (attach_ctdef->op_type_ == DAS_OP_TWO_PHASE_INDEX_MERGE) {
+      bret = true;
+    }
+    // else if (attach_ctdef->op_type_ == DAS_OP_TABLE_LOOKUP &&
+    //            FALSE_IT(rowkey_scan_ctdef = static_cast<const ObDASTableLookupCtDef*>(attach_ctdef)->get_rowkey_scan_ctdef())) {
+    // } else if (attach_ctdef->op_type_ == DAS_OP_INDEX_PROJ_LOOKUP &&
+    //            FALSE_IT(rowkey_scan_ctdef = static_cast<const ObDASIndexProjLookupCtDef*>(attach_ctdef)->get_rowkey_scan_ctdef())) {
+    // } else if (rowkey_scan_ctdef != nullptr) {
+    //   bret = rowkey_scan_ctdef->op_type_ == DAS_OP_TWO_PHASE_INDEX_MERGE;
+    // }
+  }
+  return bret;
+  
+}
+
+
 bool ObDASUtils::is_func_lookup(const ObDASBaseCtDef *attach_ctdef)
 {
   int ret = OB_SUCCESS;

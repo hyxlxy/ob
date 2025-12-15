@@ -113,6 +113,7 @@ public:
                                 ObDASOpType op_type,
                                 ObDASBaseRtDef *&target_rtdef);
   static bool is_index_merge(const ObDASBaseCtDef *attach_ctdef);
+  static bool is_two_phase_index_merge(const ObDASBaseCtDef *attach_ctdef);
   static bool is_func_lookup(const ObDASBaseCtDef *attach_ctdef);
   static bool is_vec_idx_scan(const ObDASBaseCtDef *attach_ctdef);
   static bool is_fts_idx_scan(const ObDASBaseCtDef *attach_ctdef);

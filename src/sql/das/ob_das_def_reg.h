@@ -162,6 +162,10 @@ struct ObDASIndexMergeCtDef;
 struct ObDASIndexMergeRtDef;
 REGISTER_DAS_ATTACH_OP(DAS_OP_INDEX_MERGE, ObDASIndexMergeCtDef, ObDASIndexMergeRtDef);
 
+struct ObDASTwoPhaseIndexMergeCtDef;  
+struct ObDASTwoPhaseIndexMergeRtDef;  
+REGISTER_DAS_ATTACH_OP(DAS_OP_TWO_PHASE_INDEX_MERGE, ObDASTwoPhaseIndexMergeCtDef, ObDASTwoPhaseIndexMergeRtDef);
+
 struct ObDASIndexProjLookupCtDef;
 struct ObDASIndexProjLookupRtDef;
 REGISTER_DAS_ATTACH_OP(DAS_OP_INDEX_PROJ_LOOKUP, ObDASIndexProjLookupCtDef, ObDASIndexProjLookupRtDef);

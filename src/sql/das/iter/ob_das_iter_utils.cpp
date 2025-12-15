@@ -152,6 +152,10 @@ int ObDASIterUtils::create_das_scan_iter_tree(ObDASIterTreeType tree_type,
       ret = create_index_merge_iter_tree(scan_param, alloc, attach_ctdef, attach_rtdef, related_tablet_ids, trans_desc, snapshot, iter_tree);
       break;
     }
+    case ITER_TREE_TWO_PHASE_INDEX_MERGE: {
+      // TODO
+      break;
+    }
     case ITER_TREE_FUNC_LOOKUP: {
       ret = create_function_lookup_tree(scan_param, alloc, attach_ctdef, attach_rtdef, related_tablet_ids, trans_desc, snapshot, iter_tree);
       break;
@@ -438,7 +442,7 @@ int ObDASIterUtils::set_text_retrieval_related_ids(const ObDASBaseCtDef *attach_
   }
   return ret;
 }
-
+// 在这里面需要把二阶段的也搞了
 int ObDASIterUtils::set_index_merge_related_ids(const ObDASBaseCtDef *attach_ctdef,
                                                 ObDASBaseRtDef *attach_rtdef,
                                                 const ObDASRelatedTabletID &related_tablet_ids,
@@ -487,6 +491,16 @@ int ObDASIterUtils::set_index_merge_related_ids(const ObDASBaseCtDef *attach_ctd
             LOG_WARN("failed to set related tablet ids", K(ret));
           }
           need_set_child = false;
+        }
+        break;
+      }
+      case ObDASOpType::DAS_OP_TWO_PHASE_INDEX_MERGE: {
+        if (OB_UNLIKELY(iter_type != ObDASIterType::DAS_ITER_INDEX_MERGE)) {
+          ret = OB_ERR_UNEXPECTED;
+          adlog::DEBUG("iter type not match with ctdef", K(ret), K(attach_ctdef->op_type_), K(iter_type));
+        } else {
+          adlog::DEBUG("这里还没有实现，记得实现了");
+          // ObDASTwoPhaseIndexMergeIter *merge_iter = static_cast<ObDASTwoPhaseIndexMergeIter *>(root_iter);
         }
         break;
       }

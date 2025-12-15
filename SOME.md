@@ -1,3 +1,19 @@
+*****************************************2025-12-15（晚）  *********************************************************
+还没有添加TWO_PHASE_INDEX_MERGE的，或者是比较危险的：
+
+- ObDASUtils::is_two_phase_index_merge        大概ok
+- ObDASIterUtils::set_index_merge_related_ids
+- ObDASIterUtils::set_func_lookup_iter_related_ids
+- ObDASIterUtils::create_function_lookup_tree
+- ObDasVecScanUtils::init_limit 这个貌似可能不需要？
+- ObTscCgService::generate_index_merge_node_ctdef（这个可能不需要？专门给index_merge的？）
+- ob_das_def_reg.h里
+- ObTableScanOp::prepare_range_for_each_index
+
+
+
+有关 DAS_OP_TWO_PHASE_INDEX_MERGE 的内容，搜索一下 DAS_OP_INDEX_MERGE 就可以知道了。
+
 *****************************************2025-12-15  *********************************************************
 
 需要创建:

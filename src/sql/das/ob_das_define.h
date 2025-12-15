@@ -73,9 +73,8 @@ enum class ObDasTaskStatus: uint8_t
   FINISHED
 };
 
-enum ObDASOpType
-{
-  //can not adjust the order of DASOpType, append OpType at the last
+enum ObDASOpType {
+  // can not adjust the order of DASOpType, append OpType at the last
   DAS_OP_INVALID = 0,
   DAS_OP_TABLE_SCAN,
   DAS_OP_TABLE_INSERT,
@@ -92,6 +91,7 @@ enum ObDASOpType
   DAS_OP_VEC_SCAN,
   DAS_OP_VID_MERGE,
   DAS_OP_INDEX_MERGE,
+  DAS_OP_TWO_PHASE_INDEX_MERGE,
   DAS_OP_DOC_ID_MERGE,
   DAS_OP_FUNC_LOOKUP,
   DAS_OP_INDEX_PROJ_LOOKUP,

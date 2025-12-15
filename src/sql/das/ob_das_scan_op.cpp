@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "iter/ob_das_iter_define.h"
 #define USING_LOG_PREFIX SQL_DAS
 #include "ob_das_scan_op.h"
 #include "sql/das/ob_das_extra_data.h"
@@ -404,7 +405,10 @@ ObDASIterTreeType ObDASScanOp::get_iter_tree_type() const
     tree_type = ObDASIterTreeType::ITER_TREE_GIS_LOOKUP;
   } else if (is_multivalue_index) {
     tree_type = ObDASIterTreeType::ITER_TREE_MVI_LOOKUP;
-  } else if (OB_UNLIKELY(ObDASUtils::is_index_merge(attach_ctdef_))) {
+  } else if (OB_UNLIKELY(ObDASUtils::is_two_phase_index_merge(attach_ctdef_))) { // 新加了个two_phase，哎呦我超好恶心啊
+    tree_type = ObDASIterTreeType::ITER_TREE_TWO_PHASE_INDEX_MERGE;
+  }
+  else if (OB_UNLIKELY(ObDASUtils::is_index_merge(attach_ctdef_))) {
     tree_type = ObDASIterTreeType::ITER_TREE_INDEX_MERGE;
   } else {
     tree_type = OB_ISNULL(get_lookup_ctdef()) ? ObDASIterTreeType::ITER_TREE_PARTITION_SCAN
@@ -846,6 +850,7 @@ int ObDASScanOp::reuse_iter()
             }
             break;
           }
+          case ITER_TREE_TWO_PHASE_INDEX_MERGE: //我也不知道这样可不可以，在 set_index_merge_related_ids 里面去搞吧
           case ITER_TREE_INDEX_MERGE: {
             ObDASIter *result_iter = static_cast<ObDASIter *>(result_);
             if (OB_FAIL(ObDASIterUtils::set_index_merge_related_ids(

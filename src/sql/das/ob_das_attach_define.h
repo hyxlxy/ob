@@ -234,6 +234,31 @@ public:
   virtual ~ObDASIndexMergeRtDef() {}
 };
 
+// ADVISE
+struct ObDASTwoPhaseIndexMergeCtDef : ObDASAttachCtDef  
+{  
+  ObDASTwoPhaseIndexMergeCtDef(common::ObIAllocator &alloc)  
+    : ObDASAttachCtDef(alloc, DAS_OP_TWO_PHASE_INDEX_MERGE),  
+      first_phase_limit_(0),  
+      topk_limit_(0),  
+      min_score_threshold_(0.0)  
+  {}  
+    
+  int64_t first_phase_limit_;  
+  int64_t topk_limit_;  
+  double min_score_threshold_;
+};
+
+struct ObDASTwoPhaseIndexMergeRtDef : ObDASAttachRtDef
+{
+  OB_UNIS_VERSION(1);
+public:
+  ObDASTwoPhaseIndexMergeRtDef()
+    : ObDASAttachRtDef(DAS_OP_TWO_PHASE_INDEX_MERGE) {}
+
+  virtual ~ObDASTwoPhaseIndexMergeRtDef() {}
+};
+
 struct ObDASDomainIdMergeCtDef final : ObDASAttachCtDef
 {
   OB_UNIS_VERSION(1);

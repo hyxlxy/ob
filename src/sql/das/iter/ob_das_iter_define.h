@@ -65,8 +65,7 @@ enum MergeType : uint32_t {
 
 // group fold iter is used on demand and not considered as a part of iter tree,
 // it is placed above iter tree when in use.
-enum ObDASIterTreeType : uint32_t
-{
+enum ObDASIterTreeType : uint32_t {
   ITER_TREE_INVALID = 0,
   ITER_TREE_TABLE_SCAN,
   ITER_TREE_GLOBAL_LOOKUP,
@@ -76,6 +75,7 @@ enum ObDASIterTreeType : uint32_t
   ITER_TREE_DOMAIN_LOOKUP,  // discarded
   ITER_TREE_TEXT_RETRIEVAL,
   ITER_TREE_INDEX_MERGE,
+  ITER_TREE_TWO_PHASE_INDEX_MERGE,
   ITER_TREE_FUNC_LOOKUP,
   ITER_TREE_MVI_LOOKUP,
   ITER_TREE_VEC_LOOKUP,
@@ -113,6 +113,7 @@ public:
     ITER_TREE_FUNC_LOOKUP == (_type)    ||               \
     ITER_TREE_MATCH == (_type)          ||               \
     ITER_TREE_INDEX_MERGE == (_type)    ||               \
+    ITER_TREE_TWO_PHASE_INDEX_MERGE == (_type)    ||     \
     ITER_TREE_MVI_LOOKUP == (_type)     ||               \
     ITER_TREE_VEC_LOOKUP == (_type)     ||               \
     ITER_TREE_GIS_LOOKUP == (_type);                     \
