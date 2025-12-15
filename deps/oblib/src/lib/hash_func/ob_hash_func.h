@@ -29,7 +29,7 @@ template <typename K>
 inline uint64_t dispatch_hash(const K &key, FalseType)
 {
   // default hash function
-  return murmurhash(&key, sizeof(key), 0);
+  return ::oceanbase::common::murmurhash(&key, sizeof(key), 0);
 }
 template <typename K>
 inline uint64_t dispatch_hash(const K &key, TrueType)
@@ -46,7 +46,7 @@ template <typename K>
 inline uint64_t dispatch_hash(const K &key, uint64_t seed, FalseType)
 {
   // default hash function
-  return murmurhash(&key, sizeof(key), seed);
+  return ::oceanbase::common::murmurhash(&key, sizeof(key), seed);
 }
 
 template <typename K>

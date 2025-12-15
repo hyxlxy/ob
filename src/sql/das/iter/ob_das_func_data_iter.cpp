@@ -21,6 +21,7 @@
 #include "sql/das/ob_das_scan_op.h"
 #include "sql/engine/ob_exec_context.h"
 #include "sql/das/iter/sparse_retrieval/ob_das_tr_merge_iter.h"
+#include "lib/number/ob_number_v2.h"
 
 using namespace oceanbase::common;
 
@@ -63,6 +64,117 @@ ObDASFuncDataIter::ObDASFuncDataIter()
 
 ObDASFuncDataIter::~ObDASFuncDataIter()
 {
+}
+
+// -------- DocHeaderCache static members --------
+common::ObKVCache<ObDASFuncDataIter::DocHeaderKey, ObDASFuncDataIter::DocHeaderVal> ObDASFuncDataIter::g_doc_header_cache_;
+bool ObDASFuncDataIter::g_cache_inited_ = false;
+
+int ObDASFuncDataIter::ensure_cache_inited()
+{
+  int ret = OB_SUCCESS;
+  if (!g_cache_inited_) {
+    if (OB_FAIL(g_doc_header_cache_.init("DocHeaderCache", 1 /*priority*/, 1 /*mem_limit_pct*/))) {
+      LOG_WARN("init DocHeaderCache failed", K(ret));
+    } else {
+      g_cache_inited_ = true;
+    }
+  }
+  return ret;
+}
+
+int ObDASFuncDataIter::cache_get(const ObDocIdExt &docid, DocHeaderVal &val, common::ObKVCacheHandle &handle)
+{
+  int ret = OB_SUCCESS;
+  if (OB_FAIL(ensure_cache_inited())) {
+    LOG_WARN("cache not inited", K(ret));
+  } else {
+    const DocHeaderVal *pval = nullptr;
+    DocHeaderKey key(docid);
+    if (OB_SUCC(g_doc_header_cache_.get(key, pval, handle)) && nullptr != pval) {
+      val = *pval;
+    } else if (OB_ENTRY_NOT_EXIST == ret) {
+      // miss
+    } else if (OB_FAIL(ret)) {
+      LOG_WARN("cache get failed", K(ret));
+    } else {
+      // no-op
+    }
+  }
+  return ret;
+}
+
+int ObDASFuncDataIter::cache_put(const ObDocIdExt &docid, const DocHeaderVal &val)
+{
+  int ret = OB_SUCCESS;
+  if (OB_FAIL(ensure_cache_inited())) {
+    LOG_WARN("cache not inited", K(ret));
+  } else {
+    DocHeaderKey key(docid);
+    if (OB_FAIL(g_doc_header_cache_.put(key, val, true /*overwrite*/))) {
+      LOG_TRACE("cache put failed or exist", K(ret));
+      ret = OB_SUCCESS; // do not fail pipeline on cache issue
+    }
+  }
+  return ret;
+}
+
+int ObDASFuncDataIter::try_update_doc_header_cache_batch(int64_t count)
+{
+  int ret = OB_SUCCESS;
+  if (count <= 0 || nullptr == main_lookup_iter_ || nullptr == main_lookup_ctdef_ || nullptr == main_lookup_rtdef_) {
+    return OB_SUCCESS;
+  }
+  // 从 access_exprs_ 推断 id/base_id 列
+  sql::ObExpr *id_col = nullptr;
+  sql::ObExpr *base_id_col = nullptr;
+  const auto &access_exprs = main_lookup_ctdef_->pd_expr_spec_.access_exprs_;
+  for (int64_t i = 0; i < access_exprs.count(); ++i) {
+    sql::ObExpr *e = access_exprs.at(i);
+    if (nullptr == e) continue;
+    if (e->datum_meta_.type_ == common::ObIntType || e->datum_meta_.type_ == common::ObUInt64Type || e->datum_meta_.type_ == common::ObNumberType) {
+      if (nullptr == id_col) id_col = e;
+    } else if (e->datum_meta_.type_ == common::ObVarcharType && nullptr == base_id_col) {
+      base_id_col = e;
+    }
+  }
+  sql::ObEvalCtx *eval_ctx = main_lookup_rtdef_->eval_ctx_;
+  if (nullptr == eval_ctx) return OB_SUCCESS;
+
+  for (int64_t i = 0; i < count; ++i) {
+    int64_t id_val = 0;
+    if (id_col) {
+      sql::ObEvalCtx::BatchInfoScopeGuard guard(*eval_ctx);
+      guard.set_batch_idx(i);
+      const ObDatum &d = id_col->locate_expr_datum(*eval_ctx);
+      if (!d.is_null()) {
+        if (id_col->datum_meta_.type_ == common::ObIntType) {
+          id_val = d.get_int();
+        } else if (id_col->datum_meta_.type_ == common::ObUInt64Type) {
+          id_val = static_cast<int64_t>(d.get_uint());
+        } else if (id_col->datum_meta_.type_ == common::ObNumberType) {
+          int64_t tmp = 0;
+          if (number::ObNumber(d.get_number()).is_valid_int64(tmp)) {
+            id_val = tmp;
+          }
+        }
+      }
+    }
+    uint64_t base_hash = 0;
+    if (base_id_col) {
+      sql::ObEvalCtx::BatchInfoScopeGuard guard(*eval_ctx);
+      guard.set_batch_idx(i);
+      const ObDatum &bd = base_id_col->locate_expr_datum(*eval_ctx);
+      if (!bd.is_null() && bd.len_ > 0 && bd.ptr_ != nullptr) {
+        base_hash = ::oceanbase::common::murmurhash(bd.ptr_, bd.len_, 0);
+      }
+    }
+    if (read_count_ + i < doc_ids_.count()) {
+      const ObDocIdExt &docid = doc_ids_.at(read_count_ + i).first;
+      (void)cache_put(docid, DocHeaderVal(id_val, base_hash));
+    }
+  }
+  return ret;
 }
 
 int ObDASFuncDataIter::do_table_scan()
@@ -283,6 +395,9 @@ int ObDASFuncDataIter::inner_get_next_row()
     } else {
       ret = OB_SUCCESS;
     }
+  } else if (OB_NOT_NULL(main_lookup_iter_)) {
+    // 单行路径：将本行写入头部缓存
+    (void)try_update_doc_header_cache_batch(1);
   }
 
   for (int64_t i = 0; OB_SUCC(ret) && i < iter_count_; i++) {
@@ -322,6 +437,9 @@ int ObDASFuncDataIter::inner_get_next_rows(int64_t &count, int64_t capacity)
     if (OB_ITER_END == ret) {
       ret = OB_SUCCESS;
     }
+  }
+  if (OB_SUCC(ret) && main_lookup_iter_) {
+    (void)try_update_doc_header_cache_batch(main_lookup_count);
   }
   if (OB_SUCC(ret) && OB_UNLIKELY(main_lookup_iter_ && default_size < main_lookup_count + read_count_)) {
     ret = OB_ERR_UNEXPECTED;

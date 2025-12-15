@@ -23,6 +23,7 @@
 #include "storage/concurrency_control/ob_data_validation_service.h"
 #include "sql/das/iter/ob_das_text_retrieval_iter.h"
 #include "common/ad_log.h"
+#include "sql/parser/parse_node_hash.h"
 namespace oceanbase
 {
 using namespace common;

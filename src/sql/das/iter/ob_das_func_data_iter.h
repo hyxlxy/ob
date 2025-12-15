@@ -23,6 +23,8 @@
 #include "common/ob_tablet_id.h"
 #include "share/ob_ls_id.h"
 #include "storage/access/ob_dml_param.h"
+#include "share/cache/ob_kv_storecache.h"
+#include "sql/parser/parse_node_hash.h"
 
 namespace oceanbase
 {
@@ -140,6 +142,62 @@ private:
   private:
     common::ObDatumCmpFuncType cmp_func_;
   };
+public:
+  // ---------- Lightweight DocHeader cache (tenant-level) ----------
+  struct DocHeaderKey : public common::ObIKVCacheKey
+  {
+    DocHeaderKey() : tenant_id_(MTL_ID()) {}
+    explicit DocHeaderKey(const ObDocIdExt &d) : tenant_id_(MTL_ID()), docid_(d) {}
+    uint64_t get_tenant_id() const { return tenant_id_; }
+    uint64_t hash() const { return ::oceanbase::common::murmurhash(&tenant_id_, sizeof(tenant_id_), ::oceanbase::common::murmurhash(&docid_, sizeof(docid_), 0)); }
+    int64_t size() const { return sizeof(*this); }
+    int deep_copy(char *buf, const int64_t buf_len, common::ObIKVCacheKey *&key) const
+    {
+      int ret = OB_SUCCESS;
+      if (OB_UNLIKELY(nullptr == buf || buf_len < size())) {
+        ret = OB_INVALID_ARGUMENT;
+      } else {
+        DocHeaderKey *dst = new (buf) DocHeaderKey();
+        dst->tenant_id_ = tenant_id_;
+        dst->docid_ = docid_;
+        key = dst;
+      }
+      return ret;
+    }
+    bool operator==(const common::ObIKVCacheKey &other) const
+    {
+      const DocHeaderKey &o = reinterpret_cast<const DocHeaderKey &>(other);
+      return tenant_id_ == o.tenant_id_ && docid_ == o.docid_;
+    }
+    uint64_t tenant_id_;
+    ObDocIdExt docid_;
+  };
+  struct DocHeaderVal : public common::ObIKVCacheValue
+  {
+    DocHeaderVal() : id_(0), base_hash_(0) {}
+    DocHeaderVal(int64_t id, uint64_t base_hash) : id_(id), base_hash_(base_hash) {}
+    int64_t size() const { return sizeof(*this); }
+    int deep_copy(char *buf, const int64_t buf_len, common::ObIKVCacheValue *&value) const
+    {
+      int ret = OB_SUCCESS;
+      if (OB_UNLIKELY(nullptr == buf || buf_len < size())) {
+        ret = OB_INVALID_ARGUMENT;
+      } else {
+        DocHeaderVal *dst = new (buf) DocHeaderVal();
+        dst->id_ = id_;
+        dst->base_hash_ = base_hash_;
+        value = dst;
+      }
+      return ret;
+    }
+    int64_t id_;
+    uint64_t base_hash_;
+  };
+  static int ensure_cache_inited();
+  static int cache_get(const ObDocIdExt &docid, DocHeaderVal &val, common::ObKVCacheHandle &handle);
+  static int cache_put(const ObDocIdExt &docid, const DocHeaderVal &val);
+  int try_update_doc_header_cache_batch(int64_t count);
+
 private:
   common::ObDatumCmpFuncType cmp_func_;
   ObDASIter **tr_merge_iters_;
@@ -154,6 +212,10 @@ private:
   ObSEArray<std::pair<ObDocIdExt, int>, 4> doc_ids_;
   int64_t read_count_;
   bool start_table_scan_;
+
+  // cache helpers
+  static common::ObKVCache<DocHeaderKey, DocHeaderVal> g_doc_header_cache_;
+  static bool g_cache_inited_;
 };
 
 } // end namespace sql
