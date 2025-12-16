@@ -1216,7 +1216,7 @@ int ObTextRetrievalBlockMaxIter::init_block_max_iter(const int64_t total_doc_cnt
 
     if (!cache_hit) {
       if (OB_FAIL(calc_dim_max_score(*block_max_iter_param_, ranking_param_, *block_max_scan_param_))) {
-        LOG_WARN("failed to calc dim max score", K(ret));
+    LOG_WARN("failed to calc dim max score", K(ret));
       } else {
         // 回填缓存
         if (token_hash != 0) {
@@ -1233,9 +1233,9 @@ int ObTextRetrievalBlockMaxIter::init_block_max_iter(const int64_t total_doc_cnt
 
     if (OB_SUCC(ret)) {
       if (OB_FAIL(block_max_iter_.init(ranking_param_, *block_max_iter_param_, *block_max_scan_param_))) {
-        LOG_WARN("failed to init block max iter", K(ret));
-      } else {
-        block_max_inited_ = true;
+    LOG_WARN("failed to init block max iter", K(ret));
+  } else {
+    block_max_inited_ = true;
       }
     }
   }

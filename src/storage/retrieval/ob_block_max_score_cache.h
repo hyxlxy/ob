@@ -21,6 +21,7 @@
 #include "lib/atomic/ob_atomic.h"
 #include "share/cache/ob_kv_storecache.h"
 #include "share/cache/ob_kvcache_struct.h"
+#include "lib/oblog/ob_log_module.h"
 
 namespace oceanbase
 {
@@ -107,5 +108,6 @@ inline int64_t ObBMScoreCache::miss_ = 0;
 } // namespace oceanbase
 
 #endif
+
 
 
