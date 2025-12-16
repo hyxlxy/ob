@@ -18,6 +18,7 @@
 #define OB_DAS_MATCH_ITER_H_
 
 #include "ob_das_tr_merge_iter.h"
+#include "ob_scalar_bitmap_filter.h"
 
 namespace oceanbase
 {
@@ -35,7 +36,13 @@ struct ObDASMatchIterParam : public ObDASIterParam
       ir_match_part_score_rtdef_(nullptr),
       domain_id_expr_(nullptr),
       children_relevance_exprs_(),
-      children_domain_id_exprs_()
+      children_domain_id_exprs_(),
+      base_id_in_values_(),
+      id_upper_bound_(-1),
+      table_id_(0),
+      index_id_(0),
+      schema_version_(0),
+      col_id_(0)
   {}
 
   virtual bool is_valid() const override
@@ -48,6 +55,13 @@ struct ObDASMatchIterParam : public ObDASIterParam
   ObExpr *domain_id_expr_;
   ObSEArray<ObExpr *, 4> children_relevance_exprs_;
   ObSEArray<ObExpr *, 4> children_domain_id_exprs_;
+  // 标量过滤参数
+  ObSEArray<common::ObString, 4> base_id_in_values_;
+  int64_t id_upper_bound_;
+  uint64_t table_id_;
+  uint64_t index_id_;
+  int64_t schema_version_;
+  uint64_t col_id_;
 };
 
 struct ObDASMatchMergeCmp
@@ -109,7 +123,7 @@ private:
   int fill_merge_heap();
   int collect_dims_by_id(const ObDatum *&id_datum, double &relevance, bool &got_valid_id);
   int process_collected_row(const ObDatum &id_datum, const double relevance) { return OB_SUCCESS; }
-  int filter_on_demand(const int64_t count, const double relevance, bool &need_project);
+  int filter_on_demand(const ObDatum &id_datum, const double relevance, bool &need_project);
   int cache_result(int64_t &count, const ObDatum &id_datum, const double relevance);
   int project_results(const int64_t count);
 
@@ -136,6 +150,8 @@ private:
   ObDASMatchMergeLoserTree *merge_heap_;
   int64_t next_round_cnt_;
   double max_query_score_;
+  // 标量位图过滤器
+  ObScalarBitmapFilter scalar_bitmap_filter_;
   bool is_inited_;
   DISALLOW_COPY_AND_ASSIGN(ObDASMatchIter);
 };

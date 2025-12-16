@@ -159,6 +159,36 @@ int ObDASMatchIter::inner_init(ObDASIterParam &param)
     }
   }
 
+  // 初始化标量位图过滤器
+  if (OB_SUCC(ret) && !match_param.base_id_in_values_.empty()) {
+    if (OB_FAIL(scalar_bitmap_filter_.init(myself_allocator_))) {
+      LOG_WARN("failed to init scalar bitmap filter", K(ret));
+    } else {
+      // 添加 base_id IN 值
+      for (int64_t i = 0; OB_SUCC(ret) && i < match_param.base_id_in_values_.count(); ++i) {
+        if (OB_FAIL(scalar_bitmap_filter_.add_base_id_value(match_param.base_id_in_values_.at(i)))) {
+          LOG_WARN("failed to add base_id value", K(ret));
+        }
+      }
+      // 设置 id 上界
+      if (OB_SUCC(ret) && match_param.id_upper_bound_ > 0) {
+        scalar_bitmap_filter_.set_id_upper_bound(match_param.id_upper_bound_);
+      }
+      // 准备位图（缓存 miss 时构建）
+      if (OB_SUCC(ret)) {
+        uint64_t tenant_id = MTL_ID();
+        if (OB_FAIL(scalar_bitmap_filter_.prepare(
+            tenant_id,
+            match_param.table_id_,
+            match_param.index_id_,
+            match_param.schema_version_,
+            match_param.col_id_))) {
+          LOG_WARN("failed to prepare scalar bitmap filter", K(ret));
+        }
+      }
+    }
+  }
+
   if (OB_SUCC(ret)) {
     // ObExpr *output_relevance_expr = ir_match_part_score_ctdef_ ? ir_match_part_score_ctdef_->relevance_proj_col_;
     // if (OB_ISNULL(output_relevance_expr)) {
@@ -430,7 +460,7 @@ int ObDASMatchIter::do_one_merge_round(int64_t &count)
     }
   } else if (OB_FAIL(collect_dims_by_id(id_datum, relevance, need_project))) {
     LOG_WARN("failed to merge dimensions", K(ret));
-  } else if (OB_FAIL(need_project && filter_on_demand(count, relevance, need_project))) {
+  } else if (OB_FAIL(need_project && filter_on_demand(*id_datum, relevance, need_project))) {
     LOG_WARN("failed to process filter", K(ret));
   } else if (OB_FAIL(need_project && cache_result(count, *id_datum, relevance))) {
     if (OB_ITER_END != ret) {
@@ -554,9 +584,35 @@ int ObDASMatchIter::collect_dims_by_id(const ObDatum *&id_datum, double &relevan
   return ret;
 }
 
-int ObDASMatchIter::filter_on_demand(const int64_t count, const double relevance, bool &need_project)
+int ObDASMatchIter::filter_on_demand(const ObDatum &id_datum, const double relevance, bool &need_project)
 {
   int ret = OB_SUCCESS;
+  need_project = true;
+
+  // 如果标量位图过滤器未启用，直接返回
+  if (!ObScalarBitmapFilter::ENABLE_SCALAR_BITMAP_FILTER) {
+    return ret;
+  }
+
+  if (id_datum.is_null()) {
+    need_project = false;
+    return ret;
+  }
+
+  uint64_t docid = 0;
+  if (common::ObUInt64Type == domain_id_expr_->datum_meta_.type_) {
+    docid = id_datum.get_uint64();
+  } else {
+    // 非整型 docid 暂不做位图过滤（保守不影响召回）
+    return ret;
+  }
+
+  // 检查 docid 是否在位图中
+  if (!scalar_bitmap_filter_.contains(docid)) {
+    need_project = false;
+    LOG_DEBUG("[FTCache] ScalarBM filtered out docid", K(docid));
+  }
+
   return ret;
 }
 
