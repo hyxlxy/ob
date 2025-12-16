@@ -1652,7 +1652,8 @@ int ObDASIterUtils::create_text_retrieval_sub_tree(
   } else if (OB_UNLIKELY(is_func_lookup && ir_scan_ctdef->has_pushdown_topk())) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("unexpected pushdown topk in functional lookup mode", K(ret));
-  } else {
+  } else { 
+    // decide sparse retrieval execution mode: BMW(topk) / DaaT / TaaT
     merge_iter_param.function_lookup_mode_ = is_func_lookup ? 1 : 0;
     if (ir_scan_ctdef->has_pushdown_topk() && !has_duplicate_boolean_tokens) {
       merge_iter_param.topk_mode_ = 1;
@@ -1667,6 +1668,18 @@ int ObDASIterUtils::create_text_retrieval_sub_tree(
       merge_iter_param.taat_mode_ = 1;
     } else {
       merge_iter_param.daat_mode_ = 1;
+    }
+
+    if (OB_SUCC(ret)) {
+      LOG_INFO("[Text Retrieval] choose sparse retrieval mode",
+                K(merge_iter_param.topk_mode_),
+                K(merge_iter_param.daat_mode_),
+                K(merge_iter_param.taat_mode_),
+                K(is_func_lookup),
+                K(ir_scan_ctdef->has_pushdown_topk()),
+                K(has_duplicate_boolean_tokens),
+                "token_cnt", merge_iter_param.query_tokens_.count(),
+                "mode_flag", ir_scan_ctdef->mode_flag_);
     }
     if (OB_SUCC(ret) && ir_scan_ctdef->has_pushdown_topk() && has_duplicate_boolean_tokens) {
       FLOG_INFO("disable pushdown topk since boolean query has duplicate tokens", K(merge_iter_param.topk_mode_));

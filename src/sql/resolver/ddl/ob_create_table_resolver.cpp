@@ -1516,6 +1516,66 @@ int ObCreateTableResolver::resolve_table_elements(const ParseNode *node,
 
 
     if (OB_SUCC(ret)) {
+      // MySQL 模式下，AUTO_INCREMENT 列必须有索引。如果用户未手动为自增列建索引，
+      // 自动为该列创建一个普通（非唯一）索引，避免违反引擎约束。
+      if (lib::is_mysql_mode() && 0 != autoinc_column_id && !table_schema.is_external_table()) {
+        ObCreateTableStmt *create_table_stmt = static_cast<ObCreateTableStmt*>(stmt_);
+        ObColumnSchemaV2 *autoinc_col = NULL;
+        if (OB_ISNULL(create_table_stmt)) {
+          ret = OB_ERR_UNEXPECTED;
+          SQL_RESV_LOG(WARN, "unexpected null create_table_stmt when auto add index for autoinc", K(ret));
+        } else if (OB_ISNULL(autoinc_col =
+                    create_table_stmt->get_create_table_arg().schema_.get_column_schema(
+                        autoinc_column_id))) {
+          ret = OB_ERR_UNEXPECTED;
+          SQL_RESV_LOG(WARN, "failed to get autoinc column schema when auto add index",
+                       K(ret), K(autoinc_column_id));
+        } else if (autoinc_col->is_rowkey_column()) {
+          // 已经在主键/rowkey 上，无需额外索引
+        } else {
+          // 构造一个仅包含自增列的普通本地索引
+          HEAP_VARS_2((ObCreateIndexStmt, create_index_stmt), (ObPartitionResolveResult, resolve_result)) {
+            reset();
+            index_attributes_set_ = OB_DEFAULT_INDEX_ATTRIBUTES_SET;
+            index_arg_.reset();
+            sort_column_array_.reset();
+            store_column_names_.reset();
+            hidden_store_column_names_.reset();
+            index_keyname_ = NORMAL_KEY;
+            index_scope_ = NOT_SPECIFIED; // MySQL 默认本地索引
+            name_generated_type_ = GENERATED_TYPE_SYSTEM;
+            has_index_using_type_ = false;
+            ObColumnSortItem sort_item;
+            sort_item.column_name_ = autoinc_col->get_column_name_str();
+            sort_item.prefix_len_ = -1;
+            sort_item.order_type_ = common::ObOrderType::ASC;
+            ObString uk_name;
+            if (OB_FAIL(resolve_index_name(nullptr, sort_item.column_name_, false, uk_name))) {
+              SQL_RESV_LOG(WARN, "resolve auto index name failed", K(ret));
+            } else if (OB_FAIL(add_sort_column(sort_item))) {
+              SQL_RESV_LOG(WARN, "add auto index column failed", K(ret), K(sort_item));
+            } else if (OB_FAIL(generate_index_arg(false /*process_heap_table_primary_key*/))) {
+              SQL_RESV_LOG(WARN, "generate auto index arg failed", K(ret));
+            } else {
+              ObCreateIndexArg &create_index_arg = create_index_stmt.get_create_index_arg();
+              ObSArray<ObPartitionResolveResult> &resolve_results =
+                  create_table_stmt->get_index_partition_resolve_results();
+              ObSArray<obrpc::ObCreateIndexArg> &index_arg_list =
+                  create_table_stmt->get_index_arg_list();
+              index_arg_.index_key_ = static_cast<int64_t>(index_keyname_);
+              if (OB_FAIL(create_index_arg.assign(index_arg_))) {
+                LOG_WARN("fail to assign auto index arg", K(ret));
+              } else if (OB_FAIL(resolve_results.push_back(resolve_result))) {
+                LOG_WARN("fail to push back auto index resolve result", K(ret));
+              } else if (OB_FAIL(index_arg_list.push_back(create_index_arg))) {
+                LOG_WARN("fail to push back auto index arg", K(ret));
+              }
+            }
+          }
+        }
+      }
+    }
+    if (OB_SUCC(ret)) {
       if (OB_UNLIKELY(get_primary_key_size() > 0 && NULL != primary_node)) {
         ret = OB_ERR_PRIMARY_KEY_DUPLICATE;
         SQL_RESV_LOG(WARN, "multiple primary key defined");
