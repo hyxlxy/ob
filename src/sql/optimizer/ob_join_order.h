@@ -841,8 +841,9 @@ class Path
 
     INHERIT_TO_STRING_KV("AccessPath", AccessPath, KPC_(root), K_(index_cnt));
 
-    virtual int estimate_cost() override;
-    virtual int re_estimate_cost(EstimateCostInfo &param, double &card, double &cost) override;
+    virtual int estimate_cost() override;  
+    virtual int re_estimate_cost(EstimateCostInfo &param, double &card, double &cost) override;  
+    
     virtual bool is_index_merge_path() const override { return true; }
     int get_all_scan_access_paths(ObIArray<AccessPath*> &scan_paths) const;
 
@@ -866,13 +867,46 @@ class Path
       
     virtual ~TwoPhaseIndexMergePath() {}  
         
-    virtual int estimate_cost() override;  
-    virtual int re_estimate_cost(EstimateCostInfo &param, double &card, double &cost) override;  
+    // virtual int estimate_cost() override;  
+    // virtual int re_estimate_cost(EstimateCostInfo &param, double &card, double &cost) override;  
+    virtual int estimate_cost() override {
+        
+      int ret = OB_SUCCESS;  
+      cost_ = 0.0;  
+      op_cost_ = 0.0;  
+        
+      // if (OB_ISNULL(first_phase_merge_path_) || OB_ISNULL(bmw_scan_path_)) {  
+      //   ret = OB_ERR_UNEXPECTED;  
+      //   LOG_WARN("unexpected null path", K(ret));  
+      // } else {  
+      //   // 第一阶段成本  
+      //   first_phase_cost_ = first_phase_merge_path_->get_cost();  
+          
+      //   // 第二阶段成本（基于第一阶段输出的行数估算）  
+      //   double first_phase_rows = first_phase_merge_path_->get_output_row_count();  
+      //   bmw_cost_ = estimate_bmw_cost(first_phase_rows);  
+          
+      //   // 合并成本  
+      //   merge_cost_ = estimate_merge_cost(first_phase_rows);  
+          
+      //   cost_ = first_phase_cost_ + bmw_cost_ + merge_cost_;  
+      //   op_cost_ = cost_;  
+      // }  
+        
+      return ret;  
+      
+    }
+    virtual int re_estimate_cost(EstimateCostInfo &param, double &card,
+                                 double &cost) override {
+      cost = 0;
+      cost_ = 0;
+      return OB_SUCCESS;
+    }
     virtual bool is_index_merge_path() const override { return true; }  
     virtual bool is_two_phase_index_merge_path() const override{ return true; }
 
     
-  private:  
+  public:  
     bool enable_{false};                   
     int64_t first_phase_limit_{0};          
     int64_t topk_limit_{0};            

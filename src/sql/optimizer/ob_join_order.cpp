@@ -4035,8 +4035,9 @@
    //   double merge_cost_;  
    // };
    int ret = OB_SUCCESS;
- 
+
    two_phase_path = NULL;
+   TwoPhaseIndexMergePath* two_phase_index_merge_path = NULL;
    // 首先我们要先检测一下是否满足二阶段的条件
    // 满足了之后，就去创建两个迭代器对应的两个路径
  
@@ -4092,27 +4093,28 @@
    if (!need_two_phase) {  
      // 不需要两阶段优化  
      // do nothing
-   } else if (OB_ISNULL(two_phase_path = OB_NEWx(AccessPath, allocator_))) {  
+   } else if (OB_ISNULL(two_phase_index_merge_path = OB_NEWx(TwoPhaseIndexMergePath, allocator_, table_id, ref_table_id, this))) {  
      ret = OB_ALLOCATE_MEMORY_FAILED;  
-     LOG_WARN("failed to allocate access path", K(ret));  
+     adlog::DEBUG("failed to allocate access path", K(ret));  
    } else {    
      // 设置好一些配置
-     two_phase_path->table_id_ = table_id_;  
-     two_phase_path->ref_table_id_ = ref_table_id;
-     two_phase_path->is_index_merge_ = true;
-     two_phase_path->enable_ = true;
+     two_phase_index_merge_path->table_id_ = table_id;  
+     two_phase_index_merge_path->ref_table_id_ = ref_table_id;
+    //  two_phase_index_merge_path->is_index_merge_ = true;
+     two_phase_index_merge_path->enable_ = true;
      const double fang_da_xi_shu = 5;
-     two_phase_path->first_phase_limit_ = limit_value * fang_da_xi_shu;
-     two_phase_path->topk_limit_ = limit_value;
+     two_phase_index_merge_path->first_phase_limit_ = limit_value * fang_da_xi_shu;
+     two_phase_index_merge_path->topk_limit_ = limit_value;
  
      // 创建两个子路径
      
      { // 获取第一阶段的path
        helper.no_two_phase_flag_ = true;
-       ObIArray<AccessPath *> temp_access_paths;  
-       if (OB_FAIL(create_index_merge_access_paths(table_id_, ref_table_id_,   
-                                                   helper, index_info_cache_,   
-                                                   temp_access_paths, ignore_normal_access_path_))) {  
+       ObSEArray<AccessPath *, 4> temp_access_paths;   
+       bool ignore_normal_access_path = true;
+       if (OB_FAIL(create_index_merge_access_paths(table_id, ref_table_id,   
+                                                   helper, index_info_cache,   
+                                                   temp_access_paths, ignore_normal_access_path))) {  
          adlog::DEBUG("ObJoinOrder::create_two_phase_index_merge_path failed to create index merge access paths", K(ret));  
        } else if (temp_access_paths.empty()) {  
          ret = OB_ERR_UNEXPECTED;  
@@ -4124,7 +4126,7 @@
            ret = OB_ERR_UNEXPECTED;  
            adlog::DEBUG("ObJoinOrder::create_two_phase_index_merge_path unexpected path type first_path");  
          } else {  
-           two_phase_path->first_phase_merge_path_ = static_cast<IndexMergePath*>(first_path);  
+          two_phase_index_merge_path->first_phase_merge_path_ = static_cast<IndexMergePath*>(first_path);  
          }
        }
        helper.no_two_phase_flag_ = false;
@@ -4132,29 +4134,29 @@
          return ret;
        }
      }
- 
-     { // 第二个阶段，打算创建一个索引lookup的迭代器 TODO
-       AccessPath *bmw_path = nullptr;
-       if (OB_ISNULL(bmw_path = OB_NEWx(AccessPath, allocator_))) {
-         ret = OB_ALLOCATE_MEMORY_FAILED;  
-         adlog::DEBUG("failed to allocate bmw path", K(ret));
-       } else {
-         bmw_path->table_id_ = table_id;  
-         bmw_path->ref_table_id_ = ref_table_id;  
-         bmw_path->index_id_ = ref_table_id; 
-         bmw_path->is_index_merge_ = false;  
-         bmw_path->use_das_ = true;   
+     //先暂时stop一下，记得把这里注释回来
+
+    //  { // 第二个阶段，打算创建一个索引lookup的迭代器 TODO
+    //    AccessPath *bmw_path = nullptr;
+    //     if (OB_ISNULL(bmw_path = OB_NEWx(AccessPath, allocator_,table_id, ref_table_id,  this, NULLS_FIRST_ASC))) {
+    //      ret = OB_ALLOCATE_MEMORY_FAILED;  
+    //      adlog::DEBUG("failed to allocate bmw path", K(ret));
+    //    } else {
+    //     //  bmw_path->table_id_ = table_id;  
+    //     //  bmw_path->ref_table_id_ = ref_table_id;  
+    //     //  bmw_path->index_id_ = ref_table_id;   
+    //     //  bmw_path->use_das_ = true;   
            
-         // bmw_path->est_cost_info_.topk_limit_ = limit_value;  
-         // bmw_path->est_cost_info_.enable_bmw_ = true;  
-         two_phase_path->bmw_scan_path_ = bmw_path;
-       } 
+    //     //  // bmw_path->est_cost_info_.topk_limit_ = limit_value;  
+    //     //  // bmw_path->est_cost_info_.enable_bmw_ = true;  
+    //     //  two_phase_index_merge_path->bmw_scan_path_ = bmw_path;
+    //    } 
        
-     }
+    //  }
  
  
    }  
- 
+   two_phase_path = two_phase_index_merge_path;
    return ret;
  }
  

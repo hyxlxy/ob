@@ -243,7 +243,11 @@ struct ObDASTwoPhaseIndexMergeCtDef : ObDASAttachCtDef
       topk_limit_(0),  
       min_score_threshold_(0.0)  
   {}  
-    
+  virtual ~ObDASTwoPhaseIndexMergeCtDef();
+
+  ObDASIndexMergeCtDef *phase_one_ctdef_{nullptr};    // 第一阶段索引合并  
+  ObDASScanCtDef *phase_two_ctdef_{nullptr};          // 第二阶段BMW扫描  
+  bool enable_{false};
   int64_t first_phase_limit_;  
   int64_t topk_limit_;  
   double min_score_threshold_;
@@ -256,7 +260,7 @@ public:
   ObDASTwoPhaseIndexMergeRtDef()
     : ObDASAttachRtDef(DAS_OP_TWO_PHASE_INDEX_MERGE) {}
 
-  virtual ~ObDASTwoPhaseIndexMergeRtDef() {}
+  virtual ~ObDASTwoPhaseIndexMergeRtDef();
 };
 
 struct ObDASDomainIdMergeCtDef final : ObDASAttachCtDef

@@ -1,3 +1,16 @@
+*****************************************2025-12-16（晚）  *********************************************************
+接下来需要做的：
+  join_order.cpp 里面的 第二路径 
+  ObTscCgService::generate_two_phase_index_merge_ctdef 这个里面的 第二路径 的编译时定义
+  ObDASTwoPhaseIndexMergeCtDef 的 定义可能并不好 需要改
+  join_order.h 里面的 二阶段索引合并的 estimate_cost 和 re_estimate_cost 先暂时设定成0了直接
+  ObDASIterUtils::set_index_merge_related_ids这个里面的，有关二阶段的内容
+
+目前存疑，不知道需要不要改：
+  ObDASIterUtils::set_func_lookup_iter_related_ids 目前存疑，不知道改不改
+  ObDASIterUtils::create_function_lookup_tree
+  ObTableScanOp::prepare_range_for_each_index
+
 *****************************************2025-12-15（晚）  *********************************************************
 还没有添加TWO_PHASE_INDEX_MERGE的，或者是比较危险的：
 
@@ -7,7 +20,7 @@
 - ObDASIterUtils::create_function_lookup_tree
 - ObDasVecScanUtils::init_limit 这个貌似可能不需要？
 - ObTscCgService::generate_index_merge_node_ctdef（这个可能不需要？专门给index_merge的？）
-- ob_das_def_reg.h里
+- ob_das_def_reg.h里  ok
 - ObTableScanOp::prepare_range_for_each_index
 
 

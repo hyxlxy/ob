@@ -329,6 +329,7 @@ private:
                               ObDASSortCtDef *&sort_ctdef);
   int generate_mr_mv_scan_flag(const ObLogTableScan &op, ObQueryFlag &query_flag) const;
   int generate_index_merge_ctdef(const ObLogTableScan &op, ObTableScanCtDef &tsc_ctdef, ObDASIndexMergeCtDef *&root_ctdef);
+  int generate_two_phase_index_merge_ctdef(const ObLogTableScan &op, ObTableScanCtDef &tsc_ctdef, ObDASTwoPhaseIndexMergeCtDef *&root_ctdef);
   int generate_index_merge_node_ctdef(const ObLogTableScan &op,
                                       ObTableScanCtDef &tsc_ctdef,
                                       ObIndexMergeNode *node,

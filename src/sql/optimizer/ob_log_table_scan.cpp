@@ -5387,6 +5387,15 @@ bool ObLogTableScan::use_index_merge() const
   return bret;
 }
 
+bool ObLogTableScan::use_two_phase_index_merge() const
+{
+  bool bret = false;
+  if (OB_NOT_NULL(access_path_)) {
+    bret = access_path_->is_two_phase_index_merge_path();
+  }
+  return bret;
+}
+
 int ObLogTableScan::check_match_union_merge_hint(const LogTableHint *table_hint,
                                                  bool &is_match) const
 {

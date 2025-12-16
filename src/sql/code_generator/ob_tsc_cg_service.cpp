@@ -326,7 +326,20 @@ int ObTscCgService::generate_tsc_ctdef(ObLogTableScan &op, ObTableScanCtDef &tsc
     }
   }
 
-  if (OB_SUCC(ret) && op.use_index_merge()) {
+  if (OB_SUCC(ret) && op.use_two_phase_index_merge()) {
+    ObDASTwoPhaseIndexMergeCtDef * two_phase_index_merge_ctdef = nullptr;
+    adlog::DEBUG("start create ObDASTwoPhaseIndexMergeCtDef * "
+                 "two_phase_index_merge_ctdef");
+    if(OB_FAIL(generate_two_phase_index_merge_ctdef(op,tsc_ctdef ,two_phase_index_merge_ctdef))){
+      adlog::DEBUG("WARNING! failed to generate index merge ctdef", K(ret));
+    } else if (OB_ISNULL(two_phase_index_merge_ctdef)) {
+      ret = OB_ERR_UNEXPECTED;
+      adlog::DEBUG("WARNING!unexpected nullptr two phase index merge ctdef", K(ret));
+    } else {
+      root_ctdef = two_phase_index_merge_ctdef;
+      need_attach = true;
+    }
+  } else if (OB_SUCC(ret) && op.use_index_merge()) {
     ObDASIndexMergeCtDef *index_merge_ctdef = nullptr;
     adlog::DEBUG("if (OB_FAIL(generate_index_merge_ctdef(op, tsc_ctdef, index_merge_ctdef)))");
     if (OB_FAIL(generate_index_merge_ctdef(op, tsc_ctdef, index_merge_ctdef))) {
@@ -424,6 +437,53 @@ int ObTscCgService::generate_tsc_ctdef(ObLogTableScan &op, ObTableScanCtDef &tsc
                                                     K(tsc_ctdef.scan_ctdef_.pd_expr_spec_.ext_file_column_exprs_));
   return ret;
 }
+
+// ADVISE
+int ObTscCgService::generate_two_phase_index_merge_ctdef(
+    const ObLogTableScan &op, ObTableScanCtDef &tsc_ctdef,
+    ObDASTwoPhaseIndexMergeCtDef *&root_ctdef) {
+  adlog::DEBUG("generate_two_phase_index_merge_ctdef start");
+  int ret = OB_SUCCESS;
+  const TwoPhaseIndexMergePath *two_phase_path = nullptr;
+  common::ObIAllocator &ctdef_alloc = cg_.phy_plan_->get_allocator();
+  if (OB_ISNULL(op.get_access_path())) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("unexpected nullptr", K(ret));
+  } else {
+    OB_ASSERT(op.use_two_phase_index_merge());
+    two_phase_path =
+        static_cast<const TwoPhaseIndexMergePath *>(op.get_access_path());
+
+    {// phase_1
+          auto && phase_1_ctdef = root_ctdef->phase_one_ctdef_;
+      if (OB_ISNULL(two_phase_path->first_phase_merge_path_)) {
+        adlog::DEBUG("OB_ISNULL(two_phase_path->first_phase_merge_path_)");
+      } else {
+        IndexMergePath* phase_1_path = static_cast<IndexMergePath*>(two_phase_path->first_phase_merge_path_);
+        ObIndexMergeNode* root = phase_1_path->root_;
+        if (OB_FAIL(generate_index_merge_node_ctdef(op, tsc_ctdef, root, ctdef_alloc, phase_1_ctdef))) {
+          LOG_WARN("failed to generate index merge ctdef", K(root_ctdef));
+        }        
+      }
+    }
+
+    { // phase 2
+      auto &&phase_2_ctdef = root_ctdef->phase_two_ctdef_;
+    }
+    
+  }
+
+  // 最后去设定root_ctdef 的一些内容
+  root_ctdef->enable_ = two_phase_path->enable_;  
+  root_ctdef->first_phase_limit_ = two_phase_path->first_phase_limit_;  
+  root_ctdef->topk_limit_ = two_phase_path->topk_limit_;    
+
+
+  adlog::DEBUG("generate_two_phase_index_merge_ctdef end");
+  
+  return ret;
+}
+
 
 int ObTscCgService::calc_enable_use_simplified_scan(
     const ObLogTableScan &op,
@@ -2550,7 +2610,7 @@ int ObTscCgService::generate_index_merge_node_ctdef(const ObLogTableScan &op,
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("get unexpected index merge node", KPC(node), K(ret));
   } else {
-    ObDASIndexMergeCtDef *merge_ctdef = nullptr;
+    ObDASIndexMergeCtDef *merge_ctdef = nullptr; //这里是在构建这个CtDef树
     int64_t children_cnt = node->children_.count();
     if (OB_FAIL(ObDASTaskFactory::alloc_das_ctdef(DAS_OP_INDEX_MERGE, alloc, merge_ctdef))) {
       LOG_WARN("failed to allocate index merge ctdef", K(ret));
@@ -2559,9 +2619,10 @@ int ObTscCgService::generate_index_merge_node_ctdef(const ObLogTableScan &op,
       LOG_WARN("failed to allocate child ctdef array", K(children_cnt), K(ret));
     } else if (OB_FAIL(merge_ctdef->merge_node_types_.prepare_allocate(children_cnt))) {
       LOG_WARN("failed to allocate merge node types", K(ret));
-    } else if (FALSE_IT(merge_ctdef->merge_type_ = node->node_type_)) {
+    } else if (FALSE_IT(merge_ctdef->merge_type_ = node->node_type_)) { // 把ctdef里的merge_type_赋值
     } else {
       // TODO: merge all fts nodes with priority to reduce overhead
+      // 下面的内容： 遍历儿子节点，如果是非叶子节点，就递归处理
       ObArray<ObExpr*> merge_output;
       int64_t index_merge_fts_idx = 0;
       for (int64_t i = 0; OB_SUCC(ret) && i < children_cnt; ++i) {

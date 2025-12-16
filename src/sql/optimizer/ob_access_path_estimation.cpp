@@ -14,12 +14,15 @@
  * limitations under the License.
  */
 
+#include "ob_join_order.h"
 #define USING_LOG_PREFIX SQL_OPT
 #include "sql/optimizer/ob_access_path_estimation.h"
 #include "sql/optimizer/ob_storage_estimator.h"
 #include "sql/engine/table/ob_table_scan_op.h"
 #include "ob_opt_est_parameter_normal.h"
 #include "sql/optimizer/ob_sel_estimator.h"
+#include "common/ad_log.h"
+
 namespace oceanbase {
 using namespace share::schema;
 using namespace share;
@@ -2758,12 +2761,11 @@ bool ObAccessPathEstimation::is_retry_ret(int ret)
          ret == OB_LS_NOT_EXIST ||
          ret == OB_TABLET_NOT_EXIST;
 }
-#include "common/ad_log.h"
-int ObAccessPathEstimation::classify_paths(ObIArray<AccessPath *> &paths,
-                                           ObIArray<AccessPath *> &normal_paths,
-                                           ObIArray<AccessPath *> &geo_paths,
-                                           ObIArray<IndexMergePath *> &index_merge_paths)
-{
+int ObAccessPathEstimation::classify_paths(
+    ObIArray<AccessPath *> &paths, ObIArray<AccessPath *> &normal_paths,
+    ObIArray<AccessPath *> &geo_paths,
+    ObIArray<IndexMergePath *> &index_merge_paths) {
+  adlog::DEBUG("ObAccessPathEstimation::classify_paths start");
   // int ret = OB_SUCCESS;
   // for (int64_t i = 0; OB_SUCC(ret) && i < paths.count(); ++i) {
   //   if (OB_ISNULL(paths.at(i))) {
@@ -2797,7 +2799,17 @@ int ObAccessPathEstimation::classify_paths(ObIArray<AccessPath *> &paths,
         adlog::DEBUG("get null path");
         LOG_WARN("get null path", K(ret));
       }
-    } else if (paths.at(i)->is_index_merge_path()) {
+    } else if (paths.at(i)->is_two_phase_index_merge_path()) {
+      // 如果是二阶段的话
+      adlog::DEBUG("进入了classift_oaths 的 二阶段");
+      TwoPhaseIndexMergePath *two_phase_path = static_cast<TwoPhaseIndexMergePath*>(paths.at(i));  
+      if (OB_FAIL(index_merge_paths.push_back(static_cast<IndexMergePath*>(two_phase_path->first_phase_merge_path_)))) {  
+        adlog::DEBUG("failed to push back first phase path", K(ret));  
+      } else if (OB_FAIL(normal_paths.push_back(two_phase_path->bmw_scan_path_))) {  
+        adlog::DEBUG("failed to push back bmw path", K(ret));  
+      } 
+    }
+    else if (paths.at(i)->is_index_merge_path()) {
       adlog::DEBUG("there is index merge path");
       if (OB_FAIL(index_merge_paths.push_back(static_cast<IndexMergePath*>(paths.at(i))))) {
         LOG_WARN("failed to push back index merge path", K(ret));

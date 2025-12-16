@@ -1058,6 +1058,8 @@ public:
   common::ObQueryFlag::MRMVScanMode get_mr_mv_scan() const { return mr_mv_scan_; }
 
   bool use_index_merge() const;
+  bool use_two_phase_index_merge() const;
+
   const ObIArray<ObRawExpr*> &get_full_filters() const { return full_filters_; }
   const ObIArray<ObRawExpr*> &get_index_range_conds(int64_t idx) const { return index_range_conds_.at(idx); }
   const ObIArray<ObRawExpr*> &get_index_filters(int64_t idx) const { return index_filters_.at(idx); }
