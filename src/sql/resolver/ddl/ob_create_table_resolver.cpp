@@ -26,7 +26,7 @@
 #include "share/vector_index/ob_vector_index_util.h"
 #include "share/ob_vec_index_builder_util.h"
 #include "share/ob_license_utils.h"
-
+#include "common/ad_log.h"
 
 namespace oceanbase
 {
@@ -1332,16 +1332,54 @@ int ObCreateTableResolver::resolve_table_elements(const ParseNode *node,
             }
           }
 
-          if (OB_SUCC(ret)) {
-            if (stat.is_autoincrement_) {
-              if (0 == autoinc_column_id) {
-                autoinc_column_id = column.get_column_id();
-              } else {
-                ret = OB_ERR_WRONG_AUTO_KEY;
-                LOG_USER_ERROR(OB_ERR_WRONG_AUTO_KEY);
-                SQL_RESV_LOG(WARN, "only one auto-increment column permitted", K(ret));
-              }
-            }
+          if (OB_SUCC(ret) and stat.is_autoincrement_) {    
+            if (0 == autoinc_column_id) {  
+              autoinc_column_id = column.get_column_id();
+
+              // ADVISE
+              //  
+              // 获取一些基础的信息  
+              ObCreateTableStmt *create_table_stmt = static_cast<ObCreateTableStmt*>(stmt_);  
+              ObTableSchema &table_schema = create_table_stmt->get_create_table_arg().schema_;  
+              ObColumnSchemaV2 *autoinc_col = table_schema.get_column_schema(autoinc_column_id);  
+                
+              if (OB_ISNULL(autoinc_col)) {  
+                ret = OB_ERR_UNEXPECTED;  
+                adlog::DEBUG("auto increment column is null", K(ret));  
+              } else {  
+                obrpc::ObColumnSortItem sort_item;  
+                sort_item.column_name_ = autoinc_col->get_column_name_str();  
+                sort_item.order_type_ = common::ObOrderType::ASC;  
+                sort_item.prefix_len_ = 0;  
+                sort_item.is_func_index_ = false;  
+
+                index_arg_.reset();
+                if (OB_FAIL(add_sort_column(sort_item))) {
+                  adlog::DEBUG("OB_FAIL(add_sort_column(sort_item))");
+                } else {   
+                  index_arg_.table_name_ = table_name_;  
+                  index_arg_.database_name_ = database_name_;  
+                  index_keyname_ = NORMAL_KEY;  
+                    
+                  if (OB_FAIL(generate_index_arg(false))) {  
+                    adlog::DEBUG("OB_FAIL(generate_index_arg(false))"); 
+                  } else {  
+                    ObSArray<ObPartitionResolveResult> &resolve_results = create_table_stmt->get_index_partition_resolve_results();  
+                    resolve_results.push_back(ObPartitionResolveResult());
+                    ObSArray<obrpc::ObCreateIndexArg> &index_arg_list =
+                        create_table_stmt->get_index_arg_list();
+                    adlog::DEBUG("添加了自动id");
+                    index_arg_list.push_back(index_arg_);  
+                    index_arg_.reset();
+                  }  
+                }  
+              }  
+            } else {  
+              ret = OB_ERR_WRONG_AUTO_KEY;  
+              LOG_USER_ERROR(OB_ERR_WRONG_AUTO_KEY);  
+              SQL_RESV_LOG(WARN, "only one auto-increment column permitted", K(ret));  
+            }  
+            
           }
 
           if (OB_SUCC(ret)) {
