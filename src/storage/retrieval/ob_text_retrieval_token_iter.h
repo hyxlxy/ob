@@ -85,6 +85,9 @@ public:
   sql::ObBitVector *get_skip() { return skip_; }
   int get_token_doc_cnt(int64_t &token_doc_cnt) const;
   double get_max_token_relevance() const { return max_token_relevance_; }
+  // expose token/index context for caching block-max
+  int get_current_token_hash(uint64_t &token_hash) const;
+  int get_inv_scan_ctx(uint64_t &index_id, uint64_t &tablet_id, int64_t &schema_version) const;
 private:
   int init_calc_exprs_in_relevance_expr();
   void clear_batch_wise_evaluated_flag(const int64_t count);
@@ -105,6 +108,9 @@ private:
   // tools method
   // In ivector2.0, need use the size which is created by precision to alloc the memeory.
   static int set_decimal_int_by_precision(ObDatum &result_datum, const uint64_t decint, const ObPrecision precision);
+  // expose helpers for caches
+  int get_current_token_hash(uint64_t &token_hash) const;
+  int get_inv_scan_ctx(uint64_t &index_id, uint64_t &tablet_id, int64_t &schema_version) const;
 public:
   static const int64_t FWD_IDX_ROWKEY_COL_CNT = 2;
   static const int64_t INV_IDX_ROWKEY_COL_CNT = 2;

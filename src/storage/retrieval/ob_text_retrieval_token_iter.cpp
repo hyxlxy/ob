@@ -19,8 +19,10 @@
 #include "ob_text_retrieval_token_iter.h"
 #include "sql/engine/expr/ob_expr_bm25.h"
 #include "sql/das/iter/sparse_retrieval/ob_das_tr_merge_iter.h"
+#include "lib/hash_func/murmur_hash.h"
 #include "storage/retrieval/ob_ft_term_stat_cache.h"
 #include "share/cache/ob_kv_storecache.h"
+#include "storage/retrieval/ob_block_max_score_cache.h"
 #include "lib/hash_func/murmur_hash.h"
 #include "lib/time/ob_time_utility.h"
 
@@ -993,6 +995,8 @@ void ObTextRetrievalBlockMaxIter::reset()
   dim_max_score_ = 0;
   in_shallow_status_ = false;
   block_max_inited_ = false;
+  // dump block-max cache stat for visibility
+  storage::ObBMScoreCache::dump_stat();
   is_inited_ = false;
 }
 
@@ -1192,12 +1196,86 @@ int ObTextRetrievalBlockMaxIter::init_block_max_iter(const int64_t total_doc_cnt
   } else if (FALSE_IT(ranking_param_.avg_doc_token_cnt_ = avg_doc_token_cnt)) {
   } else if (OB_FAIL(token_iter_.get_token_doc_cnt(ranking_param_.doc_freq_))) {
     LOG_WARN("failed to get token doc cnt", K(ret));
-  } else if (OB_FAIL(calc_dim_max_score(*block_max_iter_param_, ranking_param_, *block_max_scan_param_))) {
-    LOG_WARN("failed to calc dim max score", K(ret));
-  } else if (OB_FAIL(block_max_iter_.init(ranking_param_, *block_max_iter_param_, *block_max_scan_param_))) {
-    LOG_WARN("failed to init block max iter", K(ret));
   } else {
-    block_max_inited_ = true;
+    // 先从Block-Max Score缓存尝试命中
+    uint64_t token_hash = 0, index_id = 0, tablet_id = 0; int64_t schema_version = 0;
+    const storage::ObBMScoreVal *sval = nullptr; common::ObKVCacheHandle sh;
+    bool cache_hit = false;
+    if (OB_SUCC(token_iter_.get_current_token_hash(token_hash)) &&
+        OB_SUCC(token_iter_.get_inv_scan_ctx(index_id, tablet_id, schema_version))) {
+      storage::ObBMScoreKey skey(MTL_ID(), index_id, tablet_id, schema_version, token_hash);
+      if (storage::ObBMScoreCache::get_instance().get_score(skey, sval, sh) == OB_SUCCESS && sval != nullptr) {
+        dim_max_score_ = sval->dim_max_score_;
+        cache_hit = true;
+        storage::ObBMScoreCache::stat_hit();
+        FLOG_INFO("[FTCache] BlockMax hit", K(dim_max_score_), K(skey));
+      } else {
+        storage::ObBMScoreCache::stat_miss();
+      }
+    }
+
+    if (!cache_hit) {
+      if (OB_FAIL(calc_dim_max_score(*block_max_iter_param_, ranking_param_, *block_max_scan_param_))) {
+        LOG_WARN("failed to calc dim max score", K(ret));
+      } else {
+        // 回填缓存
+        if (token_hash != 0) {
+          storage::ObBMScoreKey skey(MTL_ID(), index_id, tablet_id, schema_version, token_hash);
+          storage::ObBMScoreVal sval_put(dim_max_score_, common::ObTimeUtility::current_time());
+          const storage::ObBMScoreVal *out = nullptr; common::ObKVCacheHandle h;
+          int tmp_ret = storage::ObBMScoreCache::get_instance().put_and_fetch_score(skey, sval_put, out, h);
+          if (OB_SUCCESS != tmp_ret) {
+            FLOG_INFO("[FTCache] BlockMax put failed", K(tmp_ret), K(skey), K(sval_put));
+          }
+        }
+      }
+    }
+
+    if (OB_SUCC(ret)) {
+      if (OB_FAIL(block_max_iter_.init(ranking_param_, *block_max_iter_param_, *block_max_scan_param_))) {
+        LOG_WARN("failed to init block max iter", K(ret));
+      } else {
+        block_max_inited_ = true;
+      }
+    }
+  }
+  return ret;
+}
+
+int ObTextRetrievalTokenIter::get_current_token_hash(uint64_t &token_hash) const
+{
+  int ret = OB_SUCCESS;
+  token_hash = 0;
+  if (OB_ISNULL(inv_idx_agg_param_) || inv_idx_agg_param_->key_ranges_.count() <= 0) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("invalid inv_idx_agg_param for token hash", K(ret));
+  } else {
+    const ObNewRange &range = inv_idx_agg_param_->key_ranges_.at(0);
+    const ObObj *start_objs = range.start_key_.get_obj_ptr();
+    if (OB_ISNULL(start_objs)) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("unexpected null start objs", K(ret));
+    } else if (start_objs[0].get_type() == ObVarcharType || start_objs[0].get_type() == ObCharType) {
+      ObString token = start_objs[0].get_string();
+      token_hash = murmurhash(token.ptr(), token.length(), 0);
+    } else {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("unexpected token type in start key", K(ret), K(start_objs[0]));
+    }
+  }
+  return ret;
+}
+
+int ObTextRetrievalTokenIter::get_inv_scan_ctx(uint64_t &index_id, uint64_t &tablet_id, int64_t &schema_version) const
+{
+  int ret = OB_SUCCESS;
+  if (OB_ISNULL(inv_idx_scan_param_)) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("invalid inv_idx_scan_param", K(ret));
+  } else {
+    index_id = inv_idx_scan_param_->index_id_;
+    tablet_id = inv_idx_scan_param_->tablet_id_.id();
+    schema_version = inv_idx_scan_param_->schema_version_;
   }
   return ret;
 }
