@@ -18,14 +18,23 @@ OCEANBASE_PASSWORD = os.getenv("OCEANBASE_PASSWORD")
 OCEANBASE_DBNAME = os.getenv("OCEANBASE_DBNAME")
 
 
+_client: HybridSearch | None = None
+
 def get_or_create_client() -> HybridSearch:
-    """Get or create OceanBase HybridSearch client."""
-    return HybridSearch(
-        uri=OCEANBASE_URI,
-        user=OCEANBASE_USER,
-        password=OCEANBASE_PASSWORD,
-        db_name=OCEANBASE_DBNAME,
-    )
+    """Get or create (singleton) OceanBase HybridSearch client.
+    避免在高并发场景频繁创建连接，降低连接建立开销。
+    """
+    global _client
+    if _client is None:
+        if not all([OCEANBASE_URI, OCEANBASE_USER, OCEANBASE_PASSWORD, OCEANBASE_DBNAME]):
+            logger.warning("OceanBase 连接环境变量不完整，请确认 OCEANBASE_URI/USER/PASSWORD/DBNAME 已设置")
+        _client = HybridSearch(
+            uri=OCEANBASE_URI,
+            user=OCEANBASE_USER,
+            password=OCEANBASE_PASSWORD,
+            db_name=OCEANBASE_DBNAME,
+        )
+    return _client
 
 
 if __name__ == "__main__":

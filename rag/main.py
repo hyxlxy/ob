@@ -6,6 +6,7 @@ from typing import List
 
 from src.core import add, search
 from src.util import Answer, read_questions_json, write_answers
+from src.config import RAGConfig
 
 logger = logging.getLogger(__name__)
 
@@ -82,9 +83,10 @@ if __name__ == "__main__":
     logger.info(f"Output file: {args.output}")
 
     logger.info("Starting data preparation...")
+    # 使用配置中的并发度
     add(
         dataset_dir=args.dataset,
-        max_worker=4,
+        max_worker=RAGConfig.ADD_MAX_WORKERS,
     )
     logger.info("Data preparation completed.")
 
@@ -94,9 +96,14 @@ if __name__ == "__main__":
     questions: List[str] = read_questions_json(args.questions)
     logger.info(f"Loaded {len(questions)} questions from {args.questions}")
 
-    for idx, question in enumerate(questions, 1):
-        logger.debug(f"Processing question {idx}/{len(questions)}: {question[:50]}...")
-        answers.append(search(question))
+    from concurrent.futures import ThreadPoolExecutor
+    
+    # 使用配置中的问答阶段并发度
+    with ThreadPoolExecutor(max_workers=RAGConfig.QA_MAX_WORKERS) as executor:
+        # 使用 executor.map 保序
+        results = list(executor.map(search, questions))
+    
+    answers = results
 
     logger.info(f"Completed processing {len(answers)} questions.")
     logger.info(f"Writing answers to {args.output}...")

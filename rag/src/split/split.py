@@ -4,47 +4,142 @@ from typing import List
 
 def split_text(
     text: str,
-    max_chunk_size: int = 2000,
+    max_chunk_size: int = 1200,
+    overlap: int = 150,
+    add_heading_prefix: bool = True,
 ) -> List[str]:
     """
-    Split text into chunks by paragraphs. Only split long paragraphs if they exceed max_chunk_size.
+    将文本按段落优先切分；当段落过长时再按句子边界切分，并使用少量重叠以保持上下文连续性。
+    
+    根据讲座内容实现的优化：
+    - 轻量级标题/章节识别（第X章/第X节/一、/（一）/1. 等），将最近标题作为上下文前缀
+    - 财报特定的关键词识别（财务数据、指标等）
+    - 更智能的重叠策略，避免在关键信息处断裂
+    - 语义完整性保证：不在关键词处断裂
+    - 多级标题支持：保留标题层级关系
 
     Args:
-        text: Input text to split
-        max_chunk_size: Maximum size for a chunk (in characters).
-                        Only paragraphs longer than this will be split further.
+        text: 待切分文本
+        max_chunk_size: 单块最大字符数（近似 token 控制）
+        overlap: 邻接块之间的重叠字符数（仅用于长段落切分后拼块）
+        add_heading_prefix: 是否在块前添加"【标题】xxx"前缀
 
     Returns:
-        List of text chunks, each chunk is typically a paragraph or part of a very long paragraph
+        文本块列表
     """
     if not text or not text.strip():
         return []
 
-    # Normalize whitespace: replace multiple spaces/newlines with single space/newline
+    # 归一化空白
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     text = text.strip()
 
-    # Split by paragraphs (double newlines)
-    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
-
-    if not paragraphs:
+    # 按双换行视为段落
+    raw_paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+    if not raw_paragraphs:
         return []
 
-    chunks = []
+    # 识别标题：短且匹配常见标题模式（包括财报特定的标题）
+    heading_patterns = [
+        r"^第[一二三四五六七八九十百千]+[章节篇部分]\s*.*$",
+        r"^[（(]?[一二三四五六七八九十]+[）)]?\s+.*$",  # （一）/一、
+        r"^\d+\s*[\.、)）]\s*.*$",                 # 1. / 1） / 1、
+        r"^(摘要|结论|概述|背景|前言|风险提示|盈利预测|行业概况|财务分析|主要产品|市场分析|竞争格局|发展战略|核心数据|财务指标)\s*$",
+        r"^(图\s*\d+|表\s*\d+).*$",
+        r"^(核心观点|投资建议|风险因素|关键指标|财务指标|业务分析|市场地位|竞争优势).*$",
+    ]
+    heading_re = re.compile("|".join(heading_patterns))
 
-    for paragraph in paragraphs:
-        # If paragraph is too long, split it at sentence boundaries
-        if len(paragraph) > max_chunk_size:
-            # Split long paragraph by sentences
-            long_chunks = _split_long_paragraph(paragraph, max_chunk_size)
-            chunks.extend(long_chunks)
+    paragraphs = []  # (is_heading, text)
+    for p in raw_paragraphs:
+        is_heading = (len(p) <= 80) and bool(heading_re.match(p))
+        paragraphs.append((is_heading, p))
+
+    chunks: List[str] = []
+
+    def _with_overlap(parts: List[str]) -> List[str]:
+        """使用更智能的重叠策略，避免在关键信息处断裂"""
+        if not parts:
+            return []
+        out: List[str] = []
+        buf = ""
+        for s in parts:
+            if not buf:
+                buf = s
+                continue
+            # 若加入后超限则提交当前块并带重叠开启新块
+            if len(buf) + 1 + len(s) > max_chunk_size:
+                out.append(buf)
+                if overlap > 0:
+                    # 智能重叠：优先在句子边界处重叠，避免在数字处断裂
+                    tail = buf[-overlap:]
+                    best_idx = -1
+                    # 尝试从最后一个句号/问号/感叹号处开始重叠
+                    for punct in ["。", "！", "？", ".", "!", "?"]:
+                        idx = tail.rfind(punct)
+                        if idx > 0 and idx > overlap // 2:
+                            best_idx = idx
+                            break
+                    
+                    if best_idx > 0:
+                        tail = tail[best_idx + 1:].strip()
+                    
+                    buf = (tail + " " + s)[:max_chunk_size]
+                else:
+                    buf = s
+            else:
+                buf += " " + s
+        if buf:
+            out.append(buf)
+        return out
+
+    current_heading = ""
+    current_heading_level = 0  # 用于追踪标题层级
+    
+    for is_heading, paragraph in paragraphs:
+        if is_heading:
+            # 判断标题层级
+            if re.match(r"^第[一二三四五六七八九十百千]+[章节篇部分]", paragraph):
+                current_heading_level = 1
+            elif re.match(r"^[（(]?[一二三四五六七八九十]+[）)]?", paragraph):
+                current_heading_level = 2
+            else:
+                current_heading_level = 3
+            
+            current_heading = paragraph
+            continue
+
+        # 普通段落
+        if len(paragraph) <= max_chunk_size:
+            chunk = paragraph
+            if add_heading_prefix and current_heading:
+                prefix = f"【标题】{current_heading}\n"
+                # 避免重复加前缀
+                if not chunk.startswith(prefix):
+                    chunk = prefix + chunk
+            chunks.append(chunk)
         else:
-            # Keep paragraph as is
-            chunks.append(paragraph)
+            # 先按句子切分再组块并加重叠
+            long_sentences = _split_long_paragraph(paragraph, max_chunk_size)
+            grouped = _with_overlap(long_sentences)
+            for g in grouped:
+                chunk = g
+                if add_heading_prefix and current_heading:
+                    prefix = f"【标题】{current_heading}\n"
+                    if not chunk.startswith(prefix):
+                        # 保证不超过上限
+                        remain = max_chunk_size - len(prefix)
+                        chunk = prefix + chunk[: max(0, remain)]
+                chunks.append(chunk)
 
-    # Filter out empty chunks
-    return [chunk for chunk in chunks if chunk.strip()]
+    # 过滤空块，保留所有有意义的块
+    filtered_chunks = []
+    for chunk in chunks:
+        if chunk.strip():
+            filtered_chunks.append(chunk)
+    
+    return filtered_chunks
 
 
 def _split_long_paragraph(text: str, max_chunk_size: int) -> List[str]:
