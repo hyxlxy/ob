@@ -23,6 +23,7 @@
 #include "sql/das/ob_das_ir_define.h"
 #include "ob_block_max_iter.h"
 #include "ob_i_sparse_retrieval_iter.h"
+#include "lib/string/ob_string.h"
 namespace oceanbase
 {
 namespace storage

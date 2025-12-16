@@ -250,6 +250,7 @@ public:
       int64_t top_n_count_ = 114514;
       bool has_fts_iter_ = false;
       ObDASTRMergeIter *fts_iter_;      // FTS迭代器指针
+      int64_t produced_rows_ = 0;       // 已输出的总行数（用于Top-K提前终止）
   
       int execute_two_phase();
       int first_merge_phase();

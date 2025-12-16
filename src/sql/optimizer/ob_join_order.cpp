@@ -3557,11 +3557,20 @@ int ObJoinOrder::generate_candi_index_merge_node(const uint64_t ref_table_id,
       LOG_WARN("failed to allocate index merge node", K(ret));
     } else {
       candi_node->node_type_ = (T_OP_OR == filter->get_expr_type()) ? INDEX_MERGE_UNION : INDEX_MERGE_INTERSECT;
-      // is_valid_node = (T_OP_OR == filter->get_expr_type()) ? true : false;
-      // 为了支持全是AND或者全是OR的事情
       is_valid_node = true;
     }
+
     for (int64_t i = 0; OB_SUCC(ret) && i < filter->get_param_count(); ++i) {
+      // AND 情况先尝试合并到已存在子节点
+      if (OB_SUCC(ret) && T_OP_AND == filter->get_expr_type()) {
+        bool merged = false;
+        if (OB_FAIL(try_merge_intersect_child(candi_node, filter->get_param_expr(i), merged))) {
+          LOG_WARN("failed to try merge intersect child", K(ret));
+        } else if (merged) {
+          continue; // 已合并，无需再生成新子节点
+        }
+      }
+
       ObIndexMergeNode *child = NULL;
       bool is_child_valid = false;
       if (OB_FAIL(THIS_WORKER.check_status())) {
@@ -3619,6 +3628,57 @@ int ObJoinOrder::generate_candi_index_merge_node(const uint64_t ref_table_id,
       candi_node->node_type_ = filter->has_flag(CNT_MATCH_EXPR) ? INDEX_MERGE_FTS_INDEX : INDEX_MERGE_SCAN;
       candi_node->index_tid_ = candicate_index_tids.at(0);
       is_valid_node = true;
+    }
+  }
+  return ret;
+}
+
+int ObJoinOrder::try_merge_intersect_child(ObIndexMergeNode *intersect_node,
+                                  ObRawExpr *new_filter,
+                                  bool &merged)
+{
+  int ret = OB_SUCCESS;
+  merged = false;
+  if (OB_ISNULL(intersect_node) || OB_ISNULL(new_filter)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("unexpected null arg", K(ret), KP(intersect_node), KP(new_filter));
+  } else if (intersect_node->node_type_ != INDEX_MERGE_INTERSECT) {
+    // only handle INTERSECT roots
+  } else if (!(new_filter->has_flag(IS_SIMPLE_COND) ||
+               new_filter->has_flag(IS_RANGE_COND) ||
+               new_filter->has_flag(IS_IN))) {
+    // only consider simple/range/in
+  } else {
+    ObSEArray<uint64_t, 4> filter_col_ids;
+    if (OB_FAIL(ObRawExprUtils::extract_column_ids(new_filter, filter_col_ids))) {
+      LOG_WARN("failed to extract column ids", K(ret));
+    } else if (filter_col_ids.count() != 1) {
+      // only merge for single-column predicate
+    } else {
+      const uint64_t target_col = filter_col_ids.at(0);
+      for (int64_t i = 0; !merged && i < intersect_node->children_.count(); ++i) {
+        ObIndexMergeNode *child = intersect_node->children_.at(i);
+        if (OB_ISNULL(child)) {
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("unexpected null child", K(ret), K(i));
+        } else if (child->node_type_ != INDEX_MERGE_SCAN) {
+          // only merge into scan node
+        } else if (child->filter_.empty()) {
+          // guard: child scan with no base filter - normally shouldn't happen
+        } else {
+          ObSEArray<uint64_t, 4> child_col_ids;
+          if (OB_FAIL(ObRawExprUtils::extract_column_ids(child->filter_.at(0), child_col_ids))) {
+            LOG_WARN("failed to extract child column ids", K(ret));
+          } else if (child_col_ids.count() == 1 && child_col_ids.at(0) == target_col) {
+            if (OB_FAIL(child->filter_.push_back(new_filter))) {
+              LOG_WARN("failed to merge filter into child scan node", K(ret));
+            } else {
+              merged = true;
+              break;
+            }
+          }
+        }
+      }
     }
   }
   return ret;

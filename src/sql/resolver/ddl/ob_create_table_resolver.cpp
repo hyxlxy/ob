@@ -26,6 +26,7 @@
 #include "share/vector_index/ob_vector_index_util.h"
 #include "share/ob_vec_index_builder_util.h"
 #include "share/ob_license_utils.h"
+#include "sql/resolver/ddl/ob_create_index_stmt.h"
 
 
 namespace oceanbase

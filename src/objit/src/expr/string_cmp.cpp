@@ -1694,6 +1694,15 @@ static bool is_argument_valid(const char *str1, int64_t str_len1, const char *st
   return is_arg_valid;
 }
 
+static inline unsigned char ascii_upper(unsigned char c)
+{
+  // Map 'a'..'z' to 'A'..'Z', leave others unchanged
+  if (c >= 'a' && c <= 'z') {
+    c -= 32;
+  }
+  return c;
+}
+
 static int ob_strnncollsp_utf8mb4(const uchar *s, size_t slen,
                        const uchar *t, size_t tlen,
                        ob_bool diff_if_only_endspace_difference)
@@ -1710,6 +1719,28 @@ static int ob_strnncollsp_utf8mb4(const uchar *s, size_t slen,
 //#ifndef VARCHAR_WITH_DIFF_ENDSPACE_ARE_DIFFERENT_FOR_UNIQUE
 //  diff_if_only_endspace_difference= FALSE;
 //#endif
+
+  // Fast path: handle long ASCII runs without UTF-8 decode and Unicode table lookups
+  while (s < se && t < te && *s < 0x80 && *t < 0x80) {
+    // Process as many consecutive ASCII bytes as possible
+    // Unrolled small loop to reduce branch costs
+    unsigned char a = ascii_upper(*s);
+    unsigned char b = ascii_upper(*t);
+    if (a != b) {
+      return a > b ? 1 : -1;
+    }
+    ++s; ++t;
+    // Try to continue processing ASCII quickly
+    while (s < se && t < te && *s < 0x80 && *t < 0x80) {
+      a = ascii_upper(*s);
+      b = ascii_upper(*t);
+      if (a != b) {
+        return a > b ? 1 : -1;
+      }
+      ++s; ++t;
+    }
+  }
+
   while ( s < se && t < te )
   {
     int s_res= ob_mb_wc_utf8mb4(&s_wc, s, se);

@@ -1811,6 +1811,11 @@ struct NullAwareAntiJoinInfo {
                                         ObIndexMergeNode *&candi_node,
                                         bool &is_valid_node);
 
+    // 尝试将简单/范围条件合并到已存在的 INTERSECT 子节点（同列合并成一个 SCAN 节点）
+    int try_merge_intersect_child(ObIndexMergeNode *intersect_node,
+                                  ObRawExpr *new_filter,
+                                  bool &merged);
+
     int collect_candicate_indexes(const uint64_t ref_table_id,
                                   ObRawExpr *filter,
                                   ObIArray<uint64_t> &valid_index_ids,

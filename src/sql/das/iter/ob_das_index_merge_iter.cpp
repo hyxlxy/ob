@@ -201,9 +201,11 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
     is_reverse_ = index_merge_param.is_reverse_;
 
     //
-    // top_n_count_ = param.limit_param_;
-    // adlog::DEBUG("top_n_count: ", top_n_count_);
-    
+    // 获取 LIMIT Top-K（若存在），用于提前终止
+    // 注意：ObDASIndexMergeRtDef 当前不携带 limit 参数，这里保持默认关闭早停（top_n_count_=0）
+    // 如需启用，请在上层（如 sort/tsc）下传 limit 或扩展 RtDef 结构。
+    top_n_count_ = 0;
+
     lib::ContextParam context_param;
     context_param.set_mem_attr(MTL_ID(), "DASIndexMerge", ObCtxIds::DEFAULT_CTX_ID)
         .set_properties(lib::USE_TL_PAGE_OPTIONAL);
@@ -513,6 +515,7 @@ int ObDASIndexMergeIter::set_ls_tablet_ids(const ObLSID &ls_id, const ObDASRelat
 int ObDASIndexMergeIter::inner_reuse()
 {
   int ret = OB_SUCCESS;
+  produced_rows_ = 0;
   for (int64_t i = 0; OB_SUCC(ret) && i < child_scan_rtdefs_.count(); ++i) {
     ObDASScanRtDef *scan_rtdef = child_scan_rtdefs_.at(i);
     ObDASIter *iter = child_iters_.at(i);
@@ -652,6 +655,9 @@ int ObDASIndexMergeIter::compare(int64_t cur_idx, int64_t &output_idx, int &cmp_
 int ObDASIndexMergeIter::intersect_get_next_row() {
   adlog::DEBUG("NO WAY !!!");
   int ret = OB_SUCCESS;
+  if (top_n_count_ > 0 && produced_rows_ >= top_n_count_) {
+    return OB_ITER_END;
+  }
   bool got_row = false;
   while (OB_SUCC(ret) && !got_row) {
       /* try to fill each child store */
@@ -711,6 +717,7 @@ int ObDASIndexMergeIter::intersect_get_next_row() {
             LOG_WARN("index merge failed to convert row to expr", K(ret));
           } else {
             got_row = true;
+            ++produced_rows_;
           }
         } else {
           child_stores_.at(output_idx).cur_idx_++;
@@ -744,6 +751,10 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
   result_buffer_.reuse();
   
   while (OB_SUCC(ret) && count < capacity) {  
+    if (top_n_count_ > 0 && produced_rows_ >= top_n_count_) {
+      ret = OB_ITER_END;
+      break;
+    }
     /* try to fill each child store */  
     int64_t output_idx = OB_INVALID_INDEX;  
     int cmp_ret = 0;  
@@ -836,6 +847,7 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
         adlog::DEBUG("failed to save row to result buffer", K(ret)); 
       } else {  
         count += 1;
+        ++produced_rows_;
       }
 
     }  
@@ -969,6 +981,10 @@ int ObDASIndexMergeIter::union_get_next_rows(int64_t &count, int64_t capacity) {
   count = 0;
   result_buffer_.reuse();
   while (OB_SUCC(ret) && count < capacity) {
+    if (top_n_count_ > 0 && produced_rows_ >= top_n_count_) {
+      ret = OB_ITER_END;
+      break;
+    }
     /* try to fill each child store */
     int64_t output_idx = OB_INVALID_INDEX;
     int cmp_ret = 0;

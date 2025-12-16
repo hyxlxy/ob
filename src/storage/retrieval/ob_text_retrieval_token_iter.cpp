@@ -19,6 +19,8 @@
 #include "ob_text_retrieval_token_iter.h"
 #include "sql/engine/expr/ob_expr_bm25.h"
 #include "sql/das/iter/sparse_retrieval/ob_das_tr_merge_iter.h"
+#include "storage/retrieval/ob_token_df_cache.h"
+#include "lib/hash_func/murmur_hash.h"
 
 namespace oceanbase
 {
@@ -59,6 +61,8 @@ int ObTextRetrievalTokenIter::init(const ObTextRetrievalScanIterParam &iter_para
   int ret = OB_SUCCESS;
   allocator_ = iter_param.allocator_;
   mem_context_ = iter_param.mem_context_;
+  // init token DF cache once (best-effort)
+  (void)init_token_df_cache();
   inv_idx_scan_param_ = iter_param.inv_idx_scan_param_;
   inv_idx_agg_param_ = iter_param.inv_idx_agg_param_;
   fwd_idx_scan_param_ = iter_param.fwd_idx_scan_param_;
@@ -586,6 +590,48 @@ int ObTextRetrievalTokenIter::set_decimal_int_by_precision(ObDatum &result_datum
 int ObTextRetrievalTokenIter::estimate_token_doc_cnt()
 {
   int ret = OB_SUCCESS;
+  // 1) Try cache fast path
+  if (OB_NOT_NULL(inv_idx_agg_param_) && inv_idx_agg_param_->key_ranges_.count() > 0) {
+    const ObNewRange &rng = inv_idx_agg_param_->key_ranges_.at(0);
+    if (rng.start_key_.is_valid() && rng.start_key_.get_obj_cnt() > 0) {
+      const ObObj &token_obj = rng.start_key_.get_obj_ptr()[0];
+      if (token_obj.is_string_type()) {
+        ObString tok = token_obj.get_string();
+        uint64_t tok_hash = common::murmurhash(tok.ptr(), tok.length(), 0x9747b28c);
+        ObTokenDFCacheKey key;
+        key.init(inv_idx_agg_param_->index_id_, inv_idx_agg_param_->tablet_id_.id(),
+                 inv_idx_agg_param_->schema_version_, tok_hash, static_cast<uint32_t>(tok.length()));
+        if (key.is_valid()) {
+          const ObTokenDFCacheValue *val = nullptr;
+          common::ObKVCacheHandle handle;
+          if (OB_SUCC(g_token_df_cache.get(key, val, handle)) && nullptr != val && !token_df_cache_expired(*val)) {
+            token_doc_cnt_ = val->token_doc_cnt_;
+            token_doc_cnt_calculated_ = true;
+            // compute max relevance
+            if (OB_NOT_NULL(relevance_expr_)) {
+              sql::ObExpr *total_doc_cnt_param_expr = relevance_expr_->args_[sql::ObExprBM25::TOTAL_DOC_CNT_PARAM_IDX];
+              if (OB_ISNULL(total_doc_cnt_param_expr)) {
+                ret = OB_ERR_UNEXPECTED;
+                LOG_WARN("unexpected null total doc cnt expr", K(ret));
+              } else {
+                int64_t total_doc_cnt = 0;
+                if (total_doc_cnt_param_expr->enable_rich_format()
+                    && is_valid_format(total_doc_cnt_param_expr->get_format(*eval_ctx_))) {
+                  total_doc_cnt = total_doc_cnt_param_expr->get_vector(*eval_ctx_)->get_int(0);
+                } else {
+                  total_doc_cnt = total_doc_cnt_param_expr->locate_expr_datum(*eval_ctx_, 0).get_int();
+                }
+                max_token_relevance_ = sql::ObExprBM25::query_token_weight(token_doc_cnt_, total_doc_cnt);
+              }
+            }
+            return ret;
+          }
+        }
+      }
+    }
+  }
+
+  // 2) Miss or no cache key, fallback to estimate from storage
   int64_t logical_row_cnt = 0;
   int64_t physical_row_cnt = 0;
   ObSEArray<ObEstRowCountRecord, 1> est_records;
@@ -619,6 +665,26 @@ int ObTextRetrievalTokenIter::estimate_token_doc_cnt()
   } else {
     token_doc_cnt_ = logical_row_cnt;
     token_doc_cnt_calculated_ = true;
+    // fill cache best-effort
+    if (inv_idx_agg_param_->key_ranges_.count() > 0) {
+      const ObNewRange &rng = inv_idx_agg_param_->key_ranges_.at(0);
+      if (rng.start_key_.is_valid() && rng.start_key_.get_obj_cnt() > 0) {
+        const ObObj &token_obj = rng.start_key_.get_obj_ptr()[0];
+        if (token_obj.is_string_type()) {
+          ObString tok = token_obj.get_string();
+          uint64_t tok_hash = common::murmurhash(tok.ptr(), tok.length(), 0x9747b28c);
+          ObTokenDFCacheKey key;
+          key.init(inv_idx_agg_param_->index_id_, inv_idx_agg_param_->tablet_id_.id(),
+                   inv_idx_agg_param_->schema_version_, tok_hash, static_cast<uint32_t>(tok.length()));
+          if (key.is_valid()) {
+            ObTokenDFCacheValue val(token_doc_cnt_, common::ObTimeUtility::current_time());
+            // ignore return code
+            (void)g_token_df_cache.put(key, val, true);
+          }
+        }
+      }
+    }
+
     sql::ObExpr *total_doc_cnt_param_expr = relevance_expr_->args_[sql::ObExprBM25::TOTAL_DOC_CNT_PARAM_IDX];
     if (OB_ISNULL(total_doc_cnt_param_expr)) {
       ret = OB_ERR_UNEXPECTED;
