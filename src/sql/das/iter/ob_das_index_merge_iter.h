@@ -243,13 +243,23 @@ private:
   MergeResultBuffer result_buffer_;
 
 public:
-      // ADVISE
+      // ADVISE - 两阶段优化相关
       bool enable_two_phase_ = false;
       bool has_executed_two_phase_ = false;
       double first_phase_min_score_;
       int64_t top_n_count_ = 114514;
       bool has_fts_iter_ = false;
       ObDASTRMergeIter *fts_iter_;      // FTS迭代器指针
+      
+      // 第一阶段保底结果缓存
+      common::ObArray<ObDatum*> first_phase_result_rows_;  // 保存第一阶段的保底结果行
+      int64_t first_phase_row_count_ = 0;  // 第一阶段取得的行数
+      int64_t first_phase_result_idx_ = 0;  // 当前处理的保底结果索引
+      
+      // 第二阶段参数
+      int64_t second_phase_amplify_factor_ = 3;  // n' = n * amplify_factor，默认3倍
+      int64_t second_phase_fetched_count_ = 0;  // 第二阶段已取得的行数
+      bool second_phase_finished_ = false;  // 第二阶段是否完成
   
       int execute_two_phase();
       int first_merge_phase();
@@ -259,6 +269,13 @@ public:
       bool check_mixed_query_with_fts();
       bool check_top_k();
       bool check_support_two_phase();
+      
+      // 两阶段辅助函数
+      int extract_min_score_from_first_phase();
+      int apply_min_score_threshold_to_fts();
+      int fetch_second_phase_results(int64_t &count, int64_t capacity);
+      int supplement_from_first_phase_results(int64_t &count, int64_t capacity);
+      bool should_early_stop_by_score();
 };
 
 }  // namespace sql

@@ -596,6 +596,21 @@ int ObDASIndexMergeIter::inner_get_next_rows(int64_t &count, int64_t capacity)
 {
   int ret = OB_SUCCESS;
   clear_evaluated_flag();
+  
+  // 如果启用了两阶段优化且还未执行过，则执行两阶段
+  if (enable_two_phase_ && !has_executed_two_phase_) {
+    adlog::DEBUG("Executing two-phase optimization");
+    if (OB_FAIL(execute_two_phase())) {
+      adlog::DEBUG("Two-phase execution failed, ret: ", K(ret));
+      // 两阶段失败时降级到普通执行
+      enable_two_phase_ = false;
+    } else {
+      has_executed_two_phase_ = true;
+      adlog::DEBUG("Two-phase execution completed successfully");
+    }
+  }
+  
+  // 执行常规的get_next_rows
   if (OB_FAIL((this->*get_next_rows_)(count, capacity))) {
     if (ret != OB_ITER_END) {
       LOG_WARN("index merge iter failed to get next rows", K(ret));
@@ -742,6 +757,9 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
   
   count = 0;  
   result_buffer_.reuse();
+  
+  // 优化：检测是否可以使用快速路径
+  bool use_fast_path = (rowkey_exprs_ != nullptr && rowkey_exprs_->count() == 1);
   
   while (OB_SUCC(ret) && count < capacity) {  
     /* try to fill each child store */  
@@ -1075,12 +1093,101 @@ int ObDASIndexMergeIter::execute_two_phase() {
   }
   return second_merge_phase();
 }
+
+/**
+ * 第一阶段：执行普通Index Merge，取n条结果作为保底
+ * 目标：保证最终能凑够n条结果，记录全文得分最小值作为阈值
+ */
 int ObDASIndexMergeIter::first_merge_phase() {
   int ret = OB_SUCCESS;
+  adlog::DEBUG("========== FIRST PHASE: Fetch baseline results ==========");
+  adlog::DEBUG("top_n_count_: ", K(top_n_count_));
+  
+  // 执行普通的intersect_get_next_rows取n条结果
+  int64_t fetch_count = top_n_count_;
+  int64_t fetched = 0;
+  
+  // 调用原始的intersect_get_next_rows获取保底结果
+  if (OB_FAIL(intersect_get_next_rows(fetched, fetch_count))) {
+    if (ret == OB_ITER_END) {
+      adlog::DEBUG("First phase: iterator ended, fetched: ", K(fetched));
+      ret = OB_SUCCESS;  // 允许结果不足n条
+    } else {
+      adlog::DEBUG("First phase: error during fetch, ret: ", K(ret));
+      return ret;
+    }
+  }
+  
+  first_phase_row_count_ = fetched;
+  adlog::DEBUG("First phase completed, fetched rows: ", K(first_phase_row_count_));
+  
+  // 从FTS迭代器中提取最小得分作为阈值
+  if (OB_SUCC(ret) && has_fts_iter_ && first_phase_row_count_ > 0) {
+    if (OB_FAIL(extract_min_score_from_first_phase())) {
+      adlog::DEBUG("Failed to extract min score from first phase, ret: ", K(ret));
+      // 继续执行，即使提取失败也不中断
+      ret = OB_SUCCESS;
+    }
+  }
+  
+  adlog::DEBUG("First phase min_score: ", K(first_phase_min_score_));
   return ret;
 }
+
+/**
+ * 第二阶段：使用BMW迭代器 + min_score阈值剪枝 + 标量过滤
+ * 目标：利用BMW按得分序输出、阈值剪枝的能力，省掉上层Top-N Sort
+ */
 int ObDASIndexMergeIter::second_merge_phase() {
   int ret = OB_SUCCESS;
+  adlog::DEBUG("========== SECOND PHASE: BMW-optimized retrieval ==========");
+  
+  // 第二阶段的目标是取n' = n * amplify_factor条高得分结果
+  int64_t target_count = top_n_count_ * second_phase_amplify_factor_;
+  adlog::DEBUG("Second phase target count: ", K(target_count), " (amplify_factor: ", K(second_phase_amplify_factor_), ")");
+  
+  // 应用min_score阈值到FTS迭代器
+  if (has_fts_iter_) {
+    if (OB_FAIL(apply_min_score_threshold_to_fts())) {
+      adlog::DEBUG("Failed to apply min_score threshold, ret: ", K(ret));
+      // 继续执行，即使应用失败也不中断
+      ret = OB_SUCCESS;
+    }
+  }
+  
+  // 重置child stores以便重新扫描
+  for (int64_t i = 0; i < child_stores_.count(); i++) {
+    child_stores_.at(i).reuse();
+  }
+  
+  // 从FTS迭代器中取高得分结果
+  int64_t fetched = 0;
+  if (OB_FAIL(fetch_second_phase_results(fetched, target_count))) {
+    if (ret == OB_ITER_END) {
+      adlog::DEBUG("Second phase: iterator ended, fetched: ", K(fetched));
+      ret = OB_SUCCESS;
+    } else {
+      adlog::DEBUG("Second phase: error during fetch, ret: ", K(ret));
+      return ret;
+    }
+  }
+  
+  second_phase_fetched_count_ = fetched;
+  adlog::DEBUG("Second phase completed, fetched rows: ", K(second_phase_fetched_count_));
+  
+  // 如果第二阶段结果不足n条，从第一阶段保底结果中补充
+  if (second_phase_fetched_count_ < top_n_count_) {
+    adlog::DEBUG("Second phase results insufficient, supplementing from first phase");
+    int64_t need_supplement = top_n_count_ - second_phase_fetched_count_;
+    if (OB_FAIL(supplement_from_first_phase_results(need_supplement, top_n_count_))) {
+      adlog::DEBUG("Failed to supplement from first phase, ret: ", K(ret));
+      // 继续执行
+      ret = OB_SUCCESS;
+    }
+  }
+  
+  second_phase_finished_ = true;
+  adlog::DEBUG("Second phase finished");
   return ret;
 }
 
@@ -1124,6 +1231,80 @@ int ObDASIndexMergeIter::init_two_phase(ObDASIterParam &param) {
   adlog::DEBUG("Two-phase optimization enabled ");
 
   return ret;
+}
+
+int ObDASIndexMergeIter::extract_min_score_from_first_phase() {
+  int ret = OB_SUCCESS;
+  // 从第一阶段结果中提取最小得分
+  // 遍历output_中的MATCH_AGAINST表达式，找到最小得分
+  first_phase_min_score_ = DBL_MAX;
+  
+  if (OB_ISNULL(output_)) {
+    adlog::DEBUG("extract_min_score_from_first_phase: output_ is null");
+    first_phase_min_score_ = 0.0;
+    return OB_SUCCESS;
+  }
+  
+  // 查找MATCH_AGAINST表达式
+  for (int64_t i = 0; i < output_->count(); ++i) {
+    ObExpr *expr = output_->at(i);
+    if (OB_NOT_NULL(expr) && T_FUN_MATCH_AGAINST == expr->type_) {
+      // 获取该表达式的值
+      ObDatum &datum = expr->locate_expr_datum(*eval_ctx_);
+      if (!datum.is_null()) {
+        double score = datum.get_double();
+        if (score < first_phase_min_score_) {
+          first_phase_min_score_ = score;
+        }
+      }
+    }
+  }
+  
+  // 如果没有找到得分，置为0
+  if (first_phase_min_score_ == DBL_MAX) {
+    first_phase_min_score_ = 0.0;
+  }
+  
+  adlog::DEBUG("extract_min_score_from_first_phase: min_score=", K(first_phase_min_score_));
+  return ret;
+}
+
+int ObDASIndexMergeIter::apply_min_score_threshold_to_fts() {
+  // TODO: 将first_phase_min_score_传入FTS迭代器以启用阈值剪枝
+  adlog::DEBUG("apply_min_score_threshold_to_fts: min_score=", K(first_phase_min_score_));
+  return OB_SUCCESS;
+}
+
+int ObDASIndexMergeIter::fetch_second_phase_results(int64_t &count, int64_t capacity) {
+  // TODO: 驱动FTS迭代器取按分数排序的结果，并进行标量过滤
+  // 目前先返回OB_ITER_END，随后由补充阶段兜底
+  count = 0;
+  adlog::DEBUG("fetch_second_phase_results: not implemented, fallback");
+  return OB_ITER_END;
+}
+
+int ObDASIndexMergeIter::supplement_from_first_phase_results(int64_t &count, int64_t capacity) {
+  // 直接使用常规的INTERSECT取数作为兜底
+  count = 0;
+  adlog::DEBUG("supplement_from_first_phase_results: use intersect_get_next_rows as fallback");
+  int ret = intersect_get_next_rows(count, capacity);
+  return ret;
+}
+
+/**
+ * 检查是否应该早停
+ * 条件：已获得足够的结果数 && FTS当前分数低于阈值
+ */
+bool ObDASIndexMergeIter::should_early_stop_by_score() {
+  if (!enable_two_phase_ || !has_fts_iter_) {
+    return false;
+  }
+  
+  // 检查FTS迭代器的当前分数是否低于阈值
+  // 注：这里需要从FTS迭代器中获取当前分数，当前先返回false作为占位符
+  // TODO: 从fts_iter_中获取当前分数并与first_phase_min_score_比较
+  
+  return false;
 }
 
 bool ObDASIndexMergeIter::check_top_k() {

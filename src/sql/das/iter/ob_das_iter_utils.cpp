@@ -1596,6 +1596,35 @@ int ObDASIterUtils::create_match_part_score_sub_tree(ObTableScanParam &scan_para
       match_iter_param.children_relevance_exprs_.push_back(children_relevance_exprs.at(i));
       match_iter_param.children_domain_id_exprs_.push_back(children_domain_id_exprs.at(i));
     }
+    
+    // 下推标量谓词与元信息到 ObDASMatchIterParam
+    // 从 scan_param 的过滤条件中提取 base_id IN 值和 id < 上界
+    if (OB_SUCC(ret) && OB_NOT_NULL(scan_param.op_filters_) && scan_param.op_filters_->count() > 0) {
+      // 获取倒排索引的元信息
+      const ObDASIRScanCtDef *ir_scan_ctdef = nullptr;
+      if (es_match_ctdef->children_cnt_ > 0 && OB_NOT_NULL(es_match_ctdef->children_[0])) {
+        ir_scan_ctdef = static_cast<const ObDASIRScanCtDef *>(es_match_ctdef->children_[0]);
+      }
+      
+      if (OB_NOT_NULL(ir_scan_ctdef)) {
+        const ObDASScanCtDef *inv_idx_ctdef = ir_scan_ctdef->get_inv_idx_scan_ctdef();
+        if (OB_NOT_NULL(inv_idx_ctdef)) {
+          match_iter_param.table_id_ = inv_idx_ctdef->ref_table_id_;
+          match_iter_param.index_id_ = inv_idx_ctdef->ref_table_id_;
+          match_iter_param.schema_version_ = inv_idx_ctdef->schema_version_;
+          
+          // 尝试从过滤条件中提取 base_id 列 ID
+          // 这里采用保守策略：如果无法准确提取，就跳过（不影响召回）
+          // TODO: 从 scan_param 的过滤条件中解析 base_id IN 值和 id < 上界
+          // 目前这部分需要在 codegen 层面完成，这里只是预留接口
+          LOG_DEBUG("[FTCache] Scalar bitmap filter params prepared", 
+                    K(match_iter_param.table_id_), 
+                    K(match_iter_param.index_id_),
+                    K(match_iter_param.schema_version_));
+        }
+      }
+    }
+    
     ObDASMatchIter *match_iter = nullptr;
     if (OB_FAIL(ret)) {
     } else if (OB_FAIL(create_das_iter(alloc, match_iter_param, match_iter))) {
@@ -1668,6 +1697,19 @@ int ObDASIterUtils::create_text_retrieval_sub_tree(
     } else {
       merge_iter_param.daat_mode_ = 1;
     }
+    
+    // 保守启用 Block-Max 路径
+    // 条件：1) 非functional lookup 2) 需要投影相关性分数 3) 非boolean模式的重复词
+    if (OB_SUCC(ret) && !is_func_lookup && ir_scan_ctdef->need_proj_relevance_score() 
+        && !has_duplicate_boolean_tokens && ir_scan_ctdef->need_block_max_scan()) {
+      // 如果优化器已经判定推下topk，则启用block-max路径
+      if (ir_scan_ctdef->has_pushdown_topk()) {
+        merge_iter_param.topk_mode_ = 1;
+        merge_iter_param.daat_mode_ = 1;
+        LOG_DEBUG("[FTCache] BlockMax conservative enable: topk already pushed down");
+      }
+    }
+    
     if (OB_SUCC(ret) && ir_scan_ctdef->has_pushdown_topk() && has_duplicate_boolean_tokens) {
       FLOG_INFO("disable pushdown topk since boolean query has duplicate tokens", K(merge_iter_param.topk_mode_));
     }

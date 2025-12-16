@@ -2897,6 +2897,7 @@ int ObDASHNSWScanIter::post_query_vid_with_filter(
         // for sparse vector index, iter filter is not supported
         query_cond_.query_limit_ = 0;
       } else {
+        // 优化：改进的迭代式过滤参数调整
         int64_t need_cnt_next = adaptor_vid_iter_->get_alloc_size() - adaptor_vid_iter_->get_total();
         int total_after_add = adaptor_vid_iter_->get_total();
         int added_cnt  = total_after_add - total_before_add;
@@ -2904,22 +2905,32 @@ int ObDASHNSWScanIter::post_query_vid_with_filter(
         float old_ef = static_cast<float>(query_cond_.ef_search_);
         adaptive_ctx_.iter_res_row_cnt_ += added_cnt;
         adaptive_ctx_.iter_filter_row_cnt_ += unfiltered_vid_cnt;
+        
         if (can_retry_ && OB_FAIL(check_iter_filter_need_retry())) {
           LOG_WARN("ret of check iter filter need retry.", K(ret), K(can_retry_), K(adaptive_ctx_), K(vec_index_type_), K(vec_idx_try_path_));
         } else if (need_cnt_next > 0) {
-          float need_ratio = static_cast<float>(need_cnt_next) / static_cast<float>(added_cnt);
-          float select_ratio = static_cast<float>(added_cnt) / static_cast<float>(unfiltered_vid_cnt);
+          // 优化：使用累计的过滤效果来估算选择性，而不仅仅是当前迭代的结果
+          float cumulative_select_ratio = adaptive_ctx_.iter_res_row_cnt_ > 0 ? 
+            static_cast<float>(adaptive_ctx_.iter_res_row_cnt_) / static_cast<float>(adaptive_ctx_.iter_filter_row_cnt_) : 0.0f;
+          float current_select_ratio = unfiltered_vid_cnt > 0 ? 
+            static_cast<float>(added_cnt) / static_cast<float>(unfiltered_vid_cnt) : 0.0f;
+          
+          // 使用加权平均来平衡当前和历史选择性
+          float select_ratio = (cumulative_select_ratio * 0.6f + current_select_ratio * 0.4f);
+          select_ratio = std::max(select_ratio, 0.001f); // 避免除以0
+          
           int need_res_cnt = select_ratio > 0 ? static_cast<int64_t>(std::ceil(need_cnt_next / select_ratio)) : need_cnt_next;
           uint32_t new_limit = 0;
           int64_t new_ef = old_ef;
+          
           if (added_cnt == 0) {
-            // selectivity is 0, amplify directly
+            // 选择性为0，显著扩大搜索范围
             new_limit = old_ef * FIXED_MAGNIFICATION_RATIO;
             new_ef = std::max(query_cond_.ef_search_, static_cast<int64_t>(new_limit));
             new_ef = new_ef > VSAG_MAX_EF_SEARCH ? VSAG_MAX_EF_SEARCH : new_ef;
             query_cond_.is_last_search_ = false;
           } else {
-            int need_res_cnt = static_cast<int64_t>(std::ceil(need_cnt_next / select_ratio));
+            // 优化：更精确的最后搜索判断
             if (can_be_last_search(old_ef, need_cnt_next, select_ratio)) {
               new_limit = old_ef;
               query_cond_.is_last_search_ = true;
@@ -2934,7 +2945,7 @@ int ObDASHNSWScanIter::post_query_vid_with_filter(
           if (is_hnsw_bq()) query_cond_.query_limit_ = get_reorder_count(new_ef, new_limit, search_param_);
           query_cond_.ef_search_ = new_ef;
           LOG_TRACE("iteractive filter arg log:", K(total_after_add), K(total_before_add), K(unfiltered_vid_cnt), K(select_ratio),  K(old_limit), K(new_limit),
-                                                  K(old_ef), K(new_ef), K(query_cond_.query_limit_), K(query_cond_.ef_search_));
+                                                  K(old_ef), K(new_ef), K(query_cond_.query_limit_), K(query_cond_.ef_search_), K(cumulative_select_ratio), K(current_select_ratio));
         } else {
           query_cond_.query_limit_ = 0;
         }

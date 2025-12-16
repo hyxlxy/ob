@@ -1544,6 +1544,66 @@ int ObCreateTableResolver::resolve_table_elements(const ParseNode *node,
         SQL_RESV_LOG(WARN, "resolve_primary_key_node_in_heap_table failed", K(ret));
       }
     }
+    
+    // 优化：为AUTO_INCREMENT列自动创建索引
+    if (OB_SUCC(ret) && 0 != autoinc_column_id && RESOLVE_NON_COL == resolve_rule) {
+      ObColumnSchemaV2 *autoinc_col = table_schema.get_column_schema(autoinc_column_id);
+      if (OB_NOT_NULL(autoinc_col)) {
+        // 检查是否已经有包含AUTO_INCREMENT列的索引
+        bool has_autoinc_index = false;
+        const ObIndexInfo &index_info = table_schema.get_index_info();
+        for (int64_t j = 0; j < index_info.get_size(); ++j) {
+          uint64_t column_id = 0;
+          if (OB_SUCC(index_info.get_column_id(j, column_id))) {
+            if (column_id == autoinc_column_id) {
+              has_autoinc_index = true;
+              break;
+            }
+          }
+        }
+        
+        // 如果没有包含AUTO_INCREMENT列的索引，则自动创建
+        if (!has_autoinc_index) {
+          ObCreateTableStmt *create_table_stmt = static_cast<ObCreateTableStmt*>(stmt_);
+          ObSArray<obrpc::ObCreateIndexArg> &index_arg_list = create_table_stmt->get_index_arg_list();
+          obrpc::ObCreateIndexArg index_arg;
+          
+          // 设置索引基本信息
+          ObString col_name = autoinc_col->get_column_name_str();
+          ObString suffix = "_idx";
+          ObString full_index_name;
+          char name_buf[256];
+          int64_t pos = 0;
+          if (OB_FAIL(databuff_printf(name_buf, sizeof(name_buf), pos, "%.*s%.*s", 
+                                      col_name.length(), col_name.ptr(),
+                                      suffix.length(), suffix.ptr()))) {
+            SQL_RESV_LOG(WARN, "failed to construct index name", K(ret));
+          } else if (OB_FAIL(ob_write_string(*allocator_, ObString(pos, name_buf), index_arg.index_name_))) {
+            SQL_RESV_LOG(WARN, "failed to write index name", K(ret));
+          } else {
+            index_arg.table_name_ = table_schema.get_table_name();
+            index_arg.database_name_.reset();  // 数据库名通过其他方式获取
+            index_arg.index_type_ = share::schema::INDEX_TYPE_NORMAL_LOCAL;
+            
+            // 设置索引列
+            obrpc::ObColumnSortItem sort_item;
+            sort_item.column_name_ = autoinc_col->get_column_name_str();
+            sort_item.order_type_ = common::ObOrderType::ASC;
+            sort_item.prefix_len_ = 0;
+            sort_item.is_func_index_ = false;
+            
+            if (OB_FAIL(index_arg.index_columns_.push_back(sort_item))) {
+              SQL_RESV_LOG(WARN, "failed to add column to index", K(ret));
+            } else if (OB_FAIL(index_arg_list.push_back(index_arg))) {
+              SQL_RESV_LOG(WARN, "failed to add index arg to list", K(ret));
+            } else {
+              SQL_RESV_LOG(DEBUG, "auto created index for AUTO_INCREMENT column", K(autoinc_col->get_column_name_str()));
+            }
+          }
+        }
+      }
+    }
+    
     LOG_DEBUG("resolve table elements end ", K(resolve_rule), K(table_schema));
   }
   return ret;

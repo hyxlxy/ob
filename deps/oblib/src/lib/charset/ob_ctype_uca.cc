@@ -757,11 +757,66 @@ static inline int ob_space_weight(const ObCharsetInfo *cs)
   else
     return cs->uca->weights[0][0x20 * cs->uca->lengths[0]];
 }
+// 优化：批量检测ASCII字符段，使用位运算快速判断
+static inline size_t ob_detect_ascii_segment_len(const unsigned char *s, size_t slen) {
+  size_t i = 0;
+  // 尝试一次检测8字节是否都是ASCII（高位为0）
+  while (i + 8 <= slen) {
+    uint64_t chunk = 0;
+    memcpy(&chunk, s + i, 8);
+    // ASCII字符高位为0，检查是否有任何字节的高位为1
+    if (chunk & 0x8080808080808080ULL) {
+      break;
+    }
+    i += 8;
+  }
+  // 处理剩余字节
+  while (i < slen && (s[i] & 0x80) == 0) {
+    i++;
+  }
+  return i;
+}
+
+// 快速ASCII字符权重查询
+static inline int ob_get_ascii_weight(const ObCharsetInfo *cs, unsigned char c) {
+  // ASCII字符在weights[0]（page 0）
+  if (cs->uca && cs->uca->weights[0]) {
+    uint16_t *weight_addr = cs->uca->weights[0] + c * cs->uca->lengths[0];
+    if (weight_addr) {
+      return *weight_addr;
+    }
+  }
+  return c;
+}
+
 template <class Mb_wc>
 static int ob_strnncollsp_uca(const ObCharsetInfo *cs, Mb_wc mb_wc,
                               const unsigned char *s, size_t slen, const unsigned char *t,
                               size_t tlen) {
   int s_res, t_res;
+  
+  // 优化：快速路径处理ASCII字符段
+  size_t s_ascii_len = ob_detect_ascii_segment_len(s, slen);
+  size_t t_ascii_len = ob_detect_ascii_segment_len(t, tlen);
+  size_t min_ascii_len = std::min(s_ascii_len, t_ascii_len);
+  
+  // 如果两个字符串都有ASCII前缀，直接比较ASCII部分
+  if (min_ascii_len > 0) {
+    for (size_t i = 0; i < min_ascii_len; ++i) {
+      int s_weight = ob_get_ascii_weight(cs, s[i]);
+      int t_weight = ob_get_ascii_weight(cs, t[i]);
+      if (s_weight != t_weight) {
+        return s_weight - t_weight;
+      }
+    }
+    // ASCII部分相等，更新指针
+    s += min_ascii_len;
+    slen -= min_ascii_len;
+    t += min_ascii_len;
+    tlen -= min_ascii_len;
+  }
+  
+  // 处理剩余的非ASCII或混合字符
   uca_scanner_any<Mb_wc> sscanner(mb_wc, cs, s, slen);
   uca_scanner_any<Mb_wc> tscanner(mb_wc, cs, t, tlen);
   do {
