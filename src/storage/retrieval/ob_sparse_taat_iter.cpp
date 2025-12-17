@@ -17,7 +17,7 @@
 #define USING_LOG_PREFIX STORAGE
 
 #include "ob_sparse_taat_iter.h"
-
+#include "common/ad_log.h"
 namespace oceanbase
 {
 namespace storage
@@ -129,6 +129,7 @@ int ObSRTaaTIterImpl::get_next_row()
 
 int ObSRTaaTIterImpl::get_next_rows(const int64_t capacity, int64_t &count)
 {
+  adlog::DEBUG("ObSRTaaTIterImpl::get_next_rows capacity", capacity);
   int ret = OB_SUCCESS;
   if (IS_NOT_INIT) {
     ret = OB_NOT_INIT;

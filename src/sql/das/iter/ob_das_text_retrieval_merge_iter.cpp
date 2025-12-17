@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <cstdint>
 #define USING_LOG_PREFIX SQL_DAS
 
 #include "ob_das_scan_iter.h"
@@ -1187,6 +1188,7 @@ int ObDASTRTaatIter::init_stores_by_partition()
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("total doc cnt is not set", K(ret), K_(is_hashmap_inited));
   } else {
+    // static const int64_t HASHMAP_SIZE_TMP = 6000;
     int64_t partition_cnt = force_return_docid_ ? 1 : OB_MIN((total_doc_cnt_- 1) / OB_HASHMAP_DEFAULT_SIZE + 1, OB_MAX_HASHMAP_COUNT);
     hash_map_size_ = partition_cnt;
     void *buf = nullptr;
@@ -1235,7 +1237,7 @@ int ObDASTRTaatIter::init_stores_by_partition()
       } else {
         sql::ObChunkDatumStore *store = new(buf) sql::ObChunkDatumStore(common::ObModIds::OB_SQL_CHUNK_ROW_STORE);
         if(OB_FAIL(store->init(
-          1024 * 8 /* mem limit */,
+          1024 * 32 /* mem limit */,
           MTL_ID(), common::ObCtxIds::DEFAULT_CTX_ID, common::ObModIds::OB_SQL_CHUNK_ROW_STORE,
           true /* enable dump */,
           0, /* row_extra_size */
