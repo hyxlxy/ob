@@ -1,4 +1,118 @@
 *****************************************2025-12-16（晚）  *********************************************************
+现在打算先把二阶段放一放，实现一个相对来讲可能比较简单的：
+现在打算实现一下把倒排索引放到内存上：
+然后由于是TrMergeIter里面会创建很多的DimIter，这些多个DimIter就是日后我们的token的迭代器。
+所以打算对于这个做一个缓存，如果我们之前处理过这个token的迭代器，那么map就会有记录，就可以直接在map里提取出来我们缓存的迭代器。（这里确切讲是根据我们缓存的迭代器创建一个一模一样的，而不是直接拿过来，否则多线程会寄）
+否则，我们就还是走老路径，但是走老路径的时候，在存储数据的时候会同步到一个缓存迭代器上。当存储数据完了，那么我们在TrMergeIter里面的
+用于记录缓存的一个map就会标记这个缓存迭代器可以用了，以后就可以使用这个缓存迭代器了。
+值得注意的是，缓存迭代器需要把数据都记录下来，而不是像TokenIter那样只存储batch的数据。
+
+class ObISRDaaTDimIter : public ObISparseRetrievalDimIter
+{
+public:
+  ObISRDaaTDimIter() : ObISparseRetrievalDimIter() {}
+  virtual ~ObISRDaaTDimIter() {}
+  // DaaT dimension iterator does not need explicit vectorized batch interface, but can process
+  //  and buffer batched row in inner implementation.
+  virtual int get_next_batch(const int64_t capacity, int64_t &count) override
+  {
+    return OB_NOT_IMPLEMENT;
+  }
+  // interface for daat processing
+  virtual int get_curr_score(double &score) const = 0;
+  virtual int get_curr_id(const ObDatum *&datum) const = 0;
+  // interface for plain dynamic pruning algorithms such as WAND and MaxScore
+  virtual int get_dim_max_score(double &score)
+  {
+    return OB_NOT_SUPPORTED;
+  }
+  TO_STRING_EMPTY();
+private:
+  DISALLOW_COPY_AND_ASSIGN(ObISRDaaTDimIter);
+};
+
+
+class ObDASTRCacheIter : public ObDASTextRetrievalIter
+{
+public:
+  ObDASTRCacheIter();
+  virtual ~ObDASTRCacheIter() {}
+  int get_cur_row(double &relevance, ObDocIdExt &doc_id) const;
+  INHERIT_TO_STRING_KV("ObDASTextRetrievalIter", ObDASTextRetrievalIter, K_(cur_idx), K_(count),
+      K_(relevance), K_(doc_id));
+protected:
+  virtual int inner_init(ObDASIterParam &param) override;
+  virtual int inner_reuse() override;
+  virtual int inner_release() override;
+  virtual int inner_get_next_rows(int64_t &count, int64_t capacity) override;
+private:
+  int get_next_batch_inner();
+  int save_relevances_and_docids();
+  int save_docids();
+private:
+  int64_t cur_idx_;
+  int64_t count_;
+  ObFixedArray<double, ObIAllocator> relevance_;
+  ObFixedArray<ObDocIdExt, ObIAllocator> doc_id_;
+};
+
+
+
+```c++
+// ADVISE
+class ObTRDaaTTokenCacheIter : public ObISRDaaTDimIter {  
+public:  
+  ObTRDaaTTokenCacheIter();  
+  virtual ~ObTRDaaTTokenCacheIter() {}  
+  
+  // 实现基类接口  
+  virtual int get_next_row() override;  
+  virtual int advance_to(const ObDatum &id_datum) override;  
+  virtual int get_curr_score(double &score) const override;  
+  virtual int get_curr_id(const ObDatum *&datum) const override;  
+  virtual int get_dim_max_score(double &score) override;  
+  
+  int add_data(const ObFixedArray<double, ObIAllocator> &relevance,
+               const ObFixedArray<ObDocIdExt, ObIAllocator> &doc_id,
+               int64_t count)
+      {  
+             int ret = OB_SUCCESS;  
+               
+             // 扩展数组容量  
+             if (cached_relevance_.count() < total_count_ + count) {  
+               if (OB_FAIL(cached_relevance_.reserve(total_count_ + count))) {  
+                 LOG_WARN("failed to reserve relevance array", K(ret));  
+               } else if (OB_FAIL(cached_doc_id_.reserve(total_count_ + count))) {  
+                 LOG_WARN("failed to reserve doc_id array", K(ret));  
+               }  
+             }  
+               
+             // 添加新数据  
+             if (OB_SUCC(ret)) {  
+               for (int64_t i = 0; OB_SUCC(ret) && i < count; ++i) {  
+                 if (OB_FAIL(cached_relevance_.push_back(relevance[i]))) {  
+                   LOG_WARN("failed to push back relevance", K(ret));  
+                 } else if (OB_FAIL(cached_doc_id_.push_back(doc_id[i]))) {  
+                   LOG_WARN("failed to push back doc_id", K(ret));  
+                 }  
+               }  
+               total_count_ += count;  
+             }  
+               
+             return ret;  
+           }
+
+  
+  ObFixedArray<double, ObIAllocator> cached_relevance_;  
+  ObFixedArray<ObDocIdExt, ObIAllocator> cached_doc_id_;  
+  int64_t cur_idx_{0};
+  int64_t total_count_;
+  bool is_created_flag_{false};
+  bool have_done_flag_{false};
+};
+```
+
+*****************************************2025-12-16（晚）  *********************************************************
 接下来需要做的：
   join_order.cpp 里面的 第二路径 
   ObTscCgService::generate_two_phase_index_merge_ctdef 这个里面的 第二路径 的编译时定义

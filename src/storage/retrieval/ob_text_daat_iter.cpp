@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "ob_text_retrieval_token_iter.h"
 #define USING_LOG_PREFIX STORAGE
 
 #include "ob_text_daat_iter.h"
@@ -42,13 +43,21 @@ int ObTextDaaTIter::init(const ObTextDaaTParam &param) {
   return ret;
 }
 
-void ObTextDaaTIter::reset()
-{
+void ObTextDaaTIter::reset() {
+  adlog::DEBUG("ObTextDaaTIter::reset()");
   bm25_param_estimator_.reset();
   // this class can know the type of dim_iters_, but ObSRDaaTIterImpl maybe not
   if (OB_NOT_NULL(dim_iters_)) {
     for (int64_t i = 0; i < dim_iters_->count(); ++i) {
-      static_cast<ObTextRetrievalDaaTTokenIter *>(dim_iters_->at(i))->reset();
+      // static_cast<ObTextRetrievalDaaTTokenIter *>(dim_iters_->at(i))->reset();
+      if (auto &&dim_iter =
+              dynamic_cast<ObTRDaaTTokenCacheIter *>(dim_iters_->at(i))) {
+        dim_iter->cur_idx_ = -1;
+      } else {
+        // 说明还是之前的类型
+        static_cast<ObTextRetrievalDaaTTokenIter *>(dim_iters_->at(i))->reset();
+
+      }
     }
   }
   ObSRDaaTIterImpl::reset();
@@ -56,6 +65,8 @@ void ObTextDaaTIter::reset()
 
 void ObTextDaaTIter::reuse(const bool switch_tablet)
 {
+  adlog::DEBUG("ObTextDaaTIter::reuse()");
+
   if ((OB_NOT_NULL(dim_iters_) && 0 == dim_iters_->count())) {
     // do nothing
   } else {
@@ -63,7 +74,15 @@ void ObTextDaaTIter::reuse(const bool switch_tablet)
   }
   if (OB_NOT_NULL(dim_iters_)) {
     for (int64_t i = 0; i < dim_iters_->count(); ++i) {
-      static_cast<ObTextRetrievalDaaTTokenIter *>(dim_iters_->at(i))->reuse();
+      // static_cast<ObTextRetrievalDaaTTokenIter *>(dim_iters_->at(i))->reuse();
+      if (auto &&dim_iter =
+        dynamic_cast<ObTRDaaTTokenCacheIter *>(dim_iters_->at(i))) {
+          dim_iter->cur_idx_ = -1;
+      } else {
+        // 说明还是之前的类型
+        static_cast<ObTextRetrievalDaaTTokenIter *>(dim_iters_->at(i))->reuse();
+
+      }
     }
   }
   ObSRDaaTIterImpl::reuse(switch_tablet);

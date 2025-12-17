@@ -75,6 +75,67 @@ struct ObDASTRMergeIterParam : public ObDASIterParam
   };
 };
 
+class ObGlobalTokenCacheManager {  
+private:  
+  hash::ObHashMap<ObString, ObTRDaaTTokenCacheIter*> global_cache_map_;
+  common::ObArenaAllocator allocator_; 
+
+  
+public:  
+  ObGlobalTokenCacheManager(): allocator_(ObMemAttr(MTL_ID(), "TokenCacheAlloc")) {  
+    global_cache_map_.create(1024, ObMemAttr(MTL_ID(), "TokenCache"));  
+  }  
+  ~ObGlobalTokenCacheManager() {  
+    for (auto iter = global_cache_map_.begin(); iter != global_cache_map_.end(); ++iter) {  
+      if (iter->second) {  
+        delete iter->second;  
+      }  
+    }  
+    global_cache_map_.destroy();
+  }
+  
+  static ObGlobalTokenCacheManager& get_instance() {  
+    static ObGlobalTokenCacheManager instance;  
+    return instance;  
+  }
+
+  ObTRDaaTTokenCacheIter* create_cache_iter() {  
+    void *buf = allocator_.alloc(sizeof(ObTRDaaTTokenCacheIter));  
+    if (OB_NOT_NULL(buf)) {  
+      return new(buf) ObTRDaaTTokenCacheIter(&allocator_);  
+    }  
+    return nullptr;
+  }
+  
+  ObTRDaaTTokenCacheIter* create_iter_from_cache(ObTRDaaTTokenCacheIter *cache_iter) {  
+    int ret = OB_SUCCESS;
+    ObTRDaaTTokenCacheIter *new_iter = nullptr;  
+    if (OB_ISNULL(cache_iter) || !cache_iter->have_done_flag_) {  
+      return nullptr;  
+    }    
+    void *buf = allocator_.alloc(sizeof(ObTRDaaTTokenCacheIter));  
+    if (OB_ISNULL(buf)) {  
+      return nullptr;  
+    }  
+    new_iter = new(buf) ObTRDaaTTokenCacheIter(&allocator_);  
+    if (OB_FAIL(new_iter->init_from_cache(cache_iter))) {  
+      return nullptr;  
+    }  
+    return new_iter;
+  }
+  
+  ObTRDaaTTokenCacheIter* get_cache_iter(const ObString &token) {  
+    ObTRDaaTTokenCacheIter *cache_iter = nullptr;  
+    global_cache_map_.get_refactored(token, cache_iter);  
+    return cache_iter;  
+  }  
+    
+  int cache_iter(const ObString &token, ObTRDaaTTokenCacheIter *iter) {  
+    return global_cache_map_.set_refactored(token, iter, 1);  
+  }
+};
+using TokenCacheMg = ObGlobalTokenCacheManager;
+
 class ObDASTRMergeIter : public ObDASIter
 {
 public:

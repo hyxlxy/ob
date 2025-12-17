@@ -3973,7 +3973,7 @@
      }
    }
 
-   return ret;
+  //  return ret;
    // 这里就直接暴力的搞出来二阶段的路径，先这样写着试试吧
    {
      if (OB_SUCC(ret) and (!helper.no_two_phase_flag_)) {  
@@ -3982,9 +3982,11 @@
          adlog::DEBUG("failed to create two phase index merge path", K(ret));  
        } else if (OB_NOT_NULL(two_phase_path)) {  
          adlog::DEBUG("two phase path create ok");
-         if (OB_FAIL(access_paths.push_back(two_phase_path))) {  
-           adlog::DEBUG("failed to push back two phase path", K(ret));  
-         }  
+         // 如果要开启二阶段，就把下面的内容取消注释
+
+        //  if (OB_FAIL(access_paths.push_back(two_phase_path))) {  
+        //    adlog::DEBUG("failed to push back two phase path", K(ret));  
+        //  }  
        } else{
          adlog::DEBUG("WARNING! two phase path create no ! two_phase_path nullptr!");
        }
@@ -3995,6 +3997,12 @@
         adlog::DEBUG("ret succ");
        }
        adlog::DEBUG(K(helper.no_two_phase_flag_));
+       if(helper.no_two_phase_flag_){
+        adlog::DEBUG("现在是二阶段里面的递归状态");
+       }
+       else{
+        adlog::DEBUG("现在并不是二阶段里面的内容");
+       }
        adlog::DEBUG("没有尝试创建二阶段路径， 在之前ret就fail了");
      }
    }
@@ -4003,12 +4011,13 @@
  
    return ret;
  }
- 
- int ObJoinOrder::create_two_phase_index_merge_path(const uint64_t table_id,  
-   const uint64_t ref_table_id,  
-   const PathHelper &helper,  
-   ObIndexInfoCache &index_info_cache,  
-   ObIArray<ObIndexMergeNode*> &candi_index_trees, AccessPath *&two_phase_path){
+
+ int ObJoinOrder::create_two_phase_index_merge_path(
+     const uint64_t table_id, const uint64_t ref_table_id,
+     const PathHelper &helper, ObIndexInfoCache &index_info_cache,
+     ObIArray<ObIndexMergeNode *> &candi_index_trees,
+     AccessPath *&two_phase_path) {
+   adlog::DEBUG("ObJoinOrder::create_two_phase_index_merge_path start");
      //advise
    // class TwoPhaseIndexMergePath : public AccessPath  
    // {  
@@ -4057,11 +4066,14 @@
        adlog::DEBUG("candi_index_trees.empty() or candi_index_trees.count() > 2");
        return ret;
      }
+     adlog::DEBUG("candi_index_trees.count() == 1");
      ObIndexMergeNode *root = candi_index_trees.at(0);
      if (root->gen_code_ != 114514) {
        adlog::DEBUG("root->gen_code_ != 114514");
        return ret;
      }
+     adlog::DEBUG("root->gen_code_ = 114514");
+
      // 代表root目前肯定是index_merge_and
  
      // Check if query has LIMIT clause
@@ -4080,17 +4092,20 @@
        if (OB_ISNULL(get_plan()) || OB_ISNULL(opt_ctx = &get_plan()->get_optimizer_context()) ||
            OB_ISNULL(param_store = opt_ctx->get_params()) || OB_ISNULL(exec_ctx = opt_ctx->get_exec_ctx())) {
          ret = OB_ERR_UNEXPECTED;
+         adlog::DEBUG("unexpected null optimizer context");
          LOG_WARN("unexpected null optimizer context", K(ret), KP(get_plan()), KP(opt_ctx), KP(param_store), KP(exec_ctx));
-       } else if (OB_FAIL(ObTransformUtils::get_limit_value(const_cast<ObRawExpr *>(stmt->get_limit_expr()),
-                                                            param_store,
-                                                            exec_ctx,
-                                                            allocator_,
-                                                            limit_value,
-                                                            is_null_value))) {
-         adlog::DEBUG("failed to get limit value", K(ret));
-       } else if (!is_null_value && limit_value > 0 && limit_value <= 100) {
-         need_two_phase = true;
-         adlog::DEBUG("need_two_phase = true;");
+       } else {
+
+        if (OB_FAIL(ObTransformUtils::get_limit_value(const_cast<ObRawExpr *>(stmt->get_limit_expr()),param_store,
+            exec_ctx,
+            allocator_,
+            limit_value,
+            is_null_value))) {
+          adlog::DEBUG("failed to get limit value", K(ret));
+        } else if (!is_null_value && limit_value > 0 && limit_value <= 100) {
+          need_two_phase = true;
+          adlog::DEBUG("need_two_phase = true;");
+        }
        }
      }
      
@@ -4115,6 +4130,7 @@
      // 创建两个子路径
      
      { // 获取第一阶段的path
+      adlog::DEBUG("获取第一阶段的path satart");
        helper.no_two_phase_flag_ = true;
        ObSEArray<AccessPath *, 4> temp_access_paths;   
        bool ignore_normal_access_path = true;
@@ -4127,6 +4143,7 @@
          adlog::DEBUG("ObJoinOrder::create_two_phase_index_merge_path no access paths created", K(ret));  
        } else {  
          // 取第一个路径作为保底路径  
+         adlog::DEBUG("取第一个路径作为保底路径");
          AccessPath *first_path = temp_access_paths.at(0);  
          if (OB_ISNULL(first_path) || !first_path->is_index_merge_path()) {  
            ret = OB_ERR_UNEXPECTED;  

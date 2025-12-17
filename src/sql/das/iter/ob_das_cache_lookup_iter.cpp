@@ -299,74 +299,6 @@ int ObDASCacheLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
           // index_capacity = 1;
           index_table_iter_->clear_evaluated_flag();
           adlog::DEBUG("--------------INDEX_SCAN: index_table_iter_->get_next_rows-----------");
-
-          // {
-          //   // 在这里去做把data_table_iter的range先放到index_table_iter里面
-
-          // //ObDASTRMergeIter
-          // if (auto &&index_table_it =
-          //         dynamic_cast<ObDASTRMergeIter *>(index_table_iter_)) {
-          //   adlog::DEBUG(
-          //       "index_table_iter -> index_table_it : ObDASTRMergeIter");
-          //   if (auto &&data_table_it =
-          //         dynamic_cast<ObDASScanIter *>(data_table_iter_)) {
-          //     adlog::DEBUG("data_table_iter -> data_table_it : ObDASScanIter");
-          //     // 代表找到了内层的index_it 和 data_it
-          //     // 这里先获得到 index_it 的 底层的merge_iter
-          //     storage::ObISparseRetrievalMergeIter *sparse_merge_iter =
-          //         index_table_it->get_sparse_retrieval_iter();
-
-          //     if (auto &&daat_iter =
-          //             dynamic_cast<ObSRDaaTIterImpl *>(sparse_merge_iter)) {
-          //       adlog::DEBUG("have got index_table_iter's sparse_merge_iter, daat_iter's impl");
-          //       // 打算把id_less的内容挪到 ObSRDaaTIterImpl 里面去，这样reset和reuse可以继续
-          //       // get_scan_param
-          //       storage::ObTableScanParam &scan_param = data_table_it->get_scan_param();
-          //       adlog::DEBUG("scan_param.key_ranges_.count(): ",scan_param.key_ranges_.count());
-          //       for (int i = 0; i < scan_param.key_ranges_.count(); i++) {
-          //         const ObNewRange &range = scan_param.key_ranges_.at(i);
-                  
-          //         // 获取起始和结束键值
-          //         const ObRowkey &start_key = range.start_key_;
-          //         const ObRowkey &end_key = range.end_key_;
-                  
-
-          //         // 获取键中的各个列值 (假设 id 是第0列)
-          //             // 检查是否有对象且数量大于0
-          //         if (start_key.get_obj_cnt() > 0 && end_key.get_obj_cnt() > 0) {
-          //           // 获取对象指针
-          //           const ObObj *start_obj_ptr = start_key.get_obj_ptr();
-          //           const ObObj *end_obj_ptr = end_key.get_obj_ptr();
-                    
-          //           if (nullptr != start_obj_ptr && nullptr != end_obj_ptr) {
-          //               // 获取第一列的值 (id列)
-          //               const ObObj &start_id_obj = start_obj_ptr[0];
-          //               const ObObj &end_id_obj = end_obj_ptr[0];
-                        
-          //               if (true) {
-          //                 int64_t min_id = start_id_obj.get_int();
-          //                 int64_t max_id = end_id_obj.get_int();
-          //                 daat_iter->set_id_less(max_id + 1); // 应该是不用的，先暂时算上，反正不会错
-          //                 // 现在你知道 id 的范围是 [min_id, max_id]
-          //                 adlog::DEBUG("ID range: [", min_id,",  ",
-          //                               max_id,"]");
-          //               }
-          //           }
-          //         }
-
-          //       }
-
-          //       adlog::DEBUG("ID range have over");
-          //     }
-              
-          //   }
-          // }
-          
-          
-          //   adlog::DEBUG("index or data table iter change end!");
-          // }
-
-
           if (OB_FAIL(index_table_iter_->get_next_rows(storage_count, index_capacity))) {
             if (OB_UNLIKELY(OB_ITER_END != ret)) {
               LOG_WARN("failed to get next rows from index table", K(ret));
@@ -424,7 +356,9 @@ int ObDASCacheLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
         data_table_iter_->clear_evaluated_flag();
 
         adlog::DEBUG("--------------OUTPUT_ROWS: data_table_iter_->get_next_rows ----------");
-
+        if (data_table_iter_ == index_table_iter_) {
+          adlog::DEBUG("NO! data_table_iter_ == index_table_iter_");
+        }
         if (OB_FAIL(data_table_iter_->get_next_rows(count, capacity))) {
           if (OB_LIKELY(OB_ITER_END == ret)) {
             ret = OB_SUCCESS;

@@ -137,6 +137,35 @@ private:
   DISALLOW_COPY_AND_ASSIGN(ObTextRetrievalTokenIter);
 };
 
+// ADVISE
+class ObTRDaaTTokenCacheIter : public ObISRDaaTDimIter {  
+public:  
+  ObTRDaaTTokenCacheIter(common::ObIAllocator *alloc);  
+  virtual ~ObTRDaaTTokenCacheIter() {}  
+  
+  // 实现基类接口  
+  virtual int get_next_row() override;  
+  virtual int advance_to(const ObDatum &id_datum) override;  
+  virtual int get_curr_score(double &score) const override;  
+  virtual int get_curr_id(const ObDatum *&datum) const override;  
+  virtual int get_dim_max_score(double &score) override;  
+  
+  int init_from_cache(ObTRDaaTTokenCacheIter *one);
+  
+  int add_data(const ObFixedArray<double, ObIAllocator> &relevance,
+               const ObFixedArray<ObDocIdExt, ObIAllocator> &doc_id,
+               int64_t count);
+
+  
+  ObSEArray<double,64, ModulePageAllocator > cached_relevance_;  
+  ObSEArray<ObDocIdExt,64, ModulePageAllocator > cached_doc_id_;  
+  int64_t cur_idx_;
+  int64_t total_count_;
+  bool is_created_flag_{true};
+  bool have_done_flag_{false};
+  common::ObIAllocator *allocator_;  
+};
+
 class ObTextRetrievalDaaTTokenIter final : public ObISRDaaTDimIter
 {
 public:
@@ -161,6 +190,8 @@ public:
     }
     return ret;
   }
+  // ADVISE
+  ObTRDaaTTokenCacheIter* cache_iter_{nullptr};
 private:
   int save_relevances_and_docids();
   int save_docids();
@@ -178,6 +209,9 @@ private:
   bool is_inited_;
   DISALLOW_COPY_AND_ASSIGN(ObTextRetrievalDaaTTokenIter);
 };
+
+
+
 
 class ObTextRetrievalBlockMaxIter final : public ObISRDimBlockMaxIter
 {
