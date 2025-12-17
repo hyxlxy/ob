@@ -1191,7 +1191,7 @@ ObTRDaaTTokenCacheIter::ObTRDaaTTokenCacheIter(common::ObIAllocator *alloc)
 }
 
 int ObTRDaaTTokenCacheIter::get_next_row() {
-  adlog::DEBUG("调用了缓存迭代器的 get_next_row");
+  // adlog::DEBUG("调用了缓存迭代器的 get_next_row");
   int ret = OB_SUCCESS;  
   if (OB_UNLIKELY(!have_done_flag_)) {  
     ret = OB_NOT_INIT;  
@@ -1235,7 +1235,7 @@ int ObTRDaaTTokenCacheIter::get_curr_score(double &score) const
     ret = OB_ARRAY_OUT_OF_RANGE;  
     adlog::DEBUG("ObTRDaaTTokenCacheIter::get_curr_score invalid cache state", K(ret), K_(cur_idx), K_(total_count));
   } else {
-    adlog::DEBUG("缓存迭代器： ObTRDaaTTokenCacheIter::get_curr_score");
+    // adlog::DEBUG("缓存迭代器： ObTRDaaTTokenCacheIter::get_curr_score");
     score = cached_relevance_[cur_idx_];  
   }  
   return ret;  
@@ -1248,7 +1248,7 @@ int ObTRDaaTTokenCacheIter::get_curr_id(const ObDatum *&datum) const
     ret = OB_ARRAY_OUT_OF_RANGE;  
     adlog::DEBUG("ObTRDaaTTokenCacheIter::get_curr_id invalid cache state", K(ret), K_(cur_idx), K_(total_count));  
   } else {  
-    adlog::DEBUG("缓存迭代器： ObTRDaaTTokenCacheIter::get_curr_id");
+    // adlog::DEBUG("缓存迭代器： ObTRDaaTTokenCacheIter::get_curr_id");
     datum = &cached_doc_id_[cur_idx_].get_datum();  
   }  
   return ret;  
@@ -1298,8 +1298,8 @@ int ObTRDaaTTokenCacheIter::add_data(const ObFixedArray<double, ObIAllocator> &r
                                      const ObFixedArray<ObDocIdExt, ObIAllocator> &doc_id,  
                                      int64_t count)  
 {
-  adlog::DEBUG("ObTRDaaTTokenCacheIter::add_data start");
-  adlog::DEBUG(K(count));
+  // adlog::DEBUG("ObTRDaaTTokenCacheIter::add_data start");
+  // adlog::DEBUG(K(count));
   int ret = OB_SUCCESS;  
   if (OB_UNLIKELY(count <= 0 || relevance.count() < count || doc_id.count() < count)) {  
     ret = OB_INVALID_ARGUMENT;  
@@ -1307,15 +1307,15 @@ int ObTRDaaTTokenCacheIter::add_data(const ObFixedArray<double, ObIAllocator> &r
              K(relevance.count()), K(doc_id.count()));  
   } else {  
 
-    if (cached_relevance_.count() < total_count_ + count) {
-      if (OB_FAIL(cached_relevance_.reserve(total_count_ + count))) {
-        adlog::DEBUG("failed to reserve relevance array", K(ret));  
-        LOG_WARN("failed to reserve relevance array", K(ret));  
-      } else if (OB_FAIL(cached_doc_id_.reserve(total_count_ + count))) {  
-        adlog::DEBUG("failed to reserve doc_id array", K(ret));  
-        LOG_WARN("failed to reserve doc_id array", K(ret));  
-      }  
-    }  
+    // if (cached_relevance_.count() < total_count_ + count) {
+    //   if (OB_FAIL(cached_relevance_.reserve(total_count_ + count))) {
+    //     adlog::DEBUG("failed to reserve relevance array", K(ret));  
+    //     LOG_WARN("failed to reserve relevance array", K(ret));  
+    //   } else if (OB_FAIL(cached_doc_id_.reserve(total_count_ + count))) {  
+    //     adlog::DEBUG("failed to reserve doc_id array", K(ret));  
+    //     LOG_WARN("failed to reserve doc_id array", K(ret));  
+    //   }  
+    // }  
       
     for (int64_t i = 0; OB_SUCC(ret) && i < count; ++i) {  
       if (OB_FAIL(cached_relevance_.push_back(relevance[i]))) {  
@@ -1330,7 +1330,7 @@ int ObTRDaaTTokenCacheIter::add_data(const ObFixedArray<double, ObIAllocator> &r
       is_created_flag_ = true;  
     }
   }
-  adlog::DEBUG("ObTRDaaTTokenCacheIter::add_data end");
+  // adlog::DEBUG("ObTRDaaTTokenCacheIter::add_data end");
   
   return ret;  
 }  

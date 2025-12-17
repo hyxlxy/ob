@@ -403,7 +403,7 @@ int ObDASTRMergeIter::create_dim_iters()
     }
   } else if (daat_mode_) {
     // 这边会使用的是daat_mode
-    adlog::DEBUG("daat_mode : 开始创建dim_iter");
+    // adlog::DEBUG("daat_mode : 开始创建dim_iter");
     for (int64_t i = 0; OB_SUCC(ret) && i < query_tokens_.count(); ++i) {
       ObTextRetrievalScanIterParam iter_param;
       ObTextRetrievalDaaTTokenIter *dim_iter = nullptr;
