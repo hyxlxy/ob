@@ -3570,6 +3570,11 @@ if (OB_ISNULL(ctdef) || OB_ISNULL(rtdef) || ctdef->op_type_ != DAS_OP_INDEX_MERG
       } else if (OB_FAIL(create_iter_children_array(children_cnt, alloc, merge_iter))) {
         LOG_WARN("failed to create iter children array", K(ret));
       } else {
+        // ADVISE: 设置两阶段优化的 top_n_count
+        // 从 limit_param 中提取 LIMIT 值（如果存在）
+        // Note: ObDASIndexMergeRtDef 没有 limit_param_ 成员，需要从其他地方获取
+        // 暂时保留，后续可通过上层传递或从 merge_ctdef 获取
+        
         for (int64_t i = 0; OB_SUCC(ret) && i < children_cnt; ++i) {
           merge_iter->get_children()[i] = child_iters[i];
           ObTableScanParam *child_scan_param = nullptr;

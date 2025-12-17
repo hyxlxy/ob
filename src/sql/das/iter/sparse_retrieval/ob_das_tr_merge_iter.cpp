@@ -494,15 +494,14 @@ int ObDASTRMergeIter::create_sparse_retrieval_iter()
   sr_iter_param_.relevance_expr_ = ir_ctdef_->relevance_expr_;
   sr_iter_param_.relevance_proj_expr_ = ir_ctdef_->relevance_proj_col_;
   sr_iter_param_.filter_expr_ = ir_ctdef_->match_filter_;
-  sr_iter_param_.topk_limit_ = topk_limit_;
-
-  // const int64_t OB_TR_TOPK_EXPAND_FACTOR = 3; // alpha
-  // if (topk_mode_ && topk_limit_ > 0) {
-  //   const int64_t expanded = topk_limit_ * OB_TR_TOPK_EXPAND_FACTOR;
-  //   sr_iter_param_.topk_limit_ = expanded;
-  // } else {
-  //   sr_iter_param_.topk_limit_ = topk_limit_;
-  // }
+  // 默认将 TopK 放大，缓解标量过滤丢失的风险；若后续开启两阶段可按需调整
+  const int64_t OB_TR_TOPK_EXPAND_FACTOR = 3; // 可调
+  if (topk_mode_ && topk_limit_ > 0) {
+    const int64_t expanded = topk_limit_ * OB_TR_TOPK_EXPAND_FACTOR;
+    sr_iter_param_.topk_limit_ = expanded;
+  } else {
+    sr_iter_param_.topk_limit_ = topk_limit_;
+  }
   // bool topk_mode_res = (topk_mode_)? true:false;
   // adlog::DEBUG("ObDASTRMergeIter::create_sparse_retrieval_iter(), topl_mode_", topk_mode_res );
 
@@ -1435,6 +1434,33 @@ int ObDASTRMergeIter::init_topk_limit()
       }
       topk_limit_ = limit + offset;
     }
+  }
+  return ret;
+}
+
+// ADDED: enable_topk_mode implementation for two-phase index merge
+int ObDASTRMergeIter::enable_topk_mode(const int64_t limit)
+{
+  int ret = OB_SUCCESS;
+  if (IS_NOT_INIT) {
+    ret = OB_NOT_INIT;
+    LOG_WARN("not inited", K(ret));
+  } else if (limit <= 0) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("invalid limit", K(ret), K(limit));
+  } else {
+    // 强制启用TopK模式（BMW）
+    topk_mode_ = true;
+    daat_mode_ = false;
+    taat_mode_ = false;
+    function_lookup_mode_ = false;
+    flags_ = 0;
+    flags_ |= (1u << 1); // set topk_mode_ bit
+    
+    // 设置topk limit
+    topk_limit_ = limit;
+    
+    adlog::DEBUG("enable_topk_mode: topk_limit=", K(topk_limit_));
   }
   return ret;
 }

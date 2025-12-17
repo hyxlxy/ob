@@ -108,7 +108,8 @@ struct ObSparseRetrievalMergeParam
       filter_expr_(nullptr),
       topk_limit_(0),
       field_boost_(1.0),
-      max_batch_size_(1)
+      max_batch_size_(1),
+      baseline_threshold_(0.0)
   {}
   ~ObSparseRetrievalMergeParam() {}
   bool need_project_relevance() const { return relevance_proj_expr_ != nullptr; }
@@ -127,6 +128,8 @@ struct ObSparseRetrievalMergeParam
   int64_t topk_limit_;
   double field_boost_;
   int64_t max_batch_size_;
+  // ADDED: baseline threshold for two-phase optimization
+  double baseline_threshold_;  // min_score from first phase, used for BMW pruning
   //ADVISE
   // bool has_id_less_filter_{false};     // 是否有ID小于过滤条件
   // uint64_t id_less_value_{UINT64_MAX};      // ID小于的值

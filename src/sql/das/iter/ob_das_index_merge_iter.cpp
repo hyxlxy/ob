@@ -18,6 +18,7 @@
 #define USING_LOG_PREFIX SQL_DAS
 #include "sql/das/iter/ob_das_index_merge_iter.h"
 #include "src/sql/das/ob_das_attach_define.h"
+#include "sql/das/iter/sparse_retrieval/ob_das_tr_merge_iter.h"
 namespace oceanbase
 {
 using namespace common;
@@ -598,6 +599,12 @@ int ObDASIndexMergeIter::inner_get_next_row()
 int ObDASIndexMergeIter::inner_get_next_rows(int64_t &count, int64_t capacity)
 {
   int ret = OB_SUCCESS;
+  // 两阶段：首次取数前配置BMW TopK
+  if (enable_two_phase_ && !has_executed_two_phase_) {
+    if (OB_FAIL(execute_two_phase())) {
+      LOG_WARN("execute_two_phase failed", K(ret));
+    }
+  }
   clear_evaluated_flag();
   if (OB_FAIL((this->*get_next_rows_)(count, capacity))) {
     if (ret != OB_ITER_END) {
@@ -734,6 +741,12 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
 {
   int ret = OB_SUCCESS;
   adlog::DEBUG("ObDASIndexMergeIter::intersect_get_next_rows start");
+  // 两阶段触发点：首次进入时执行两阶段预备
+  if (enable_two_phase_ && !has_executed_two_phase_) {
+    if (OB_FAIL(execute_two_phase())) {
+      LOG_WARN("failed to execute two-phase preparation", K(ret));
+    }
+  }
   // {
   //   adlog::DEBUG("INTERSECT rowkey_exprs_ count", K(rowkey_exprs_->count()));  
   //   for (int64_t i = 0; i < rowkey_exprs_->count(); i++) {
@@ -865,6 +878,15 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
   if (OB_ITER_END == ret && count > 0) {  
     ret = OB_SUCCESS;  
   }  
+  
+  // 两阶段补齐：当本批结束且仍未达TopN，尝试用保底结果补齐当前批次
+  // 注意：补齐逻辑会直接修改count和result_buffer_
+  if (OB_SUCC(ret) && enable_two_phase_ && second_phase_need_supplement_ && produced_rows_ < top_n_count_) {
+    if (OB_FAIL(supplement_with_fallback_rows(count, capacity))) {
+      LOG_WARN("failed to supplement with fallback rows", K(ret));
+    }
+  }
+
   if (OB_SUCC(ret) && count > 0) {
     if (OB_FAIL(result_buffer_.to_expr(count))) {
       adlog::DEBUG("failed to convert result buffer to exprs", K(ret));  
@@ -1085,18 +1107,116 @@ int ObDASIndexMergeIter::union_get_next_rows(int64_t &count, int64_t capacity) {
 // ADVISE
 
 int ObDASIndexMergeIter::execute_two_phase() {
-  int ret = first_merge_phase();
-  if (ret != OB_SUCCESS) {
+  int ret = OB_SUCCESS;
+  
+  // 防止重复执行
+  if (has_executed_two_phase_) {
+    adlog::DEBUG("Two-phase already executed, skip");
+    return OB_SUCCESS;
+  }
+  has_executed_two_phase_ = true;
+  
+  LOG_DEBUG("Starting two-phase index merge optimization", K(top_n_count_), K(top_n_amplify_factor_));
+  adlog::DEBUG("Starting two-phase index merge optimization", K(top_n_count_), K(top_n_amplify_factor_));
+  
+  // 第一阶段：保底取数
+  if (OB_FAIL(first_merge_phase())) {
+    LOG_WARN("First merge phase failed", K(ret));
+    adlog::DEBUG("First merge phase failed", K(ret));
     return ret;
   }
-  return second_merge_phase();
-}
-int ObDASIndexMergeIter::first_merge_phase() {
-  int ret = OB_SUCCESS;
+  
+  // 第二阶段：BMW精准筛选
+  if (OB_FAIL(second_merge_phase())) {
+    LOG_WARN("Second merge phase failed", K(ret));
+    adlog::DEBUG("Second merge phase failed", K(ret));
+    return ret;
+  }
+  
+  LOG_DEBUG("Two-phase index merge optimization completed", K(first_phase_min_score_), K(first_phase_fallback_count_));
+  adlog::DEBUG("Two-phase index merge optimization completed", K(first_phase_min_score_), K(first_phase_fallback_count_));
+  
   return ret;
 }
-int ObDASIndexMergeIter::second_merge_phase() {
+
+int ObDASIndexMergeIter::first_merge_phase() {
+  // 第一阶段：保底取数
+  // 使用标准Index Merge逻辑快速取N条满足标量条件的行
+  // 同时计算这N条行的全文相关性得分，记录最小得分用于BMW阈值
   int ret = OB_SUCCESS;
+  int64_t n = top_n_count_;
+  
+  LOG_DEBUG("First merge phase: collecting fallback rows", K(n));
+  
+  // 保存第一阶段的保底行
+  if (OB_FAIL(save_first_phase_fallback_rows())) {
+    LOG_WARN("Failed to save first phase fallback rows", K(ret));
+    return ret;
+  }
+  
+  first_phase_completed_ = true;
+  LOG_DEBUG("First merge phase completed", K(first_phase_fallback_count_), K(first_phase_min_score_));
+  
+  return ret;
+}
+
+int ObDASIndexMergeIter::second_merge_phase() {
+  // 第二阶段：BMW精准筛选
+  // 启用FTS迭代器的TopK模式，设置得分阈值，取n'候选
+  // 用标量条件过滤n'候选，凑满N条，不足则用第一阶段保底结果补充
+  int ret = OB_SUCCESS;
+  
+  if (!has_fts_iter_ || OB_ISNULL(fts_iter_)) {
+    LOG_DEBUG("No FTS iterator in second phase, skip");
+    return OB_SUCCESS;
+  }
+  
+  int64_t n = top_n_count_;
+  int64_t n_prime = n * top_n_amplify_factor_;  // 放大因子，可配置
+  
+  adlog::DEBUG("Second merge phase: enabling BMW TopK mode", K(n), K(n_prime), K(first_phase_min_score_));
+  LOG_DEBUG("Second merge phase: enabling BMW TopK mode", K(n), K(n_prime), K(first_phase_min_score_));
+  
+  // 启用FTS迭代器的TopK模式（BMW算法）
+  if (OB_FAIL(fts_iter_->enable_topk_mode(n_prime))) {
+    LOG_WARN("Failed to enable topk mode for FTS iterator", K(ret), K(n_prime));
+    adlog::DEBUG("Failed to enable topk mode for FTS iterator", K(ret), K(n_prime));
+    // 不中断流程，继续执行（TopK启用失败不影响正确性，只是性能优化）
+    ret = OB_SUCCESS;
+  } else {
+    adlog::DEBUG("Successfully enabled topk mode for FTS iterator", K(n_prime));
+  }
+  
+  // 设置BMW的得分阈值（用于剪枝）
+  // 这样可以跳过得分低于第一阶段最小得分的候选
+  if (first_phase_min_score_ > 0.0) {
+    if (OB_FAIL(fts_iter_->set_baseline_threshold(first_phase_min_score_))) {
+      LOG_DEBUG("Failed to set baseline threshold for BMW pruning", K(ret), K(first_phase_min_score_));
+      // 不中断流程，继续执行（阈值设置失败不影响正确性，只是性能优化）
+      ret = OB_SUCCESS;
+    } else {
+      adlog::DEBUG("Successfully set baseline threshold for BMW pruning", K(first_phase_min_score_));
+    }
+  }
+  
+  // 清空子store中的残留数据，避免使用第一阶段的数据
+  for (int64_t i = 0; i < child_stores_.count(); ++i) {
+    child_stores_.at(i).reuse();
+  }
+  
+  // 重新扫描以启用新的迭代器配置
+  if (OB_FAIL(rescan())) {
+    LOG_WARN("Failed to rescan after enabling topk mode", K(ret));
+    adlog::DEBUG("Failed to rescan after enabling topk mode", K(ret));
+    return ret;
+  }
+  
+  // 标记需要补充标志：当第二阶段结果不足N条时，用第一阶段保底结果补充
+  second_phase_need_supplement_ = true;
+  
+  adlog::DEBUG("Second merge phase enabled", K(n_prime), "will supplement with fallback rows if needed");
+  LOG_DEBUG("Second merge phase enabled", K(n_prime));
+  
   return ret;
 }
 
@@ -1110,77 +1230,356 @@ int ObDASIndexMergeIter::second_merge_phase() {
 */
 int ObDASIndexMergeIter::init_two_phase(ObDASIterParam &param) {
   int ret = OB_SUCCESS;
+  
+  adlog::DEBUG("init_two_phase: merge_type_=", K(merge_type_), "INDEX_MERGE_INTERSECT=", K(INDEX_MERGE_INTERSECT));
+  
+  // 只有INTERSECT模式（AND操作）才支持两阶段优化
   if (merge_type_ != INDEX_MERGE_INTERSECT) {
-    adlog::DEBUG("check_init_two_phase: no and");
+    LOG_DEBUG("Two-phase optimization only supports INTERSECT merge type");
+    adlog::DEBUG("Two-phase optimization only supports INTERSECT merge type");
     return OB_SUCCESS;
   }
 
+  // 检查是否存在FTS迭代器
   if (!check_mixed_query_with_fts()) {
-    adlog::DEBUG("check_mixed_query_with_fts false");
+    LOG_DEBUG("No FTS iterator found for two-phase optimization");
+    adlog::DEBUG("No FTS iterator found for two-phase optimization");
     return OB_SUCCESS;
   }
 
   if (!has_fts_iter_) {
-    adlog::DEBUG("has_fts_iter_: false");
+    LOG_DEBUG("FTS iterator not available");
+    adlog::DEBUG("FTS iterator not available");
     return OB_SUCCESS;
   }
 
-  if (!check_top_k()) {
-    adlog::DEBUG("check top k false");
+  adlog::DEBUG("Found FTS iterator, fts_iter_=", K(fts_iter_));
+
+  // 若上层未传入TopN，尝试从FTS iter读取limit
+  if (top_n_count_ <= 0) {
+    int64_t fts_limit = 0;
+    if (OB_FAIL(fts_iter_->get_topk_limit(fts_limit))) {
+      LOG_DEBUG("Failed to get topk limit from FTS iterator", K(ret));
+      adlog::DEBUG("Failed to get topk limit from FTS iterator", K(ret));
+      ret = OB_SUCCESS; // 忽略错误，继续
+    } else if (fts_limit > 0) {
+      top_n_count_ = fts_limit;
+      LOG_DEBUG("Inferred top_n_count from FTS child", K(top_n_count_));
+      adlog::DEBUG("Inferred top_n_count from FTS child", K(top_n_count_));
+    }
+  }
+
+  // 如果 top_n_count_ 仍未设置，则跳过两阶段
+  if (top_n_count_ <= 0) {
+    LOG_DEBUG("Top-N count not set, skip two-phase optimization");
+    adlog::DEBUG("Top-N count not set, skip two-phase optimization");
     return OB_SUCCESS;
   }
 
+  // 检查是否满足两阶段优化的条件
   if (!check_support_two_phase()) {
-    adlog::DEBUG("check_support_two_phase false");
+    LOG_DEBUG("Two-phase optimization conditions not met");
+    adlog::DEBUG("Two-phase optimization conditions not met");
     return OB_SUCCESS;
   }
 
+  // 标记启用两阶段优化
   enable_two_phase_ = true;
-
-  adlog::DEBUG("Two-phase optimization enabled ");
+  LOG_DEBUG("Two-phase optimization enabled", K(top_n_count_), K(top_n_amplify_factor_));
+  adlog::DEBUG("Two-phase optimization enabled", K(top_n_count_), K(top_n_amplify_factor_));
 
   return ret;
 }
 
-bool ObDASIndexMergeIter::check_top_k() {
-
-  // if (merge_rtdef_ && merge_rtdef_->limit_param_.is_valid()) {
-  //   top_n_count_ = merge_rtdef_->limit_param_.limit_count_;
-  //   if (top_n_count_ > 0) {
-  //       adlog::DEBUG("Top-K query detected from limit_param: ", top_n_count_);
-  //       return true;
-  //   }
-  // }
-  if (top_n_count_ == 0 or top_n_count_ == 114514) {
-    return false;
+int ObDASIndexMergeIter::enable_two_phase_optimization(int64_t top_n_count, int64_t amplify_factor) {
+  int ret = OB_SUCCESS;
+  
+  if (top_n_count <= 0) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("Invalid top_n_count for two-phase optimization", K(ret), K(top_n_count));
+  } else if (amplify_factor <= 0) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("Invalid amplify_factor for two-phase optimization", K(ret), K(amplify_factor));
+  } else {
+    top_n_count_ = top_n_count;
+    top_n_amplify_factor_ = amplify_factor;
+    LOG_DEBUG("Two-phase optimization configured", K(top_n_count_), K(top_n_amplify_factor_));
   }
-  return true;
+  
+  return ret;
 }
 
-bool ObDASIndexMergeIter::check_support_two_phase() { return true; }
+bool ObDASIndexMergeIter::check_support_two_phase() {
+  // 检查是否满足两阶段优化的条件
+  // 当前版本支持所有满足基本条件的查询
+  // 可根据需要扩展条件检查（如：检查是否有标量过滤、是否有排序等）
+  return true;
+}
 
 bool ObDASIndexMergeIter::check_mixed_query_with_fts() {
   has_fts_iter_ = false;
   fts_iter_ = nullptr;
 
+  adlog::DEBUG("check_mixed_query_with_fts: child_iters_.count()=", K(child_iters_.count()));
+  
   for (int64_t i = 0; i < child_iters_.count(); i++) {
     ObDASIter *child = child_iters_.at(i);
     if (child == nullptr) {
+      adlog::DEBUG("check_mixed_query_with_fts: child", K(i), "is null");
       continue;
     }
     
     ObDASIterType child_type = child->get_type();
+    adlog::DEBUG("check_mixed_query_with_fts: child", K(i), "type=", K(child_type), "DAS_ITER_TEXT_RETRIEVAL_MERGE=", K(DAS_ITER_TEXT_RETRIEVAL_MERGE));
     
     if (child_type == DAS_ITER_TEXT_RETRIEVAL_MERGE) {
       // 找到FTS迭代器
       has_fts_iter_ = true;
       fts_iter_ = static_cast<ObDASTRMergeIter *>(child);
-      adlog::DEBUG("find fts_iter");
+      adlog::DEBUG("Found FTS iterator at index", K(i), "fts_iter_=", K(fts_iter_));
       break;
     }
   }
 
+  adlog::DEBUG("check_mixed_query_with_fts result: has_fts_iter_=", K(has_fts_iter_), "fts_iter_=", K(fts_iter_));
   return has_fts_iter_;
+}
+
+int ObDASIndexMergeIter::extract_relevance_score_from_row(double &score) {
+  // 从当前行的表达式中提取全文相关性得分
+  // 遍历 output_ 表达式查找 MATCH_AGAINST 表达式
+  int ret = OB_SUCCESS;
+  score = 0.0;
+  
+  if (OB_ISNULL(output_)) {
+    LOG_DEBUG("output_ is null, cannot extract relevance score");
+    return OB_SUCCESS;
+  }
+  
+  for (int64_t i = 0; OB_SUCC(ret) && i < output_->count(); ++i) {
+    ObExpr *expr = output_->at(i);
+    if (OB_NOT_NULL(expr) && T_FUN_MATCH_AGAINST == expr->type_) {
+      // 使用 locate_expr_datum 获取表达式的 datum
+      const ObDatum &datum = expr->locate_expr_datum(*eval_ctx_);
+      if (!datum.is_null()) {
+        double expr_score = datum.get_double();
+        score = MAX(score, expr_score); // 取最大得分
+        adlog::DEBUG("Extracted relevance score from MATCH_AGAINST", K(expr_score), K(score));
+      }
+    }
+  }
+  
+  return ret;
+}
+
+int ObDASIndexMergeIter::save_first_phase_fallback_rows() {
+  // 第一阶段：保底取数
+  // 直接从子迭代器取N条结果，保存到fallback缓存，记录min_score
+  int ret = OB_SUCCESS;
+  int64_t n = top_n_count_;
+  int64_t count = 0;
+  
+  adlog::DEBUG("First phase: collecting", K(n), "rows for fallback");
+  
+  // 分配保底行缓存（预分配 n 行）
+  if (OB_ISNULL(first_phase_fallback_rows_)) {
+    common::ObArenaAllocator &alloc = mem_ctx_->get_arena_allocator();
+    first_phase_fallback_max_ = n;
+    if (OB_ISNULL(first_phase_fallback_rows_ = 
+        static_cast<ObChunkDatumStore::LastStoredRow*>(
+            alloc.alloc(n * sizeof(ObChunkDatumStore::LastStoredRow))))) {
+      ret = OB_ALLOCATE_MEMORY_FAILED;
+      LOG_WARN("failed to allocate fallback rows buffer", K(ret), K(n));
+    } else {
+      for (int64_t i = 0; i < n; ++i) {
+        new (&first_phase_fallback_rows_[i]) ObChunkDatumStore::LastStoredRow(alloc);
+        first_phase_fallback_rows_[i].reuse_ = true;
+      }
+    }
+  }
+  
+  // 第一阶段：直接使用普通Index Merge逻辑取N条行
+  // 这里复用intersect_get_next_rows的核心逻辑，但不递归调用
+  while (OB_SUCC(ret) && count < n) {
+    int64_t output_idx = OB_INVALID_INDEX;
+    int cmp_ret = 0;
+    
+    // 填充各child store
+    for (int64_t i = 0; OB_SUCC(ret) && i < child_stores_.count(); i++) {
+      IndexMergeRowStore &child_store = child_stores_.at(i);
+      if (!child_store.have_data()) {
+        if (!child_store.iter_end_) {
+          ObDASIter *child_iter = child_iters_.at(i);
+          if (OB_ISNULL(child_iter)) {
+            ret = OB_ERR_UNEXPECTED;
+            LOG_WARN("unexpected nullptr child iter", K(i), K(ret));
+          } else {
+            int64_t child_rows_cnt = 0;
+            ret = child_iter->get_next_rows(child_rows_cnt, n - count);
+            if (OB_ITER_END == ret && child_rows_cnt > 0) {
+              ret = OB_SUCCESS;
+            }
+            if (OB_SUCC(ret)) {
+              if (OB_FAIL(child_store.save(true, child_rows_cnt))) {
+                LOG_WARN("failed to save child rows", K(child_rows_cnt), K(ret));
+              } else if (OB_FAIL(compare(i, output_idx, cmp_ret))) {
+                LOG_WARN("failed to compare row", K(i), K(output_idx), K(ret));
+              }
+            } else if (OB_ITER_END == ret) {
+              child_store.iter_end_ = true;
+              ret = OB_SUCCESS;
+            }
+          }
+        }
+      } else if (OB_FAIL(compare(i, output_idx, cmp_ret))) {
+        LOG_WARN("failed to compare row", K(i), K(output_idx), K(ret));
+      }
+    }
+    
+    if (OB_FAIL(ret)) {
+      break;
+    } else if (output_idx == OB_INVALID_INDEX) {
+      // 所有child都已结束
+      ret = OB_ITER_END;
+      break;
+    } else {
+      // 检查是否所有child都有匹配的行
+      bool all_matched = true;
+      for (int64_t i = 0; OB_SUCC(ret) && i < child_stores_.count(); i++) {
+        if (output_idx == i) {
+          continue;
+        }
+        if (!child_stores_.at(i).have_data()) {
+          all_matched = false;
+          break;
+        } else if (OB_FAIL(compare(i, output_idx, cmp_ret))) {
+          LOG_WARN("failed to compare row", K(i), K(output_idx), K(ret));
+        } else if (cmp_ret != 0) {
+          all_matched = false;
+          break;
+        }
+      }
+      
+      if (OB_FAIL(ret)) {
+        break;
+      } else if (!all_matched) {
+        // rowkey不匹配，跳过当前行
+        child_stores_.at(output_idx).cur_idx_++;
+      } else {
+        // 找到一条匹配的行，保存到fallback缓存
+        // 先转换表达式到eval_ctx
+        for (int64_t i = 0; OB_SUCC(ret) && i < child_stores_.count(); i++) {
+          if (output_idx != i) {
+            if (OB_FAIL(child_stores_.at(i).to_expr())) {
+              LOG_WARN("failed to convert child row to expr", K(ret), K(i));
+            }
+          }
+        }
+        if (OB_SUCC(ret)) {
+          if (OB_FAIL(child_stores_.at(output_idx).to_expr())) {
+            LOG_WARN("failed to convert output row to expr", K(ret));
+          }
+        }
+        
+        // 保存到fallback缓存
+        if (OB_SUCC(ret)) {
+          ObEvalCtx::BatchInfoScopeGuard batch_info_guard(*eval_ctx_);
+          batch_info_guard.set_batch_size(1);
+          batch_info_guard.set_batch_idx(0);
+          if (OB_FAIL(first_phase_fallback_rows_[count].save_store_row(*output_, *eval_ctx_))) {
+            LOG_WARN("failed to save fallback row", K(ret), K(count));
+          } else {
+            // 提取并记录该行的得分
+            double row_score = 0.0;
+            if (OB_FAIL(extract_relevance_score_from_row(row_score))) {
+              LOG_WARN("failed to extract relevance score", K(ret));
+              // 不中断流程，继续处理
+              ret = OB_SUCCESS;
+            } else {
+              // 只在有有效得分时更新min_score
+              if (row_score > 0.0) {
+                if (first_phase_min_score_ == 0.0 || row_score < first_phase_min_score_) {
+                  first_phase_min_score_ = row_score;
+                }
+              }
+              adlog::DEBUG("First phase row", K(count), "score=", K(row_score), "min_score=", K(first_phase_min_score_));
+            }
+            count++;
+          }
+        }
+      }
+    }
+  }
+  
+  first_phase_fallback_count_ = count;
+  first_phase_fallback_cursor_ = 0;
+  
+  adlog::DEBUG("First phase completed with", K(count), "rows, min_score=", K(first_phase_min_score_));
+  
+  return ret;
+}
+
+int ObDASIndexMergeIter::supplement_with_fallback_rows(int64_t &count, int64_t capacity) {
+  // 第二阶段结束后，如果结果不足N条，用第一阶段的保底结果补齐
+  int ret = OB_SUCCESS;
+  int64_t need_cnt = top_n_count_ - produced_rows_;
+  
+  adlog::DEBUG("supplement_with_fallback_rows start", K(need_cnt), K(produced_rows_), K(top_n_count_), K(count), K(capacity));
+  
+  if (need_cnt <= 0 || first_phase_fallback_count_ <= 0) {
+    adlog::DEBUG("supplement_with_fallback_rows: no need to supplement", K(need_cnt), K(first_phase_fallback_count_));
+    return OB_SUCCESS;
+  }
+  
+  int64_t can_supplement = MIN(need_cnt, first_phase_fallback_count_ - first_phase_fallback_cursor_);
+  can_supplement = MIN(can_supplement, capacity - count);
+  
+  adlog::DEBUG("Supplementing with fallback rows", K(can_supplement), K(need_cnt), K(count), K(capacity), K(first_phase_fallback_cursor_), K(first_phase_fallback_count_));
+  
+  if (can_supplement <= 0) {
+    adlog::DEBUG("supplement_with_fallback_rows: can_supplement <= 0");
+    return OB_SUCCESS;
+  }
+  
+  // 从fallback缓存中取行，转换为表达式
+  ObEvalCtx::BatchInfoScopeGuard batch_info_guard(*eval_ctx_);
+  batch_info_guard.set_batch_size(1);
+  for (int64_t i = 0; OB_SUCC(ret) && i < can_supplement; ++i) {
+    batch_info_guard.set_batch_idx(0);
+    int64_t idx = first_phase_fallback_cursor_ + i;
+    
+    if (OB_UNLIKELY(idx < 0 || idx >= first_phase_fallback_count_)) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("invalid fallback row index", K(ret), K(idx), K(first_phase_fallback_count_));
+      adlog::DEBUG("invalid fallback row index", K(ret), K(idx), K(first_phase_fallback_count_));
+      break;
+    }
+    
+    if (OB_ISNULL(first_phase_fallback_rows_[idx].store_row_)) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("null store row in fallback", K(ret), K(idx));
+      adlog::DEBUG("null store row in fallback", K(ret), K(idx));
+      break;
+    }
+    
+    if (OB_FAIL(first_phase_fallback_rows_[idx].store_row_->to_expr<true>(*output_, *eval_ctx_))) {
+      LOG_WARN("failed to convert fallback row to expr", K(ret), K(idx));
+      adlog::DEBUG("failed to convert fallback row to expr", K(ret), K(idx));
+    } else if (OB_FAIL(save_row_to_result_buffer())) {
+      LOG_WARN("failed to save supplemented row to result buffer", K(ret));
+      adlog::DEBUG("failed to save supplemented row to result buffer", K(ret));
+    } else {
+      count += 1;
+      ++produced_rows_;
+      adlog::DEBUG("Supplemented row", K(i), K(count), K(produced_rows_));
+    }
+  }
+  
+  first_phase_fallback_cursor_ += can_supplement;
+  
+  adlog::DEBUG("supplement_with_fallback_rows end", K(count), K(produced_rows_), K(first_phase_fallback_cursor_));
+  
+  return ret;
 }
 
 }  // namespace sql

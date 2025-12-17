@@ -19,6 +19,7 @@
 
 #include "sql/das/iter/ob_das_iter.h"
 #include "sql/optimizer/ob_join_order.h"
+
 #include <cstdint>
 
 namespace oceanbase
@@ -243,23 +244,67 @@ private:
   MergeResultBuffer result_buffer_;
 
 public:
-      // ADVISE
-      bool enable_two_phase_ = false;
-      bool has_executed_two_phase_ = false;
-      double first_phase_min_score_;
-      int64_t top_n_count_ = 114514;
-      bool has_fts_iter_ = false;
-      ObDASTRMergeIter *fts_iter_;      // FTS迭代器指针
-      int64_t produced_rows_ = 0;       // 已输出的总行数（用于Top-K提前终止）
+  // ===== 两阶段优化相关接口 =====
+  // 启用两阶段优化
+  int enable_two_phase_optimization(int64_t top_n_count, int64_t amplify_factor = 3);
   
-      int execute_two_phase();
-      int first_merge_phase();
-      int second_merge_phase();
-      int init_two_phase(ObDASIterParam &param);
-      int64_t get_top_n_count();
-      bool check_mixed_query_with_fts();
-      bool check_top_k();
-      bool check_support_two_phase();
+  // 获取TopN计数（用于上层传递）
+  int64_t get_top_n_count() const { return top_n_count_; }
+  
+  // 获取放大因子
+  int64_t get_amplify_factor() const { return top_n_amplify_factor_; }
+
+private:
+  // ===== 两阶段优化内部状态 =====
+  bool enable_two_phase_ = false;                    // 是否启用两阶段优化
+  bool has_executed_two_phase_ = false;              // 是否已执行两阶段准备
+  bool first_phase_completed_ = false;               // 第一阶段是否完成
+  double first_phase_min_score_ = 0.0;               // 第一阶段最小得分（用于BMW阈值）
+  int64_t top_n_count_ = 0;                          // TopN数量
+  int64_t top_n_amplify_factor_ = 3;                 // n' = n * factor，用于第二阶段候选扩大
+  bool has_fts_iter_ = false;                        // 是否存在FTS迭代器
+  ObDASTRMergeIter *fts_iter_ = nullptr;             // FTS迭代器指针
+  int64_t produced_rows_ = 0;                        // 已输出的总行数（用于TopK提前终止）
+  
+  // ===== 第一阶段保底结果缓存 =====
+  ObChunkDatumStore::LastStoredRow *first_phase_fallback_rows_ = nullptr;  // 保底行数据
+  int64_t first_phase_fallback_count_ = 0;           // 保底行数量
+  int64_t first_phase_fallback_max_ = 0;             // 保底行最大容量
+  int64_t first_phase_fallback_cursor_ = 0;          // 保底行读取游标
+  
+  // ===== 第二阶段BMW TopK相关 =====
+  int64_t second_phase_candidate_count_ = 0;         // 第二阶段候选行数
+  bool second_phase_need_supplement_ = false;        // 是否需要用保底结果补充
+  bool collecting_fallback_ = false;                 // 是否正在收集保底结果
+  
+  // ===== 两阶段执行函数 =====
+  // 执行两阶段优化的主入口
+  int execute_two_phase();
+  
+  // 第一阶段：保底取数
+  // 使用标准Index Merge逻辑取N条行，记录最小得分
+  int first_merge_phase();
+  
+  // 第二阶段：BMW精准筛选
+  // 启用FTS迭代器的TopK模式，设置得分阈值，取n'候选
+  int second_merge_phase();
+  
+  // 初始化两阶段优化
+  int init_two_phase(ObDASIterParam &param);
+  
+  // 检查是否支持两阶段优化
+  bool check_mixed_query_with_fts();
+  bool check_support_two_phase();
+  
+  // 两阶段辅助函数
+  // 从当前行提取全文相关性得分
+  int extract_relevance_score_from_row(double &score);
+  
+  // 保存第一阶段的保底行
+  int save_first_phase_fallback_rows();
+  
+  // 用保底行补充第二阶段不足的结果
+  int supplement_with_fallback_rows(int64_t &count, int64_t capacity);
 };
 
 }  // namespace sql

@@ -82,6 +82,13 @@ public:
   virtual ~ObDASTRMergeIter() {}
   virtual int do_table_scan() override;
   virtual int rescan() override;
+  // ADVISE: expose topk limit for two-phase index merge
+  int get_topk_limit(int64_t &limit) const { limit = topk_limit_; return OB_SUCCESS; }
+  // ADVISE: set baseline threshold for BMW pruning in two-phase optimization
+  int set_baseline_threshold(const double threshold) {
+    sr_iter_param_.baseline_threshold_ = threshold;
+    return OB_SUCCESS;
+  }
 
   INHERIT_TO_STRING_KV("ObDASIter", ObDASIter, K_(ir_ctdef), K_(ir_rtdef), K_(tx_desc),
       K_(snapshot), K_(query_tokens), K_(sr_iter_param), K_(sparse_retrieval_iter), K_(dim_iters),
@@ -153,6 +160,9 @@ public:
   storage::ObISparseRetrievalMergeIter *get_sparse_retrieval_iter() {
     return sparse_retrieval_iter_;
   }
+public:
+  // 强制切换为TopK(BMW)模式并设置limit
+  int enable_topk_mode(const int64_t limit);
 private:
   static const int64_t FWD_IDX_ROWKEY_COL_CNT = 2;
   static const int64_t INV_IDX_ROWKEY_COL_CNT = 2;

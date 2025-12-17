@@ -162,3 +162,4 @@ inline bool token_df_cache_expired(const ObTokenDFCacheValue &v)
 
 #endif // OB_TEXT_RETRIEVAL_TOKEN_DF_CACHE_H_
 
+
