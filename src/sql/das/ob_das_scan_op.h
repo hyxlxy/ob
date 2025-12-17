@@ -202,14 +202,17 @@ public:
   union {
     uint64_t flags_;
     struct {
-      uint64_t is_index_merge_               : 1; // whether used for index merge
-      uint64_t reserved_                     : 63;
+      uint64_t is_index_merge_ : 1; // whether used for index merge
+      uint64_t enable_bmw_                   : 1;
+      uint64_t reserved_                     : 62;
     };
   };
   ObFixedArray<share::DomainIdxs, common::ObIAllocator> domain_id_idxs_;
   ObFixedArray<int64_t, common::ObIAllocator> domain_types_;
   ObFixedArray<uint64_t, common::ObIAllocator> domain_tids_;
   ObPreRangeGraph pre_range_graph_;
+
+  double min_score_for_bmw_{0.0}; 
 };
 
 struct ObDASScanRtDef : ObDASBaseRtDef

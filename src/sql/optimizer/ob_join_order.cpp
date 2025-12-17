@@ -3972,7 +3972,8 @@
        LOG_TRACE("generate one index merge path", KPC(index_merge_path));
      }
    }
- 
+
+   return ret;
    // 这里就直接暴力的搞出来二阶段的路径，先这样写着试试吧
    {
      if (OB_SUCC(ret) and (!helper.no_two_phase_flag_)) {  
@@ -3989,6 +3990,11 @@
        }
      } 
      else{
+      adlog::DEBUG("pre : ");
+       if(OB_SUCC(ret)){
+        adlog::DEBUG("ret succ");
+       }
+       adlog::DEBUG(K(helper.no_two_phase_flag_));
        adlog::DEBUG("没有尝试创建二阶段路径， 在之前ret就fail了");
      }
    }

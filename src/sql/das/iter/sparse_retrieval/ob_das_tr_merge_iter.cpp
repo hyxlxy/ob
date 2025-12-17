@@ -69,7 +69,13 @@ int ObDASTRMergeIter::inner_init(ObDASIterParam &param)
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("invalid das iter param type for text retrieval merge iter", K(ret), K(param));
   } else {
-    ObDASTRMergeIterParam &merge_param = static_cast<ObDASTRMergeIterParam &>(param);
+    ObDASTRMergeIterParam &merge_param =
+        static_cast<ObDASTRMergeIterParam &>(param);
+  // ad taat
+    merge_param.taat_mode_ = 1;
+    merge_param.daat_mode_ = 0;
+    merge_param.flags_ = 0;
+    merge_param.flags_ |= (1U << 3);
     ir_ctdef_ = merge_param.ir_ctdef_;
     ir_rtdef_ = merge_param.ir_rtdef_;
     tx_desc_ = merge_param.tx_desc_;
@@ -107,7 +113,7 @@ int ObDASTRMergeIter::inner_init(ObDASIterParam &param)
     sr_iter_param_.max_batch_size_ = merge_param.max_batch_size_; // may be greater than ir_rtdef_->eval_ctx_->max_batch_size_
     inv_idx_tablet_switched_ = false;
     is_inited_ = true;
-    LOG_DEBUG("tr merge iter", K_(function_lookup_mode), K_(topk_mode), K_(daat_mode), K_(taat_mode));
+    adlog::DEBUG("tr merge iter", K_(function_lookup_mode), K_(topk_mode), K_(daat_mode), K_(taat_mode));
   }
   return ret;
 }
@@ -115,6 +121,8 @@ int ObDASTRMergeIter::inner_init(ObDASIterParam &param)
 int ObDASTRMergeIter::init_das_iter_scan_params()
 {
   int ret = OB_SUCCESS;
+  // ad taat
+  taat_mode_ = 1;
   const int64_t dim_iter_cnt = taat_mode_ ? 1 : query_tokens_.count();
   if (!ir_ctdef_->need_estimate_total_doc_cnt() && 0 != dim_iter_cnt) {
     void *buf = nullptr;
@@ -405,7 +413,7 @@ int ObDASTRMergeIter::create_dim_iters()
         LOG_WARN("failed to push back dim iter", K(ret));
       }
     }
-  } else if (taat_mode_) {
+  } else if (taat_mode_ or true) { //ad taat
     ObTextRetrievalScanIterParam iter_param;
     ObTextRetrievalTokenIter *dim_iter = nullptr;
     if (OB_FAIL(init_dim_iter_param(iter_param, 0))) {
@@ -431,7 +439,10 @@ int ObDASTRMergeIter::init_dim_iter_param(ObTextRetrievalScanIterParam &iter_par
   if (OB_ISNULL(ir_ctdef_) || OB_ISNULL(ir_rtdef_) || OB_ISNULL(ir_rtdef_->eval_ctx_)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("unexpected null pointer", K(ret), KP_(ir_ctdef), KP_(ir_rtdef));
+    adlog::DEBUG("WARNING! ObDASTRMergeIter::init_dim_iter_param first error");
   } else {
+    // ad taat
+    taat_mode_ = 1;
     const int64_t dim_iter_cnt = taat_mode_ ? 1 : query_tokens_.count();
     iter_param.inv_idx_scan_param_ = inv_scan_params_[idx];
     iter_param.inv_idx_scan_iter_ = static_cast<ObDASScanIter*>(children_[idx]);
@@ -550,7 +561,8 @@ int ObDASTRMergeIter::create_sparse_retrieval_iter()
     } else {
       sparse_retrieval_iter_ = bmw_iter;
     }
-  } else if (daat_mode_) {
+  } else if (daat_mode_ and false) { //ad taat
+    adlog::DEBUG("use daat mode");
     ObTextDaaTParam iter_param;
     ObTextDaaTIter *daat_iter = nullptr;
     if (OB_FAIL(init_daat_iter_param(iter_param))) {
@@ -563,7 +575,9 @@ int ObDASTRMergeIter::create_sparse_retrieval_iter()
     } else {
       sparse_retrieval_iter_ = daat_iter;
     }
-  } else if (taat_mode_) {
+  } else if (taat_mode_ or true) { //ad taat
+    // ADVISE adlog::DEBUG("use taat mode");
+    adlog::DEBUG("use taat mode");
     ObTextTaaTParam iter_param;
     ObTextTaaTIter *taat_iter = nullptr;
     if (OB_FAIL(init_taat_iter_param(iter_param))) {
@@ -574,6 +588,7 @@ int ObDASTRMergeIter::create_sparse_retrieval_iter()
     } else if (OB_FAIL(taat_iter->init(iter_param))) {
       LOG_WARN("failed to init text retrieval taat iter", K(ret));
     } else {
+      adlog::DEBUG("sparse_retrieval_iter_ = taat_iter;");
       sparse_retrieval_iter_ = taat_iter;
     }
   } else {
@@ -585,12 +600,12 @@ int ObDASTRMergeIter::create_sparse_retrieval_iter()
     if (OB_UNLIKELY(topk_mode_)) {
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("unexpected both topk mode and function lookup mode", K(ret));
-    } else if (daat_mode_) {
+    } else if (daat_mode_ and false) { //ad taat
       if (OB_ISNULL(lookup_iter = OB_NEWx(ObSRSortedLookupIter, &myself_allocator_))) {
         ret = OB_ALLOCATE_MEMORY_FAILED;
         LOG_WARN("failed to allocate memory for sorted lookup iter", K(ret));
       }
-    } else if (taat_mode_) {
+    } else if (taat_mode_ or true) { //ad taat
       if (OB_ISNULL(lookup_iter = OB_NEWx(ObSRHashLookupIter, &myself_allocator_))) {
         ret = OB_ALLOCATE_MEMORY_FAILED;
         LOG_WARN("failed to allocate memory for hash lookup iter", K(ret));
@@ -683,11 +698,14 @@ int ObDASTRMergeIter::init_taat_iter_param(ObTextTaaTParam &iter_param)
   iter_param.bm25_param_est_ctx_.doc_length_est_param_ = &doc_length_est_param_;
   if (OB_ISNULL(iter_param.dim_iter_ = dim_iter_)) {
     ret = OB_ERR_UNEXPECTED;
+    adlog::DEBUG("WARNING! OB_ISNULL(iter_param.dim_iter_ = dim_iter_)");
     LOG_WARN("unexpected null dim iter", K(ret));
   } else if (OB_ISNULL(iter_param.bm25_param_est_ctx_.total_doc_cnt_expr_)) {
     ret = OB_ERR_UNEXPECTED;
+    adlog::DEBUG("WARNING! OB_ISNULL(iter_param.bm25_param_est_ctx_.total_doc_cnt_expr_)");
     LOG_WARN("unexpected null total doc cnt expr", K(ret));
   } else if (OB_FAIL(init_doc_length_est_param())) {
+    adlog::DEBUG("WARNING! OB_FAIL(init_doc_length_est_param())");
     LOG_WARN("failed to init doc length est param", K(ret));
   } else if (!ir_ctdef_->need_estimate_total_doc_cnt()) {
     if (OB_UNLIKELY(!static_cast<sql::ObStoragePushdownFlag>(total_doc_cnt_scan_param_->pd_storage_flag_).is_aggregate_pushdown())) {
@@ -696,6 +714,11 @@ int ObDASTRMergeIter::init_taat_iter_param(ObTextTaaTParam &iter_param)
     } else {
       iter_param.bm25_param_est_ctx_.total_doc_cnt_iter_ = static_cast<sql::ObDASScanIter*>(children_[children_cnt_ - 1]);
     }
+  }
+  if(OB_SUCC(ret)){
+    adlog::DEBUG("ObDASTRMergeIter::init_taat_iter_param success");
+  } else {
+    adlog::DEBUG("ObDASTRMergeIter::init_taat_iter_param bad");
   }
   return ret;
 }
@@ -726,6 +749,8 @@ int ObDASTRMergeIter::set_children_iter_rangekey()
     }
     int64_t group_idx = ObNewRange::get_group_idx(group_id);
     ObNewRange inv_idx_scan_range;
+    // ad taat
+    taat_mode_ = 1;
     const int64_t dim_iter_cnt = taat_mode_ ? 1 : query_tokens_.count();
     for (int64_t i = 0; OB_SUCC(ret) && i < dim_iter_cnt; ++i) {
       if (OB_FAIL(gen_inv_idx_scan_default_range(query_tokens_[i], inv_idx_scan_range))) {
@@ -780,6 +805,8 @@ int ObDASTRMergeIter::set_children_iter_rangekey(const common::ObIArray<std::pai
     }
     int64_t group_idx = ObNewRange::get_group_idx(group_id);
     ObNewRange inv_idx_scan_range;
+    // ad taat
+    taat_mode_ = 1;
     const int64_t dim_iter_cnt = taat_mode_ ? 1 : query_tokens_.count();
     for (int64_t i = 0; OB_SUCC(ret) && i < dim_iter_cnt; ++i) {
       for (int64_t j = 0; OB_SUCC(ret) && j < batch_size; ++j) {

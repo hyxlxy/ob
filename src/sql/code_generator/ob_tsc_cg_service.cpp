@@ -454,29 +454,50 @@ int ObTscCgService::generate_two_phase_index_merge_ctdef(
     two_phase_path =
         static_cast<const TwoPhaseIndexMergePath *>(op.get_access_path());
 
-    {// phase_1
+    { // phase_1
+      auto && two_phase_path_non_const = const_cast<TwoPhaseIndexMergePath*>(two_phase_path);
           auto && phase_1_ctdef = root_ctdef->phase_one_ctdef_;
-      if (OB_ISNULL(two_phase_path->first_phase_merge_path_)) {
-        adlog::DEBUG("OB_ISNULL(two_phase_path->first_phase_merge_path_)");
+      if (OB_ISNULL(two_phase_path_non_const->first_phase_merge_path_)) {
+        adlog::DEBUG("OB_ISNULL(two_phase_path_non_const->first_phase_merge_path_)");
       } else {
-        IndexMergePath* phase_1_path = static_cast<IndexMergePath*>(two_phase_path->first_phase_merge_path_);
-        ObIndexMergeNode* root = phase_1_path->root_;
-        if (OB_FAIL(generate_index_merge_node_ctdef(op, tsc_ctdef, root, ctdef_alloc, phase_1_ctdef))) {
+        IndexMergePath* phase_1_path = static_cast<IndexMergePath*>(two_phase_path_non_const->first_phase_merge_path_);
+        ObIndexMergeNode *root = phase_1_path->root_;
+        auto&& phase_1_ctdef_ptr = &phase_1_ctdef;
+        if (OB_FAIL(generate_index_merge_node_ctdef(op, tsc_ctdef, root, ctdef_alloc, phase_1_ctdef_ptr))) {
           LOG_WARN("failed to generate index merge ctdef", K(root_ctdef));
         }        
       }
     }
 
     { // phase 2
-      auto &&phase_2_ctdef = root_ctdef->phase_two_ctdef_;
+      // auto && two_phase_path_non_const = const_cast<TwoPhaseIndexMergePath*>(two_phase_path);
+      
+      auto &&phase_2_ctdef = root_ctdef->phase_two_ctdef_;  
+      if (OB_ISNULL(two_phase_path->bmw_scan_path_)) {  
+        adlog::DEBUG("OB_ISNULL(two_phase_path->bmw_scan_path_)");  
+      } else {  
+         
+        DASScanCGCtx cg_ctx;  
+        bool has_rowscn = false;  
+        if (OB_FAIL(generate_das_scan_ctdef(op, cg_ctx, phase_2_ctdef, has_rowscn))) {  
+          adlog::DEBUG("failed to generate phase 2 scan ctdef", K(ret));  
+        } else {  
+          phase_2_ctdef.enable_bmw_ = true;  
+          // 这里先暂时的取消了，看后续如果需要的话，再加上
+          // phase_2_ctdef.limit_param_.limit_ = two_phase_path->topk_limit_;  
+          phase_2_ctdef.min_score_for_bmw_ = two_phase_path->min_score_threshold_;  // 新增  
+        }  
+        
+      }  
     }
     
   }
 
   // 最后去设定root_ctdef 的一些内容
   root_ctdef->enable_ = two_phase_path->enable_;  
-  root_ctdef->first_phase_limit_ = two_phase_path->first_phase_limit_;  
-  root_ctdef->topk_limit_ = two_phase_path->topk_limit_;    
+  root_ctdef->first_phase_limit_ = two_phase_path->first_phase_limit_;
+  root_ctdef->topk_limit_ = two_phase_path->topk_limit_;
+  root_ctdef->min_score_threshold_ = two_phase_path->min_score_threshold_;
 
 
   adlog::DEBUG("generate_two_phase_index_merge_ctdef end");

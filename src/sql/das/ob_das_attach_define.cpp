@@ -102,6 +102,69 @@ OB_SERIALIZE_MEMBER((ObDASIndexMergeCtDef, ObDASAttachCtDef), merge_type_, is_re
 
 OB_SERIALIZE_MEMBER((ObDASIndexMergeRtDef, ObDASAttachRtDef));
 
+OB_SERIALIZE_MEMBER((ObDASTwoPhaseIndexMergeCtDef, ObDASAttachCtDef),  
+                    phase_one_ctdef_,  
+                    phase_two_ctdef_,  
+                    enable_,  
+                    first_phase_limit_,  
+                    topk_limit_,  
+                    min_score_threshold_);  
+  
+OB_SERIALIZE_MEMBER((ObDASTwoPhaseIndexMergeRtDef, ObDASAttachRtDef));
+
+// OB_DEF_SERIALIZE(ObDASTwoPhaseIndexMergeCtDef)  
+// {  
+//   int ret = OB_SUCCESS;  
+//   BASE_SER((ObDASTwoPhaseIndexMergeCtDef, ObDASAttachCtDef));  
+    
+//   // 序列化指针 - 先序列化是否存在，再序列化内容  
+//   bool has_phase_one = phase_one_ctdef_ != nullptr;  
+//   OB_UNIS_ENCODE(has_phase_one);  
+//   if (has_phase_one) {  
+//     OB_UNIS_ENCODE(*phase_one_ctdef_);  
+//   }  
+    
+//   bool has_phase_two = phase_two_ctdef_ != nullptr;  
+//   OB_UNIS_ENCODE(has_phase_two);  
+//   if (has_phase_two) {  
+//     OB_UNIS_ENCODE(*phase_two_ctdef_);  
+//   }  
+    
+//   OB_UNIS_ENCODE(enable_);  
+//   OB_UNIS_ENCODE(first_phase_limit_);  
+//   OB_UNIS_ENCODE(topk_limit_);  
+//   OB_UNIS_ENCODE(min_score_threshold_);  
+    
+//   return ret;  
+// }
+
+// OB_DEF_DESERIALIZE(ObDASTwoPhaseIndexMergeCtDef)  
+// {  
+//   int ret = OB_SUCCESS;  
+//   BASE_DESER((ObDASTwoPhaseIndexMergeCtDef, ObDASAttachCtDef));  
+    
+//   bool has_phase_one = false;  
+//   OB_UNIS_DECODE(has_phase_one);  
+//   if (has_phase_one) {  
+//     phase_one_ctdef_ = OB_NEWx(ObDASIndexMergeCtDef, &alloc_, alloc_);  
+//     OB_UNIS_DECODE(*phase_one_ctdef_);  
+//   }  
+    
+//   bool has_phase_two = false;  
+//   OB_UNIS_DECODE(has_phase_two);  
+//   if (has_phase_two) {  
+//     phase_two_ctdef_ = OB_NEWx(ObDASScanCtDef, &alloc_, alloc_);  
+//     OB_UNIS_DECODE(*phase_two_ctdef_);  
+//   }  
+    
+//   OB_UNIS_DECODE(enable_);  
+//   OB_UNIS_DECODE(first_phase_limit_);  
+//   OB_UNIS_DECODE(topk_limit_);  
+//   OB_UNIS_DECODE(min_score_threshold_);  
+    
+//   return ret;  
+// }
+
 OB_DEF_SERIALIZE(ObDASAttachSpec)
 {
   int ret = OB_SUCCESS;

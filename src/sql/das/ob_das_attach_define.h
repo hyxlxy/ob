@@ -235,18 +235,17 @@ public:
 };
 
 // ADVISE
-struct ObDASTwoPhaseIndexMergeCtDef : ObDASAttachCtDef  
-{  
-  ObDASTwoPhaseIndexMergeCtDef(common::ObIAllocator &alloc)  
-    : ObDASAttachCtDef(alloc, DAS_OP_TWO_PHASE_INDEX_MERGE),  
-      first_phase_limit_(0),  
-      topk_limit_(0),  
-      min_score_threshold_(0.0)  
+struct ObDASTwoPhaseIndexMergeCtDef : ObDASAttachCtDef {
+  OB_UNIS_VERSION(1);
+public:
+  ObDASTwoPhaseIndexMergeCtDef(common::ObIAllocator &alloc)
+      : ObDASAttachCtDef(alloc, DAS_OP_TWO_PHASE_INDEX_MERGE),phase_one_ctdef_(alloc), phase_two_ctdef_(alloc),
+        first_phase_limit_(0), topk_limit_(0), min_score_threshold_(0.0)
   {}  
   virtual ~ObDASTwoPhaseIndexMergeCtDef();
 
-  ObDASIndexMergeCtDef *phase_one_ctdef_{nullptr};    // 第一阶段索引合并  
-  ObDASScanCtDef *phase_two_ctdef_{nullptr};          // 第二阶段BMW扫描  
+  ObDASIndexMergeCtDef phase_one_ctdef_;    // 第一阶段索引合并  
+  ObDASScanCtDef phase_two_ctdef_;          // 第二阶段BMW扫描  
   bool enable_{false};
   int64_t first_phase_limit_;  
   int64_t topk_limit_;  
