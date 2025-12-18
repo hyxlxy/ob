@@ -217,9 +217,15 @@ private:
   int extract_match_against_exprs(const common::ObIArray<ObExpr*> &exprs, common::ObIArray<ObExpr*> &match_against_exprs);
   int fill_default_values_for_union(const common::ObIArray<ObExpr*> &exprs);
   int save_row_to_result_buffer();
+  // Build bitmap for a single BTree index iter using a temporary ObDASScanIter.
+  // This temporary iter is independent of child_iters_ and is destroyed after use,
+  // so it will not affect the normal index merge execution.
+  int build_bitmap_for_single_btree_iter(int64_t iter_idx,
+                                         common::hash::ObHashSet<sql::ObDocIdExt, common::hash::NoPthreadDefendMode> &prefilter_bitmap,
+                                         int64_t &iter_rows_scanned,
+                                         int64_t &iter_docids_inserted);
   // Build prefilter bitmap from BTree index scan results for scalar conditions (e.g., id < 1000, base_id IN (...))
   // This bitmap will be used to pre-filter doc_ids in full-text search
-  // After bitmap is built, BTree iters will be removed from child_iters_, leaving only FTS iter
   int build_prefilter_docid_bitmap();
   // Helper function to recursively find FTS iterator (may be wrapped in SORT)
   ObDASTRMergeIter *find_fts_iter_recursive(ObDASIter *iter);

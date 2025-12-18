@@ -426,6 +426,185 @@ int ObDASIndexMergeIter::save_row_to_result_buffer()
   return result_buffer_.add_row();
 }
 
+int ObDASIndexMergeIter::build_bitmap_for_single_btree_iter(
+    int64_t iter_idx,
+    common::hash::ObHashSet<sql::ObDocIdExt, common::hash::NoPthreadDefendMode> &prefilter_bitmap,
+    int64_t &iter_rows_scanned,
+    int64_t &iter_docids_inserted)
+{
+  int ret = OB_SUCCESS;
+  iter_rows_scanned = 0;
+  iter_docids_inserted = 0;
+
+  // 1. 取出该 child 对应的 scan rtdef/ctdef 与 tablet 信息
+  if (iter_idx < 0 || iter_idx >= child_scan_rtdefs_.count()
+      || iter_idx >= child_tablet_ids_.count()) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("[PREFILTER_BITMAP] invalid iter_idx for bitmap building", K(ret), K(iter_idx),
+             K(child_scan_rtdefs_.count()), K(child_tablet_ids_.count()));
+  } else {
+    ObDASScanRtDef *scan_rtdef = child_scan_rtdefs_.at(iter_idx);
+    const ObDASScanCtDef *scan_ctdef =
+        OB_NOT_NULL(scan_rtdef) ? static_cast<const ObDASScanCtDef *>(scan_rtdef->ctdef_) : nullptr;
+    const ObTabletID &tablet_id = child_tablet_ids_.at(iter_idx);
+
+    if (OB_ISNULL(scan_rtdef) || OB_ISNULL(scan_ctdef)) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("[PREFILTER_BITMAP] unexpected null scan rtdef/ctdef for bitmap building",
+               K(ret), K(iter_idx), KP(scan_rtdef), KP(scan_ctdef));
+    } else if (OB_ISNULL(rowkey_exprs_) || rowkey_exprs_->count() == 0 || OB_ISNULL(rowkey_exprs_->at(0))) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("[PREFILTER_BITMAP] unexpected null rowkey expr when building bitmap",
+               K(ret), KP(rowkey_exprs_), "rowkey_exprs_count",
+               (rowkey_exprs_ ? rowkey_exprs_->count() : 0));
+    } else {
+      // 2. 构造临时的 ObTableScanParam，用 index_merge 自己的 helper 填充
+      ObTableScanParam tmp_scan_param;
+      if (OB_FAIL(init_scan_param(ls_id_, tablet_id, scan_ctdef, scan_rtdef, tmp_scan_param))) {
+        LOG_WARN("[PREFILTER_BITMAP] failed to init tmp scan param for bitmap", K(ret), K(iter_idx));
+      } else {
+        // 3. 构造临时 ObDASScanIterParam，并使用临时 ObDASScanIter
+        ObDASScanIterParam tmp_iter_param;
+        tmp_iter_param.scan_ctdef_ = scan_ctdef;
+        tmp_iter_param.eval_ctx_ = eval_ctx_;
+        tmp_iter_param.exec_ctx_ = exec_ctx_;
+        tmp_iter_param.max_size_ = 1;
+        tmp_iter_param.output_ = &scan_ctdef->result_output_;
+        
+        LOG_INFO("[PREFILTER_BITMAP] tmp_iter_param before init",
+                 K(iter_idx), KP(tmp_iter_param.output_),
+                 "output_count", (tmp_iter_param.output_ ? tmp_iter_param.output_->count() : -1),
+                 KP(tmp_iter_param.eval_ctx_), KP(tmp_iter_param.exec_ctx_));
+
+        ObDASScanIter tmp_scan_iter;
+        if (OB_FAIL(tmp_scan_iter.init(tmp_iter_param))) {
+          LOG_WARN("[PREFILTER_BITMAP] failed to init tmp scan iter for bitmap", K(ret), K(iter_idx),
+                   KP(tmp_iter_param.output_), KP(tmp_iter_param.eval_ctx_), KP(tmp_iter_param.exec_ctx_));
+        } else {
+          // 4. 绑定临时的 scan_param 并执行 table_scan
+          tmp_scan_iter.set_scan_param(tmp_scan_param);
+          LOG_INFO("[PREFILTER_BITMAP] Start temporary BTree scan for bitmap",
+                   K(iter_idx), K(tablet_id), KP(scan_ctdef), KP(scan_rtdef));
+
+          if (OB_FAIL(tmp_scan_iter.do_table_scan())) {
+            LOG_WARN("[PREFILTER_BITMAP] failed to do temporary table scan for bitmap", K(ret), K(iter_idx));
+          } else {
+            // 5. 复用原来的 child_store 作为 batch buffer（用完立刻 reuse，不影响后续 index_merge）
+            IndexMergeRowStore &child_store = child_stores_.at(iter_idx);
+
+            const int64_t batch_capacity = 256;
+            while (OB_SUCC(ret)) {
+              int64_t batch_count = 0;
+              if (OB_FAIL(tmp_scan_iter.get_next_rows(batch_count, batch_capacity))) {
+                if (ret != OB_ITER_END) {
+                  LOG_WARN("[PREFILTER_BITMAP] failed to get next rows from tmp scan iter", K(ret), K(iter_idx));
+                }
+                break;
+              }
+              if (batch_count <= 0) {
+                break;
+              }
+
+              // 保存 batch 到 child_store，复用原有提取 doc_id 的逻辑
+              if (OB_FAIL(child_store.save(true, batch_count))) {
+                LOG_WARN("[PREFILTER_BITMAP] failed to save tmp scan data to child_store", K(ret));
+              } else {
+                const ExprFixedArray *btree_output = tmp_scan_iter.get_output();
+                const ObExpr *rowkey_expr = rowkey_exprs_->at(0);
+                if (OB_ISNULL(btree_output) || btree_output->count() == 0) {
+                  ret = OB_ERR_UNEXPECTED;
+                  LOG_WARN("[PREFILTER_BITMAP] unexpected null or empty tmp scan output", K(ret));
+                } else if (OB_ISNULL(rowkey_expr)) {
+                  ret = OB_ERR_UNEXPECTED;
+                  LOG_WARN("[PREFILTER_BITMAP] unexpected null rowkey expr in tmp scan", K(ret));
+                } else {
+                  int64_t doc_id_col_idx = OB_INVALID_INDEX;
+                  for (int64_t col_idx = 0; col_idx < btree_output->count(); ++col_idx) {
+                    const ObExpr *btree_expr = btree_output->at(col_idx);
+                    if (OB_NOT_NULL(btree_expr) && btree_expr == rowkey_expr) {
+                      doc_id_col_idx = col_idx;
+                      break;
+                    }
+                  }
+                  if (doc_id_col_idx == OB_INVALID_INDEX) {
+                    doc_id_col_idx = 0;
+                    LOG_WARN("[PREFILTER_BITMAP] Could not find rowkey_expr in tmp scan output, using first column as doc_id",
+                             KP(rowkey_expr), "btree_output_count", btree_output->count());
+                  } else {
+                    LOG_INFO("[PREFILTER_BITMAP] Found doc_id column in tmp scan output",
+                             "doc_id_col_idx", doc_id_col_idx,
+                             "btree_output_count", btree_output->count());
+                  }
+
+                  // 遍历本批次的每一行，提取 doc_id
+                  for (int64_t i = 0; OB_SUCC(ret) && i < batch_count; ++i) {
+                    const ObDatum *datums = child_store.cur_datums();
+                    if (OB_ISNULL(datums)) {
+                      ret = OB_ERR_UNEXPECTED;
+                      LOG_WARN("[PREFILTER_BITMAP] unexpected null datums from child_store", K(ret), K(i));
+                    } else if (doc_id_col_idx >= btree_output->count()) {
+                      ret = OB_ERR_UNEXPECTED;
+                      LOG_WARN("[PREFILTER_BITMAP] doc_id column index out of range in tmp scan",
+                               K(ret), K(doc_id_col_idx), "btree_output_count", btree_output->count());
+                    } else {
+                      const ObDatum &doc_id_datum = datums[doc_id_col_idx];
+                      sql::ObDocIdExt doc_id;
+                      if (OB_FAIL(doc_id.from_datum(doc_id_datum))) {
+                        LOG_WARN("[PREFILTER_BITMAP] failed to convert datum to doc_id in tmp scan",
+                                 K(ret), K(i), K(doc_id_col_idx));
+                      } else {
+                        int hash_ret = prefilter_bitmap.set_refactored(doc_id);
+                        if (OB_SUCCESS != hash_ret && OB_HASH_EXIST != hash_ret) {
+                          ret = hash_ret;
+                          LOG_WARN("[PREFILTER_BITMAP] failed to insert doc_id into bitmap in tmp scan",
+                                   K(ret), K(hash_ret));
+                        } else {
+                          iter_docids_inserted++;
+                          // 记录前若干个 doc_id 便于调试
+                          if (iter_docids_inserted <= 10) {
+                            ObObj doc_id_obj;
+                            if (OB_SUCC(doc_id_datum.to_obj(doc_id_obj, rowkey_expr->obj_meta_,
+                                                            rowkey_expr->obj_datum_map_))) {
+                              LOG_INFO("[PREFILTER_BITMAP] Inserted doc_id into bitmap (tmp scan)",
+                                       K(iter_docids_inserted), K(doc_id_col_idx),
+                                       "doc_id_datum", doc_id_datum, "doc_id_obj", doc_id_obj,
+                                       "doc_id", doc_id, "rowkey_expr_type", rowkey_expr->type_,
+                                       "btree_output_count", btree_output->count());
+                            } else {
+                              LOG_INFO("[PREFILTER_BITMAP] Inserted doc_id into bitmap (tmp scan, no obj conversion)",
+                                       K(iter_docids_inserted), K(doc_id_col_idx),
+                                       "doc_id_datum", doc_id_datum, "doc_id", doc_id);
+                            }
+                          }
+                        }
+                      }
+                    }
+                    iter_rows_scanned++;
+                    // 推进 child_store 游标
+                    child_store.cur_idx_++;
+                  }
+                  // 用完本批数据后清空 child_store，避免影响后续 index_merge
+                  child_store.reuse();
+                }
+              }
+            } // while
+
+            if (ret == OB_ITER_END) {
+              ret = OB_SUCCESS;
+            }
+          }
+
+          // tmp_scan_iter 为栈对象，生命周期到此结束
+        }
+      }
+    }
+  }
+
+  LOG_INFO("[PREFILTER_BITMAP] Finished temporary BTree scan for bitmap",
+           K(iter_idx), K(iter_rows_scanned), K(iter_docids_inserted), K(ret));
+  return ret;
+}
+
 int ObDASIndexMergeIter::do_table_scan()
 {
   int ret = OB_SUCCESS;
@@ -1584,13 +1763,77 @@ int ObDASIndexMergeIter::build_prefilter_docid_bitmap()
           }
         }
         
-        // BTree iter 扫描完成后，不需要重新初始化
-        // 因为后面会将 BTree iter 从 child_iters_ 中移除，只保留 FTS iter
-        // 这样 intersect 就变成了单路扫描 + bitmap 过滤
-        
-        // 如果 ret 是 OB_ITER_END，说明正常扫描完毕，将其置为 OB_SUCCESS
-        if (ret == OB_ITER_END) {
+        // Reset iter for later use
+        // CRITICAL: After scanning all data for bitmap building, we need to re-init the iterator
+        // to allow it to be used again in intersect_get_next_rows().
+        //
+        // 方案：不使用 rescan()（因为 rescan 对已经扫描到末尾的 iter 可能返回 OB_NOT_INIT），
+        // 而是重新调用 init_scan_param() + do_table_scan() 来重新初始化扫描。
+        int saved_ret = ret;
+        LOG_INFO("[PREFILTER_BITMAP] Before re-init BTree iter", K(iter_idx), K(saved_ret),
+                 "OB_SUCC(saved_ret)", OB_SUCC(saved_ret));
+
+        // 只有在出现真正的错误（且不是 OB_ITER_END）时才跳过重新初始化
+        if (OB_FAIL(ret) && ret != OB_ITER_END) {
+          LOG_WARN("[PREFILTER_BITMAP] Skipping re-init because ret is real error", K(ret), K(iter_idx));
+        } else {
+          // 将 ret 复位为成功状态
           ret = OB_SUCCESS;
+          
+          // 重新初始化 BTree iter：先 release() 释放旧的扫描结果，再重新 do_table_scan()
+          // 注意：do_table_scan() 要求 result_ == nullptr，所以必须先 release()
+          ObDASScanRtDef *scan_rtdef = child_scan_rtdefs_.at(iter_idx);
+          if (OB_NOT_NULL(scan_rtdef)) {
+            const ObDASScanCtDef *scan_ctdef = static_cast<const ObDASScanCtDef*>(scan_rtdef->ctdef_);
+            ObTableScanParam *scan_param = child_scan_params_.at(iter_idx);
+            if (OB_ISNULL(scan_ctdef) || OB_ISNULL(scan_param)) {
+              LOG_WARN("[PREFILTER_BITMAP] null scan_ctdef or scan_param, skip re-init",
+                       K(iter_idx), KP(scan_ctdef), KP(scan_param));
+            } else {
+              LOG_INFO("[PREFILTER_BITMAP] Re-initializing BTree iter via release + init_scan_param + do_table_scan", K(iter_idx));
+              // 先 release() 释放旧的扫描结果（会将 result_ 置为 nullptr，inited_ 置为 false）
+              int reinit_ret = btree_iter->release();
+              if (OB_FAIL(reinit_ret)) {
+                LOG_WARN("[PREFILTER_BITMAP] failed to release btree iter before re-init",
+                         K(reinit_ret), K(iter_idx));
+              } else {
+                // 重新 init()
+                // 需要构造一个 ObDASScanIterParam
+                ObDASScanIterParam scan_iter_param;
+                scan_iter_param.scan_ctdef_ = scan_ctdef;
+                scan_iter_param.max_size_ = max_size_;
+                scan_iter_param.eval_ctx_ = eval_ctx_;
+                scan_iter_param.exec_ctx_ = exec_ctx_;
+                scan_iter_param.output_ = &scan_ctdef->result_output_;
+                reinit_ret = btree_iter->init(scan_iter_param);
+                if (OB_FAIL(reinit_ret)) {
+                  LOG_WARN("[PREFILTER_BITMAP] failed to re-init btree iter",
+                           K(reinit_ret), K(iter_idx));
+                } else {
+                  // 设置 scan_param 并执行 do_table_scan()
+                  static_cast<ObDASScanIter*>(btree_iter)->set_scan_param(*scan_param);
+                  reinit_ret = init_scan_param(ls_id_, child_tablet_ids_.at(iter_idx), scan_ctdef, scan_rtdef, *scan_param);
+                  if (OB_FAIL(reinit_ret)) {
+                    LOG_WARN("[PREFILTER_BITMAP] failed to re-init scan param for btree iter",
+                             K(reinit_ret), K(iter_idx));
+                  } else {
+                    reinit_ret = btree_iter->do_table_scan();
+                    if (OB_FAIL(reinit_ret)) {
+                      LOG_WARN("[PREFILTER_BITMAP] failed to do_table_scan for btree iter after bitmap building",
+                               K(reinit_ret), K(iter_idx));
+                    } else {
+                      LOG_INFO("[PREFILTER_BITMAP] Successfully re-initialized BTree iter after bitmap building", K(iter_idx));
+                    }
+                  }
+                }
+              }
+            }
+          } else {
+            // 没有 scan_rtdef，无法重新初始化
+            LOG_WARN("[PREFILTER_BITMAP] No scan_rtdef, cannot re-init btree iter", K(iter_idx));
+          }
+          // 将 ret 恢复为扫描阶段的返回码（可能是 OB_SUCCESS 或 OB_ITER_END）
+          ret = saved_ret;
         }
         
         LOG_INFO("[PREFILTER_BITMAP] Finished scanning BTree iter", 
@@ -1601,6 +1844,17 @@ int ObDASIndexMergeIter::build_prefilter_docid_bitmap()
     LOG_INFO("[PREFILTER_BITMAP] After scanning all BTree iters", 
              K(ret), K(total_rows_scanned), K(total_docids_inserted), 
              KP(prefilter_bitmap), K(prefilter_bitmap ? prefilter_bitmap->size() : 0));
+    
+    // CRITICAL: Reset all child_stores that were used for bitmap building
+    // This is necessary because we modified their state (cur_idx_, saved_size_) during bitmap building
+    for (int64_t idx = 0; idx < btree_iter_indices.count(); ++idx) {
+      int64_t iter_idx = btree_iter_indices.at(idx);
+      IndexMergeRowStore &child_store = child_stores_.at(iter_idx);
+      child_store.reuse();
+      LOG_INFO("[PREFILTER_BITMAP] Reset child_store after bitmap building", K(iter_idx),
+               "cur_idx", child_store.cur_idx_, "saved_size", child_store.saved_size_,
+               "iter_end", child_store.iter_end_);
+    }
     
     // Even if there were errors during scanning, if we have a valid bitmap with data,
     // we should still try to pass it to FTS iter
@@ -1629,49 +1883,48 @@ int ObDASIndexMergeIter::build_prefilter_docid_bitmap()
       } else {
         LOG_INFO("[PREFILTER_BITMAP] Bitmap passed to FTS iter successfully", 
                  K(prefilter_bitmap->size()), K(btree_iter_indices.count()));
-        
-        // CRITICAL: 移除 BTree iter，只保留 FTS iter
-        // 这样后续 intersect 就变成了单路扫描 + bitmap 过滤
-        // 需要从后往前移除，避免索引错乱
-        LOG_INFO("[PREFILTER_BITMAP] Removing BTree iters from child_iters_, before removal",
-                 "child_iters_count", child_iters_.count(),
-                 "child_stores_count", child_stores_.count(),
-                 "btree_iter_indices_count", btree_iter_indices.count());
-        
-        for (int64_t idx = btree_iter_indices.count() - 1; idx >= 0; --idx) {
-          int64_t iter_idx = btree_iter_indices.at(idx);
-          LOG_INFO("[PREFILTER_BITMAP] Removing BTree iter at index", K(idx), K(iter_idx));
-          
-          // 先 release BTree iter 释放资源
-          ObDASIter *btree_iter_to_remove = child_iters_.at(iter_idx);
-          if (OB_NOT_NULL(btree_iter_to_remove)) {
-            btree_iter_to_remove->release();
-          }
-          
-          // 从各个数组中移除对应元素
-          child_iters_.remove(iter_idx);
-          child_stores_.remove(iter_idx);
-          child_scan_rtdefs_.remove(iter_idx);
-          child_scan_params_.remove(iter_idx);
-          child_tablet_ids_.remove(iter_idx);
-          child_match_against_exprs_.remove(iter_idx);
-        }
-        
-        LOG_INFO("[PREFILTER_BITMAP] After removing BTree iters",
-                 "child_iters_count", child_iters_.count(),
-                 "child_stores_count", child_stores_.count());
-        
-        // 验证：移除后应该只剩下 FTS iter
-        for (int64_t i = 0; i < child_iters_.count(); ++i) {
-          ObDASIter *child = child_iters_.at(i);
-          ObDASIterType child_type = OB_NOT_NULL(child) ? child->get_type() : DAS_ITER_INVALID;
-          LOG_INFO("[PREFILTER_BITMAP] Remaining child iter after removal",
-                   K(i), K(child_type), KP(child));
-        }
       }
     } else {
-      LOG_WARN("[PREFILTER_BITMAP] Failed to build bitmap or bitmap is empty", K(ret), 
+      LOG_WARN("[PREFILTER_BITMAP] Failed to build bitmap", K(ret), 
                K(total_rows_scanned), K(total_docids_inserted));
+    }
+    
+    // Check state of all child_stores after bitmap building
+    LOG_INFO("[PREFILTER_BITMAP] Checking child_store states after bitmap building");
+    for (int64_t i = 0; i < child_stores_.count(); ++i) {
+      ObDASIter *child_iter = child_iters_.at(i);
+      IndexMergeRowStore &child_store = child_stores_.at(i);
+      ObDASIterType child_type = OB_NOT_NULL(child_iter) ? child_iter->get_type() : DAS_ITER_INVALID;
+      const char *child_type_str = "UNKNOWN";
+      bool is_btree = false;
+      switch (child_type) {
+        case DAS_ITER_TEXT_RETRIEVAL_MERGE:
+          child_type_str = "FTS_MERGE";
+          break;
+        case DAS_ITER_SCAN:
+          child_type_str = "SCAN";
+          is_btree = true;  // SCAN iter is typically BTree index
+          break;
+        case DAS_ITER_SORT:
+          child_type_str = "SORT";
+          break;
+        case DAS_ITER_MERGE:
+          child_type_str = "MERGE";
+          break;
+        default:
+          child_type_str = "OTHER";
+          // If not FTS_MERGE, it's likely a BTree iter
+          if (child_type != DAS_ITER_TEXT_RETRIEVAL_MERGE) {
+            is_btree = true;
+          }
+          break;
+      }
+      LOG_INFO("[PREFILTER_BITMAP] Child store state after bitmap building",
+               K(i), "child_type", child_type_str, K(child_type), "is_btree", is_btree,
+               "child_store_cur_idx", child_store.cur_idx_,
+               "child_store_saved_size", child_store.saved_size_,
+               "child_store_iter_end", child_store.iter_end_,
+               "child_store_have_data", child_store.have_data());
     }
   }
   
