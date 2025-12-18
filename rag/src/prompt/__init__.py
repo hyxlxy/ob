@@ -1,10 +1,19 @@
 """Prompt templates and constants for the RAG system."""
 
-from src.prompt.query import QUERY_SYSTEM_PROMPT, QUERY_USER_PROMPT_TEMPLATE
+from src.prompt.query import (
+    QUERY_SYSTEM_PROMPT,
+    QUERY_USER_PROMPT_TEMPLATE,
+    NUMERIC_QUESTION_PROMPT,
+    LIST_QUESTION_PROMPT,
+    ANALYSIS_QUESTION_PROMPT,
+)
 from src.prompt.vlm import VLM_IMAGE_EXTRACTION_PROMPT
 
 __all__ = [
     "QUERY_SYSTEM_PROMPT",
     "QUERY_USER_PROMPT_TEMPLATE",
+    "NUMERIC_QUESTION_PROMPT",
+    "LIST_QUESTION_PROMPT",
+    "ANALYSIS_QUESTION_PROMPT",
     "VLM_IMAGE_EXTRACTION_PROMPT",
 ]

@@ -1,19 +1,25 @@
 import re
-from typing import List
+from typing import List, Tuple
 
 
 def split_text(
     text: str,
     max_chunk_size: int = 1200,
     overlap: int = 150,
+    preserve_tables: bool = True,
 ) -> List[str]:
     """
-    将文本按段落优先切分；当段落过长时再按句子边界切分，并使用少量重叠以保持上下文连续性。
+    将文本按语义优先切分：
+    1. 优先保持表格、列表等结构完整
+    2. 按段落和标题边界切分
+    3. 当段落过长时按句子边界切分
+    4. 使用重叠保持上下文连续性
 
     Args:
         text: 待切分文本
         max_chunk_size: 单块最大字符数（近似 token 控制）
-        overlap: 邻接块之间的重叠字符数（仅用于长段落切分后拼块）
+        overlap: 邻接块之间的重叠字符数
+        preserve_tables: 是否保持表格完整
 
     Returns:
         文本块列表
@@ -26,8 +32,31 @@ def split_text(
     text = re.sub(r"\n{3,}", "\n\n", text)
     text = text.strip()
 
-    # 按双换行视为段落
-    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+    # 检测并提取表格（Markdown格式）
+    tables = []
+    if preserve_tables:
+        # 匹配Markdown表格
+        table_pattern = r'(\|[^\n]+\|\n)(\|[-:\s|]+\|\n)((?:\|[^\n]+\|\n?)+)'
+        for match in re.finditer(table_pattern, text):
+            tables.append((match.start(), match.end(), match.group(0)))
+    
+    # 按标题和段落边界切分
+    # 检测标题模式（数字开头、#开头等）
+    section_patterns = [
+        r'\n(?=\d+[\.、）]\s*[^\n]+)',  # 数字标题
+        r'\n(?=#{1,3}\s+[^\n]+)',        # Markdown标题
+        r'\n(?=【[^】]+】)',              # 中文标题
+        r'\n(?=[一二三四五六七八九十]+[、．]\s*)',  # 中文数字标题
+    ]
+    
+    # 合并段落分隔模式
+    split_pattern = r'\n\n+'
+    for pattern in section_patterns:
+        split_pattern += f'|{pattern}'
+    
+    # 按段落分割
+    paragraphs = re.split(split_pattern, text)
+    paragraphs = [p.strip() for p in paragraphs if p and p.strip()]
 
     if not paragraphs:
         return []
@@ -39,15 +68,13 @@ def split_text(
             return []
         out: List[str] = []
         buf = ""
-        for i, s in enumerate(parts):
+        for s in parts:
             if not buf:
                 buf = s
                 continue
-            # 若加入后超限则提交当前块并带重叠开启新块
             if len(buf) + 1 + len(s) > max_chunk_size:
                 out.append(buf)
                 if overlap > 0:
-                    # 取尾部 overlap 字符作为下块开头
                     tail = buf[-overlap:]
                     buf = (tail + " " + s)[:max_chunk_size]
                 else:
@@ -59,15 +86,54 @@ def split_text(
         return out
 
     for paragraph in paragraphs:
-        if len(paragraph) <= max_chunk_size:
+        # 检查是否包含表格
+        is_table = any('|' in paragraph and paragraph.count('|') >= 4 for _ in [1])
+        
+        if is_table:
+            # 表格尽量保持完整
+            if len(paragraph) <= max_chunk_size * 1.5:  # 允许表格稍大
+                chunks.append(paragraph)
+            else:
+                # 表格太大，按行拆分
+                lines = paragraph.split('\n')
+                current_chunk = ""
+                for line in lines:
+                    if len(current_chunk) + len(line) + 1 <= max_chunk_size:
+                        current_chunk += line + "\n"
+                    else:
+                        if current_chunk:
+                            chunks.append(current_chunk.strip())
+                        current_chunk = line + "\n"
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+        elif len(paragraph) <= max_chunk_size:
             chunks.append(paragraph)
         else:
             # 先按句子切分再组块并加重叠
             long_sentences = _split_long_paragraph(paragraph, max_chunk_size)
             chunks.extend(_with_overlap(long_sentences))
 
-    # 过滤空块
-    return [chunk for chunk in chunks if chunk.strip()]
+    # 过滤空块和过短块
+    return [chunk for chunk in chunks if chunk.strip() and len(chunk.strip()) > 20]
+
+
+def extract_key_info(text: str) -> Tuple[List[str], List[str]]:
+    """
+    从文本中提取关键信息，用于增强检索
+    
+    Args:
+        text: 文本内容
+        
+    Returns:
+        (数值列表, 实体列表) 元组
+    """
+    # 提取数值（包括百分比、金额等）
+    numbers = re.findall(r'\d+(?:\.\d+)?(?:%|亿|万|百万)?', text)
+    
+    # 提取可能的实体（2-6个字的专有名词）
+    entities = re.findall(r'(?:千味央厨|油炸类|烘焙类|蒸煮类|菜肴类)', text)
+    
+    return numbers, entities
 
 
 def _split_long_paragraph(text: str, max_chunk_size: int) -> List[str]:

@@ -296,13 +296,26 @@ def _detect_embedding_dim() -> int:
     return 1024
 
 
-def add(dataset_dir: str, max_worker: int):
+def check_data_exists(client) -> bool:
+    """检查数据库中是否已有数据"""
+    try:
+        from sqlalchemy import text
+        result = client.perform_raw_text_sql(text(f"SELECT COUNT(*) FROM {TABLE_NAME}"))
+        count = list(result)[0][0] if result else 0
+        return count > 0
+    except Exception as e:
+        logger.debug(f"Error checking data existence: {e}")
+        return False
+
+
+def add(dataset_dir: str, max_worker: int = 4, force_rebuild: bool = False):
     """
     Prepare RAG data by parsing PDFs, generating embeddings, and storing in OceanBase.
 
     Args:
         dataset_dir: Directory containing PDF files
-        max_worker: Number of parallel workers for processing PDF files (default: 2)
+        max_worker: Number of parallel workers for processing PDF files
+        force_rebuild: If True, rebuild even if data already exists
     """
     pdf_files: List[str] = glob.glob(os.path.join(dataset_dir, "*.pdf"))
 
@@ -321,9 +334,18 @@ def add(dataset_dir: str, max_worker: int):
 
     create_table_if_not_exists(client, vector_dim)
 
+    # Check if data already exists
+    if not force_rebuild and check_data_exists(client):
+        logger.info("Data already exists in database, skipping import. Use force_rebuild=True to rebuild.")
+        return
+
+    # 动态调整并行度：PDF文件数量少时减少worker数
+    effective_workers = min(max_worker, len(pdf_files), 4)
+    logger.info(f"Using {effective_workers} workers for {len(pdf_files)} PDF files")
+
     # Process PDF files in parallel
     total_chunks = 0
-    with ThreadPoolExecutor(max_workers=max_worker) as executor:
+    with ThreadPoolExecutor(max_workers=effective_workers) as executor:
         # Submit all PDF processing tasks
         future_to_pdf = {
             executor.submit(process_pdf_file, pdf_file, client): pdf_file

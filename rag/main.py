@@ -94,16 +94,66 @@ if __name__ == "__main__":
     questions: List[str] = read_questions_json(args.questions)
     logger.info(f"Loaded {len(questions)} questions from {args.questions}")
 
-    from concurrent.futures import ThreadPoolExecutor
+    import time
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     
-    # Use 4 workers for QA to balance concurrency and rate limits
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        # Submit all questions. We preserve order by mapping futures to their original index
-        # or simply using executor.map if search returns the Answer object directly.
-        # search(question) returns Answer.
-        results = list(executor.map(search, questions))
+    # 根据问题数量动态调整并行度
+    # 较少问题时可以更激进，较多问题时要控制并发避免限流
+    if len(questions) <= 5:
+        max_workers = 2
+        delay_between = 0.5
+    elif len(questions) <= 15:
+        max_workers = 3
+        delay_between = 0.3
+    else:
+        max_workers = 2  # 大量问题时减少并发
+        delay_between = 0.2
     
-    answers = results
+    logger.info(f"Using {max_workers} workers with {delay_between}s delay")
+    
+    answers = [None] * len(questions)
+    
+    def process_question(idx_question):
+        idx, question = idx_question
+        try:
+            result = search(question)
+            return idx, result
+        except Exception as e:
+            logger.error(f"Error processing question {idx}: {e}")
+            return idx, Answer(
+                question=question,
+                answer=f"处理问题时发生错误: {str(e)}",
+                filename="",
+                page=0
+            )
+    
+    # 使用 ThreadPoolExecutor 并行处理
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = []
+        for idx, question in enumerate(questions):
+            future = executor.submit(process_question, (idx, question))
+            futures.append(future)
+            # 添加小延迟避免API限流
+            if idx < len(questions) - 1:
+                time.sleep(delay_between)
+        
+        # 收集结果
+        for future in as_completed(futures):
+            try:
+                idx, result = future.result()
+                answers[idx] = result
+            except Exception as e:
+                logger.error(f"Future failed: {e}")
+    
+    # 确保所有答案都有值
+    for idx, ans in enumerate(answers):
+        if ans is None:
+            answers[idx] = Answer(
+                question=questions[idx],
+                answer="未能生成答案",
+                filename="",
+                page=0
+            )
 
     logger.info(f"Completed processing {len(answers)} questions.")
     logger.info(f"Writing answers to {args.output}...")
