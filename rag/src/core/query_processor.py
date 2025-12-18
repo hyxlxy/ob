@@ -23,6 +23,7 @@ QUESTION_TYPES = {
 def classify_question_type(question: str) -> str:
     """
     识别问题类型，用于后续的检索策略选择和重排序权重调整
+    针对千味央厨财务报告问题优化
     
     Args:
         question: 用户问题
@@ -31,40 +32,59 @@ def classify_question_type(question: str) -> str:
         问题类型标识
     """
     # 时间事实类关键词
-    time_keywords = ["什么时候", "成立时间", "哪一年", "何时", "日期"]
-    # 数值事实类关键词
-    numeric_keywords = ["多少", "营业收入", "利润", "费用率", "毛利率", 
-                       "周转率", "产能利用率", "百分比", "比例", "金额", "数额"]
+    time_keywords = ["什么时候", "成立时间", "哪一年", "何时", "日期", "时间是"]
+    
+    # 数值事实类关键词 - 扩展覆盖更多数值问题
+    numeric_keywords = [
+        "多少", "是多少", "分别是多少",
+        "营业收入", "收入是", "利润", "净利润",
+        "费用率", "毛利率", "周转率", "利用率", "产能利用率",
+        "百分比", "比例", "金额", "数额",
+        "2018年", "2019年", "2020年", "2021年", "2022年", "2023年", "2024年",
+        "预计", "预测",
+    ]
+    
     # 对比类关键词
-    comparison_keywords = ["相比", "对比", "不同", "区别", "差异", "与.*比"]
+    comparison_keywords = ["相比", "对比", "不同", "区别", "差异", "与.*比", "有何不同", "如何.*相比"]
+    
     # 列表类关键词
-    list_keywords = ["有哪些", "包括哪些", "哪些类别", "什么类别", "主要.*有"]
+    list_keywords = ["有哪些", "包括哪些", "哪些类别", "什么类别", "主要.*有", "哪些.*类"]
+    
     # 分析类关键词
-    analysis_keywords = ["如何", "为什么", "原因", "怎样", "怎么", "策略"]
+    analysis_keywords = ["如何实施", "为什么", "原因是什么", "主要原因", "怎样", "策略", "驱动因素", "困境是什么"]
     
-    question_lower = question.lower()
+    # 按优先级匹配 - 调整顺序以更准确分类
     
-    # 按优先级匹配
+    # 1. 先检查是否包含具体年份+数值询问 -> 数值类
+    if re.search(r'20\d{2}年.*(多少|是多少|分别)', question):
+        return "numeric_fact"
+    
+    # 2. 时间事实类
     for kw in time_keywords:
         if kw in question:
             return "time_fact"
     
-    for kw in numeric_keywords:
-        if kw in question:
-            return "numeric_fact"
-    
+    # 3. 对比类 - 检测"有何不同"等模式
     for kw in comparison_keywords:
         if kw in question or re.search(kw, question):
             return "comparison"
     
+    # 4. 列表类
     for kw in list_keywords:
         if kw in question or re.search(kw, question):
             return "list"
     
+    # 5. 数值事实类
+    for kw in numeric_keywords:
+        if kw in question:
+            return "numeric_fact"
+    
+    # 6. 分析类
     for kw in analysis_keywords:
         if kw in question:
             return "analysis"
     
+    # 7. 默认为实体事实类
     return "entity_fact"
 
 

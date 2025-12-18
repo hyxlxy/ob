@@ -27,6 +27,20 @@ def extract_numbers_from_text(text: str) -> List[str]:
     return numbers
 
 
+def extract_precise_numbers(text: str) -> set:
+    """提取精确数值（用于完全匹配评分）"""
+    patterns = [
+        r'\d+(?:\.\d+)?%',  # 百分比如 70.05%
+        r'\d{1,3}(?:,\d{3})*(?:\.\d+)?',  # 带逗号的数字
+        r'\d+(?:\.\d+)?(?:亿|万|百万)?(?:元)?',  # 金额
+    ]
+    numbers = set()
+    for pattern in patterns:
+        matches = re.findall(pattern, text)
+        numbers.update(matches)
+    return numbers
+
+
 def calculate_keyword_density(content: str, keywords: List[str]) -> float:
     """
     计算关键词密度得分
@@ -194,6 +208,7 @@ def score_chunk_relevance(
     3. 信息完整性
     4. 精确度（数值类问题）
     5. 文件级加成
+    6. 【新增】问题数值精确匹配
     
     Args:
         content: Chunk内容
@@ -207,43 +222,51 @@ def score_chunk_relevance(
     """
     score = 0.0
     
-    # 1. 关键词密度 (权重: 0.35)
+    # 1. 关键词密度 (权重: 0.30)
     keyword_density = calculate_keyword_density(content, keywords)
-    score += keyword_density * 0.35
+    score += keyword_density * 0.30
     
-    # 2. 语义相关性 (权重: 0.25)
+    # 2. 语义相关性 (权重: 0.20)
     semantic_score = calculate_semantic_relevance(content, question)
-    score += semantic_score * 0.25
+    score += semantic_score * 0.20
     
-    # 3. 信息完整性 (权重: 0.15)
-    # 检查是否包含完整的句子和数据
+    # 3. 信息完整性 (权重: 0.10)
     has_complete_sentences = content.count('。') >= 1 or content.count('.') >= 1
     has_data = bool(re.search(r'\d+', content))
     completeness = (0.5 if has_complete_sentences else 0) + (0.5 if has_data else 0)
-    score += completeness * 0.15
+    score += completeness * 0.10
     
     # 4. 精确度 - 针对数值类问题 (权重: 0.15)
     precision_score = 0.5
     if question_type == "numeric_fact":
-        # 检查是否包含数值和单位
         numbers = extract_numbers_from_text(content)
         if numbers:
             precision_score = min(len(numbers) / 3, 1.0)
     elif question_type == "time_fact":
-        # 检查是否包含年份
         years = re.findall(r'\d{4}年|\d{2}年', content)
         if years:
             precision_score = 0.9
     elif question_type == "list":
-        # 检查是否包含列表或多个项目
         list_markers = content.count('、') + content.count('；') + content.count('，')
         if list_markers >= 2:
             precision_score = 0.8
-    
     score += precision_score * 0.15
     
-    # 5. 文件级加成 (权重: 0.1)
-    score += file_score * 0.1
+    # 5. 【新增】问题数值精确匹配 (权重: 0.15)
+    # 如果问题中有具体数值/年份，chunk中也有，则大幅加分
+    question_numbers = extract_precise_numbers(question)
+    if question_numbers:
+        chunk_numbers = extract_precise_numbers(content)
+        exact_matches = len(question_numbers & chunk_numbers)
+        if exact_matches > 0:
+            # 精确匹配是强信号
+            score += min(exact_matches * 0.15, 0.15)
+    else:
+        # 没有具体数值时，按普通权重
+        score += 0.075
+    
+    # 6. 文件级加成 (权重: 0.10)
+    score += file_score * 0.10
     
     return min(score, 1.0)
 

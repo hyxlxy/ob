@@ -1,5 +1,5 @@
 from .add import add
-from .search_optimized import search
+from .search_enhanced import search  # 使用增强版搜索
 from .query_processor import QueryProcessor, classify_question_type, extract_keywords
 from .reranker import AdvancedReranker
 
