@@ -850,6 +850,8 @@ class Path
   public:
     ObIndexMergeNode *root_;
     int64_t index_cnt_;
+    int64_t topn_limit_{-1};  
+    bool enable_topn_pushdown_{false}; 
 
   private:
     DISALLOW_COPY_AND_ASSIGN(IndexMergePath);

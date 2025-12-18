@@ -2613,6 +2613,12 @@ int ObTscCgService::generate_index_merge_ctdef(const ObLogTableScan &op,
     ObIndexMergeNode *root = path->root_;
     if (OB_FAIL(generate_index_merge_node_ctdef(op, tsc_ctdef, root, ctdef_alloc, root_ctdef))) {
       LOG_WARN("failed to generate index merge ctdef", K(root_ctdef));
+    } else {
+      if(root_ctdef and path){
+        // 这里尝试一下把topn给吓退一下试试
+        root_ctdef->topn_limit_ = path->topn_limit_;
+        root_ctdef->enable_topn_pushdown_ = path->enable_topn_pushdown_;
+      }
     }
   }
   return ret;

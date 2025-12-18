@@ -161,7 +161,7 @@ public:
   ObSEArray<ObDocIdExt,64, ModulePageAllocator > cached_doc_id_;  
   int64_t cur_idx_;
   int64_t total_count_;
-  bool is_created_flag_{true};
+  bool is_created_flag_{false};
   bool have_done_flag_{false};
   common::ObIAllocator *allocator_;  
 };
@@ -191,7 +191,7 @@ public:
     return ret;
   }
   // ADVISE
-  ObTRDaaTTokenCacheIter* cache_iter_{nullptr};
+  mutable ObTRDaaTTokenCacheIter* cache_iter_{nullptr};
 private:
   int save_relevances_and_docids();
   int save_docids();

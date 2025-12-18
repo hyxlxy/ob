@@ -139,18 +139,17 @@ public:
   {
   public:
     MergeResultBuffer()
-      : exprs_(nullptr),
-        eval_ctx_(nullptr),
-        max_size_(1),
-        result_store_("DASIndexMerge"),
-        result_store_iter_()
+        : exprs_(nullptr), eval_ctx_(nullptr), max_size_(1),
+          result_store_("DASIndexMerge"), result_store_iter_(),
+          topn_limit_(-1), enable_topn_(false),  topn_heap_(compare_, nullptr) 
     {}
     int init(int64_t max_size, ObEvalCtx *eval_ctx, const common::ObIArray<ObExpr*> *exprs, common::ObIAllocator &alloc);
     int add_row();
+    int add_row_with_topn();  
     int to_expr(int64_t size);
     void reuse();
     void reset();
-
+    int to_expr_from_topn(int64_t &size);
   public:
     const common::ObIArray<ObExpr*> *exprs_;
     ObEvalCtx *eval_ctx_;
@@ -158,6 +157,36 @@ public:
 
     ObChunkDatumStore result_store_;           // 结果存储区
     ObChunkDatumStore::Iterator result_store_iter_;
+
+    int64_t topn_limit_;
+    bool enable_topn_;
+
+    struct TopNRow {  
+      TopNRow() : row_data_(nullptr), score_(0.0) {}  
+      TopNRow(ObChunkDatumStore::StoredRow *row, double score)   
+        : row_data_(row), score_(score) {}  
+        
+      ObChunkDatumStore::StoredRow *row_data_;  
+      double score_;  
+        
+      TO_STRING_KV(K_(row_data), K_(score));
+    };
+    
+    struct TopNCompare {  
+    public:  
+      bool operator()(const TopNRow *lhs, const TopNRow *rhs) const  
+      {  
+        if (OB_ISNULL(lhs) || OB_ISNULL(rhs)) {  
+          return false;  
+        }  
+        return lhs->score_ < rhs->score_;  
+      }  
+        
+      int get_error_code() const { return common::OB_SUCCESS; }  
+    };
+    TopNCompare compare_;
+    common::ObBinaryHeap<TopNRow *, TopNCompare> topn_heap_;
+    common::ObIAllocator *alloc_;
   };
 
 public:

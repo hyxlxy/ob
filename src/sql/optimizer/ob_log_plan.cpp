@@ -15685,8 +15685,11 @@ int ObLogPlan::try_push_topn_into_text_retrieval_scan(
     ObLogicalOperator *&top, ObRawExpr *topn_expr, ObRawExpr *limit_expr,
     ObRawExpr *offset_expr, bool is_fetch_with_ties, bool need_exchange,
     const ObIArray<OrderItem> &sort_keys, bool &need_further_sort) {
-  adlog::DEBUG("ObLogPlan::try_push_topn_into_text_retrieval_scan");
   int ret = OB_SUCCESS;
+  adlog::DEBUG("ObLogPlan::try_push_topn_into_text_retrieval_scan start");
+  // if (top->is_index_merge()) {
+    
+  // }
   need_further_sort = true;
   ObLogTableScan *table_scan = NULL;
   bool has_multi_sort_keys = false;

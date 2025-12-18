@@ -719,7 +719,12 @@ int ObTextRetrievalDaaTTokenIter::get_next_row() {
   bool need_load = false;
 
   if (cache_iter_ and cache_iter_->have_done_flag_) {
-    // 代表他指的迭代器可以使用了，那么就直接调用它的对应的缓存迭代器吧.
+    // 代表他指的迭代器可以使用了，那么就直接调用它的对应的缓存迭代器吧.ObTRDaaTTokenCacheIter
+    if (!cache_iter_->is_created_flag_) {
+      // 这里会导致内存泄漏，以后要注意修复
+      cache_iter_ = TokenCacheMg::get_instance().create_iter_from_cache(cache_iter_);
+      cache_iter_->is_created_flag_ = true;
+    }
     cache_iter_->cur_idx_ = cur_idx_;
     ++cur_idx_;
     adlog::DEBUG("使用了内置的缓存迭代器");
@@ -881,6 +886,11 @@ int ObTextRetrievalDaaTTokenIter::get_curr_score(double &score) const
   
   if (cache_iter_ and cache_iter_->have_done_flag_) {
     // 代表他指的迭代器可以使用了，那么就直接调用它的对应的缓存迭代器吧.
+    if (!cache_iter_->is_created_flag_) {
+      // 这里会导致内存泄漏，以后要注意修复
+      cache_iter_ = TokenCacheMg::get_instance().create_iter_from_cache(cache_iter_);
+      cache_iter_->is_created_flag_ = true;
+    }
     cache_iter_->cur_idx_ = cur_idx_;
     return cache_iter_->get_curr_score(score);
   }
@@ -900,6 +910,11 @@ int ObTextRetrievalDaaTTokenIter::get_curr_id(const ObDatum *&id_datum) const
 
   if (cache_iter_ and cache_iter_->have_done_flag_) {
     // 代表他指的迭代器可以使用了，那么就直接调用它的对应的缓存迭代器吧.
+    if (!cache_iter_->is_created_flag_) {
+      // 这里会导致内存泄漏，以后要注意修复
+      cache_iter_ = TokenCacheMg::get_instance().create_iter_from_cache(cache_iter_);
+      cache_iter_->is_created_flag_ = true;
+    }
     cache_iter_->cur_idx_ = cur_idx_;
     return cache_iter_->get_curr_id(id_datum);
   }
@@ -1208,7 +1223,7 @@ ObTRDaaTTokenCacheIter();
 */
 
 ObTRDaaTTokenCacheIter::ObTRDaaTTokenCacheIter(common::ObIAllocator *alloc)
-    : cur_idx_(-1), total_count_(0), is_created_flag_(true),
+    : cur_idx_(-1), total_count_(0), is_created_flag_(false),
       have_done_flag_(false), allocator_(alloc)  
 {  
   // cached_relevance_.set_allocator(allocator_);  
@@ -1312,7 +1327,7 @@ int ObTRDaaTTokenCacheIter::init_from_cache(ObTRDaaTTokenCacheIter *one)
       total_count_ = one->total_count_;  
       cur_idx_ = -1;  
       have_done_flag_ = true;
-      is_created_flag_ = true;
+      is_created_flag_ = false;
       // adlog::DEBUG("缓存迭代器： 从cache拷贝过来了一个");
     }  
   }  
@@ -1341,8 +1356,7 @@ int ObTRDaaTTokenCacheIter::add_data(const ObFixedArray<double, ObIAllocator> &r
     }  
       
     if (OB_SUCC(ret)) {  
-      total_count_ += count;  
-      is_created_flag_ = true;  
+      total_count_ += count;    
     }
   }
   // adlog::DEBUG("ObTRDaaTTokenCacheIter::add_data end");

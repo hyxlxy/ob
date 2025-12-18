@@ -141,6 +141,7 @@ int ObDASIndexMergeIter::MergeResultBuffer::init(int64_t max_size,
     max_size_ = max_size;
     eval_ctx_ = eval_ctx;
     exprs_ = exprs;
+    alloc_ = &alloc;
   }
   return ret;
 }
@@ -177,7 +178,131 @@ void ObDASIndexMergeIter::MergeResultBuffer::reset()
 {
   result_store_iter_.reset();
   result_store_.reset();
+  if (enable_topn_) { 
+    topn_heap_.reset();
+  }
 }
+
+int ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn() {
+  int ret = OB_SUCCESS;
+
+  auto make_topn_row = [&](TopNRow*& row) -> int {
+    int ret = OB_SUCCESS;
+    ObChunkDatumStore::StoredRow *stored_row = nullptr; 
+    if (OB_FAIL(ObChunkDatumStore::StoredRow::build(stored_row, *exprs_, *eval_ctx_, *alloc_))) {  
+      adlog::DEBUG("failed to build stored row", K(ret));  
+    } else {    
+      double score = 0.0;
+      ObSEArray<ObExpr *, 4> match_against_exprs;
+      for (int64_t i = 0; OB_SUCC(ret) && i < exprs_->count(); ++i) {
+        ObExpr *expr = exprs_->at(i);
+        if (OB_ISNULL(expr)) {
+          ret = OB_ERR_UNEXPECTED;  
+          LOG_WARN("unexpected nullptr expr", K(ret));
+        } else if (T_FUN_MATCH_AGAINST == expr->type_) {
+          if (OB_FAIL(match_against_exprs.push_back(expr))) {
+            LOG_WARN("failed to push back match against expr", K(ret));
+          }
+        }
+      }
+      // if (OB_FAIL(extract_match_against_exprs(*exprs_, match_against_exprs))) {
+      //   return ret;
+      // }
+      if (!match_against_exprs.empty()) {  
+        adlog::DEBUG("提取到了match_against_expr");
+        ObExpr *score_expr = match_against_exprs.at(0);  
+        int64_t expr_idx = -1;  
+        for (int64_t i = 0; i < exprs_->count(); ++i) {  
+          if (exprs_->at(i) == score_expr) {  
+            expr_idx = i;  
+            break;  
+          }  
+        }  
+          
+        if (expr_idx >= 0 && expr_idx < stored_row->cnt_) {  
+          ObDatum *score_datum = &stored_row->cells()[expr_idx];
+          score = score_datum->get_double();
+          adlog::DEBUG("找到了分数： ",score);//
+        }  
+      }  
+      row = OB_NEWx(TopNRow, alloc_, stored_row, score);  
+    }  
+
+    return ret;
+  };
+
+  TopNRow *row = nullptr;
+  if (OB_FAIL(make_topn_row(row))) {
+    return ret;
+  }
+
+  if (topn_heap_.count() < topn_limit_) {
+    if (OB_FAIL(topn_heap_.push(row))) {
+      adlog::DEBUG("index merge iter: topn_heap push error");
+    }
+    return ret;
+  }
+
+  TopNRow *heap_top = topn_heap_.top();  
+  if (OB_NOT_NULL(heap_top)) {  
+  }else{ // heap top竟然是空指针
+    adlog::DEBUG("NO WAY!!!! heap top nullptr");
+    return ret;
+  }
+
+  if (row->score_ <= heap_top->score_) {
+    alloc_->free(row);
+    ret = OB_ERR_UNEXPECTED;
+    return ret;
+  }
+
+  if (OB_FAIL(topn_heap_.replace_top(row))) {  
+    LOG_WARN("failed to replace heap top", K(ret));  
+  } else {    
+    alloc_->free(heap_top);  
+  }  
+  
+  
+  return ret;
+}
+
+
+int ObDASIndexMergeIter::MergeResultBuffer::to_expr_from_topn(int64_t &size)  
+{  
+  int ret = OB_SUCCESS;  
+     
+  common::ObArray<TopNRow*> sorted_rows;
+  while (topn_heap_.count() > 0) {
+    auto &&top = topn_heap_.top();
+    sorted_rows.push_back(top);
+    topn_heap_.pop();
+  } 
+  std::sort(sorted_rows.begin(), sorted_rows.end(), [](const TopNRow *a, const TopNRow *b) {  
+    return a->score_ > b->score_; // 
+  });  
+  {  
+    ObEvalCtx::BatchInfoScopeGuard batch_info_guard(*eval_ctx_);  
+    batch_info_guard.set_batch_size(sorted_rows.count());  
+      
+    for (int64_t i = 0; OB_SUCC(ret) && i < sorted_rows.count(); ++i) {  
+      batch_info_guard.set_batch_idx(i);  
+      TopNRow *row = sorted_rows.at(i);  
+      if (OB_ISNULL(row) || OB_ISNULL(row->row_data_)) {  
+        ret = OB_ERR_UNEXPECTED;  
+        LOG_WARN("unexpected null row", K(ret));  
+      } else if (OB_FAIL(row->row_data_->to_expr<true>(*exprs_, *eval_ctx_))) {  
+        LOG_WARN("failed to convert row to expr", K(ret));  
+      }  
+    }  
+      
+    if (OB_SUCC(ret)) {  
+      size = sorted_rows.count();  
+    }  
+  }  
+  topn_heap_.reset();  
+  return ret;  
+}  
+
 
 int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
 {
@@ -263,6 +388,12 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
         if (OB_SUCC(ret)) {
           if (OB_FAIL(result_buffer_.init(max_size_, eval_ctx_, output_, mem_ctx_->get_malloc_allocator()))) {
             LOG_WARN("failed to init merge result buffer", K(ret));
+          } else {
+            if (merge_ctdef_->enable_topn_pushdown_) {
+              result_buffer_.enable_topn_ = merge_ctdef_->enable_topn_pushdown_;
+              result_buffer_.topn_limit_ = merge_ctdef_->topn_limit_;
+              adlog::DEBUG(K(result_buffer_.topn_limit_));
+            }
           }
         }
       }
@@ -418,9 +549,13 @@ int ObDASIndexMergeIter::fill_default_values_for_union(const common::ObIArray<Ob
   return ret;
 }
 
-int ObDASIndexMergeIter::save_row_to_result_buffer()
-{
-  return result_buffer_.add_row();
+int ObDASIndexMergeIter::save_row_to_result_buffer() {
+  // adlog::DEBUG()
+  // if (!result_buffer_.enable_topn_ or true) {
+  if (!result_buffer_.enable_topn_) {
+    return result_buffer_.add_row();
+  }
+  return result_buffer_.add_row_with_topn();
 }
 
 int ObDASIndexMergeIter::do_table_scan()
@@ -832,8 +967,12 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
         child_stores_.at(i).to_expr();
       }
       child_stores_.at(output_idx).to_expr();
-      if (OB_FAIL(save_row_to_result_buffer())) {  
-        adlog::DEBUG("failed to save row to result buffer", K(ret)); 
+      if (OB_FAIL(save_row_to_result_buffer())) {
+        if (result_buffer_.enable_topn_) {
+          ret = OB_SUCCESS;
+        }else {
+          adlog::DEBUG("failed to save row to result buffer", K(ret));
+        }
       } else {  
         count += 1;
       }
@@ -854,7 +993,11 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
     ret = OB_SUCCESS;  
   }  
   if (OB_SUCC(ret) && count > 0) {
-    if (OB_FAIL(result_buffer_.to_expr(count))) {
+
+    if (result_buffer_.enable_topn_) {
+      adlog::DEBUG("result_buffer_.to_expr_from_topn(count)");
+      result_buffer_.to_expr_from_topn(count);
+    } else if (OB_FAIL(result_buffer_.to_expr(count))) {
       adlog::DEBUG("failed to convert result buffer to exprs", K(ret));  
       LOG_WARN("failed to convert result buffer to exprs", K(ret));  
     }  

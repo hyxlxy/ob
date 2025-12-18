@@ -3982,6 +3982,30 @@
          adlog::DEBUG("failed to create two phase index merge path", K(ret));  
        } else if (OB_NOT_NULL(two_phase_path)) {  
          adlog::DEBUG("two phase path create ok");
+         if (auto &&two_phase_p =
+                 static_cast<TwoPhaseIndexMergePath *>(two_phase_path)) {
+           adlog::DEBUG("给进行一下topn的下推");
+           adlog::DEBUG(K(access_paths.count()));
+           adlog::DEBUG(K(two_phase_p->topk_limit_));
+           if (access_paths.count() == 1) {
+             auto && path = access_paths.at(0);
+             if (path->is_index_merge_path()) {
+               auto && index_merge_path = static_cast<IndexMergePath*>(path);
+               if (index_merge_path->root_ and index_merge_path->root_->gen_code_ == 114514) {
+                 index_merge_path->topn_limit_ = two_phase_p->topk_limit_;
+                 index_merge_path->enable_topn_pushdown_ = true;
+               }
+             }
+           }
+          //  for (AccessPath *path : access_paths) {
+          //    if (!path->is_index_merge_path()) {
+          //      continue;
+          //    }
+          //    auto && index_merge_path = static_cast<IndexMergePath*>(path);
+          //    index_merge_path->topn_limit_ = two_phase_p->topk_limit_;
+          //    index_merge_path->enable_topn_pushdown_ = true;
+          // }
+         }
          // 如果要开启二阶段，就把下面的内容取消注释
 
         //  if (OB_FAIL(access_paths.push_back(two_phase_path))) {  
@@ -4106,11 +4130,14 @@
           need_two_phase = true;
           adlog::DEBUG("need_two_phase = true;");
         }
+
+
        }
      }
-     
    }
+
    adlog::DEBUG(K(need_two_phase), "  ", K(limit_value));
+   
    if (!need_two_phase) {  
      // 不需要两阶段优化  
      // do nothing
