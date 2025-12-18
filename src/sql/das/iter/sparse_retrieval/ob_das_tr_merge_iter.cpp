@@ -55,7 +55,8 @@ ObDASTRMergeIter::ObDASTRMergeIter()
     flags_(0),
     check_rangekey_inited_(false),
     inv_idx_tablet_switched_(false),
-    is_inited_(false)
+    is_inited_(false),
+    prefilter_docid_bitmap_(nullptr)
 {
 }
 
@@ -561,6 +562,8 @@ int ObDASTRMergeIter::create_sparse_retrieval_iter()
     } else if (OB_FAIL(daat_iter->init(iter_param))) {
       LOG_WARN("failed to init text retrieval daat iter", K(ret));
     } else {
+      // remember DAAT iter so that we can inject bitmap later when bitmap
+      // is built by index merge after this iterator has been created.
       sparse_retrieval_iter_ = daat_iter;
     }
   } else if (taat_mode_) {
@@ -617,6 +620,14 @@ int ObDASTRMergeIter::init_daat_iter_param(ObTextDaaTParam &iter_param)
   iter_param.allocator_ = &myself_allocator_;
   iter_param.mode_flag_ = ir_ctdef_->mode_flag_;
   iter_param.function_lookup_mode_ = function_lookup_mode_;
+  // Pass prefilter bitmap to DAAT iter
+  iter_param.prefilter_docid_set_ = prefilter_docid_bitmap_;
+  if (OB_NOT_NULL(prefilter_docid_bitmap_)) {
+    LOG_INFO("[PREFILTER_BITMAP] init_daat_iter_param() passing bitmap to DAAT iter", 
+             K(prefilter_docid_bitmap_->size()));
+  } else {
+    LOG_INFO("[PREFILTER_BITMAP] init_daat_iter_param() no bitmap to pass (NULL)");
+  }
   iter_param.bm25_param_est_ctx_.total_doc_cnt_expr_
       = ir_ctdef_->get_doc_agg_ctdef()->pd_expr_spec_.pd_storage_aggregate_output_.at(0);
   iter_param.bm25_param_est_ctx_.estimated_total_doc_cnt_ = ir_ctdef_->estimated_total_doc_cnt_;
@@ -811,6 +822,31 @@ int ObDASTRMergeIter::set_children_iter_rangekey(const common::ObIArray<std::pai
     LOG_WARN("failed to set hints", K(ret), K(batch_size));
   }
   return ret;
+}
+
+int ObDASTRMergeIter::set_prefilter_docid_bitmap(common::hash::ObHashSet<sql::ObDocIdExt, common::hash::NoPthreadDefendMode> *bitmap)
+{
+  prefilter_docid_bitmap_ = bitmap;
+  if (OB_NOT_NULL(bitmap)) {
+    LOG_INFO("[PREFILTER_BITMAP] ObDASTRMergeIter::set_prefilter_docid_bitmap() called", K(bitmap->size()), KP(sparse_retrieval_iter_));
+    // Try to inject bitmap into underlying DAAT iterator if it already exists.
+    // Note: sparse_retrieval_iter_ may be wrapped by lookup iterator (ObSRLookupIter).
+    // Current DAAT prefilter is only supported for pure DAAT mode without lookup wrapper.
+    if (OB_NOT_NULL(sparse_retrieval_iter_)) {
+      storage::ObTextDaaTIter *daat_iter = dynamic_cast<storage::ObTextDaaTIter *>(sparse_retrieval_iter_);
+      if (nullptr != daat_iter) {
+        daat_iter->set_prefilter_docid_set(bitmap);
+        LOG_INFO("[PREFILTER_BITMAP] injected bitmap into ObTextDaaTIter", K(bitmap->size()), KP(daat_iter));
+      } else {
+        LOG_INFO("[PREFILTER_BITMAP] sparse_retrieval_iter_ is not ObTextDaaTIter, skip injection");
+      }
+    } else {
+      LOG_INFO("[PREFILTER_BITMAP] sparse_retrieval_iter_ is NULL when setting bitmap");
+    }
+  } else {
+    LOG_INFO("[PREFILTER_BITMAP] ObDASTRMergeIter::set_prefilter_docid_bitmap() called with NULL bitmap");
+  }
+  return OB_SUCCESS;
 }
 
 int ObDASTRMergeIter::gen_inv_idx_scan_default_range(const ObString &query_token, ObNewRange &scan_range)

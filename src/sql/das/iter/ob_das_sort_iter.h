@@ -71,6 +71,8 @@ public:
   virtual int do_table_scan() override;
   virtual int rescan() override;
   virtual void clear_evaluated_flag() override;
+  // Get child iterator (for recursive FTS iterator lookup)
+  ObDASIter *get_child() const { return child_; }
 
 protected:
   virtual int inner_init(ObDASIterParam &param) override;

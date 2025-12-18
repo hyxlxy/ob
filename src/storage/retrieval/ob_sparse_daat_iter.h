@@ -21,6 +21,7 @@
 #include "ob_sparse_utils.h"
 #include "lib/container/ob_loser_tree.h"
 #include "sql/das/ob_das_ir_define.h"
+#include "lib/hash/ob_hashset.h"
 #include <cstdint>
 
 namespace oceanbase
@@ -104,6 +105,10 @@ protected:
   int64_t next_round_cnt_;
   void (*set_datum_func_)(ObDatum &, const ObDocIdExt &);
 
+  // Pre-filter bitmap: set of valid doc_ids from scalar conditions
+  // If not null, only doc_ids in this set will be processed
+  common::hash::ObHashSet<sql::ObDocIdExt, common::hash::NoPthreadDefendMode> *prefilter_docid_set_;
+
   // ADVISE
   int ididid;
   bool has_id_less_filter_{false};     // 是否有ID小于过滤条件
@@ -121,6 +126,13 @@ public:
     has_id_less_filter_ = true;
     id_less_filter_extracted_flag_ = true;
     id_less_value_ = val;
+  }
+  // Set prefilter bitmap for doc_id filtering after initialization.
+  // This is used by upper layer (e.g., ObDASTRMergeIter) to inject bitmap
+  // after DAAT iterator has been created.
+  void set_prefilter_docid_set(common::hash::ObHashSet<sql::ObDocIdExt, common::hash::NoPthreadDefendMode> *bitmap)
+  {
+    prefilter_docid_set_ = bitmap;
   }
 private:
   DISALLOW_COPY_AND_ASSIGN(ObSRDaaTIterImpl);

@@ -23,6 +23,7 @@
 #include "storage/retrieval/ob_text_daat_iter.h"
 #include "storage/retrieval/ob_text_taat_iter.h"
 #include "storage/retrieval/ob_sparse_lookup_iter.h"
+#include "lib/hash/ob_hashset.h"
 
 namespace oceanbase
 {
@@ -121,6 +122,11 @@ public:
   int get_query_max_score(double &score) {
     return sparse_retrieval_iter_->get_query_max_score(score);
   }
+  // Set prefilter bitmap for scalar condition filtering (e.g., id < 1000, base_id IN (...))
+  // This bitmap should be built from BTree index scan results before full-text search.
+  // Implementation is in cpp so that we can try to inject bitmap into underlying
+  // DAAT iterator when it already exists.
+  int set_prefilter_docid_bitmap(common::hash::ObHashSet<sql::ObDocIdExt, common::hash::NoPthreadDefendMode> *bitmap);
 private:
   int init_das_iter_scan_params();
   static int init_das_iter_scan_param(
@@ -198,6 +204,9 @@ private:
   bool check_rangekey_inited_;
   bool inv_idx_tablet_switched_;
   bool is_inited_;
+  // Prefilter bitmap: set of valid doc_ids from scalar conditions
+  // Built from BTree index scan (e.g., idx_base_id) before full-text search
+  common::hash::ObHashSet<sql::ObDocIdExt, common::hash::NoPthreadDefendMode> *prefilter_docid_bitmap_;
   DISALLOW_COPY_AND_ASSIGN(ObDASTRMergeIter);
 };
 

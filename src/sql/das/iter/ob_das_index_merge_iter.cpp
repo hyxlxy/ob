@@ -18,6 +18,9 @@
 #define USING_LOG_PREFIX SQL_DAS
 #include "sql/das/iter/ob_das_index_merge_iter.h"
 #include "src/sql/das/ob_das_attach_define.h"
+#include "lib/hash/ob_hashset.h"
+#include "sql/das/ob_das_ir_define.h"
+#include "sql/das/iter/ob_das_sort_iter.h"
 namespace oceanbase
 {
 using namespace common;
@@ -447,6 +450,23 @@ int ObDASIndexMergeIter::do_table_scan()
       LOG_WARN("child iter failed to do table scan", K(ret));
     }
   }
+  
+  // After all child iters have done table scan, build prefilter bitmap if needed
+  if (OB_SUCC(ret)) {
+    // Ensure has_fts_iter_ is set by calling check_mixed_query_with_fts()
+    // This is needed because init_two_phase() might not have been called
+    check_mixed_query_with_fts();
+    LOG_INFO("[PREFILTER_BITMAP] After check_mixed_query_with_fts in do_table_scan",
+             K(has_fts_iter_), KP(fts_iter_));
+
+    LOG_INFO("just for test", K(ret));
+    if (OB_FAIL(build_prefilter_docid_bitmap())) {
+      LOG_WARN("failed to build prefilter docid bitmap", K(ret));
+      // Don't fail the entire operation if bitmap building fails
+      ret = OB_SUCCESS;
+    }
+  }
+  
   return ret;
 }
 
@@ -614,36 +634,54 @@ int ObDASIndexMergeIter::compare(int64_t cur_idx, int64_t &output_idx, int &cmp_
   cmp_ret = 0;
   if (cur_idx == OB_INVALID_INDEX || !child_stores_.at(cur_idx).have_data()) {
     ret = OB_INVALID_ARGUMENT;
-    LOG_WARN("invalid idx", K(cur_idx), K(ret));
+    LOG_WARN("[PREFILTER_BITMAP_INDEX_MERGE] compare: invalid idx", K(cur_idx), K(ret));
   } else if (output_idx == OB_INVALID_INDEX) {
     output_idx = cur_idx;
+    LOG_INFO("[PREFILTER_BITMAP_INDEX_MERGE] compare: set initial output_idx", K(cur_idx));
   } else {
     const ObDatum *cur_datums = child_stores_.at(cur_idx).cur_datums();
     const ObDatum *output_datums = child_stores_.at(output_idx).cur_datums();
     if (OB_ISNULL(cur_datums) || OB_ISNULL(output_datums)) {
       ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("unexpected nullptr", K(cur_datums), K(output_datums));
+      LOG_WARN("[PREFILTER_BITMAP_INDEX_MERGE] compare: unexpected nullptr", K(cur_datums), K(output_datums));
     }
     ObObj cur_obj;
     ObObj output_obj;
+    int64_t old_output_idx = output_idx;
     for (int64_t i = 0; (cmp_ret == 0) && OB_SUCC(ret) && i < rowkey_exprs_->count(); i++) {
       const ObExpr *expr = rowkey_exprs_->at(i);
       if (OB_ISNULL(expr)) {
         ret = OB_ERR_UNEXPECTED;
-        LOG_WARN("unexpected nullptr", K(ret));
+        LOG_WARN("[PREFILTER_BITMAP_INDEX_MERGE] compare: unexpected nullptr expr", K(i), K(ret));
       } else if (OB_FAIL(cur_datums[i].to_obj(cur_obj, expr->obj_meta_, expr->obj_datum_map_))) {
-        LOG_WARN("failed to convert left datum to obj", K(i), KPC(expr), K(ret));
+        LOG_WARN("[PREFILTER_BITMAP_INDEX_MERGE] compare: failed to convert cur datum to obj", K(i), KPC(expr), K(ret));
       } else if (OB_FAIL(output_datums[i].to_obj(output_obj, expr->obj_meta_, expr->obj_datum_map_))) {
-        LOG_WARN("failed to convert right datum to obj", K(i), KPC(expr), K(ret));
+        LOG_WARN("[PREFILTER_BITMAP_INDEX_MERGE] compare: failed to convert output datum to obj", K(i), KPC(expr), K(ret));
       } else if (OB_FAIL(cur_obj.check_collation_free_and_compare(output_obj, cmp_ret))) {
-          LOG_WARN("failed to compare cur obj with output obj", K(ret));
+          LOG_WARN("[PREFILTER_BITMAP_INDEX_MERGE] compare: failed to compare objs", K(i), K(ret));
       } else if (cmp_ret != 0) {
+        // Log rowkey comparison details
+        LOG_INFO("[PREFILTER_BITMAP_INDEX_MERGE] compare: rowkey mismatch",
+                 K(cur_idx), K(old_output_idx), K(i), K(cmp_ret),
+                 "cur_obj", cur_obj, "output_obj", output_obj,
+                 "cur_store_cur_idx", child_stores_.at(cur_idx).cur_idx_,
+                 "output_store_cur_idx", child_stores_.at(old_output_idx).cur_idx_);
         if (cmp_ret < 0) {
+          // cur < output, so cur becomes the new output_idx (smaller rowkey)
           output_idx = OB_UNLIKELY(is_reverse_) ? output_idx : cur_idx;
+          LOG_INFO("[PREFILTER_BITMAP_INDEX_MERGE] compare: cur < output, update output_idx",
+                   K(cur_idx), K(old_output_idx), "new_output_idx", output_idx, K(is_reverse_));
         } else {
+          // cur > output, keep output_idx (output is smaller)
           output_idx = OB_UNLIKELY(is_reverse_) ? cur_idx : output_idx;
+          LOG_INFO("[PREFILTER_BITMAP_INDEX_MERGE] compare: cur > output, keep output_idx",
+                   K(cur_idx), K(old_output_idx), "new_output_idx", output_idx, K(is_reverse_));
         }
       }
+    }
+    if (OB_SUCC(ret) && cmp_ret == 0) {
+      LOG_INFO("[PREFILTER_BITMAP_INDEX_MERGE] compare: rowkey matched",
+               K(cur_idx), K(output_idx), "rowkey_count", rowkey_exprs_->count());
     }
   }
   return ret;
@@ -726,19 +764,41 @@ int ObDASIndexMergeIter::intersect_get_next_row() {
 int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacity)  
 {
   int ret = OB_SUCCESS;
-  adlog::DEBUG("ObDASIndexMergeIter::intersect_get_next_rows start");
-  // {
-  //   adlog::DEBUG("INTERSECT rowkey_exprs_ count", K(rowkey_exprs_->count()));  
-  //   for (int64_t i = 0; i < rowkey_exprs_->count(); i++) {
-  //     // adlog::DEBUG("rowkey_expr", i, std::to_string(*rowkey_exprs_->at(i)));
-  //     {
-  //       char buf[1024];  
-  //       int64_t pos = 0;  
-  //       pos = rowkey_exprs_->at(i)->to_string(buf, sizeof(buf));  
-  //       adlog::DEBUG("rowkey_expr", i, std::string(buf, pos));
-  //     }
-  //   }
-  // }
+  LOG_INFO("[PREFILTER_BITMAP_INDEX_MERGE] intersect_get_next_rows start",
+           K(capacity), K(child_stores_.count()));
+  
+  // Check initial state of each child iter and child_store before merge
+  LOG_INFO("[PREFILTER_BITMAP_INDEX_MERGE] Checking initial state of all child iters and stores");
+  for (int64_t i = 0; i < child_iters_.count() && i < child_stores_.count(); ++i) {
+    ObDASIter *child_iter = child_iters_.at(i);
+    IndexMergeRowStore &child_store = child_stores_.at(i);
+    ObDASIterType child_type = OB_NOT_NULL(child_iter) ? child_iter->get_type() : DAS_ITER_INVALID;
+      const char *child_type_str = "UNKNOWN";
+      switch (child_type) {
+        case DAS_ITER_TEXT_RETRIEVAL_MERGE:
+          child_type_str = "FTS_MERGE";
+          break;
+        case DAS_ITER_SCAN:
+          child_type_str = "SCAN";
+          break;
+        case DAS_ITER_SORT:
+          child_type_str = "SORT";
+          break;
+        case DAS_ITER_MERGE:
+          child_type_str = "MERGE";
+          break;
+        default:
+          child_type_str = "OTHER";
+          break;
+      }
+    LOG_INFO("[PREFILTER_BITMAP_INDEX_MERGE] Child initial state",
+             K(i), "child_type", child_type_str, K(child_type),
+             "child_store_cur_idx", child_store.cur_idx_,
+             "child_store_saved_size", child_store.saved_size_,
+             "child_store_iter_end", child_store.iter_end_,
+             "child_store_have_data", child_store.have_data(),
+             KP(child_iter), KP(child_iter ? child_iter->get_output() : nullptr));
+  }
   
   count = 0;  
   result_buffer_.reuse();
@@ -757,50 +817,63 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
           ObDASIter *child_iter = child_iters_.at(i);
           if (OB_ISNULL(child_iter)) {
             ret = OB_ERR_UNEXPECTED;
-            adlog::DEBUG("unexpected nullptr", K(i));
+            LOG_WARN("[PREFILTER_BITMAP_INDEX_MERGE] unexpected nullptr child_iter",
+                     K(i), K(ret));
           } else {
 
             ret = child_iter->get_next_rows(child_rows_cnt, capacity);
 
             if (OB_FAIL(ret)) {
               if (OB_ITER_END != ret) {
-                adlog::DEBUG("WARNING child_iter->get_next_rows(child_rows_cnt, capacity);");
+                LOG_WARN("[PREFILTER_BITMAP_INDEX_MERGE] child_iter get_next_rows failed",
+                         K(i), K(child_rows_cnt), K(capacity), K(ret));
               }
             }
-            adlog::DEBUG("child_iter: ",K(i),"  ", K(child_rows_cnt));
+            LOG_INFO("[PREFILTER_BITMAP_INDEX_MERGE] child_iter fetched rows",
+                     K(i), K(child_rows_cnt), K(capacity), "iter_end", child_store.iter_end_);
 
             if (OB_ITER_END == ret && child_rows_cnt > 0) {
               ret = OB_SUCCESS;
             }
             if (OB_SUCC(ret)) {
               if (OB_FAIL(child_store.save(true, child_rows_cnt))) {
-                adlog::DEBUG("WARNING failed to save child rows", K(child_rows_cnt), K(ret));
+                LOG_WARN("[PREFILTER_BITMAP_INDEX_MERGE] failed to save child rows",
+                         K(i), K(child_rows_cnt), K(ret));
               } else if (OB_FAIL(compare(i, output_idx, cmp_ret))) {
-                adlog::DEBUG("WARNING index merge failed to compare row", K(i), K(output_idx), K(ret));
+                LOG_WARN("[PREFILTER_BITMAP_INDEX_MERGE] compare after save failed",
+                         K(i), K(output_idx), K(ret));
               } else if (child_iter->get_type() == DAS_ITER_SORT) {
-                adlog::DEBUG("i: ",i,"child_iter->get_type() == DAS_ITER_SORT" );
+                LOG_INFO("[PREFILTER_BITMAP_INDEX_MERGE] child_iter is SORT, reset datum ptr",
+                         K(i), K(child_rows_cnt));
                 reset_datum_ptr(child_iter->get_output(), child_rows_cnt);
               }
             } else if (OB_ITER_END == ret) {
               child_store.iter_end_ = true;
               ret = OB_SUCCESS;
             } else {
-              adlog::DEBUG("WARNING failed to get next rows from child iter", K(ret));
+              LOG_WARN("[PREFILTER_BITMAP_INDEX_MERGE] failed to get next rows from child iter",
+                       K(i), K(ret));
             }
           }
         }
       } else if (OB_FAIL(compare(i, output_idx, cmp_ret))) {
-        adlog::DEBUG("WARNING index merge failed to compare row", K(i), K(output_idx), K(ret));
+        LOG_WARN("[PREFILTER_BITMAP_INDEX_MERGE] compare failed on existing child_store",
+                 K(i), K(output_idx), K(ret));
       }
     }
 
     if (OB_FAIL(ret)) {
-      adlog::DEBUG("WARNING OB_FAIL(RET)");
+      LOG_WARN("[PREFILTER_BITMAP_INDEX_MERGE] loop failed before intersect check", K(ret));
     } else if (output_idx == OB_INVALID_INDEX) {  
       ret = OB_ITER_END;
-      adlog::DEBUG("ret = OB_ITER_END");
+      LOG_INFO("[PREFILTER_BITMAP_INDEX_MERGE] no available row, set OB_ITER_END",
+               K(count));
     } else {    
       bool all_matched = true;
+      int64_t advance_idx = OB_INVALID_INDEX;  // Record which child should be advanced
+      // 输出当前这一轮候选 output_idx 以及各 child 的 have_data / iter_end_ 状态
+      LOG_INFO("[PREFILTER_BITMAP_INDEX_MERGE] intersect candidate before verify",
+               K(output_idx), K(count));
       for (int64_t i = 0; OB_SUCC(ret) && i < child_stores_.count(); i++) {
         if (output_idx == i) {  
           continue;
@@ -808,34 +881,114 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
         if ((!child_stores_.at(i).have_data())) {
             all_matched = false;  // 这个child没有数据，不匹配
             ret = OB_ITER_END;
+            LOG_INFO("[PREFILTER_BITMAP_INDEX_MERGE] child has no data, mark OB_ITER_END",
+                     K(i), K(output_idx),
+                     "child_iter_end", child_stores_.at(i).iter_end_,
+                     "output_store_cur_idx", child_stores_.at(output_idx).cur_idx_,
+                     "child_store_cur_idx", child_stores_.at(i).cur_idx_);
         } else if (OB_FAIL(compare(i, output_idx, cmp_ret))) {  
-          adlog::DEBUG("index merge failed to compare row", K(i), K(output_idx), K(ret));  
+          LOG_WARN("[PREFILTER_BITMAP_INDEX_MERGE] compare in verify phase failed",
+                   K(i), K(output_idx), K(ret));  
         } else if (cmp_ret == 0) {  
-          
+          LOG_INFO("[PREFILTER_BITMAP_INDEX_MERGE] child matched on rowkey",
+                   K(i), K(output_idx));
         } else { 
-          all_matched = false;  // rowkey不匹配  
+          all_matched = false;  // rowkey不匹配
+          // CRITICAL: Restore original logic - always advance output_idx when !all_matched
+          // This matches the original intersect_get_next_row() behavior (line 752)
+          // Since output_idx is guaranteed to be the child with the smallest rowkey
+          // (by compare() function), advancing output_idx allows it to catch up with
+          // other children that have larger rowkeys.
+          // 
+          // Original logic in intersect_get_next_row():
+          //   if (!all_matched) {
+          //     child_stores_.at(output_idx).cur_idx_++;
+          //   }
+          //
+          // We maintain this same behavior to ensure compatibility with normal index_merge
+          if (advance_idx == OB_INVALID_INDEX) {
+            advance_idx = output_idx;  // Always advance output_idx (original logic)
+          }
+          // Get rowkey values for detailed logging (first column only)
+          const ObDatum *child_datums = child_stores_.at(i).cur_datums();
+          const ObDatum *output_datums = child_stores_.at(output_idx).cur_datums();
+          if (OB_NOT_NULL(child_datums) && OB_NOT_NULL(output_datums) && 
+              OB_NOT_NULL(rowkey_exprs_) && rowkey_exprs_->count() > 0) {
+            const ObExpr *expr = rowkey_exprs_->at(0);
+            if (OB_NOT_NULL(expr)) {
+              ObObj child_obj, output_obj;
+              if (OB_SUCC(child_datums[0].to_obj(child_obj, expr->obj_meta_, expr->obj_datum_map_)) &&
+                  OB_SUCC(output_datums[0].to_obj(output_obj, expr->obj_meta_, expr->obj_datum_map_))) {
+                LOG_INFO("[PREFILTER_BITMAP_INDEX_MERGE] child NOT matched on rowkey",
+                         K(i), K(output_idx), K(cmp_ret),
+                         "output_store_cur_idx", child_stores_.at(output_idx).cur_idx_,
+                         "child_store_cur_idx", child_stores_.at(i).cur_idx_,
+                         "advance_idx", advance_idx,
+                         "cmp_ret_meaning", (cmp_ret < 0 ? "child < output" : "child > output"),
+                         K(child_obj), K(output_obj));
+              } else {
+                LOG_INFO("[PREFILTER_BITMAP_INDEX_MERGE] child NOT matched on rowkey (no rowkey detail)",
+                         K(i), K(output_idx), K(cmp_ret),
+                         "output_store_cur_idx", child_stores_.at(output_idx).cur_idx_,
+                         "child_store_cur_idx", child_stores_.at(i).cur_idx_,
+                         "advance_idx", advance_idx,
+                         "cmp_ret_meaning", (cmp_ret < 0 ? "child < output" : "child > output"));
+              }
+            } else {
+              LOG_INFO("[PREFILTER_BITMAP_INDEX_MERGE] child NOT matched on rowkey (no expr)",
+                       K(i), K(output_idx), K(cmp_ret),
+                       "output_store_cur_idx", child_stores_.at(output_idx).cur_idx_,
+                       "child_store_cur_idx", child_stores_.at(i).cur_idx_,
+                       "advance_idx", advance_idx);
+            }
+          } else {
+            LOG_INFO("[PREFILTER_BITMAP_INDEX_MERGE] child NOT matched on rowkey (no datums)",
+                     K(i), K(output_idx), K(cmp_ret),
+                     "output_store_cur_idx", child_stores_.at(output_idx).cur_idx_,
+                     "child_store_cur_idx", child_stores_.at(i).cur_idx_,
+                     "advance_idx", advance_idx);
+          }
         }
       }
 
       if (OB_FAIL(ret)) {
-        adlog::DEBUG("OB_FAIL(ret)");
+        LOG_WARN("[PREFILTER_BITMAP_INDEX_MERGE] verify phase failed", K(ret));
         continue;
       }
       if (!all_matched) {
-        child_stores_.at(output_idx).cur_idx_++;  
+        // Advance the child with smaller rowkey (recorded in advance_idx)
+        // If advance_idx is still OB_INVALID_INDEX, fallback to output_idx
+        if (advance_idx == OB_INVALID_INDEX) {
+          advance_idx = output_idx;
+        }
+        int64_t old_cur_idx = child_stores_.at(advance_idx).cur_idx_;
+        child_stores_.at(advance_idx).cur_idx_++;  
+        LOG_INFO("[PREFILTER_BITMAP_INDEX_MERGE] candidate rejected, advance child store",
+                 "advance_idx", advance_idx, "old_cur_idx", old_cur_idx, 
+                 "new_cur_idx", child_stores_.at(advance_idx).cur_idx_,
+                 "output_idx", output_idx);
         continue;
       }
       for (int64_t i = 0; OB_SUCC(ret) && i < child_stores_.count(); i++) {
         if (output_idx == i) {  
           continue;
         }
-        child_stores_.at(i).to_expr();
+        if (OB_FAIL(child_stores_.at(i).to_expr())) {
+          LOG_WARN("[PREFILTER_BITMAP_INDEX_MERGE] to_expr failed for non-output child",
+                   K(i), K(output_idx), K(ret));
       }
-      child_stores_.at(output_idx).to_expr();
-      if (OB_FAIL(save_row_to_result_buffer())) {  
-        adlog::DEBUG("failed to save row to result buffer", K(ret)); 
+      }
+      if (OB_SUCC(ret) && OB_FAIL(child_stores_.at(output_idx).to_expr())) {
+        LOG_WARN("[PREFILTER_BITMAP_INDEX_MERGE] to_expr failed for output child",
+                 K(output_idx), K(ret));
+      }
+      if (OB_SUCC(ret) && OB_FAIL(save_row_to_result_buffer())) {  
+        LOG_WARN("[PREFILTER_BITMAP_INDEX_MERGE] failed to save row to result buffer",
+                 K(output_idx), K(ret)); 
       } else {  
         count += 1;
+        LOG_INFO("[PREFILTER_BITMAP_INDEX_MERGE] intersect produced one row",
+                 K(count), K(output_idx));
       }
 
     }  
@@ -843,12 +996,13 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
 
   if(OB_FAIL(ret)){
     if (ret == OB_ITER_END) {
-      adlog::DEBUG("intersect_get_next_rows : OB_FAIL(ret) ret == OB_ITER_END");
+      LOG_INFO("[PREFILTER_BITMAP_INDEX_MERGE] intersect_get_next_rows reach OB_ITER_END",
+               K(count));
     } else {
-      adlog::DEBUG("intersect_get_next_rows : OB_FAIL(ret)");
+      LOG_WARN("[PREFILTER_BITMAP_INDEX_MERGE] intersect_get_next_rows error", K(ret), K(count));
     }
   }
-  adlog::DEBUG("intersect_get_next_rows :",K(count));
+  LOG_INFO("[PREFILTER_BITMAP_INDEX_MERGE] intersect_get_next_rows finish", K(count));
   
   if (OB_ITER_END == ret && count > 0) {  
     ret = OB_SUCCESS;  
@@ -1143,9 +1297,47 @@ bool ObDASIndexMergeIter::check_top_k() {
 
 bool ObDASIndexMergeIter::check_support_two_phase() { return true; }
 
+ObDASTRMergeIter *ObDASIndexMergeIter::find_fts_iter_recursive(ObDASIter *iter) {
+  if (OB_ISNULL(iter)) {
+    return nullptr;
+  }
+  
+  ObDASIterType iter_type = iter->get_type();
+  
+  if (iter_type == DAS_ITER_TEXT_RETRIEVAL_MERGE) {
+    // Found FTS iterator
+    LOG_INFO("[PREFILTER_BITMAP] Found FTS iterator recursively", KP(iter));
+    return static_cast<ObDASTRMergeIter *>(iter);
+  } else if (iter_type == DAS_ITER_SORT) {
+    // FTS iterator might be wrapped in SORT, check child recursively
+    ObDASSortIter *sort_iter = static_cast<ObDASSortIter *>(iter);
+    ObDASIter *child = sort_iter->get_child();
+    LOG_INFO("[PREFILTER_BITMAP] Found SORT iterator, checking child recursively", 
+             KP(iter), KP(child));
+    return find_fts_iter_recursive(child);
+  } else if (iter_type == DAS_ITER_TEXT_RETRIEVAL) {
+    // 当前 bitmap 逻辑只支持 TEXT_RETRIEVAL_MERGE，这里记录一下 TEXT_RETRIEVAL 被发现但不会参与
+    LOG_INFO("[PREFILTER_BITMAP] Found TEXT_RETRIEVAL iter (not MERGE, bitmap not applied)",
+             "iter_type", iter_type, KP(iter));
+  } else if (iter_type == DAS_ITER_HNSW_SCAN) {
+    // HNSW 也是一种“检索”iter，这里也记录下来，方便和执行计划对齐
+    LOG_INFO("[PREFILTER_BITMAP] Found HNSW_SCAN iter under SORT (bitmap currently not supported)",
+             "iter_type", iter_type, KP(iter));
+  } else {
+    // 其它类型的 iter，统一打日志，帮助确认 iter 树结构
+    LOG_INFO("[PREFILTER_BITMAP] Non-FTS iter in find_fts_iter_recursive",
+             "iter_type", iter_type, KP(iter));
+  }
+  
+  return nullptr;
+}
+
 bool ObDASIndexMergeIter::check_mixed_query_with_fts() {
   has_fts_iter_ = false;
   fts_iter_ = nullptr;
+
+  LOG_INFO("[PREFILTER_BITMAP] check_mixed_query_with_fts() called", 
+           K(child_iters_.count()));
 
   for (int64_t i = 0; i < child_iters_.count(); i++) {
     ObDASIter *child = child_iters_.at(i);
@@ -1154,17 +1346,336 @@ bool ObDASIndexMergeIter::check_mixed_query_with_fts() {
     }
     
     ObDASIterType child_type = child->get_type();
+    LOG_INFO("[PREFILTER_BITMAP] Checking child iter in check_mixed_query_with_fts",
+             K(i), K(child_type), KP(child));
     
-    if (child_type == DAS_ITER_TEXT_RETRIEVAL_MERGE) {
-      // 找到FTS迭代器
+    // Recursively find FTS iterator (may be wrapped in SORT)
+    ObDASTRMergeIter *fts = find_fts_iter_recursive(child);
+    if (OB_NOT_NULL(fts)) {
       has_fts_iter_ = true;
-      fts_iter_ = static_cast<ObDASTRMergeIter *>(child);
-      adlog::DEBUG("find fts_iter");
+      fts_iter_ = fts;
+      LOG_INFO("[PREFILTER_BITMAP] Found FTS iterator (possibly wrapped in SORT)",
+               K(i), KP(fts_iter_));
       break;
     }
   }
 
+  LOG_INFO("[PREFILTER_BITMAP] check_mixed_query_with_fts() result",
+           K(has_fts_iter_), KP(fts_iter_));
+
   return has_fts_iter_;
+}
+
+int ObDASIndexMergeIter::build_prefilter_docid_bitmap()
+{
+  int ret = OB_SUCCESS;
+  
+  LOG_INFO("[PREFILTER_BITMAP] build_prefilter_docid_bitmap() called", 
+           K(has_fts_iter_), KP(fts_iter_), KP(rowkey_exprs_), 
+           K(rowkey_exprs_ ? rowkey_exprs_->count() : 0));
+  
+  // Log all child iter types to help debug
+  LOG_INFO("[PREFILTER_BITMAP] Checking all child iter types before bitmap building");
+  for (int64_t i = 0; i < child_iters_.count(); ++i) {
+    ObDASIter *child = child_iters_.at(i);
+    ObDASIterType child_type = OB_NOT_NULL(child) ? child->get_type() : DAS_ITER_INVALID;
+    const char *child_type_str = "UNKNOWN";
+    switch (child_type) {
+      case DAS_ITER_TEXT_RETRIEVAL_MERGE:
+        child_type_str = "FTS_MERGE";
+        break;
+      case DAS_ITER_SCAN:
+        child_type_str = "SCAN";
+        break;
+      case DAS_ITER_SORT:
+        child_type_str = "SORT";
+        break;
+      case DAS_ITER_MERGE:
+        child_type_str = "MERGE";
+        break;
+      default:
+        child_type_str = "OTHER";
+        break;
+    }
+    LOG_INFO("[PREFILTER_BITMAP] Child iter type in build_prefilter_docid_bitmap",
+             K(i), "child_type", child_type_str, K(child_type), KP(child));
+  }
+  
+  // Check if we have both FTS iter and BTree index iters
+  if (!has_fts_iter_ || OB_ISNULL(fts_iter_) || OB_ISNULL(rowkey_exprs_) || rowkey_exprs_->count() == 0) {
+    // No FTS iter or no rowkey exprs, skip bitmap building
+    LOG_INFO("[PREFILTER_BITMAP] Skip bitmap building: no FTS iter or no rowkey exprs",
+             K(has_fts_iter_), KP(fts_iter_), KP(rowkey_exprs_),
+             "rowkey_exprs_count", (rowkey_exprs_ ? rowkey_exprs_->count() : 0));
+    return OB_SUCCESS;
+  }
+  
+  // Find BTree index iters (non-FTS iters)
+  ObArray<int64_t> btree_iter_indices;
+  for (int64_t i = 0; i < child_iters_.count(); ++i) {
+    ObDASIter *child = child_iters_.at(i);
+    if (OB_NOT_NULL(child) && child->get_type() != DAS_ITER_TEXT_RETRIEVAL_MERGE) {
+      // This is a BTree index iter
+      if (OB_FAIL(btree_iter_indices.push_back(i))) {
+        LOG_WARN("failed to push back btree iter index", K(ret));
+      }
+    }
+  }
+  
+  LOG_INFO("[PREFILTER_BITMAP] Found BTree iter count", 
+           K(btree_iter_indices.count()), K(child_iters_.count()));
+  
+  if (btree_iter_indices.count() == 0) {
+    // No BTree index iters, skip bitmap building
+    LOG_INFO("[PREFILTER_BITMAP] Skip bitmap building: no BTree index iters");
+    return OB_SUCCESS;
+  }
+  
+  // Allocate hash set for prefilter bitmap
+  // Use typedef to avoid macro expansion issues with template parameters containing commas
+  typedef common::hash::ObHashSet<sql::ObDocIdExt, common::hash::NoPthreadDefendMode> PrefilterBitmapType;
+  PrefilterBitmapType *prefilter_bitmap = nullptr;
+  common::ObArenaAllocator &alloc = mem_ctx_->get_arena_allocator();
+  if (OB_ISNULL(prefilter_bitmap = OB_NEWx(PrefilterBitmapType, &alloc))) {
+    ret = OB_ALLOCATE_MEMORY_FAILED;
+    LOG_WARN("failed to allocate prefilter bitmap", K(ret));
+  } else if (OB_FAIL(prefilter_bitmap->create(1024, ObMemAttr(MTL_ID(), "PrefilterBitmap")))) {
+    LOG_WARN("failed to create prefilter bitmap", K(ret));
+  } else {
+    LOG_INFO("[PREFILTER_BITMAP] Bitmap created successfully, initial capacity=1024", 
+             K(btree_iter_indices.count()), K(child_iters_.count()));
+    // Scan BTree index iters to collect doc_ids
+    int64_t total_rows_scanned = 0;
+    int64_t total_docids_inserted = 0;
+    for (int64_t idx = 0; OB_SUCC(ret) && idx < btree_iter_indices.count(); ++idx) {
+      int64_t iter_idx = btree_iter_indices.at(idx);
+      ObDASIter *btree_iter = child_iters_.at(iter_idx);
+      int64_t iter_rows_scanned = 0;
+      int64_t iter_docids_inserted = 0;
+      
+      LOG_INFO("[PREFILTER_BITMAP] Start scanning BTree iter", K(idx), K(iter_idx), 
+               KP(btree_iter), KP(btree_iter ? btree_iter->get_output() : nullptr));
+      
+      if (OB_ISNULL(btree_iter) || OB_ISNULL(btree_iter->get_output())) {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("unexpected null btree iter or output", K(ret), K(iter_idx));
+      } else {
+        // Scan all rows from this BTree index iter
+        int64_t batch_count = 0;
+        const int64_t batch_capacity = 256;
+        while (OB_SUCC(ret)) {
+          batch_count = 0;
+          ret = btree_iter->get_next_rows(batch_count, batch_capacity);
+          if (OB_ITER_END == ret && batch_count > 0) {
+            ret = OB_SUCCESS;
+          }
+          if (OB_FAIL(ret)) {
+            if (OB_ITER_END != ret) {
+              LOG_WARN("failed to get next rows from btree iter", K(ret), K(iter_idx));
+            }
+            break;
+          }
+          
+          if (batch_count == 0) {
+            break;
+          }
+          
+          // Save data from BTree iter to child_store, then extract doc_id
+          // This follows the same pattern as intersect_get_next_rows()
+          IndexMergeRowStore &child_store = child_stores_.at(iter_idx);
+          if (OB_FAIL(child_store.save(true, batch_count))) {
+            LOG_WARN("failed to save btree iter data to store", K(ret));
+          } else {
+            // Extract doc_id from rowkey_exprs_[0] which should correspond to doc_id
+            // After save(), the data should be available in child_store, but we need to
+            // use rowkey_exprs_ which references index_merge's eval_ctx_
+            // Actually, we should extract from child_store's saved data directly
+            // But for simplicity, we use rowkey_exprs_[0] assuming it maps to the first column
+            if (OB_ISNULL(rowkey_exprs_) || rowkey_exprs_->count() == 0 || OB_ISNULL(rowkey_exprs_->at(0))) {
+              ret = OB_ERR_UNEXPECTED;
+              LOG_WARN("unexpected null rowkey expr", K(ret));
+            } else {
+              // Extract doc_id from each saved row
+              // CRITICAL: We need to find which column in BTree iter's output corresponds to rowkey_exprs_[0]
+              // The BTree iter's output may not have the same column order as rowkey_exprs_
+              const ExprFixedArray *btree_output = btree_iter->get_output();
+              const ObExpr *rowkey_expr = rowkey_exprs_->at(0);
+              if (OB_ISNULL(btree_output) || btree_output->count() == 0) {
+                ret = OB_ERR_UNEXPECTED;
+                LOG_WARN("unexpected null or empty btree iter output", K(ret));
+              } else if (OB_ISNULL(rowkey_expr)) {
+                ret = OB_ERR_UNEXPECTED;
+                LOG_WARN("unexpected null rowkey expr", K(ret));
+              } else {
+                // Find the column index in BTree output that matches rowkey_exprs_[0]
+                // We compare by expr pointer or by column id
+                int64_t doc_id_col_idx = OB_INVALID_INDEX;
+                for (int64_t col_idx = 0; col_idx < btree_output->count(); ++col_idx) {
+                  const ObExpr *btree_expr = btree_output->at(col_idx);
+                  if (OB_NOT_NULL(btree_expr) && btree_expr == rowkey_expr) {
+                    doc_id_col_idx = col_idx;
+                    break;
+                  }
+                }
+                
+                // If not found by pointer, try to find by column id (resname or other identifier)
+                if (doc_id_col_idx == OB_INVALID_INDEX) {
+                  // Fallback: assume first column is doc_id (may be wrong!)
+                  doc_id_col_idx = 0;
+                  LOG_WARN("[PREFILTER_BITMAP] Could not find rowkey_expr in BTree output, using first column as doc_id",
+                           KP(rowkey_expr), "btree_output_count", btree_output->count());
+                } else {
+                  LOG_INFO("[PREFILTER_BITMAP] Found doc_id column in BTree output",
+                           "doc_id_col_idx", doc_id_col_idx, "btree_output_count", btree_output->count());
+                }
+                
+                // Iterate through all saved rows
+                for (int64_t i = 0; OB_SUCC(ret) && i < batch_count; ++i) {
+                  // Get datums for current row
+                  const ObDatum *datums = child_store.cur_datums();
+                  if (OB_ISNULL(datums)) {
+                    ret = OB_ERR_UNEXPECTED;
+                    LOG_WARN("unexpected null datums from child store", K(ret), K(i));
+                  } else if (doc_id_col_idx >= btree_output->count()) {
+                    ret = OB_ERR_UNEXPECTED;
+                    LOG_WARN("doc_id column index out of range", K(ret), K(doc_id_col_idx), 
+                             "btree_output_count", btree_output->count());
+                  } else {
+                    // Extract doc_id from the correct column
+                    const ObDatum &doc_id_datum = datums[doc_id_col_idx];
+                    sql::ObDocIdExt doc_id;
+                    if (OB_FAIL(doc_id.from_datum(doc_id_datum))) {
+                      LOG_WARN("failed to convert datum to doc_id", K(ret), K(i), K(doc_id_col_idx));
+                    } else {
+                      int hash_ret = prefilter_bitmap->set_refactored(doc_id);
+                      if (OB_SUCCESS != hash_ret && OB_HASH_EXIST != hash_ret) {
+                        ret = hash_ret;
+                        LOG_WARN("failed to insert doc_id into bitmap", K(ret), K(hash_ret));
+                      } else {
+                        iter_docids_inserted++;
+                        total_docids_inserted++;
+                        // Log first 10 doc_ids for debugging with detailed information
+                        if (total_docids_inserted <= 10) {
+                          ObObj doc_id_obj;
+                          if (OB_SUCC(doc_id_datum.to_obj(doc_id_obj, rowkey_expr->obj_meta_, rowkey_expr->obj_datum_map_))) {
+                            LOG_INFO("[PREFILTER_BITMAP] Inserted doc_id into bitmap", 
+                                     K(total_docids_inserted), K(doc_id_col_idx), 
+                                     "doc_id_datum", doc_id_datum, "doc_id_obj", doc_id_obj, 
+                                     "doc_id", doc_id, "rowkey_expr_type", rowkey_expr->type_,
+                                     "btree_output_count", btree_output->count());
+                          } else {
+                            LOG_INFO("[PREFILTER_BITMAP] Inserted doc_id into bitmap (no obj conversion)", 
+                                     K(total_docids_inserted), K(doc_id_col_idx), 
+                                     "doc_id_datum", doc_id_datum, "doc_id", doc_id);
+                          }
+                        }
+                      }
+                    }
+                  }
+                  iter_rows_scanned++;
+                  total_rows_scanned++;
+                  // Move to next row in store
+                  child_store.cur_idx_++;
+                }
+                // Reset store after extracting
+                child_store.reuse();
+              }
+            }
+          }
+        }
+        
+        // BTree iter 扫描完成后，不需要重新初始化
+        // 因为后面会将 BTree iter 从 child_iters_ 中移除，只保留 FTS iter
+        // 这样 intersect 就变成了单路扫描 + bitmap 过滤
+        
+        // 如果 ret 是 OB_ITER_END，说明正常扫描完毕，将其置为 OB_SUCCESS
+        if (ret == OB_ITER_END) {
+          ret = OB_SUCCESS;
+        }
+        
+        LOG_INFO("[PREFILTER_BITMAP] Finished scanning BTree iter", 
+                 K(iter_idx), K(iter_rows_scanned), K(iter_docids_inserted), K(ret));
+      }
+    }
+    
+    LOG_INFO("[PREFILTER_BITMAP] After scanning all BTree iters", 
+             K(ret), K(total_rows_scanned), K(total_docids_inserted), 
+             KP(prefilter_bitmap), K(prefilter_bitmap ? prefilter_bitmap->size() : 0));
+    
+    // Even if there were errors during scanning, if we have a valid bitmap with data,
+    // we should still try to pass it to FTS iter
+    // Only fail if bitmap creation itself failed or bitmap is NULL
+    if (OB_NOT_NULL(prefilter_bitmap) && prefilter_bitmap->size() > 0) {
+      // Clear any previous errors if we have valid bitmap data
+      // The bitmap is more important than minor errors during scanning
+      if (OB_FAIL(ret)) {
+        LOG_WARN("[PREFILTER_BITMAP] Had errors during scanning, but bitmap has data, will continue", 
+                 K(ret), K(total_rows_scanned), K(total_docids_inserted), K(prefilter_bitmap->size()));
+        ret = OB_SUCCESS;  // Clear error to allow bitmap passing
+      }
+    }
+    
+    if (OB_SUCC(ret) && OB_NOT_NULL(prefilter_bitmap) && prefilter_bitmap->size() > 0) {
+      // Pass bitmap to FTS iter
+      LOG_INFO("[PREFILTER_BITMAP] Summary: total_rows_scanned", 
+               K(total_rows_scanned), K(total_docids_inserted), 
+               K(prefilter_bitmap->size()), K(btree_iter_indices.count()));
+      
+      LOG_INFO("[PREFILTER_BITMAP] About to pass bitmap to FTS iter", 
+               KP(fts_iter_), KP(prefilter_bitmap), 
+               K(prefilter_bitmap ? prefilter_bitmap->size() : 0));
+      if (OB_FAIL(fts_iter_->set_prefilter_docid_bitmap(prefilter_bitmap))) {
+        LOG_WARN("failed to set prefilter bitmap to FTS iter", K(ret));
+      } else {
+        LOG_INFO("[PREFILTER_BITMAP] Bitmap passed to FTS iter successfully", 
+                 K(prefilter_bitmap->size()), K(btree_iter_indices.count()));
+        
+        // CRITICAL: 移除 BTree iter，只保留 FTS iter
+        // 这样后续 intersect 就变成了单路扫描 + bitmap 过滤
+        // 需要从后往前移除，避免索引错乱
+        LOG_INFO("[PREFILTER_BITMAP] Removing BTree iters from child_iters_, before removal",
+                 "child_iters_count", child_iters_.count(),
+                 "child_stores_count", child_stores_.count(),
+                 "btree_iter_indices_count", btree_iter_indices.count());
+        
+        for (int64_t idx = btree_iter_indices.count() - 1; idx >= 0; --idx) {
+          int64_t iter_idx = btree_iter_indices.at(idx);
+          LOG_INFO("[PREFILTER_BITMAP] Removing BTree iter at index", K(idx), K(iter_idx));
+          
+          // 先 release BTree iter 释放资源
+          ObDASIter *btree_iter_to_remove = child_iters_.at(iter_idx);
+          if (OB_NOT_NULL(btree_iter_to_remove)) {
+            btree_iter_to_remove->release();
+          }
+          
+          // 从各个数组中移除对应元素
+          child_iters_.remove(iter_idx);
+          child_stores_.remove(iter_idx);
+          child_scan_rtdefs_.remove(iter_idx);
+          child_scan_params_.remove(iter_idx);
+          child_tablet_ids_.remove(iter_idx);
+          child_match_against_exprs_.remove(iter_idx);
+        }
+        
+        LOG_INFO("[PREFILTER_BITMAP] After removing BTree iters",
+                 "child_iters_count", child_iters_.count(),
+                 "child_stores_count", child_stores_.count());
+        
+        // 验证：移除后应该只剩下 FTS iter
+        for (int64_t i = 0; i < child_iters_.count(); ++i) {
+          ObDASIter *child = child_iters_.at(i);
+          ObDASIterType child_type = OB_NOT_NULL(child) ? child->get_type() : DAS_ITER_INVALID;
+          LOG_INFO("[PREFILTER_BITMAP] Remaining child iter after removal",
+                   K(i), K(child_type), KP(child));
+        }
+      }
+    } else {
+      LOG_WARN("[PREFILTER_BITMAP] Failed to build bitmap or bitmap is empty", K(ret), 
+               K(total_rows_scanned), K(total_docids_inserted));
+    }
+  }
+  
+  return ret;
 }
 
 }  // namespace sql

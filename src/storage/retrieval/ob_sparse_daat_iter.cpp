@@ -149,6 +149,7 @@ int ObSRDaaTIterImpl::init(
       next_round_cnt_ = dim_iters.count();
       input_row_cnt_ = 0;
       output_row_cnt_ = 0;
+      prefilter_docid_set_ = nullptr;  // Will be set by ObTextDaaTIter::init
       is_inited_ = true;
     }
   }
@@ -174,6 +175,7 @@ void ObSRDaaTIterImpl::reset()
   output_row_cnt_ = 0;
   is_inited_ = false;
 
+  prefilter_docid_set_ = nullptr;
   has_id_less_filter_ = false;     // 是否有ID小于过滤条件
   id_less_value_ = UINT64_MAX;      // ID小于的值
   id_less_filter_extracted_flag_ = false;
@@ -197,6 +199,7 @@ void ObSRDaaTIterImpl::reuse(const bool switch_tablet)
   input_row_cnt_ = 0;
   output_row_cnt_ = 0;
 
+  // Note: prefilter_docid_set_ is not reset here as it's managed by ObDASTRMergeIter
   has_id_less_filter_ = false;     // 是否有ID小于过滤条件
   id_less_value_ = UINT64_MAX;      // ID小于的值
   id_less_filter_extracted_flag_ = false;
@@ -389,42 +392,78 @@ int ObSRDaaTIterImpl::collect_dims_by_id(const ObDatum *&id_datum, double &relev
 
   if (OB_SUCC(ret)) {
     id_datum = iter_domain_ids_[iter_idx];
-    LOG_DEBUG("collect one dim", KPC(id_datum));
+    LOG_INFO("[PREFILTER_BITMAP] collect_dims_by_id collected one candidate doc",
+             KPC(id_datum), K(iter_idx), K(next_round_cnt_));
+    
+    LOG_INFO("测试日志",
+              K(iter_idx), K(next_round_cnt_), K(output_row_cnt_), K(input_row_cnt_));
+    // Log level visibility test: this block is expected to be hit for every candidate doc_id.
+    // You can grep "[PREFILTER_BITMAP_LOGLEVEL_TEST]" to check which log levels are actually printed.
+    LOG_TRACE("[PREFILTER_BITMAP_LOGLEVEL_TEST] trace level log reached in collect_dims_by_id",
+              K(iter_idx), K(next_round_cnt_), K(output_row_cnt_), K(input_row_cnt_));
+    LOG_DEBUG("[PREFILTER_BITMAP_LOGLEVEL_TEST] debug level log reached in collect_dims_by_id",
+              K(iter_idx), K(next_round_cnt_), K(output_row_cnt_), K(input_row_cnt_));
+    LOG_INFO("[PREFILTER_BITMAP_LOGLEVEL_TEST] info level log reached in collect_dims_by_id",
+             K(iter_idx), K(next_round_cnt_), K(output_row_cnt_), K(input_row_cnt_));
+    LOG_WARN("[PREFILTER_BITMAP_LOGLEVEL_TEST] warn level log reached in collect_dims_by_id",
+             K(iter_idx), K(next_round_cnt_), K(output_row_cnt_), K(input_row_cnt_));
+
     if (OB_ISNULL(id_datum)) {
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("unexpected null id datum", K(ret));
     } else {
-
-      // // 在这里添加ID筛选逻辑 - 回表前的筛选
-      // bool id_passes_filter = true;
-      // if (has_id_less_filter_) {
-      //   int64_t current_id = 0;
-      //   current_id = static_cast<int64_t>(id_datum->get_int());
-
-      //   id_passes_filter = (current_id < id_less_value_);
-      //   static int count = 0;
-      //   count++;
-      //   if (count % 100 == 0) {
-      //     adlog::DEBUG("current_id: ", current_id, " id_less_value_: ",id_less_value_);
-      //     {
-      //       auto str = id_datum->get_string();
-      //       std::string std_str(str.ptr(), str.length());  // 转换为 std::string
-      //       adlog::DEBUG("current_id_str: ",std_str);
-      //     }
-      //   }
-      // }
-      
-      // // 如果ID不满足筛选条件，直接返回，不进行后续处理（包括回表）
-      // if (!id_passes_filter) {
-      //   got_valid_id = false;  // 标记为无效ID，不进行回表
-      //   return ret;  // 直接返回，跳过后续的process_collected_row
-      // }
-
+      // Pre-filter: check if doc_id is in the prefilter bitmap
+      // This happens BEFORE relevance calculation to avoid unnecessary computation
+      if (OB_NOT_NULL(prefilter_docid_set_)) {
+        sql::ObDocIdExt current_docid;
+        if (OB_FAIL(current_docid.from_datum(*id_datum))) {
+          LOG_WARN("[PREFILTER_BITMAP] failed to convert datum to docid", K(ret), KPC(id_datum));
+        } else {
+          int exist_ret = prefilter_docid_set_->exist_refactored(current_docid);
+          if (OB_HASH_NOT_EXIST == exist_ret) {
+            // Doc_id not in prefilter set, skip this document
+            got_valid_id = false;
+            // Log first 10 filtered doc_ids for debugging
+            static int64_t filtered_count = 0;
+            if (++filtered_count <= 10) {
+              LOG_INFO("[PREFILTER_BITMAP] doc_id filtered out by bitmap (NOT_EXIST) - DETAILED",
+                       KPC(id_datum), K(current_docid), K(prefilter_docid_set_->size()),
+                       "filtered_count", filtered_count);
+            } else {
+              LOG_INFO("[PREFILTER_BITMAP] doc_id filtered out by bitmap (NOT_EXIST)",
+                       KPC(id_datum), K(current_docid), K(prefilter_docid_set_->size()));
+            }
+            return ret;  // Skip relevance calculation and subsequent processing
+          } else if (OB_HASH_EXIST != exist_ret) {
+            LOG_WARN("[PREFILTER_BITMAP] failed to check doc_id in bitmap",
+                     K(ret), K(exist_ret), KPC(id_datum), K(current_docid));
+            // Continue processing on error (fallback to normal flow)
+          } else {
+            // OB_HASH_EXIST: doc_id exists in bitmap, continue processing
+            // Log first 10 doc_ids that pass filter for comparison with bitmap building
+            static int64_t passed_count = 0;
+            if (++passed_count <= 10) {
+              LOG_INFO("[PREFILTER_BITMAP] doc_id passed bitmap filter (EXIST) - DETAILED",
+                       KPC(id_datum), K(current_docid), K(prefilter_docid_set_->size()),
+                       "passed_count", passed_count);
+            } else {
+              LOG_INFO("[PREFILTER_BITMAP] doc_id passed bitmap filter (EXIST)",
+                       KPC(id_datum), K(current_docid), K(prefilter_docid_set_->size()));
+            }
+          }
+        }
+      } else {
+        LOG_INFO("[PREFILTER_BITMAP] No bitmap set in collect_dims_by_id, skipping prefilter check");
+      }
 
       if (OB_FAIL(relevance_collector_->get_result(relevance, got_valid_id))) {
         LOG_WARN("failed to get result", K(ret));
-      } else if (got_valid_id && OB_FAIL(process_collected_row(*id_datum, relevance))) {
-        LOG_WARN("failed to process collected row", K(ret));
+      } else {
+        LOG_INFO("[PREFILTER_BITMAP] relevance result after bitmap",
+                 K(got_valid_id), K(relevance), K(output_row_cnt_), K(input_row_cnt_));
+        if (got_valid_id && OB_FAIL(process_collected_row(*id_datum, relevance))) {
+          LOG_WARN("failed to process collected row", K(ret));
+        }
       }
     }
   }
@@ -447,6 +486,8 @@ int ObSRDaaTIterImpl::filter_on_demand(const int64_t count, const double relevan
 
   if (!iter_param_->need_filter()) {
     need_project = true;
+    LOG_INFO("[PREFILTER_BITMAP] filter_on_demand skip filter (need_filter=false)",
+             K(count), K(relevance), K(output_row_cnt_), K(input_row_cnt_));
   } else if (eval_ctx->is_vectorized()) {
     if (OB_UNLIKELY(count >= eval_ctx->max_batch_size_)) {
       ret = OB_ERR_UNEXPECTED;
@@ -463,6 +504,9 @@ int ObSRDaaTIterImpl::filter_on_demand(const int64_t count, const double relevan
         LOG_WARN("failed to evaluate filter", K(ret));
       } else {
         need_project = !(filter_res->is_null() || 0 == filter_res->get_int());
+        LOG_INFO("[PREFILTER_BITMAP] filter_on_demand vectorized",
+                 K(count), K(relevance), K(need_project),
+                 K(output_row_cnt_), K(input_row_cnt_));
       }
     }
   } else if (OB_UNLIKELY(0 != count)) {
@@ -473,6 +517,9 @@ int ObSRDaaTIterImpl::filter_on_demand(const int64_t count, const double relevan
     ObDatum &relevance_proj_datum = relevance_proj_expr->locate_datum_for_write(*eval_ctx);
     relevance_proj_datum.set_double(relevance);
     relevance_proj_expr->set_evaluated_projected(*eval_ctx);
+    LOG_INFO("[PREFILTER_BITMAP] filter_on_demand scalar",
+             K(count), K(relevance), K(need_project),
+             K(output_row_cnt_), K(input_row_cnt_));
   }
   return ret;
 }
@@ -487,6 +534,8 @@ int ObSRDaaTIterImpl::cache_result(int64_t &count, const ObDatum &id_datum, cons
   if (limit_param->is_valid() && input_row_cnt_ <= offset) {
     // TODO: Maybe we should not process offset logic here
     // don't need to project
+    LOG_INFO("[PREFILTER_BITMAP] cache_result skip due to offset",
+             K(count), K(output_row_cnt_), K(input_row_cnt_), K(offset), K(limit));
   } else if (OB_UNLIKELY(count >= buffered_domain_ids_.count() || count >= buffered_relevances_.count())) {
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("invalid buffered idx", K(ret), K(count), K(buffered_domain_ids_.count()), K(buffered_relevances_.count()));
@@ -495,6 +544,9 @@ int ObSRDaaTIterImpl::cache_result(int64_t &count, const ObDatum &id_datum, cons
     buffered_relevances_[count] = relevance;
     ++count;
     ++output_row_cnt_;
+    LOG_INFO("[PREFILTER_BITMAP] cache_result keep doc",
+             K(count), K(output_row_cnt_), K(input_row_cnt_), K(limit), K(offset),
+             K(relevance));
     if (limit_param->is_valid() && output_row_cnt_ >= limit) {
       ret = OB_ITER_END;
     }

@@ -19,6 +19,8 @@
 
 #include "sql/das/iter/ob_das_iter.h"
 #include "sql/optimizer/ob_join_order.h"
+#include "lib/hash/ob_hashset.h"
+#include "sql/das/ob_das_ir_define.h"
 #include <cstdint>
 
 namespace oceanbase
@@ -215,6 +217,12 @@ private:
   int extract_match_against_exprs(const common::ObIArray<ObExpr*> &exprs, common::ObIArray<ObExpr*> &match_against_exprs);
   int fill_default_values_for_union(const common::ObIArray<ObExpr*> &exprs);
   int save_row_to_result_buffer();
+  // Build prefilter bitmap from BTree index scan results for scalar conditions (e.g., id < 1000, base_id IN (...))
+  // This bitmap will be used to pre-filter doc_ids in full-text search
+  // After bitmap is built, BTree iters will be removed from child_iters_, leaving only FTS iter
+  int build_prefilter_docid_bitmap();
+  // Helper function to recursively find FTS iterator (may be wrapped in SORT)
+  ObDASTRMergeIter *find_fts_iter_recursive(ObDASIter *iter);
 
 private:
   ObIndexMergeType merge_type_;

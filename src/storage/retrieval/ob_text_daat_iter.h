@@ -21,6 +21,8 @@
 #include "ob_sparse_bmw_iter.h"
 #include "ob_sparse_daat_iter.h"
 #include "ob_text_retrieval_token_iter.h"
+#include "sql/das/ob_das_ir_define.h"
+#include "lib/hash/ob_hashset.h"
 
 namespace oceanbase
 {
@@ -36,7 +38,7 @@ struct ObTextDaaTParam
   ObTextDaaTParam()
     : dim_iters_(nullptr), base_param_(nullptr), allocator_(nullptr), relevance_collector_(nullptr),
       bm25_param_est_ctx_(), mode_flag_(ObMatchAgainstMode::NATURAL_LANGUAGE_MODE),
-      function_lookup_mode_(false) {}
+      function_lookup_mode_(false), prefilter_docid_set_(nullptr) {}
   ~ObTextDaaTParam() {}
   TO_STRING_KV(K_(base_param), KP_(dim_iters), K_(bm25_param_est_ctx),  K_(mode_flag), K_(function_lookup_mode));
   ObIArray<ObISRDaaTDimIter *> *dim_iters_;
@@ -46,6 +48,8 @@ struct ObTextDaaTParam
   ObBM25ParamEstCtx bm25_param_est_ctx_;
   ObMatchAgainstMode mode_flag_;
   bool function_lookup_mode_;
+  // Prefilter bitmap for scalar condition filtering (e.g., id < 1000, base_id IN (...))
+  common::hash::ObHashSet<sql::ObDocIdExt, common::hash::NoPthreadDefendMode> *prefilter_docid_set_;
 };
 
 class ObTextDaaTIter final : public ObSRDaaTIterImpl

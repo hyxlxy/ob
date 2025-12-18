@@ -38,6 +38,14 @@ int ObTextDaaTIter::init(const ObTextDaaTParam &param) {
   } else {
     mode_flag_ = param.mode_flag_;
     function_lookup_mode_ = param.function_lookup_mode_;
+    // Set prefilter bitmap from param
+    prefilter_docid_set_ = param.prefilter_docid_set_;
+    if (OB_NOT_NULL(prefilter_docid_set_)) {
+      LOG_INFO("[PREFILTER_BITMAP] ObTextDaaTIter::init() received bitmap", 
+               K(prefilter_docid_set_->size()));
+    } else {
+      LOG_INFO("[PREFILTER_BITMAP] ObTextDaaTIter::init() no bitmap received (NULL)");
+    }
   }
   return ret;
 }
