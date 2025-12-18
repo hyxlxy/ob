@@ -179,7 +179,7 @@ public:
         if (OB_ISNULL(lhs) || OB_ISNULL(rhs)) {  
           return false;  
         }  
-        return lhs->score_ < rhs->score_;  
+        return lhs->score_ > rhs->score_;  
       }  
         
       int get_error_code() const { return common::OB_SUCCESS; }  
