@@ -717,6 +717,16 @@ void ObTextRetrievalDaaTTokenIter::reset()
 int ObTextRetrievalDaaTTokenIter::get_next_row() {
   int ret = OB_SUCCESS;
   bool need_load = false;
+
+  if (cache_iter_ and cache_iter_->have_done_flag_) {
+    // 代表他指的迭代器可以使用了，那么就直接调用它的对应的缓存迭代器吧.
+    cache_iter_->cur_idx_ = cur_idx_;
+    ++cur_idx_;
+    adlog::DEBUG("使用了内置的缓存迭代器");
+    return cache_iter_->get_next_row();
+  }
+
+  // adlog::DEBUG("没有使用缓存迭代器： ObTextRetrievalDaaTTokenIter::get_next_row()");
   if (OB_LIKELY((++cur_idx_) < count_)) {
   } else if (!eval_ctx_->is_vectorized() && (OB_FAIL(token_iter_->get_next_row()))) {
     if (OB_UNLIKELY(OB_ITER_END != ret)) {
@@ -781,12 +791,12 @@ int ObTextRetrievalDaaTTokenIter::save_relevances_and_docids()
       }
     }
     // 把这个结果也给我放到缓存里面去，哎我焯，希望QPS能多一点吧
-    adlog::DEBUG("检测是否可以缓存数据");
-    adlog::DEBUG(K(cache_iter_->have_done_flag_));
-    if(cache_iter_){ adlog::DEBUG("cache_iter_ is not nullptr"); }
-    else { adlog::DEBUG("cache_iter_ is nullptr"); }
+    // adlog::DEBUG("检测是否可以缓存数据");
+    // adlog::DEBUG(K(cache_iter_->have_done_flag_));
+    // if(cache_iter_){ adlog::DEBUG("cache_iter_ is not nullptr"); }
+    // else { adlog::DEBUG("cache_iter_ is nullptr"); }
     if (OB_SUCC(ret) && cache_iter_ != nullptr && (!cache_iter_->have_done_flag_)) {  
-      adlog::DEBUG("ObTextRetrievalDaaTTokenIter::save_relevances_and_docids() 开始把数据放进去缓存了");
+      // adlog::DEBUG("ObTextRetrievalDaaTTokenIter::save_relevances_and_docids() 开始把数据放进去缓存了");
       if (OB_FAIL(cache_iter_->add_data(relevance_, doc_id_, count_))) {  
         adlog::DEBUG("failed to add data to cache", K(ret));  
       }  
@@ -867,6 +877,14 @@ int ObTextRetrievalDaaTTokenIter::advance_to(const ObDatum &id_datum)
 int ObTextRetrievalDaaTTokenIter::get_curr_score(double &score) const
 {
   int ret = OB_SUCCESS;
+
+  
+  if (cache_iter_ and cache_iter_->have_done_flag_) {
+    // 代表他指的迭代器可以使用了，那么就直接调用它的对应的缓存迭代器吧.
+    cache_iter_->cur_idx_ = cur_idx_;
+    return cache_iter_->get_curr_score(score);
+  }
+
   if (OB_UNLIKELY(cur_idx_ >= count_)) {
     ret = OB_ARRAY_OUT_OF_RANGE;
     LOG_WARN("array index out of bounds", K(ret), K_(cur_idx), K_(count));
@@ -879,6 +897,13 @@ int ObTextRetrievalDaaTTokenIter::get_curr_score(double &score) const
 int ObTextRetrievalDaaTTokenIter::get_curr_id(const ObDatum *&id_datum) const
 {
   int ret = OB_SUCCESS;
+
+  if (cache_iter_ and cache_iter_->have_done_flag_) {
+    // 代表他指的迭代器可以使用了，那么就直接调用它的对应的缓存迭代器吧.
+    cache_iter_->cur_idx_ = cur_idx_;
+    return cache_iter_->get_curr_id(id_datum);
+  }
+
   if (OB_UNLIKELY(cur_idx_ >= count_)) {
     ret = OB_ARRAY_OUT_OF_RANGE;
     LOG_WARN("array index out of bounds", K(ret), K_(cur_idx), K_(count));
@@ -1288,7 +1313,7 @@ int ObTRDaaTTokenCacheIter::init_from_cache(ObTRDaaTTokenCacheIter *one)
       cur_idx_ = -1;  
       have_done_flag_ = true;
       is_created_flag_ = true;
-      adlog::DEBUG("缓存迭代器： 从cache拷贝过来了一个");
+      // adlog::DEBUG("缓存迭代器： 从cache拷贝过来了一个");
     }  
   }  
   return ret;  
@@ -1306,16 +1331,6 @@ int ObTRDaaTTokenCacheIter::add_data(const ObFixedArray<double, ObIAllocator> &r
     adlog::DEBUG("invalid count or array size", K(ret), K(count),   
              K(relevance.count()), K(doc_id.count()));  
   } else {  
-
-    // if (cached_relevance_.count() < total_count_ + count) {
-    //   if (OB_FAIL(cached_relevance_.reserve(total_count_ + count))) {
-    //     adlog::DEBUG("failed to reserve relevance array", K(ret));  
-    //     LOG_WARN("failed to reserve relevance array", K(ret));  
-    //   } else if (OB_FAIL(cached_doc_id_.reserve(total_count_ + count))) {  
-    //     adlog::DEBUG("failed to reserve doc_id array", K(ret));  
-    //     LOG_WARN("failed to reserve doc_id array", K(ret));  
-    //   }  
-    // }  
       
     for (int64_t i = 0; OB_SUCC(ret) && i < count; ++i) {  
       if (OB_FAIL(cached_relevance_.push_back(relevance[i]))) {  

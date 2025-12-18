@@ -410,14 +410,18 @@ int ObDASTRMergeIter::create_dim_iters()
 
       ObTRDaaTTokenCacheIter *cache_iter =
           TokenCacheMg::get_instance().get_cache_iter(query_tokens_.at(i));
-
+      {
+        auto && current_token = query_tokens_.at(i);
+        std::string one(current_token.ptr(), current_token.length());
+        adlog::DEBUG("token:", one);
+      }
       if (cache_iter and cache_iter->have_done_flag_) {
-        adlog::DEBUG("cached_iter and cached_iter.have_done_flag_");
+        // adlog::DEBUG("cached_iter and cached_iter.have_done_flag_");
         adlog::DEBUG("开始使用之前的缓存迭代器了");
         auto &&dim_iter_tmp =
             TokenCacheMg::get_instance().create_iter_from_cache(cache_iter);
         ObISRDaaTDimIter *dim_iter_tmp_2 = dim_iter_tmp; 
-        adlog::DEBUG("放进去了缓存迭代器");
+        // adlog::DEBUG("放进去了缓存迭代器");
         if (OB_FAIL(dim_iters_.push_back(dim_iter_tmp_2))) {
           adlog::DEBUG("WARNING! failed to push back dim iter", K(ret));
         }
@@ -437,20 +441,16 @@ int ObDASTRMergeIter::create_dim_iters()
         //  代表之前已经有人搞出来过cache_iter了，但是还没有弄完，
         // 那么我们这个就正常走就行，也不需要存数据
         if (!cache_iter) {
-          adlog::DEBUG("!cache_iter");
+          // adlog::DEBUG("!cache_iter");
           // 如果之前没有人创建过，那么这次就创建出来
           dim_iter->cache_iter_ =
               TokenCacheMg::get_instance().create_cache_iter();
           
           TokenCacheMg::get_instance().cache_iter(query_tokens_.at(i), dim_iter->cache_iter_);
-          if (dim_iter->cache_iter_) {
-            adlog::DEBUG("dim_iter->cache_iter_");
-          } else {
-            adlog::DEBUG("WARNING! dim_iter->cache_iter_ = nullptr");
-          }
         } else {
           adlog::DEBUG("缓存迭代器存在");
           adlog::DEBUG(K(cache_iter->have_done_flag_));
+          dim_iter->cache_iter_ = cache_iter;
         }
       }
 
