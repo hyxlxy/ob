@@ -7242,6 +7242,7 @@ int ObLogPlan::candi_allocate_order_by(bool &need_limit,
                 if (sort_op->get_topn_expr() != nullptr) {
                   // (limit_expr) = (sort_op->get_topn_expr());
                   table_scan->set_limit_expr(sort_op->get_topn_expr());
+                  sort_op->set_topn_expr(nullptr);
                   adlog::DEBUG("把sort里面的limit_expr放到了当前的table_"
                                "scan的limit_count_expr里了");
                   table_scan->set_parent(nullptr);

@@ -308,82 +308,82 @@ int ObDASIndexMergeIter::MergeResultBuffer::to_expr_from_topn(int64_t &size)
               return a->score_ > b->score_; //
             });
 
-  { // debug
-/*
+//   { // debug
+// /*
 
-      } else if (OB_FAIL(result_store_.init(UINT64_MAX, MTL_ID(), ObCtxIds::DEFAULT_CTX_ID, "DASIndexMerge"))) {
-    LOG_WARN("failed to init result store", K(ret));
-  } else {
-    result_store_.set_allocator(alloc);
-*/
-    ObChunkDatumStore debug_store("DebugTopN");
-    if (OB_FAIL(debug_store.init(UINT64_MAX, MTL_ID(), ObCtxIds::DEFAULT_CTX_ID, "DASIndexMergeDebug"))) {
-      LOG_WARN("debug store init failed", K(ret));
-      return ret;
-    } else {
-      debug_store.set_allocator(*alloc_);
-    }
+//       } else if (OB_FAIL(result_store_.init(UINT64_MAX, MTL_ID(), ObCtxIds::DEFAULT_CTX_ID, "DASIndexMerge"))) {
+//     LOG_WARN("failed to init result store", K(ret));
+//   } else {
+//     result_store_.set_allocator(alloc);
+// */
+//     ObChunkDatumStore debug_store("DebugTopN");
+//     if (OB_FAIL(debug_store.init(UINT64_MAX, MTL_ID(), ObCtxIds::DEFAULT_CTX_ID, "DASIndexMergeDebug"))) {
+//       LOG_WARN("debug store init failed", K(ret));
+//       return ret;
+//     } else {
+//       debug_store.set_allocator(*alloc_);
+//     }
 
-    {
-      ObEvalCtx::BatchInfoScopeGuard guard(*eval_ctx_);
-      guard.set_batch_size(1);
-      for (int64_t i = 0; OB_SUCC(ret) && i < sorted_rows.count(); ++i) {
-        guard.set_batch_idx(0);
-        TopNRow *row = sorted_rows.at(i);
-        if (OB_NOT_NULL(row) && OB_NOT_NULL(row->row_data_)) {
-          // 先把行写入 eval_ctx_
-          if (OB_FAIL(row->row_data_->to_expr<true>(*exprs_, *eval_ctx_))) {
-            LOG_WARN("to_expr failed", K(i));
-          } else if (OB_FAIL(debug_store.add_row(*exprs_, eval_ctx_))) {
-            LOG_WARN("debug_store add_row failed", K(i));
-          }
-        }
-      }
-    }
+//     {
+//       ObEvalCtx::BatchInfoScopeGuard guard(*eval_ctx_);
+//       guard.set_batch_size(1);
+//       for (int64_t i = 0; OB_SUCC(ret) && i < sorted_rows.count(); ++i) {
+//         guard.set_batch_idx(0);
+//         TopNRow *row = sorted_rows.at(i);
+//         if (OB_NOT_NULL(row) && OB_NOT_NULL(row->row_data_)) {
+//           // 先把行写入 eval_ctx_
+//           if (OB_FAIL(row->row_data_->to_expr<true>(*exprs_, *eval_ctx_))) {
+//             LOG_WARN("to_expr failed", K(i));
+//           } else if (OB_FAIL(debug_store.add_row(*exprs_, eval_ctx_))) {
+//             LOG_WARN("debug_store add_row failed", K(i));
+//           }
+//         }
+//       }
+//     }
 
-    // 用标准路径输出
-    ObChunkDatumStore::Iterator iter;
-    int64_t read_size = 0;
-    if (OB_SUCC(ret)) {
-      if (OB_FAIL(debug_store.begin(iter))) {
-        LOG_WARN("debug_store begin failed", K(ret));
-      } else if (OB_FAIL(iter.get_next_batch<true>(*exprs_, *eval_ctx_, 
-                                                  sorted_rows.count(), read_size))) {
-        LOG_WARN("get_next_batch from debug_store failed", K(ret));
+//     // 用标准路径输出
+//     ObChunkDatumStore::Iterator iter;
+//     int64_t read_size = 0;
+//     if (OB_SUCC(ret)) {
+//       if (OB_FAIL(debug_store.begin(iter))) {
+//         LOG_WARN("debug_store begin failed", K(ret));
+//       } else if (OB_FAIL(iter.get_next_batch<true>(*exprs_, *eval_ctx_, 
+//                                                   sorted_rows.count(), read_size))) {
+//         LOG_WARN("get_next_batch from debug_store failed", K(ret));
+//       } else {
+//         size = read_size;
+//       }
+//     }
+//     adlog::DEBUG("ObChunkDatumStore::Iterator iter read_size: ",read_size);
+//   }
+  {  
+    ObEvalCtx::BatchInfoScopeGuard batch_info_guard(*eval_ctx_);  
+    batch_info_guard.set_batch_size(sorted_rows.count());  
+      
+    for (int64_t i = 0; OB_SUCC(ret) && i < sorted_rows.count(); ++i) {  
+      batch_info_guard.set_batch_idx(i);  
+      TopNRow *row = sorted_rows.at(i);  
+      if (OB_ISNULL(row) || OB_ISNULL(row->row_data_)) {  
+        ret = OB_ERR_UNEXPECTED;  
+        LOG_WARN("unexpected null row", K(ret));  
+      } else if (OB_FAIL(row->row_data_->to_expr<true>(*exprs_, *eval_ctx_))) {  
+        LOG_WARN("failed to convert row to expr", K(ret));
       } else {
-        size = read_size;
+        adlog::DEBUG("row->row_data_->to_expr<true>(*exprs_, *eval_ctx_) ok!");
       }
+    }  
+      
+    if (OB_SUCC(ret)) {  
+      size = sorted_rows.count();  
     }
-    adlog::DEBUG("ObChunkDatumStore::Iterator iter read_size: ",read_size);
-  }
-  // {  
-  //   ObEvalCtx::BatchInfoScopeGuard batch_info_guard(*eval_ctx_);  
-  //   batch_info_guard.set_batch_size(sorted_rows.count());  
-      
-  //   for (int64_t i = 0; OB_SUCC(ret) && i < sorted_rows.count(); ++i) {  
-  //     batch_info_guard.set_batch_idx(i);  
-  //     TopNRow *row = sorted_rows.at(i);  
-  //     if (OB_ISNULL(row) || OB_ISNULL(row->row_data_)) {  
-  //       ret = OB_ERR_UNEXPECTED;  
-  //       LOG_WARN("unexpected null row", K(ret));  
-  //     } else if (OB_FAIL(row->row_data_->to_expr<true>(*exprs_, *eval_ctx_))) {  
-  //       LOG_WARN("failed to convert row to expr", K(ret));
-  //     } else {
-  //       adlog::DEBUG("row->row_data_->to_expr<true>(*exprs_, *eval_ctx_) ok!");
-  //     }
-  //   }  
-      
-  //   if (OB_SUCC(ret)) {  
-  //     size = sorted_rows.count();  
-  //   }
 
-  //   for (auto &&one : sorted_rows) {
-  //     // delete one;
-  //     alloc_->free(one);
+    for (auto &&one : sorted_rows) {
+      // delete one;
+      alloc_->free(one);
 
-  //   }
+    }
     
-  // }  
+  }  
   // topn_heap_.reset();  
   // result_store_iter_.reset();
   // result_store_.reset();
