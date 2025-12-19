@@ -91,78 +91,52 @@ def classify_question_type(question: str) -> str:
 def extract_keywords(question: str) -> List[str]:
     """
     从问题中提取关键词，用于BM25检索和重排序
-    针对千味央厨财务报告问题优化
     
     Args:
         question: 用户问题
         
     Returns:
-        关键词列表（按重要性排序）
+        关键词列表
     """
     keywords = []
     
-    # 1. 添加公司名
+    # 1. 添加特定实体（如公司名）
     if "千味央厨" in question:
         keywords.append("千味央厨")
     
-    # 2. 提取年份（非常重要，用于定位具体数据）
-    years = re.findall(r'\d{4}年', question)
-    keywords.extend(years)
-    
-    # 3. 提取百分比和金额数值
-    numbers = re.findall(r'\d+(?:\.\d+)?%|\d+(?:\.\d+)?(?:亿|万|百万)?元', question)
+    # 2. 提取数字（包括年份、百分比等）
+    numbers = re.findall(r'\d{4}年|\d+(?:\.\d+)?%|\d+(?:\.\d+)?(?:亿|万|百万)?元?', question)
     keywords.extend(numbers)
     
-    # 4. 提取专业术语（按优先级排序）
-    # 高优先级：核心业务术语
-    high_priority_terms = [
-        "产能利用率", "资产周转率", "销售费用率", "管理费用率", "期间费用率",
-        "财务报表预测", "收入结构", "产品线", "定制生产模式", "通用品生产模式",
-        "三高一低", "预制菜市场", "餐饮供应链", "大客户优先",
-        "营业收入", "毛利率", "费用率", "周转率", "净利润",
-    ]
-    
-    # 中优先级：产品和业务术语
-    medium_priority_terms = [
-        "成立时间", "财务报表", "财务报告",
+    # 3. 提取专业术语（预定义的重要词汇，按长度降序排列避免重复）
+    important_terms = [
+        # 长词优先
+        "产能利用率", "资产周转率", "销售费用率", "管理费用率",
+        "财务报表预测", "收入结构", "产品线", "定制生产", "通用品生产",
+        "三高一低", "预制菜市场", "餐饮供应链",
+        # 中等长度
+        "营业收入", "毛利率", "费用率", "周转率", "成立时间", "财务报表",
         "销售费用", "管理费用", "产品定价", "市场研究", "产品创新",
-        "油炸类", "烘焙类", "蒸煮类", "菜肴类", "油条",
+        "油炸类", "烘焙类", "蒸煮类", "菜肴类",
         "大客户", "小B端", "大B端", "预制菜", "速冻",
-        "定制生产", "通用品", "驱动因素", "冷链物流",
-    ]
-    
-    # 低优先级：通用术语
-    low_priority_terms = [
+        "定制生产", "通用品", "驱动因素",
+        # 短词
         "产品", "类别", "餐饮", "供应链", "定价", "市场", "渠道",
-        "成立", "收入", "利润", "困境", "策略", "模式", "案例",
-        "创新", "场景", "细分",
+        "成立", "收入", "利润", "困境", "策略", "模式",
     ]
     
-    # 按优先级提取
-    for term_list in [high_priority_terms, medium_priority_terms, low_priority_terms]:
-        for term in term_list:
-            if term in question and term not in keywords:
-                # 检查是否已被更长的词包含
-                is_subset = False
-                for existing in keywords:
-                    if term in existing and term != existing:
-                        is_subset = True
-                        break
-                if not is_subset:
-                    keywords.append(term)
+    for term in important_terms:
+        if term in question and term not in keywords:
+            # 检查是否已被更长的词包含
+            is_subset = False
+            for existing in keywords:
+                if term in existing and term != existing:
+                    is_subset = True
+                    break
+            if not is_subset:
+                keywords.append(term)
     
-    # 5. 对于特定问题模式，添加额外关键词
-    if "如何" in question or "怎样" in question:
-        if "实施" not in keywords:
-            keywords.append("实施")
-    if "不同" in question or "区别" in question:
-        if "区别" not in keywords:
-            keywords.append("区别")
-    if "原因" in question or "为什么" in question:
-        if "原因" not in keywords:
-            keywords.append("原因")
-    
-    # 去重保持顺序
+    # 去重
     seen = set()
     unique_keywords = []
     for kw in keywords:
@@ -170,7 +144,7 @@ def extract_keywords(question: str) -> List[str]:
             seen.add(kw)
             unique_keywords.append(kw)
     
-    return unique_keywords[:12]  # 增加关键词数量限制
+    return unique_keywords[:8]  # 限制关键词数量
 
 
 def generate_hypothetical_document(question: str, question_type: str) -> str:
@@ -187,55 +161,39 @@ def generate_hypothetical_document(question: str, question_type: str) -> str:
     Returns:
         假设性文档内容
     """
-    # 根据问题类型定制prompt - 优化版
-    type_prompts = {
-        "time_fact": """问题：{question}
-
-生成一段财务报告中关于千味央厨成立/创办时间的描述，例如：
-"千味央厨成立于2012年，是一家专注于速冻面米制品的企业..."
-直接输出内容：""",
-
-        "numeric_fact": """问题：{question}
-
-生成一段财务报告中的数值描述，要求包含具体数字和单位，例如：
-"千味央厨2021年实现营业收入12.85亿元，同比增长..."
-"预计2024年营业收入为2,459百万元..."
-直接输出内容：""",
-
-        "list": """问题：{question}
-
-生成一段财务报告中关于产品类别/项目列表的描述，例如：
-"千味央厨的主要产品包括油炸类、烘焙类、蒸煮类、菜肴类及其他四个大类..."
-直接输出内容：""",
-
-        "comparison": """问题：{question}
-
-生成一段财务报告中的对比分析描述，例如：
-"千味央厨的定制生产模式通过市场调研、立项等环节，而通用品生产模式则..."
-直接输出内容：""",
-
-        "analysis": """问题：{question}
-
-生成一段财务报告中的分析性描述，包含原因、策略、驱动因素等，例如：
-"千味央厨坚持大客户优先理念，快速响应需求。公司内部形成对接大客户的内部小组..."
-直接输出内容：""",
-
-        "entity_fact": """问题：{question}
-
-生成一段财务报告中关于公司特定事项的描述，例如：
-"千味央厨的产品定价主要根据成本加成法..."
-直接输出内容：""",
+    # 根据问题类型定制prompt
+    type_hints = {
+        "time_fact": "请直接给出具体的时间/日期信息。",
+        "numeric_fact": "请给出具体的数值数据，包括单位。",
+        "entity_fact": "请列出相关的实体/名称/类别。",
+        "analysis": "请从原因、方式、策略等角度进行分析说明。",
+        "comparison": "请对比说明不同点和相同点。",
+        "list": "请以列表形式列出所有相关项目。",
     }
     
-    prompt_template = type_prompts.get(question_type, type_prompts["entity_fact"])
-    prompt = prompt_template.format(question=question)
+    hint = type_hints.get(question_type, "")
+    
+    prompt = f"""你是一个专业的财务报告分析师，正在回答关于"千味央厨"公司的问题。
+
+问题：{question}
+
+请根据你对速冻食品行业和千味央厨公司的了解，生成一段可能出现在财务分析报告中的、回答这个问题的文字内容。
+{hint}
+
+要求：
+1. 内容要像真实的财务报告或研报中的表述
+2. 包含具体的数据、时间或事实（可以是假设的）
+3. 使用专业的财务/商业术语
+4. 长度控制在100-200字
+
+直接输出内容，不要添加任何解释。"""
 
     try:
         response = generate_llm_response(
             [{"role": "user", "content": prompt}],
-            model="qwen-turbo",  # 使用更快的模型
+            model="qwen-plus",
             max_retries=2,
-            timeout=20.0,
+            timeout=30.0,
         )
         return response.strip()
     except Exception as e:
