@@ -153,34 +153,12 @@ def _filename_relevance_boost(
     """
     boost = 1.0
     
-    # 1. 关键词直接匹配（提高权重）
+    # 1. 关键词直接匹配
     for kw in keywords:
         if kw in filename:
-            boost += 0.4
+            boost += 0.3
     
-    # 2. 问题特征词与文件名匹配（针对性优化）
-    question_filename_mapping = [
-        # (问题关键词, 文件名关键词, 加成)
-        ("成立时间", "深耕餐饮供应链为人间千味", 0.8),
-        ("财务报表预测", "首次覆盖", 0.8),
-        ("主要产品", "深耕餐饮渠道研发助力发展", 0.8),
-        ("资产周转率", "深耕B端抢占蓝海", 0.8),
-        ("2021年的营业收入", "投资价值分析", 0.8),
-        ("销售费用率", "深耕餐饮供应链借力上市迎风成长", 0.8),
-        ("产品定价", "聚焦B端蓝海扬帆", 0.8),
-        ("产品线和收入结构", "深耕蓝海鹏程万里", 0.8),
-        ("定制生产模式", "大小B双轮驱动餐饮市场大有可为", 0.8),
-        ("油条细分场景", "餐供米面龙头大小B梯次突破", 0.8),
-        ("大客户优先", "千滋百味厨师之选", 0.8),
-        ("预制菜市场", "新品与渠道双轮驱动打开成长空间", 0.8),
-        ("三高一低", "厚积薄发大小B双轮驱动共筑高成长", 0.8),
-        ("产能利用率", "打造央厨之道服务千万餐饮", 0.8),
-    ]
-    for q_kw, fn_kw, score in question_filename_mapping:
-        if q_kw in question and fn_kw in filename:
-            boost += score
-    
-    # 3. 年份匹配（文件名中的日期）
+    # 2. 年份匹配（文件名中的日期）
     question_years = _extract_years(question)
     date_match = re.search(r'(\d{2})(\d{2})(\d{2})\d*页', filename)
     if date_match:
@@ -188,7 +166,7 @@ def _filename_relevance_boost(
         if question_years and file_year in question_years:
             boost += 0.5
     
-    # 4. 报告类型匹配
+    # 3. 报告类型匹配
     report_type_boosts = {
         "深度报告": 0.2,
         "深度研究": 0.2,
@@ -342,13 +320,7 @@ def _select_best_source_enhanced(
 
 def _post_process_answer(answer: str, question: str = "") -> str:
     """
-    答案后处理 - 严格匹配标准答案格式
-    
-    标准答案特点：
-    1. 以"千味央厨"开头
-    2. 简洁直接，一般1-2句话
-    3. 数值精确，保留原格式
-    4. 以句号结尾
+    答案后处理 - 清理格式，保留核心内容
     """
     # 移除来源引用
     answer = re.sub(r'[（\(][^）\)]*\.pdf[^）\)]*[）\)]', '', answer)
@@ -357,7 +329,7 @@ def _post_process_answer(answer: str, question: str = "") -> str:
     answer = re.sub(r'【[^】]*页[^】]*】', '', answer)
     answer = re.sub(r'\([^)]*来源[^)]*\)', '', answer)
     
-    # 移除冗余开头（扩展列表）
+    # 移除冗余开头
     redundant_starts = [
         "根据文档，", "根据提供的文档，", "根据文档内容，",
         "根据资料，", "根据提供的资料，", "根据以上文档，",
@@ -365,7 +337,6 @@ def _post_process_answer(answer: str, question: str = "") -> str:
         "答案是：", "答案：", "回答：", "答：",
         "综上所述，", "总结来说，", "总的来说，",
         "根据上述信息，", "根据检索到的信息，",
-        "根据千味央厨的财务报告，", "根据千味央厨财务报告，",
     ]
     for start in redundant_starts:
         if answer.startswith(start):
@@ -381,38 +352,9 @@ def _post_process_answer(answer: str, question: str = "") -> str:
     if answer.count('\n') <= 1:
         answer = re.sub(r'^\d+[\.、）]\s*', '', answer)
     
-    # 如果不以合法开头，尝试调整
-    valid_starts = ["千味央厨", "冷链物流", "餐饮业"]
-    has_valid_start = any(answer.startswith(s) for s in valid_starts)
-    
-    if not has_valid_start:
-        # 检查是否在答案开头附近提到千味央厨
-        if "千味央厨" in answer[:60]:
-            idx = answer.find("千味央厨")
-            answer = answer[idx:]
-        # 特殊处理：某些问题的答案确实不以千味央厨开头
-        elif "冷链" in answer[:30]:
-            idx = answer.find("冷链")
-            answer = answer[idx:]
-        elif "餐饮" in answer[:30] and "三高一低" in answer:
-            idx = answer.find("餐饮")
-            answer = answer[idx:]
-    
     # 确保以句号结尾
     if answer and answer[-1] not in '。.！!？?':
         answer += '。'
-    
-    # 如果答案太长（超过400字），尝试提取核心部分
-    if len(answer) > 400:
-        # 找到合适的截断点
-        periods = [m.start() for m in re.finditer(r'[。]', answer)]
-        for p in periods:
-            if 80 < p < 350:
-                # 检查是否有重要后续内容
-                remaining = answer[p+1:p+100]
-                if not any(kw in remaining for kw in ['、', '；', '同时', '此外', '另外']):
-                    answer = answer[:p+1]
-                    break
     
     return answer
 
