@@ -1030,6 +1030,7 @@ public:
                N_WHERE, condition_exprs_,
                N_ORDER_BY, order_items_,
                N_LIMIT, limit_count_expr_,
+               N_AD_LIMIT, ad_limit_expr_,
                N_OFFSET, limit_offset_expr_,
                N_STMT_HINT, stmt_hint_,
                N_SUBQUERY_EXPRS, subquery_exprs_,
@@ -1172,7 +1173,8 @@ protected:
   common::ObSEArray<OrderItem, 8, common::ModulePageAllocator, true> order_items_;
   // limit
   /* -1 means no limit */
-  ObRawExpr*  limit_count_expr_;
+  ObRawExpr *limit_count_expr_;
+  ObRawExpr *ad_limit_expr_;
   ObRawExpr*  limit_offset_expr_;
   ObRawExpr*  limit_percent_expr_;
   bool has_fetch_;

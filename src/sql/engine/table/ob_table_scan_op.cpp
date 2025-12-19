@@ -2436,13 +2436,17 @@ int ObTableScanOp::get_next_batch_with_das(int64_t &count, int64_t capacity)
 {
   int ret = OB_SUCCESS;
   int64_t batch_size = capacity;
-  //it means multi-partition limit pushed down in DAS TSC
-  //need to calc final limit row
+  // it means multi-partition limit pushed down in DAS TSC
+  // need to calc final limit row
+  adlog::DEBUG("ObTableScanOp::get_next_batch_with_das(int64_t &count, int64_t "
+               "capacity)");
+  adlog::DEBUG(K(capacity));
   while (OB_SUCC(ret) && need_final_limit_ && input_row_cnt_ < limit_param_.offset_) {
     if (input_row_cnt_ + batch_size > limit_param_.offset_) {
       // adjust iterating count for last batch
       batch_size = limit_param_.offset_ - input_row_cnt_;
     }
+    adlog::DEBUG(K(batch_size));
     clear_evaluated_flag();
     // ObNewIterIterator::get_next_rows() may return rows too when got OB_ITER_END.
     // It's hard to use, we split it into two calls here since get_next_rows() is reentrant

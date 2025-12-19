@@ -296,7 +296,8 @@ int ObDASCacheLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
           index_capacity =
               std::min(capacity, std::min(max_size_, default_batch_row_count_ -
                                                          lookup_rowkey_cnt_));
-          // index_capacity = 1;
+          // index_capacity = 256;
+          adlog::DEBUG("KKKKKKKKKKKKK: ",K(capacity),"  ",K(max_size_),"   ", K(default_batch_row_count_), "  ",K(lookup_rowkey_cnt_));
           index_table_iter_->clear_evaluated_flag();
           adlog::DEBUG("--------------INDEX_SCAN: index_table_iter_->get_next_rows-----------");
           if (OB_FAIL(index_table_iter_->get_next_rows(storage_count, index_capacity))) {
@@ -359,6 +360,7 @@ int ObDASCacheLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
         if (data_table_iter_ == index_table_iter_) {
           adlog::DEBUG("NO! data_table_iter_ == index_table_iter_");
         }
+        adlog::DEBUG("LLLLLLLLLLLLLLLL: ", K(capacity));
         if (OB_FAIL(data_table_iter_->get_next_rows(count, capacity))) {
           if (OB_LIKELY(OB_ITER_END == ret)) {
             ret = OB_SUCCESS;

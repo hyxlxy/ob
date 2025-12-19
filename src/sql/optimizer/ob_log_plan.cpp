@@ -7224,6 +7224,7 @@ int ObLogPlan::candi_allocate_order_by(bool &need_limit,
         // 在这里试试看能不能把sort算子给去掉 advise 
         adlog::DEBUG("在这里试试看能不能把sort算子给去掉");
         do {
+          // break;
           int ret = OB_SUCCESS;
           ObLogicalOperator *&top = candidate_plan.plan_tree_;
           if (OB_ISNULL(top) || log_op_def::LOG_SORT != top->get_type()) {  
@@ -7241,7 +7242,7 @@ int ObLogPlan::candi_allocate_order_by(bool &need_limit,
                 // auto && limit_expr = table_scan->get_limit_expr();
                 if (sort_op->get_topn_expr() != nullptr) {
                   // (limit_expr) = (sort_op->get_topn_expr());
-                  table_scan->set_limit_expr(sort_op->get_topn_expr());
+                  table_scan->set_ad_limit_expr(sort_op->get_topn_expr());
                   sort_op->set_topn_expr(nullptr);
                   adlog::DEBUG("把sort里面的limit_expr放到了当前的table_"
                                "scan的limit_count_expr里了");

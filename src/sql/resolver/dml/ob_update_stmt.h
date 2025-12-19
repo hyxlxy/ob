@@ -77,6 +77,7 @@ public:
       N_WHERE, condition_exprs_,
       N_ORDER_BY, order_items_,
       N_LIMIT, limit_count_expr_,
+      N_AD_LIMIT, ad_limit_expr_,
       N_OFFSET, limit_offset_expr_,
       N_STMT_HINT, stmt_hint_,
       N_QUERY_CTX, query_ctx_);

@@ -59,6 +59,7 @@
 #define N_RANGE "range"
 #define N_INDEX_RANGE "index_range"
 #define N_LIMIT "limit"
+#define N_AD_LIMIT "ad_limit"
 #define N_WIN_FUNC "win_func"
 #define N_OFFSET "offset"
 #define N_ERROR_ON_OVERLAP_TIME "error_on_overlap_time"

@@ -430,7 +430,8 @@ int ObSelectStmt::iterate_stmt_expr(ObStmtExprVisitor &visitor)
 ObSelectStmt::ObSelectStmt()
     : ObDMLStmt(stmt::T_SELECT)
 {
-  limit_count_expr_  = NULL;
+  limit_count_expr_ = NULL;
+  ad_limit_expr_ = NULL;
   limit_offset_expr_ = NULL;
   is_distinct_ = false;
   is_set_distinct_ = false;
@@ -586,6 +587,7 @@ int ObSelectStmt::do_to_string(char *buf, const int64_t buf_len, int64_t &pos) c
            N_AGGR_FUNC, agg_items_,
            N_ORDER_BY, order_items_,
            N_LIMIT, limit_count_expr_,
+           N_AD_LIMIT,ad_limit_expr_,
            N_WIN_FUNC, win_func_exprs_,
            N_OFFSET, limit_offset_expr_,
            N_SHOW_STMT_CTX, show_stmt_ctx_,

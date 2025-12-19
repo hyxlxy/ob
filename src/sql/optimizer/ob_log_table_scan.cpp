@@ -300,6 +300,9 @@ int ObLogTableScan::get_op_exprs(ObIArray<ObRawExpr*> &all_exprs)
   } else if (NULL != limit_count_expr_ &&
              OB_FAIL(all_exprs.push_back(limit_count_expr_))) {
     LOG_WARN("failed to push back expr", K(ret));
+  } else if (NULL != ad_limit_expr_ &&
+             OB_FAIL(all_exprs.push_back(ad_limit_expr_))) {
+    adlog::DEBUG("failed to push back expr");
   } else if (NULL != limit_offset_expr_ &&
              OB_FAIL(all_exprs.push_back(limit_offset_expr_))) {
     LOG_WARN("failed to push back expr", K(ret));
@@ -796,7 +799,10 @@ int ObLogTableScan::replace_gen_col_op_exprs(ObRawExprReplacer &replacer)
     } else if (NULL != limit_offset_expr_ &&
         OB_FAIL(replace_expr_action(replacer, limit_count_expr_))) {
       LOG_WARN("failed to replace limit count expr", K(ret));
-    } else if (NULL != limit_offset_expr_  &&
+    } else if (NULL != ad_limit_expr_  &&
+      OB_FAIL(replace_expr_action(replacer, ad_limit_expr_))) {
+      LOG_WARN("failed to replace ad_limit_expr_ ", K(ret));
+    }  else if (NULL != limit_offset_expr_  &&
               OB_FAIL(replace_expr_action(replacer, limit_offset_expr_))) {
       LOG_WARN("failed to replace limit offset expr ", K(ret));
     } else {

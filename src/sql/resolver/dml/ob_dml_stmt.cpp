@@ -340,6 +340,7 @@ ObDMLStmt::ObDMLStmt(stmt::StmtType type)
     : ObStmt(type),
       order_items_(),
       limit_count_expr_(NULL),
+      ad_limit_expr_(NULL),
       limit_offset_expr_(NULL),
       limit_percent_expr_(NULL),
       has_fetch_(false),
@@ -468,6 +469,7 @@ int ObDMLStmt::assign(const ObDMLStmt &other)
     LOG_WARN("faield to assign vector index query param", K(ret));
   } else {
     limit_count_expr_ = other.limit_count_expr_;
+    ad_limit_expr_ = other.ad_limit_expr_;
     limit_offset_expr_ = other.limit_offset_expr_;
     limit_percent_expr_ = other.limit_percent_expr_;
     has_fetch_ = other.has_fetch_;
@@ -609,6 +611,9 @@ int ObDMLStmt::deep_copy_stmt_struct(ObIAllocator &allocator,
   } else if (OB_FAIL(expr_copier.copy(other.limit_count_expr_,
                                       limit_count_expr_))) {
     LOG_WARN("deep copy limit count expr failed", K(ret));
+  } else if (OB_FAIL(expr_copier.copy(other.ad_limit_expr_,
+                                      ad_limit_expr_))) {
+    LOG_WARN("deep copy ad_limit_expr_ failed", K(ret));
   } else if (OB_FAIL(expr_copier.copy(other.limit_offset_expr_,
                                       limit_offset_expr_))) {
     LOG_WARN("deep copy limit offset expr failed", K(ret));
@@ -888,6 +893,9 @@ int ObDMLStmt::iterate_stmt_expr(ObStmtExprVisitor &visitor)
     } else if (NULL != limit_count_expr_ &&
                OB_FAIL(visitor.visit(limit_count_expr_, SCOPE_LIMIT))) {
       LOG_WARN("failed to visit limit count exprs", K(ret));
+    } else if (NULL != ad_limit_expr_ &&
+      OB_FAIL(visitor.visit(ad_limit_expr_, SCOPE_LIMIT))) {
+      LOG_WARN("failed to visit ad_limit_expr_ exprs", K(ret));
     } else if (NULL != limit_offset_expr_ &&
                OB_FAIL(visitor.visit(limit_offset_expr_, SCOPE_LIMIT))) {
       LOG_WARN("failed to visit limit offset exprs", K(ret));

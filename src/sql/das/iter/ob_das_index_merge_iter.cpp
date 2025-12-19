@@ -370,6 +370,7 @@ int ObDASIndexMergeIter::MergeResultBuffer::to_expr_from_topn(int64_t &size)
         LOG_WARN("failed to convert row to expr", K(ret));
       } else {
         adlog::DEBUG("row->row_data_->to_expr<true>(*exprs_, *eval_ctx_) ok!");
+        adlog::DEBUG("index_merge里输出的 i: " , i, " score: ", row->score_);
       }
     }  
       
@@ -1071,6 +1072,7 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
       adlog::DEBUG("intersect_get_next_rows : OB_FAIL(ret)");
     }
   }
+  adlog::DEBUG("count: ",count," capity: ", capacity);
   adlog::DEBUG("intersect_get_next_rows :",K(count));
   
   if (OB_ITER_END == ret && count > 0) {  

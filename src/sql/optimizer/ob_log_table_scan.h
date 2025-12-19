@@ -331,32 +331,19 @@ class ObLogTableScan : public ObLogicalOperator
 {
 public:
   ObLogTableScan(ObLogPlan &plan)
-      : ObLogicalOperator(plan),
-        table_id_(common::OB_INVALID_ID ),
-        ref_table_id_(common::OB_INVALID_ID ),
-        index_table_id_(common::OB_INVALID_ID ),
-        session_id_(0),
-        advisor_table_id_(OB_INVALID_ID),
-        is_index_global_(false),
-        is_spatial_index_(false),
-        is_multivalue_index_(false),
-        use_das_(false),
-        index_back_(false),
-        is_multi_part_table_scan_(false),
-        table_name_(),
-        index_name_(),
-        scan_direction_(default_asc_direction()),
+      : ObLogicalOperator(plan), table_id_(common::OB_INVALID_ID),
+        ref_table_id_(common::OB_INVALID_ID),
+        index_table_id_(common::OB_INVALID_ID), session_id_(0),
+        advisor_table_id_(OB_INVALID_ID), is_index_global_(false),
+        is_spatial_index_(false), is_multivalue_index_(false), use_das_(false),
+        index_back_(false), is_multi_part_table_scan_(false), table_name_(),
+        index_name_(), scan_direction_(default_asc_direction()),
         scan_order_(common::ObQueryFlag::ScanOrder::Forward),
-        for_update_(false),
-        for_update_wait_us_(-1), /* default infinite */
-        pre_range_graph_(NULL),
-        part_ids_(NULL),
-        filter_before_index_back_(),
-        table_partition_info_(NULL),
-        ranges_(),
-        ss_ranges_(),
-        is_skip_scan_(),
+        for_update_(false), for_update_wait_us_(-1), /* default infinite */
+        pre_range_graph_(NULL), part_ids_(NULL), filter_before_index_back_(),
+        table_partition_info_(NULL), ranges_(), ss_ranges_(), is_skip_scan_(),
         limit_count_expr_(NULL),
+        ad_limit_expr_(NULL),
         limit_offset_expr_(NULL),
         sample_info_(),
         est_cost_info_(NULL),
@@ -714,7 +701,10 @@ public:
   inline const common::ObIArray<bool> &get_filter_before_index_flags() const { return filter_before_index_back_; }
   inline const ObRawExpr *get_limit_expr() const { return limit_count_expr_; }
   inline ObRawExpr *get_limit_expr() { return limit_count_expr_; }
-  inline void set_limit_expr(ObRawExpr * one) { limit_count_expr_ = one; }
+
+  inline void set_ad_limit_expr(ObRawExpr * one) { ad_limit_expr_ = one; }
+  inline ObRawExpr *get_ad_limit_expr() { return ad_limit_expr_; }
+
   inline ObRawExpr *get_offset_expr() { return limit_offset_expr_; }
   int set_limit_offset(ObRawExpr *limit, ObRawExpr *offset);
   inline int64_t get_table_row_count() const
@@ -1218,6 +1208,7 @@ protected: // memeber variables
 
   // limit params from upper limit op
   ObRawExpr *limit_count_expr_;
+  ObRawExpr *ad_limit_expr_;
   ObRawExpr *limit_offset_expr_;
   // Record whether the table is sampled, sampling method, ratio, etc. information
   SampleInfo sample_info_;
