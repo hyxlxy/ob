@@ -3973,67 +3973,131 @@
      }
    }
 
-  //  return ret;
-   // 这里就直接暴力的搞出来二阶段的路径，先这样写着试试吧
-   {
-     if (OB_SUCC(ret) and (!helper.no_two_phase_flag_)) {  
-       AccessPath *two_phase_path = nullptr;  
-       if (OB_FAIL(create_two_phase_index_merge_path(table_id,ref_table_id ,helper,index_info_cache,candi_index_trees, two_phase_path))) {  
-         adlog::DEBUG("failed to create two phase index merge path", K(ret));  
-       } else if (OB_NOT_NULL(two_phase_path)) {  
-         adlog::DEBUG("two phase path create ok");
-         if (auto &&two_phase_p =
-                 static_cast<TwoPhaseIndexMergePath *>(two_phase_path)) {
-           adlog::DEBUG("给进行一下topn的下推");
-           adlog::DEBUG(K(access_paths.count()));
-           adlog::DEBUG(K(two_phase_p->topk_limit_));
-           if (access_paths.count() == 1) {
-             auto && path = access_paths.at(0);
-             if (path->is_index_merge_path()) {
-               auto && index_merge_path = static_cast<IndexMergePath*>(path);
-               if (index_merge_path->root_ and index_merge_path->root_->gen_code_ == 114514) {
-                 index_merge_path->topn_limit_ = two_phase_p->topk_limit_;
-                 index_merge_path->enable_topn_pushdown_ = true;
-               }
-             }
-           }
-          //  for (AccessPath *path : access_paths) {
-          //    if (!path->is_index_merge_path()) {
-          //      continue;
-          //    }
-          //    auto && index_merge_path = static_cast<IndexMergePath*>(path);
-          //    index_merge_path->topn_limit_ = two_phase_p->topk_limit_;
-          //    index_merge_path->enable_topn_pushdown_ = true;
-          // }
-         }
-         // 如果要开启二阶段，就把下面的内容取消注释
 
-        //  if (OB_FAIL(access_paths.push_back(two_phase_path))) {  
-        //    adlog::DEBUG("failed to push back two phase path", K(ret));  
-        //  }  
-       } else{
-         adlog::DEBUG("WARNING! two phase path create no ! two_phase_path nullptr!");
-       }
-     } 
-     else{
-      adlog::DEBUG("pre : ");
-       if(OB_SUCC(ret)){
-        adlog::DEBUG("ret succ");
-       }
-       adlog::DEBUG(K(helper.no_two_phase_flag_));
-       if(helper.no_two_phase_flag_){
-        adlog::DEBUG("现在是二阶段里面的递归状态");
-       }
-       else{
-        adlog::DEBUG("现在并不是二阶段里面的内容");
-       }
-       adlog::DEBUG("没有尝试创建二阶段路径， 在之前ret就fail了");
-     }
-   }
- 
-   adlog::DEBUG("ObJoinOrder::do_create_index_merge_paths END");
- 
+   do {
+     IndexMergePath* p = nullptr;
+    if (access_paths.count() == 1) {
+      auto && path = access_paths.at(0);
+      if (path->is_index_merge_path()) {
+        auto && index_merge_path = static_cast<IndexMergePath*>(path);
+        if (index_merge_path->root_ and index_merge_path->root_->gen_code_ == 114514) {
+          p = index_merge_path;
+        }
+      }
+    }
+
+    if (!p)
+      break;
+
+    int64_t limit_value = -1;
+    {
+      // 代表root目前肯定是index_merge_and
+  
+      // Check if query has LIMIT clause
+      const ObDMLStmt *stmt = NULL;
+      if (OB_ISNULL(get_plan()) || OB_ISNULL(stmt = get_plan()->get_stmt())) {
+        // do nothing
+        // 就直接返回吧
+        adlog::DEBUG("OB_ISNULL(get_plan()) || OB_ISNULL(stmt = get_plan()->get_stmt())");
+        return ret;
+      } else if (OB_SUCC(ret)  && (NULL != stmt->get_limit_expr())) {
+        // Extract LIMIT value using ObTransformUtils
+        ObOptimizerContext *opt_ctx = NULL;
+        const ParamStore *param_store = NULL;
+        ObExecContext *exec_ctx = NULL;
+        bool is_null_value = false;
+        if (OB_ISNULL(get_plan()) || OB_ISNULL(opt_ctx = &get_plan()->get_optimizer_context()) ||
+            OB_ISNULL(param_store = opt_ctx->get_params()) || OB_ISNULL(exec_ctx = opt_ctx->get_exec_ctx())) {
+          ret = OB_ERR_UNEXPECTED;
+          adlog::DEBUG("unexpected null optimizer context");
+          LOG_WARN("unexpected null optimizer context", K(ret), KP(get_plan()), KP(opt_ctx), KP(param_store), KP(exec_ctx));
+        } else {
+  
+          if (OB_FAIL(ObTransformUtils::get_limit_value(const_cast<ObRawExpr *>(stmt->get_limit_expr()),param_store,
+              exec_ctx,
+              allocator_,
+              limit_value,
+              is_null_value))) {
+            adlog::DEBUG("failed to get limit value", K(ret));
+          } else if (is_null_value) {
+            limit_value = -1;
+            adlog::DEBUG("limit_value = -1;");
+          }
+  
+        }
+      }
+    }
+
+    if (limit_value == -1)
+      break;
+
+    p->enable_topn_pushdown_ = true;
+    p->topn_limit_ = limit_value;
+    adlog::DEBUG("p->topn_limit_ = limit_value : ", limit_value);
+
+   }while(0);
+   
    return ret;
+  //  // 这里就直接暴力的搞出来二阶段的路径，先这样写着试试吧
+  //  {
+  //    if (OB_SUCC(ret) and (!helper.no_two_phase_flag_)) {  
+  //      AccessPath *two_phase_path = nullptr;  
+  //      if (OB_FAIL(create_two_phase_index_merge_path(table_id,ref_table_id ,helper,index_info_cache,candi_index_trees, two_phase_path))) {  
+  //        adlog::DEBUG("failed to create two phase index merge path", K(ret));  
+  //      } else if (OB_NOT_NULL(two_phase_path)) {  
+  //        adlog::DEBUG("two phase path create ok");
+  //        if (auto &&two_phase_p =
+  //                static_cast<TwoPhaseIndexMergePath *>(two_phase_path)) {
+  //          adlog::DEBUG("给进行一下topn的下推");
+  //          adlog::DEBUG(K(access_paths.count()));
+  //          adlog::DEBUG(K(two_phase_p->topk_limit_));
+  //          if (access_paths.count() == 1) {
+  //            auto && path = access_paths.at(0);
+  //            if (path->is_index_merge_path()) {
+  //              auto && index_merge_path = static_cast<IndexMergePath*>(path);
+  //              if (index_merge_path->root_ and index_merge_path->root_->gen_code_ == 114514) {
+  //                index_merge_path->topn_limit_ = two_phase_p->topk_limit_;
+  //                index_merge_path->enable_topn_pushdown_ = true;
+  //              }
+  //            }
+  //          }
+  //         //  for (AccessPath *path : access_paths) {
+  //         //    if (!path->is_index_merge_path()) {
+  //         //      continue;
+  //         //    }
+  //         //    auto && index_merge_path = static_cast<IndexMergePath*>(path);
+  //         //    index_merge_path->topn_limit_ = two_phase_p->topk_limit_;
+  //         //    index_merge_path->enable_topn_pushdown_ = true;
+  //         // }
+  //        }
+  //        // 如果要开启二阶段，就把下面的内容取消注释
+
+  //       //  if (OB_FAIL(access_paths.push_back(two_phase_path))) {  
+  //       //    adlog::DEBUG("failed to push back two phase path", K(ret));  
+  //       //  }  
+  //      } else{
+  //        adlog::DEBUG("WARNING! two phase path create no ! two_phase_path nullptr!");
+  //      }
+  //    } 
+  //    else{
+  //     adlog::DEBUG("pre : ");
+  //      if(OB_SUCC(ret)){
+  //       adlog::DEBUG("ret succ");
+  //      }
+  //      adlog::DEBUG(K(helper.no_two_phase_flag_));
+  //      if(helper.no_two_phase_flag_){
+  //       adlog::DEBUG("现在是二阶段里面的递归状态");
+  //      }
+  //      else{
+  //       adlog::DEBUG("现在并不是二阶段里面的内容");
+  //      }
+  //      adlog::DEBUG("没有尝试创建二阶段路径， 在之前ret就fail了");
+  //    }
+  //  }
+ 
+  //  adlog::DEBUG("ObJoinOrder::do_create_index_merge_paths END");
+ 
+  //  return ret;
  }
 
  int ObJoinOrder::create_two_phase_index_merge_path(

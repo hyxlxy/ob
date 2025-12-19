@@ -325,6 +325,7 @@ int ObDASIndexMergeIter::MergeResultBuffer::to_expr_from_topn(int64_t &size)
 int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
 {
   adlog::DEBUG("index merge iter use!!!");
+  adlog::DEBUG("ObDASIndexMergeIter::inner_init start");
   int ret = OB_SUCCESS;
   if (ObDASIterType::DAS_ITER_INDEX_MERGE != param.type_) {
     ret = OB_ERR_UNEXPECTED;
@@ -407,22 +408,27 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
           if (OB_FAIL(result_buffer_.init(max_size_, eval_ctx_, output_, mem_ctx_->get_malloc_allocator()))) {
             LOG_WARN("failed to init merge result buffer", K(ret));
           } else {
-            if (merge_ctdef_->enable_topn_pushdown_) {
-              result_buffer_.enable_topn_ = merge_ctdef_->enable_topn_pushdown_;
-              result_buffer_.topn_limit_ = merge_ctdef_->topn_limit_;
+            if (merge_rtdef_->enable_topn_pushdown_) {
+              result_buffer_.enable_topn_ = merge_rtdef_->enable_topn_pushdown_;
+              result_buffer_.topn_limit_ = merge_rtdef_->topn_limit_;
+              // adlog::DEBUG("result_buffer_.topn_limit_ =  ",)
               // result_buffer_.enable_topn_ = false;
               adlog::DEBUG(K(result_buffer_.topn_limit_));
+            } else {
+              adlog::DEBUG("result_buffer_.topn_limit _ 无");
             }
           }
         }
       }
     }
   }
-  if (OB_SUCC(ret)) {
-    if (OB_FAIL(init_two_phase(param))) {
-      return ret;
-    }
-  }
+  // if (OB_SUCC(ret)) {
+  //   if (OB_FAIL(init_two_phase(param))) {
+  //     return ret;
+  //   }
+  // }
+  adlog::DEBUG("ObDASIndexMergeIter::inner_init end");
+
   return ret;
 }
 
@@ -881,18 +887,7 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
 {
   int ret = OB_SUCCESS;
   adlog::DEBUG("ObDASIndexMergeIter::intersect_get_next_rows start");
-  // {
-  //   adlog::DEBUG("INTERSECT rowkey_exprs_ count", K(rowkey_exprs_->count()));  
-  //   for (int64_t i = 0; i < rowkey_exprs_->count(); i++) {
-  //     // adlog::DEBUG("rowkey_expr", i, std::to_string(*rowkey_exprs_->at(i)));
-  //     {
-  //       char buf[1024];  
-  //       int64_t pos = 0;  
-  //       pos = rowkey_exprs_->at(i)->to_string(buf, sizeof(buf));  
-  //       adlog::DEBUG("rowkey_expr", i, std::string(buf, pos));
-  //     }
-  //   }
-  // }
+
   
   count = 0;  
   result_buffer_.reuse();

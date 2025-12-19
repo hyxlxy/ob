@@ -233,6 +233,8 @@ public:
     : ObDASAttachRtDef(DAS_OP_INDEX_MERGE) {}
 
   virtual ~ObDASIndexMergeRtDef() {}
+  int64_t topn_limit_;  
+  bool enable_topn_pushdown_;  
 };
 
 // ADVISE
