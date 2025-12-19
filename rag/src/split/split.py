@@ -4,7 +4,7 @@ from typing import List
 
 def split_text(
     text: str,
-    max_chunk_size: int = 400,
+    max_chunk_size: int = 100,
     overlap: int = 50,
 ) -> List[str]:
     """

@@ -28,9 +28,9 @@ OCEANBASE_DBNAME = os.getenv("OCEANBASE_DBNAME")
 TABLE_NAME = "rag_documents"
 
 # Retrieval parameters (configurable via env)
-TOP_K = int(os.getenv("TOP_K", "15"))
-BM25_CANDIDATES = int(os.getenv("BM25_CANDIDATES", str(TOP_K * 4)))
-VEC_CANDIDATES = int(os.getenv("VEC_CANDIDATES", str(TOP_K * 6)))
+TOP_K = int(os.getenv("TOP_K", "20"))  # 增加召回数量
+BM25_CANDIDATES = int(os.getenv("BM25_CANDIDATES", str(TOP_K * 5)))  # 100
+VEC_CANDIDATES = int(os.getenv("VEC_CANDIDATES", str(TOP_K * 6)))    # 120
 RRF_K = float(os.getenv("RRF_K", "60"))  # RRF 常数项
 MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "20000"))
 
