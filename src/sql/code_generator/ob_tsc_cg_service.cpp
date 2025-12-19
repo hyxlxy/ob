@@ -2617,9 +2617,9 @@ int ObTscCgService::generate_index_merge_ctdef(const ObLogTableScan &op,
     } else {
       if(root_ctdef and path){
         // 这里尝试一下把topn给吓退一下试试
-        root_ctdef->topn_limit_ = path->topn_limit_;
-        root_ctdef->enable_topn_pushdown_ = path->enable_topn_pushdown_;
-        adlog::DEBUG("root_ctdef->topn_limit_ = path->topn_limit_: ", path->topn_limit_);
+        // root_ctdef->topn_limit_ = path->topn_limit_;
+        // root_ctdef->enable_topn_pushdown_ = path->enable_topn_pushdown_;
+        // adlog::DEBUG("root_ctdef->topn_limit_ = path->topn_limit_: ", path->topn_limit_);
       }
     }
 
