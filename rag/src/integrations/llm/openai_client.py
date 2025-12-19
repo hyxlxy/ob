@@ -26,9 +26,9 @@ llm = OpenAI(
 def generate_response(
     messages: List[Dict[str, str]],
     model="qwen-plus",
-    max_retries: int = 3,
-    initial_backoff: float = 1.0,
-    timeout: float = 300.0,
+    max_retries: int = 2,
+    initial_backoff: float = 0.5,
+    timeout: float = 60.0,
 ) -> str:
     """
     Generate a response from the LLM with error handling and retry logic.

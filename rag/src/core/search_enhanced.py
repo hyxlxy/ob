@@ -42,14 +42,15 @@ dotenv.load_dotenv()
 
 TABLE_NAME = "rag_documents"
 
-# 检索参数
-TOP_K = int(os.getenv("TOP_K", "25"))
-BM25_CANDIDATES = int(os.getenv("BM25_CANDIDATES", str(TOP_K * 5)))
-VEC_CANDIDATES = int(os.getenv("VEC_CANDIDATES", str(TOP_K * 8)))
+# 检索参数 - 针对40分钟时限优化
+TOP_K = int(os.getenv("TOP_K", "20"))
+BM25_CANDIDATES = int(os.getenv("BM25_CANDIDATES", "60"))
+VEC_CANDIDATES = int(os.getenv("VEC_CANDIDATES", "80"))
 RRF_K = float(os.getenv("RRF_K", "60"))
-MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "28000"))
+MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "20000"))
 
-ENABLE_HYDE = os.getenv("ENABLE_HYDE", "true").lower() == "true"
+# 关闭HyDE以节省时间（每个问题少一次LLM调用）
+ENABLE_HYDE = os.getenv("ENABLE_HYDE", "false").lower() == "true"
 
 
 def _extract_years(text: str) -> Set[str]:
@@ -380,13 +381,16 @@ def search(question: str) -> Answer:
     logger.info(f"[Enhanced] Processing: '{question[:60]}...'")
 
     try:
-        # ===== 1. Query预处理 =====
-        processor = QueryProcessor(enable_hyde=ENABLE_HYDE)
-        query_info = processor.process(question)
+        # ===== 1. Query预处理（简化版，不用HyDE节省时间）=====
+        question_type = classify_question_type(question)
+        keywords = extract_keywords(question)
+        hypothetical_doc = None
         
-        question_type = query_info["question_type"]
-        keywords = query_info["keywords"]
-        hypothetical_doc = query_info.get("hypothetical_doc")
+        # 仅在明确启用时使用HyDE
+        if ENABLE_HYDE:
+            processor = QueryProcessor(enable_hyde=True)
+            query_info = processor.process(question)
+            hypothetical_doc = query_info.get("hypothetical_doc")
         
         logger.debug(f"Type: {question_type}, Keywords: {keywords[:5]}")
 
