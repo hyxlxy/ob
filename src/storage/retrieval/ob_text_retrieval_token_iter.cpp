@@ -741,7 +741,9 @@ int ObTextRetrievalDaaTTokenIter::get_next_row() {
   } else if (eval_ctx_->is_vectorized() && OB_FAIL(token_iter_->get_next_batch(max_batch_size_, count_))) {
     if (OB_UNLIKELY(OB_ITER_END != ret)) {
       LOG_WARN("failed to get batch rows from inverted index", K(ret));
-      cache_iter_->have_done_flag_ = true;
+      if (cache_iter_) {
+        cache_iter_->have_done_flag_ = true;
+      }
       adlog::DEBUG("WARNING! 缓存迭代器 failed to get batch rows from inverted index");
     } else if (count_ != 0) {
       ret = OB_SUCCESS;
@@ -754,10 +756,14 @@ int ObTextRetrievalDaaTTokenIter::get_next_row() {
       } else if (OB_FAIL(save_docids())) {
           LOG_WARN("failed to save doc ids", K(ret));
       }
-      cache_iter_->have_done_flag_ = true;
+      if (cache_iter_) {
+        cache_iter_->have_done_flag_ = true;
+      }
       return ret;
     } else {
-      cache_iter_->have_done_flag_ = true;
+      if (cache_iter_) {
+        cache_iter_->have_done_flag_ = true;
+      }
       adlog::DEBUG("阿巴 count = 0");
     }
   } else {

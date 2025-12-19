@@ -30,7 +30,7 @@ echo "[INFO] OceanBase 运行中 (PID: $OBSERVER_PID)"
 rm -f "${PERF_DATA}" "${PERF_SCRIPT}" "${FLAMEGRAPH_SVG}"
 
 # 设置超时时间
-TEST_TIMEOUT=240
+TEST_TIMEOUT=133
 
 echo "[INFO] 启动性能采集（超时: ${TEST_TIMEOUT}秒）..."
 

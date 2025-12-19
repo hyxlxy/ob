@@ -1,3 +1,62 @@
+*****************************************2025-12-19  *********************************************************
+
+之前：
+  每一次有符合的，就会调用add_row()，本质就是调用了result_buffer_里的result_store_.add_row(*exprs,eval_ctx_);
+  调用了result_store_.add_row(*exprs,eval_ctx_)，其实就是 一个 ObChunkDatumStore 类型的 往里面放了数据。
+
+
+int ObChunkDatumStore::add_row(
+  const common::ObIArray<ObExpr*> &exprs, ObEvalCtx *ctx, StoredRow **stored_row)
+{
+  int ret = OB_SUCCESS;
+  if (!is_inited()) {
+    ret = OB_NOT_INIT;
+    LOG_WARN("not init", K(ret));
+  } else {
+    if (NULL == cur_blk_) {
+      int64_t min_buf_size = 0;
+      Block *new_blk = nullptr;
+      if (OB_FAIL(Block::min_buf_size(exprs, row_extend_size_, *ctx, min_buf_size))) {
+      } else if (OB_FAIL(alloc_block_buffer(new_blk, min_buf_size, false))) {
+        LOG_WARN("alloc block failed", K(ret));
+      } else {
+        use_block(new_blk);
+        blocks_.add_last(cur_blk_);
+        n_blocks_++;
+      }
+    }
+    if (OB_SUCC(ret)) {
+      if (OB_FAIL(cur_blk_->append_row(
+          exprs, ctx, cur_blk_buffer_, row_extend_size_, stored_row, false))) {
+        if (OB_BUF_NOT_ENOUGH == ret) {
+          int64_t min_buf_size = 0;
+          if (OB_FAIL(Block::min_buf_size(exprs, row_extend_size_, *ctx, min_buf_size))) {
+          } else if (OB_FAIL(switch_block(min_buf_size))) {
+            if (OB_EXCEED_MEM_LIMIT != ret) {
+              LOG_WARN("switch block failed", K(ret));
+            }
+          } else if (OB_FAIL(cur_blk_->append_row(
+              exprs, ctx, cur_blk_buffer_, row_extend_size_, stored_row, false))) {
+          } else {
+            row_cnt_++;
+            if (OB_UNLIKELY(0 > col_count_)) {
+              col_count_ = exprs.count();
+            }
+          }
+        } else {
+          LOG_WARN("add row to block failed", K(ret));
+        }
+      } else {
+        row_cnt_++;
+        if (OB_UNLIKELY(0 > col_count_)) {
+          col_count_ = exprs.count();
+        }
+      }
+    }
+  }
+  return ret;
+}
+
 *****************************************2025-12-18  *********************************************************
 
 目前关于topn的下推，数据漏了，QPS不知。

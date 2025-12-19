@@ -143,7 +143,8 @@ int ObDASIndexMergeIter::MergeResultBuffer::init(int64_t max_size,
     exprs_ = exprs;
     alloc_ = &alloc;
     
-    
+    // topn_limit_ = max_size;  // 设置堆容量限制  
+    // enable_topn_ = (topn_limit_ > 0);
   }
   return ret;
 }
@@ -184,69 +185,71 @@ void ObDASIndexMergeIter::MergeResultBuffer::reset()
     topn_heap_.reset();
   }
 }
-
+//ADVISE
 int ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn() {
   adlog::DEBUG("ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn");
   int ret = OB_SUCCESS;
 
   auto make_topn_row = [&](TopNRow*& row) -> int {
     int ret = OB_SUCCESS;
-    ObChunkDatumStore::StoredRow *stored_row = nullptr; 
-    if (OB_FAIL(ObChunkDatumStore::StoredRow::build(stored_row, *exprs_, *eval_ctx_, *alloc_))) {  
-      adlog::DEBUG("failed to build stored row", K(ret));  
-    } else {    
-      double score = 0.0;
-      ObSEArray<ObExpr *, 4> match_against_exprs;
-      for (int64_t i = 0; OB_SUCC(ret) && i < exprs_->count(); ++i) {
-        ObExpr *expr = exprs_->at(i);
-        if (OB_ISNULL(expr)) {
-          ret = OB_ERR_UNEXPECTED;  
-          LOG_WARN("unexpected nullptr expr", K(ret));
-        } else if (T_FUN_MATCH_AGAINST == expr->type_) {
-          if (OB_FAIL(match_against_exprs.push_back(expr))) {
-            LOG_WARN("failed to push back match against expr", K(ret));
-          }
-        }
-      }
-      // if (OB_FAIL(extract_match_against_exprs(*exprs_, match_against_exprs))) {
-      //   return ret;
-      // }
-      if (!match_against_exprs.empty()) {  
-      adlog::DEBUG("提取到了match_against_expr");
-        adlog::DEBUG(K(match_against_exprs.count()));
-        ObExpr *score_expr = match_against_exprs.at(0);  
-        int64_t expr_idx = -1;  
-        for (int64_t i = 0; i < exprs_->count(); ++i) {  
-          if (exprs_->at(i) == score_expr) {  
-            expr_idx = i;  
-            break;  
-          }  
+
+
+    double score = 0.0;  
+    ObSEArray<ObExpr *, 4> match_against_exprs;  
+      
+    for (int64_t i = 0; OB_SUCC(ret) && i < exprs_->count(); ++i) {  
+      ObExpr *expr = exprs_->at(i);  
+      if (OB_ISNULL(expr)) {  
+        ret = OB_ERR_UNEXPECTED;  
+      } else if (T_FUN_MATCH_AGAINST == expr->type_) {  
+        if (OB_FAIL(match_against_exprs.push_back(expr))) {  
+          LOG_WARN("failed to push back match against expr", K(ret));  
         }  
-          
-        if (expr_idx >= 0 && expr_idx < stored_row->cnt_) {  
-          ObDatum *score_datum = &stored_row->cells()[expr_idx];
-          score = score_datum->get_double();
-          adlog::DEBUG("找到了分数： ",score);//
-        }
-      }
-      else{
-        adlog::DEBUG("WARNING! match_against_exprs.empty()");
-      }
-      adlog::DEBUG("构建的row的score: ", score);
-      row = OB_NEWx(TopNRow, alloc_, stored_row, score);  
+      }  
     }  
+      
+    if (OB_SUCC(ret) && !match_against_exprs.empty()) {  
+      ObExpr *score_expr = match_against_exprs.at(0);  
+      ObDatum &score_datum = score_expr->locate_expr_datum(*eval_ctx_);  
+      if (!score_datum.is_null()) {  
+        score = score_datum.get_double();  
+      }  
+      adlog::DEBUG("直接获取的分数: ", score);  
+    }  
+
+    ObChunkDatumStore::StoredRow *stored_row = nullptr;  
+    if (OB_FAIL(result_store_.add_row(*exprs_, eval_ctx_, &stored_row))) {  
+      return ret;  
+    } else {
+      // 在add_row成功后检查
+      adlog::DEBUG("checking...");
+      if (OB_SUCC(ret) && OB_NOT_NULL(stored_row)) {  
+        adlog::DEBUG("stored_row cnt", K(stored_row->cnt_));  
+        for (int64_t i = 0; i < stored_row->cnt_; ++i) {  
+          adlog::DEBUG("datum", K(i), K(stored_row->cells()[i].is_null()));  
+        }  
+      }
+    }
+
+    adlog::DEBUG("构建的row的score: ", score);
+    row = OB_NEWx(TopNRow, alloc_, stored_row, score);   
 
     return ret;
   };
 
   TopNRow *row = nullptr;
+  adlog::DEBUG("add_row_with_topn");
+  adlog::DEBUG("exprs count", K(exprs_->count()));  
+  adlog::DEBUG("eval_ctx ptr", K(eval_ctx_)); 
   if (OB_FAIL(make_topn_row(row))) {
     return ret;
   }
   adlog::DEBUG("make_topn_row(row): row->score_: ",row->score_);
-  if (topn_heap_.count() < topn_limit_) {
+  if (topn_heap_.empty() or topn_heap_.count() < topn_limit_) {
     if (OB_FAIL(topn_heap_.push(row))) {
       adlog::DEBUG("index merge iter: topn_heap push error");
+    } else {
+      adlog::DEBUG("push topn_heap: row->score_: ",row->score_);
     }
     return ret;
   }
@@ -280,45 +283,110 @@ int ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn() {
 
 
 int ObDASIndexMergeIter::MergeResultBuffer::to_expr_from_topn(int64_t &size)  
-{  
-  int ret = OB_SUCCESS;  
-     
-  common::ObArray<TopNRow*> sorted_rows;
+{
+  int ret = OB_SUCCESS;
+  adlog::DEBUG("MergeResultBuffer::to_expr_from_topn");
+  adlog::DEBUG("to_expr exprs count", K(exprs_->count()));  
+  adlog::DEBUG("to_expr eval_ctx ptr", K(eval_ctx_));
+  common::ObArray<TopNRow *> sorted_rows;
+  adlog::DEBUG(K(topn_heap_.count()));
   while (topn_heap_.count() > 0) {
     auto &&top = topn_heap_.top();
-    sorted_rows.push_back(top);
+    if (OB_FAIL(sorted_rows.push_back(top))) {
+      adlog::DEBUG("ERROR! sorted_row push_back error");
+    }
     topn_heap_.pop();
-  } 
-  std::sort(sorted_rows.begin(), sorted_rows.end(), [](const TopNRow *a, const TopNRow *b) {  
-    return a->score_ > b->score_; // 
-  });  
-  {  
-    ObEvalCtx::BatchInfoScopeGuard batch_info_guard(*eval_ctx_);  
-    batch_info_guard.set_batch_size(sorted_rows.count());  
-      
-    for (int64_t i = 0; OB_SUCC(ret) && i < sorted_rows.count(); ++i) {  
-      batch_info_guard.set_batch_idx(i);  
-      TopNRow *row = sorted_rows.at(i);  
-      if (OB_ISNULL(row) || OB_ISNULL(row->row_data_)) {  
-        ret = OB_ERR_UNEXPECTED;  
-        LOG_WARN("unexpected null row", K(ret));  
-      } else if (OB_FAIL(row->row_data_->to_expr<true>(*exprs_, *eval_ctx_))) {  
-        LOG_WARN("failed to convert row to expr", K(ret));  
-      }  
-    }  
-      
-    if (OB_SUCC(ret)) {  
-      size = sorted_rows.count();  
+  }
+
+  if (OB_FAIL(ret)) {
+    adlog::DEBUG("MergeResultBuffer::to_expr_from_topn OB_FAIL(ret)");
+    return ret;
+  }
+  adlog::DEBUG(K(sorted_rows.count()));
+  std::sort(sorted_rows.begin(), sorted_rows.end(),
+            [](const TopNRow *a, const TopNRow *b) {
+              return a->score_ > b->score_; //
+            });
+
+  { // debug
+/*
+
+      } else if (OB_FAIL(result_store_.init(UINT64_MAX, MTL_ID(), ObCtxIds::DEFAULT_CTX_ID, "DASIndexMerge"))) {
+    LOG_WARN("failed to init result store", K(ret));
+  } else {
+    result_store_.set_allocator(alloc);
+*/
+    ObChunkDatumStore debug_store("DebugTopN");
+    if (OB_FAIL(debug_store.init(UINT64_MAX, MTL_ID(), ObCtxIds::DEFAULT_CTX_ID, "DASIndexMergeDebug"))) {
+      LOG_WARN("debug store init failed", K(ret));
+      return ret;
+    } else {
+      debug_store.set_allocator(*alloc_);
     }
 
-    for (auto &&one : sorted_rows) {
-      // delete one;
-      alloc_->free(one);
-
+    {
+      ObEvalCtx::BatchInfoScopeGuard guard(*eval_ctx_);
+      guard.set_batch_size(1);
+      for (int64_t i = 0; OB_SUCC(ret) && i < sorted_rows.count(); ++i) {
+        guard.set_batch_idx(0);
+        TopNRow *row = sorted_rows.at(i);
+        if (OB_NOT_NULL(row) && OB_NOT_NULL(row->row_data_)) {
+          // 先把行写入 eval_ctx_
+          if (OB_FAIL(row->row_data_->to_expr<true>(*exprs_, *eval_ctx_))) {
+            LOG_WARN("to_expr failed", K(i));
+          } else if (OB_FAIL(debug_store.add_row(*exprs_, eval_ctx_))) {
+            LOG_WARN("debug_store add_row failed", K(i));
+          }
+        }
+      }
     }
+
+    // 用标准路径输出
+    ObChunkDatumStore::Iterator iter;
+    int64_t read_size = 0;
+    if (OB_SUCC(ret)) {
+      if (OB_FAIL(debug_store.begin(iter))) {
+        LOG_WARN("debug_store begin failed", K(ret));
+      } else if (OB_FAIL(iter.get_next_batch<true>(*exprs_, *eval_ctx_, 
+                                                  sorted_rows.count(), read_size))) {
+        LOG_WARN("get_next_batch from debug_store failed", K(ret));
+      } else {
+        size = read_size;
+      }
+    }
+    adlog::DEBUG("ObChunkDatumStore::Iterator iter read_size: ",read_size);
+  }
+  // {  
+  //   ObEvalCtx::BatchInfoScopeGuard batch_info_guard(*eval_ctx_);  
+  //   batch_info_guard.set_batch_size(sorted_rows.count());  
+      
+  //   for (int64_t i = 0; OB_SUCC(ret) && i < sorted_rows.count(); ++i) {  
+  //     batch_info_guard.set_batch_idx(i);  
+  //     TopNRow *row = sorted_rows.at(i);  
+  //     if (OB_ISNULL(row) || OB_ISNULL(row->row_data_)) {  
+  //       ret = OB_ERR_UNEXPECTED;  
+  //       LOG_WARN("unexpected null row", K(ret));  
+  //     } else if (OB_FAIL(row->row_data_->to_expr<true>(*exprs_, *eval_ctx_))) {  
+  //       LOG_WARN("failed to convert row to expr", K(ret));
+  //     } else {
+  //       adlog::DEBUG("row->row_data_->to_expr<true>(*exprs_, *eval_ctx_) ok!");
+  //     }
+  //   }  
+      
+  //   if (OB_SUCC(ret)) {  
+  //     size = sorted_rows.count();  
+  //   }
+
+  //   for (auto &&one : sorted_rows) {
+  //     // delete one;
+  //     alloc_->free(one);
+
+  //   }
     
-  }  
-  topn_heap_.reset();  
+  // }  
+  // topn_heap_.reset();  
+  // result_store_iter_.reset();
+  // result_store_.reset();
   return ret;  
 }  
 
@@ -985,11 +1053,7 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
       }
       child_stores_.at(output_idx).to_expr();
       if (OB_FAIL(save_row_to_result_buffer())) {
-        // if (result_buffer_.enable_topn_) {
-        //   ret = OB_SUCCESS;
-        // }else {
           adlog::DEBUG("failed to save row to result buffer", K(ret));
-        // }
       } else {
         count += 1;
         if (result_buffer_.enable_topn_) { 
@@ -1016,9 +1080,10 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
 
     if (result_buffer_.enable_topn_) {
       adlog::DEBUG("result_buffer_.to_expr_from_topn(count): ", count);
-      result_buffer_.to_expr_from_topn(count);
+      int64_t tmp;
+      result_buffer_.to_expr_from_topn(tmp);
     } else if (OB_FAIL(result_buffer_.to_expr(count))) {
-      adlog::DEBUG("failed to convert result buffer to exprs", K(ret));  
+      adlog::DEBUG("WARNING! failed to convert result buffer to exprs", K(ret));  
       LOG_WARN("failed to convert result buffer to exprs", K(ret));  
     }  
   }  

@@ -714,6 +714,7 @@ public:
   inline const common::ObIArray<bool> &get_filter_before_index_flags() const { return filter_before_index_back_; }
   inline const ObRawExpr *get_limit_expr() const { return limit_count_expr_; }
   inline ObRawExpr *get_limit_expr() { return limit_count_expr_; }
+  inline void set_limit_expr(ObRawExpr * one) { limit_count_expr_ = one; }
   inline ObRawExpr *get_offset_expr() { return limit_offset_expr_; }
   int set_limit_offset(ObRawExpr *limit, ObRawExpr *offset);
   inline int64_t get_table_row_count() const

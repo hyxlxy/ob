@@ -2627,9 +2627,37 @@ int ObTscCgService::generate_index_merge_ctdef(const ObLogTableScan &op,
     {
       auto && log_table_scan = const_cast<ObLogTableScan&>(op);
       parent = log_table_scan.get_parent();
+      adlog::DEBUG("parent = log_table_scan.get_parent();");
+      if (!log_table_scan.use_index_merge()) {
+        adlog::DEBUG("ERROR not use index_merge");
+      }
+      if(log_table_scan.get_limit_expr() == nullptr){
+        adlog::DEBUG("ERROR 之前的没传过来");
+      }
+      if (log_table_scan.use_index_merge() and
+          (log_table_scan.get_limit_expr() != nullptr)) {
+        // 说明上层的sort已经被搞到这一层了
+        adlog::DEBUG("说明上层的sort已经被搞到这一层了");
+        log_table_scan.set_parent(nullptr);
+        adlog::DEBUG("log_table_scan.set_parent(nullptr);");
+        {
+          adlog::DEBUG("0 limit_op->get_limit_expr()");
+          ObExpr *limit_expr = nullptr; 
+          auto && limit_raw_expr = log_table_scan.get_limit_expr();  
+          if (OB_FAIL(cg_.generate_rt_expr(*limit_raw_expr, limit_expr))) {  
+            LOG_WARN("0 failed to generate rt expr", K(ret));  
+          } else {  
+            root_ctdef->limit_expr_ = limit_expr;  
+            adlog::DEBUG("0 set limit_expr to root_ctdef");
+          }
+        }
+      }
     }
-    if (OB_NOT_NULL(parent) && parent->get_type() == log_op_def::LOG_SORT) {  
-      ObLogSort *limit_op = static_cast<ObLogSort*>(parent);  
+
+
+    if (OB_NOT_NULL(parent) && parent->get_type() == log_op_def::LOG_SORT) {
+      ObLogSort *limit_op = static_cast<ObLogSort *>(parent);
+      adlog::DEBUG("ObLogSort *limit_op = static_cast<ObLogSort *>(parent);");
       if (OB_NOT_NULL(limit_op->get_topn_expr())) {//get_topn_expr
         // 阿巴阿巴
         adlog::DEBUG("1 limit_op->get_limit_expr()");
@@ -2652,7 +2680,9 @@ int ObTscCgService::generate_index_merge_ctdef(const ObLogTableScan &op,
           root_ctdef->limit_expr_ = limit_expr;  
           adlog::DEBUG("1 set limit_expr to root_ctdef");
         }
-      } 
+      } else {
+        adlog::DEBUG("limit_op 没有expr啊");
+      }
     } else if(OB_NOT_NULL(parent) && parent->get_type() == log_op_def::LOG_LIMIT){
       adlog::DEBUG("父亲是LIMIT类型");
       ObLogLimit *limit_op = static_cast<ObLogLimit*>(parent);  
@@ -2668,6 +2698,8 @@ int ObTscCgService::generate_index_merge_ctdef(const ObLogTableScan &op,
           adlog::DEBUG("2 set limit_expr to root_ctdef");
         }  
       }
+    } else {
+      adlog::DEBUG("当前index merge，但是父亲不是SORT和LIMIT啊");
     }
 
   }

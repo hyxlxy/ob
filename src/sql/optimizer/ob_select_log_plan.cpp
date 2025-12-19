@@ -26,7 +26,7 @@
 #include "sql/optimizer/ob_log_window_function.h"
 #include "sql/optimizer/ob_log_topk.h"
 #include "sql/optimizer/ob_log_expand.h"
-
+#include "common/ad_log.h"
 using namespace oceanbase;
 using namespace sql;
 using namespace oceanbase::common;
@@ -5494,6 +5494,79 @@ int ObSelectLogPlan::allocate_plan_top()
         LOG_TRACE("succeed to allocate root exchange", K(candidates_.candidate_plans_.count()));
       }
     }
+
+    // 在这里看能不能消除掉sort
+    if (OB_SUCC(ret)) {  
+      for (int64_t i = 0; OB_SUCC(ret) && i < candidates_.candidate_plans_.count(); i++) {
+        ObLogicalOperator *&top = candidates_.candidate_plans_.at(i).plan_tree_;
+        if (OB_ISNULL(top) || log_op_def::LOG_SORT != top->get_type()) {
+          continue;
+        }
+
+        ObLogicalOperator *child = top->get_child(0);
+        if (OB_ISNULL(child) or
+            log_op_def::LOG_TABLE_SCAN != child->get_type()) {
+          adlog::DEBUG("下层不是table scan啊");
+          continue;
+        }
+
+        ObLogTableScan *table_scan = static_cast<ObLogTableScan *>(child);
+        if (!table_scan->use_index_merge()) {
+          adlog::DEBUG("下层用的不是index merge 啊");
+          continue;
+        }
+        adlog::DEBUG("下层用的是index merge");
+        ObLogSort *sort_op = static_cast<ObLogSort *>(top);
+        
+        if (sort_op->get_topn_expr() != nullptr) {
+          table_scan->set_limit_expr(sort_op->get_topn_expr());
+          adlog::DEBUG("把sort里面的limit_expr放到了当前的table_"
+                       "scan的limit_count_expr里了");
+          table_scan->set_parent(nullptr);
+        }
+
+        top = child;
+       
+      
+          // // 在这里试试看能不能把sort算子给去掉 advise 
+          // adlog::DEBUG("在这里试试看能不能把sort算子给去掉");
+          // do {
+          //   int ret = OB_SUCCESS;
+          //   ObLogicalOperator *&top = candidate_plan.plan_tree_;
+          //   if (OB_ISNULL(top) || log_op_def::LOG_SORT != top->get_type()) {  
+          //     // 不是sort算子，无需处理  
+          //     adlog::DEBUG("不是sort算子啊");
+          //   } else {  
+          //     ObLogSort *sort_op = static_cast<ObLogSort*>(top);  
+          //     ObLogicalOperator *child = sort_op->get_child(0);  
+          //     if (OB_NOT_NULL(child) && log_op_def::LOG_TABLE_SCAN == child->get_type()) {
+          //       ObLogTableScan *table_scan = static_cast<ObLogTableScan *>(child);
+          //       if (table_scan->use_index_merge()) {
+          //         // 使用的index merge
+          //         adlog::DEBUG("下层用的是index merge");
+          //         // get_limit_expr
+          //         // auto && limit_expr = table_scan->get_limit_expr();
+          //         if (sort_op->get_topn_expr() != nullptr) {
+          //           // (limit_expr) = (sort_op->get_topn_expr());
+          //           table_scan->set_limit_expr(sort_op->get_topn_expr());
+          //           adlog::DEBUG("把sort里面的limit_expr放到了当前的table_"
+          //                        "scan的limit_count_expr里了");
+          //           table_scan->set_parent(nullptr);
+          //         }
+          //         top = child;
+          //       }
+          //       else {
+          //         adlog::DEBUG("但是下层使用的不是index merge");
+          //       }
+          //     } else {
+          //       adlog::DEBUG("下层不是table scan啊");
+          //     }  
+          //   } 
+            
+          // }while(0);
+      }  
+    }
+
   }
   return ret;
 }
