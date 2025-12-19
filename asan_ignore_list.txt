@@ -1,0 +1,627 @@
+RAG 系统完整技术文档
+一、系统概述
+1.1 整体架构
+┌─────────────────────────────────────────────────────────────────────────┐
+│                            RAG 系统架构                                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │                     数据导入阶段 (Add)                            │  │
+│  │                                                                    │  │
+│  │   PDF文件 → 逐页处理 → 文本提取/VLM → 分块 → 向量化 → 存储        │  │
+│  │                                                                    │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                                  ↓                                      │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │                      OceanBase 数据库                             │  │
+│  │                                                                    │  │
+│  │   ┌─────────────────────────────────────────────────────────┐    │  │
+│  │   │  rag_documents 表                                        │    │  │
+│  │   │  - id, source_id, filename, page, content, vector       │    │  │
+│  │   │  - 向量索引 (HNSW) + 全文索引 (IK分词)                   │    │  │
+│  │   └─────────────────────────────────────────────────────────┘    │  │
+│  │                                                                    │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                                  ↓                                      │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │                    检索问答阶段 (Search)                          │  │
+│  │                                                                    │  │
+│  │   用户问题 → 向量化 → 混合检索 → RRF融合 → LLM生成 → 输出答案    │  │
+│  │                                                                    │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+1.2 核心文件结构
+rag/
+├── main.py                 # 主入口，编排 add 和 search 流程
+├── eval.py                 # 评分脚本
+├── requirements.txt        # Python 依赖
+├── .env.example            # 环境变量示例
+├── data/
+│   ├── dataset/            # PDF 数据集目录
+│   ├── questions.json      # 测试问题
+│   ├── answer.json         # 标准答案
+│   └── output.json         # 输出结果
+└── src/
+    ├── core/
+    │   ├── add.py          # 数据导入核心逻辑
+    │   └── search.py       # 检索问答核心逻辑
+    ├── integrations/
+    │   ├── embedding/      # 嵌入模型 (text-embedding-v4)
+    │   ├── llm/            # 文本生成模型 (qwen-plus)
+    │   └── vlm/            # 视觉语言模型 (qwen3-vl-flash)
+    ├── parser/
+    │   └── pdf.py          # PDF 解析、图像转换
+    ├── prompt/
+    │   ├── query.py        # 问答 Prompt
+    │   └── vlm.py          # VLM 提取 Prompt
+    ├── split/
+    │   └── split.py        # 文本分块
+    ├── storage/
+    │   └── oceanbase.py    # OceanBase 客户端
+    └── util/
+        └── util.py         # 工具函数、Answer 类
+二、数据导入阶段 (Add)
+2.1 入口函数
+文件: 
+src/core/add.py
+ - 
+add()
+ 函数
+
+python
+def add(dataset_dir: str, max_worker: int):
+    # 1. 扫描 PDF 文件
+    pdf_files = glob.glob(os.path.join(dataset_dir, "*.pdf"))
+    
+    # 2. 初始化 OceanBase 客户端
+    client = get_or_create_client()
+    
+    # 3. 探测嵌入维度并创建表
+    vector_dim = _detect_embedding_dim()
+    create_table_if_not_exists(client, vector_dim)
+    
+    # 4. 并行处理 PDF 文件
+    with ThreadPoolExecutor(max_workers=max_worker) as executor:
+        for pdf_file in pdf_files:
+            executor.submit(process_pdf_file, pdf_file, client)
+关键参数:
+
+max_worker=8: 并行处理 PDF 的线程数
+2.2 数据库表结构
+表名: rag_documents
+
+字段	类型	说明
+id	Integer	自增主键
+source_id	VARCHAR(64)	UUID，chunk 唯一标识
+filename	VARCHAR(512)	PDF 文件名 (评分用)
+page	Integer	页码，1-indexed (评分用)
+content	VARCHAR(8192)	文本内容
+vector	VECTOR(dim)	嵌入向量
+索引:
+
+向量索引: vec_idx - HNSW 算法，用于语义检索
+全文索引: fts_idx_content - IK 分词器，用于 BM25 检索
+python
+# 向量索引参数
+vec_index_param = "distance=cosine, type=hnsw, lib=vsag"
+
+# 全文索引参数
+FtsIndexParam(
+    index_name="fts_idx_content",
+    field_names=["content"],
+    parser_type=FtsParser.IK,
+)
+2.3 PDF 处理流程
+文件: 
+src/core/add.py
+ - 
+process_pdf_file()
+ 函数
+
+┌─────────────────────────────────────────────────────────────────┐
+│                    process_pdf_file() 流程                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  for page_num in range(1, total_pages + 1):                     │
+│      │                                                           │
+│      ▼                                                           │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ Step 1: 文本提取                                          │   │
+│  │ raw_text = reader.pages[page_num-1].extract_text()       │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│      │                                                           │
+│      ▼                                                           │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ Step 2: VLM 图像理解 (条件触发)                           │   │
+│  │ if len(page_text) < 500:  # 文本稀疏，可能是图表页        │   │
+│  │     image = pdf_page_to_image(pdf_file, page_num)        │   │
+│  │     vlm_text = generate_vlm_response(prompt, image)      │   │
+│  │     page_text += "\n\n【页面视觉内容描述】\n" + vlm_text  │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│      │                                                           │
+│      ▼                                                           │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ Step 3: 文本分块                                          │   │
+│  │ text_chunks = split_text(page_text)                      │   │
+│  │ # max_chunk_size=1200, overlap=150                       │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│      │                                                           │
+│      ▼                                                           │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ Step 4: 向量化                                            │   │
+│  │ embeddings = generate_embedding(valid_chunks)            │   │
+│  │ # 模型: text-embedding-v4                                │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│      │                                                           │
+│      ▼                                                           │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ Step 5: 组装数据                                          │   │
+│  │ {                                                         │   │
+│  │     "source_id": uuid4(),                                │   │
+│  │     "filename": os.path.basename(pdf_file),              │   │
+│  │     "page": page_num,                                    │   │
+│  │     "content": chunk_text[:8190],                        │   │
+│  │     "vector": embedding                                  │   │
+│  │ }                                                         │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                                                                  │
+│  批量写入数据库 (batch_size=100)                                 │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+2.4 VLM 图像理解
+触发条件: 页面提取的文本 < 500 字符
+
+文件: 
+src/parser/pdf.py
+ - 
+pdf_page_to_image()
+ 函数
+
+python
+# PDF 页面转图像
+images = convert_from_path(pdf_path, dpi=100, first_page=page_num, last_page=page_num)
+# 转灰度图并保存为临时 PNG 文件
+img = img.convert("L")  # 灰度模式
+img.save(temp_file.name, "PNG")
+VLM Prompt (
+src/prompt/vlm.py
+):
+
+python
+VLM_IMAGE_EXTRACTION_PROMPT = (
+    "请仔细阅读这张图片中的所有文字内容，包括图表、表格、标题、正文等，并将关键文字内容简洁地提取出来。"
+    "如果图片中包含表格，请以Markdown格式的表格形式输出，确保数值准确。"
+    "如果图片中包含图表（如柱状图、折线图、饼图等），请详细描述图表中的趋势、关键数据点和图例含义。"
+    "请保持输出精简，避免冗余描述，只提取必要信息。"
+)
+VLM 模型: qwen3-vl-flash
+
+错误处理: 遇到 502 错误时，会压缩图像后重试
+
+2.5 文本分块
+文件: 
+src/split/split.py
+ - 
+split_text()
+ 函数
+
+策略:
+
+按双换行 (\n\n) 分割为段落
+段落 ≤ 1200 字符: 直接作为一个 chunk
+段落 > 1200 字符: 按句子边界切分，再组合
+相邻 chunk 有 150 字符重叠
+python
+def split_text(
+    text: str,
+    max_chunk_size: int = 1200,  # 单块最大字符数
+    overlap: int = 150,          # 重叠字符数
+) -> List[str]:
+句子边界识别:
+
+python
+sentence_endings = r"[。！？.!?]"  # 中英文句号、问号、感叹号
+2.6 向量化
+文件: 
+src/integrations/embedding/openai_client.py
+
+模型: text-embedding-v4
+
+支持批量: 支持传入字符串列表，批量生成向量
+
+python
+def generate_response(
+    embedding_text: str | List[str],
+    model: str = "text-embedding-v4",
+    max_retries: int = 3,
+    initial_backoff: float = 1.0,
+) -> List[float] | List[List[float]]:
+三、检索问答阶段 (Search)
+3.1 入口函数
+文件: 
+src/core/search.py
+ - 
+search()
+ 函数
+
+┌─────────────────────────────────────────────────────────────────┐
+│                      search() 流程                               │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  输入: question (用户问题字符串)                                 │
+│      │                                                           │
+│      ▼                                                           │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ Step 1: 问题向量化                                        │   │
+│  │ question_embedding = generate_embedding(question)        │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│      │                                                           │
+│      ▼                                                           │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ Step 2: 并行执行双路检索                                  │   │
+│  │                                                           │   │
+│  │   ┌─────────────────┐    ┌─────────────────┐            │   │
+│  │   │   BM25 检索     │    │   向量检索      │            │   │
+│  │   │ (全文索引)      │    │ (HNSW索引)     │            │   │
+│  │   │ 候选数: 60      │    │ 候选数: 90     │            │   │
+│  │   └────────┬────────┘    └────────┬────────┘            │   │
+│  │            │                       │                      │   │
+│  │            └───────────┬───────────┘                      │   │
+│  │                        ▼                                  │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│      │                                                           │
+│      ▼                                                           │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ Step 3: RRF 融合                                          │   │
+│  │ fused = _rrf_fuse(bm25_results, vec_results, TOP_K=15)   │   │
+│  │ # RRF_K = 60                                             │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│      │                                                           │
+│      ▼                                                           │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ Step 4: 组装上下文                                        │   │
+│  │ - 提取 content, filename, page                           │   │
+│  │ - 按 (filename, page) 去重                               │   │
+│  │ - 截断至 MAX_CONTEXT_CHARS=20000                         │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│      │                                                           │
+│      ▼                                                           │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ Step 5: 来源选择 ⚠️                                       │   │
+│  │ answer.filename, answer.page = meta[0]  # 取第一条结果   │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│      │                                                           │
+│      ▼                                                           │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ Step 6: LLM 生成答案                                      │   │
+│  │ answer.answer = generate_llm_response(messages)          │   │
+│  │ # 模型: qwen-plus                                        │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│      │                                                           │
+│      ▼                                                           │
+│  输出: Answer(question, answer, filename, page)                  │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+3.2 检索参数
+python
+TOP_K = 15                    # 最终返回的结果数
+BM25_CANDIDATES = 60          # BM25 候选数 (TOP_K * 4)
+VEC_CANDIDATES = 90           # 向量检索候选数 (TOP_K * 6)
+RRF_K = 60                    # RRF 融合常数
+MAX_CONTEXT_CHARS = 20000     # 上下文最大字符数
+SIMILARITY_THRESHOLD = 0.2    # 向量相似度阈值
+3.3 BM25 检索
+查询构造:
+
+python
+def _build_fts_query(query: str) -> Dict:
+    return {
+        "bool": {
+            "must": [
+                {
+                    "query_string": {
+                        "fields": ["content"],
+                        "type": "best_fields",
+                        "query": query,
+                        "minimum_should_match": "30%",
+                    }
+                }
+            ]
+        }
+    }
+请求体:
+
+python
+bm25_request = {
+    "query": fts_query,
+    "from": 0,
+    "size": BM25_CANDIDATES,  # 60
+}
+3.4 向量检索
+请求体:
+
+python
+vec_request = {
+    "knn": {
+        "field": "vector",
+        "k": VEC_CANDIDATES,              # 90
+        "num_candidates": max(VEC_CANDIDATES, 128),
+        "query_vector": question_embedding,
+        "similarity": 0.2,                # 相似度阈值
+    },
+    "from": 0,
+    "size": VEC_CANDIDATES,
+}
+3.5 RRF 融合算法
+Reciprocal Rank Fusion (RRF):
+
+python
+def _rrf_fuse(bm25: List[Dict], dense: List[Dict], top_k: int) -> List[Dict]:
+    """
+    RRF 公式: score(d) = Σ 1/(k + rank_i(d))
+    其中 k = RRF_K = 60
+    """
+    scores: Dict[str, float] = defaultdict(float)
+    
+    # BM25 结果贡献分数
+    for rank, doc in enumerate(bm25, start=1):
+        scores[key(doc)] += 1.0 / (RRF_K + rank)
+    
+    # 向量结果贡献分数
+    for rank, doc in enumerate(dense, start=1):
+        scores[key(doc)] += 1.0 / (RRF_K + rank)
+    
+    # 按融合分数排序，取 top_k
+    return sorted_by_score[:top_k]
+去重 Key:
+
+python
+def _key(d: Dict) -> str:
+    return d.get("source_id") or f"{d.get('filename','')}#{d.get('page',0)}#{hash(d.get('content',''))}"
+3.6 上下文组装
+python
+contexts: List[str] = []
+meta: List[Tuple[str, int]] = []  # (filename, page)
+seen = set()
+
+for r in fused:
+    content = r.get("content", "").strip()
+    filename = r.get("filename", "")
+    page = r.get("page", 0)
+    key = (filename, page)
+    
+    if content and key not in seen:
+        contexts.append(content)
+        meta.append(key)
+        seen.add(key)
+
+# 截断上下文
+contexts = _truncate_context(contexts, MAX_CONTEXT_CHARS)
+context_text = "\n\n".join(contexts)
+3.7 来源选择 (⚠️ 当前实现的弱点)
+python
+# 采用首条的文件与页作为主引用
+if meta:
+    answer.filename, answer.page = meta[0]
+问题: 只取第一条结果的来源信息，不一定是真正回答问题的来源。
+
+3.8 LLM 生成答案
+模型: qwen-plus
+
+System Prompt (
+src/prompt/query.py
+):
+
+python
+QUERY_SYSTEM_PROMPT = (
+    "你是一个专业的文档问答助手。必须严格依据提供的文档内容作答，"
+    "不要编造、不要引入未提供的外部知识；若文档缺乏答案，请明确说明无法从文档中得到答案。"
+    "回答必须包含明确的来源引用。"
+)
+User Prompt Template:
+
+python
+QUERY_USER_PROMPT_TEMPLATE = """请仅基于下述文档片段回答用户问题：
+
+【文档片段开始】
+{context_text}
+【文档片段结束】
+
+用户问题：{question}
+
+作答要求：
+1. 只使用文档片段中的信息，保持表述准确、简洁；
+2. 若文档没有相关信息，请说"无法从提供的文档中找到答案"；
+3. **必须**在回答中引用相关信息来源，引用格式为：(文件名, 页码)。
+   例如："千味央厨成立于2012年 (千味央厨-公司研究报告.pdf, 15)。"
+   如果是多个来源，请全部列出。
+"""
+四、模型集成
+4.1 嵌入模型
+文件: 
+src/integrations/embedding/openai_client.py
+
+配置	值
+模型	text-embedding-v4
+API	OpenAI 兼容接口
+重试	3 次，指数退避
+4.2 文本生成模型 (LLM)
+文件: 
+src/integrations/llm/openai_client.py
+
+配置	值
+模型	qwen-plus
+Temperature	0.2
+Timeout	300 秒
+重试	3 次，指数退避
+4.3 视觉语言模型 (VLM)
+文件: 
+src/integrations/vlm/openai_client.py
+
+配置	值
+模型	qwen3-vl-flash
+Temperature	0.2
+图像格式	PNG base64
+重试	3 次，502 错误时压缩图像重试
+五、评分机制
+5.1 评分公式
+文件: 
+eval.py
+
+总分 = filename_score × 25 + page_score × 25 + answer_score × 50
+评分项	满分	评分规则
+filename	25	精确匹配得 25 分，否则 0 分
+page	25	需 filename 先匹配，页码精确匹配得 25 分
+answer	50	LLM 评判语义相似度 (0.0-1.0) × 50
+5.2 答案相似度评判
+使用 qwen-max 模型评判答案与标准答案的语义相似度:
+
+python
+def llm_judge(origin_text: str, text: str) -> Optional[float]:
+    """返回 0.0-1.0 的相似度评分"""
+评分标准:
+
+0.95-1.0: 极高相关性，语义高度一致
+0.85-0.94: 高度相关，核心语义一致
+0.75-0.84: 高度相关，主要语义一致
+0.65-0.74: 中等相关，语义部分一致
+...以此类推
+六、数据流转示例
+6.1 导入阶段示例
+输入: 千味央厨-公司研究报告-深耕餐饮供应链为人间千味-23011258页.pdf
+
+第 15 页处理:
+
+文本提取: "公司简介：千味央厨成立于2012年，是一家专注于..."
+判断是否需要 VLM: len(text) = 800 > 500，不需要
+分块: 分成 2 个 chunks
+存储:
+json
+[
+  {
+    "id": 142,
+    "source_id": "a1b2c3d4-...",
+    "filename": "千味央厨-公司研究报告-深耕餐饮供应链为人间千味-23011258页.pdf",
+    "page": 15,
+    "content": "公司简介：千味央厨成立于2012年...",
+    "vector": [0.023, -0.156, ...]
+  },
+  {
+    "id": 143,
+    "source_id": "b2c3d4e5-...",
+    "filename": "千味央厨-公司研究报告-深耕餐饮供应链为人间千味-23011258页.pdf",
+    "page": 15,
+    "content": "...主要客户包括百胜中国、海底捞...",
+    "vector": [0.045, -0.112, ...]
+  }
+]
+6.2 检索阶段示例
+输入: "千味央厨的成立时间是什么时候？"
+
+向量化: [0.031, -0.142, ...]
+BM25 检索: 返回 60 条候选
+向量检索: 返回 90 条候选
+RRF 融合: 得到 15 条结果，第一条是:
+json
+{
+  "content": "公司简介：千味央厨成立于2012年...",
+  "filename": "千味央厨-公司研究报告-深耕餐饮供应链为人间千味-23011258页.pdf",
+  "page": 15
+}
+来源选择: filename=上述文件, page=15
+LLM 生成: "千味央厨成立于2012年。"
+输出:
+
+json
+{
+  "question": "千味央厨的成立时间是什么时候？",
+  "answer": "千味央厨成立于2012年。",
+  "filename": "千味央厨-公司研究报告-深耕餐饮供应链为人间千味-23011258页.pdf",
+  "page": 15
+}
+评分: filename ✓ (25) + page ✓ (25) + answer ~0.95 (47.5) = 97.5 分
+
+七、当前问题与优化方向
+7.1 来源选择问题 (高优先级)
+问题: 只取 RRF 融合后第一条结果的 filename 和 page
+
+影响: 即使检索到正确信息，如果不在第一位，来源就错
+
+优化方案:
+
+让 LLM 在回答中指明来源，解析 LLM 输出
+答案生成后，计算答案与各 chunk 的相似度，选最相关的
+多个 chunk 来自同一页时投票
+7.2 检索召回问题 (中优先级)
+问题: 正确答案可能未被召回
+
+优化方案:
+
+增大 TOP_K 和候选数
+添加 Reranker 重排序
+Query 改写/扩展
+7.3 分块质量问题 (中优先级)
+问题:
+
+答案被切到两个 chunk
+chunk 太大导致噪声
+关键信息（如数字）被遗漏
+优化方案:
+
+按语义/标题边界分块
+增加重叠
+优化 VLM prompt 确保数值准确
+7.4 VLM 触发策略 (低优先级)
+问题: 500 字符阈值可能不够精准
+
+优化方案:
+
+降低阈值
+结合页面是否有图片判断
+对所有页面都用 VLM
+八、环境配置
+8.1 环境变量 (.env)
+bash
+# LLM 配置
+OPENAI_API_KEY="your-api-key"
+OPENAI_BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1"
+
+# OceanBase 配置
+OCEANBASE_URI="127.0.0.1:2881"
+OCEANBASE_USER="root"
+OCEANBASE_PASSWORD=""
+OCEANBASE_DBNAME="oceanbase"
+
+# 可选配置
+EMBEDDING_DIM=0           # 0 表示自动探测
+VECTOR_METRIC="cosine"    # l2 | ip | cosine
+TOP_K=15
+BM25_CANDIDATES=60
+VEC_CANDIDATES=90
+RRF_K=60
+MAX_CONTEXT_CHARS=20000
+SIMILARITY_THRESHOLD=0.2
+8.2 依赖 (
+requirements.txt
+)
+openai>=2.8.0
+pdf2image>=1.17.0
+Pillow>=12.0.0
+pyobvector>=0.2.19
+pypdf>=6.2.0
+PyPDF2>=3.0.1
+python-dotenv>=1.2.1
+SQLAlchemy>=2.0.44
+九、执行命令
+9.1 运行 RAG
+bash
+cd rag && python3 main.py \
+    --dataset="./data/dataset/" \
+    --questions="./data/questions.json" \
+    --output="./data/output.json"
+9.2 本地评测
+bash
+cd rag && python3 eval.py \
+    --output="./data/output.json" \
+    --answer="./data/answer.json"
