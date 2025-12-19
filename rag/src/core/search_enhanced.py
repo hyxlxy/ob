@@ -42,15 +42,15 @@ dotenv.load_dotenv()
 
 TABLE_NAME = "rag_documents"
 
-# 检索参数 - 针对40分钟时限优化
-TOP_K = int(os.getenv("TOP_K", "20"))
-BM25_CANDIDATES = int(os.getenv("BM25_CANDIDATES", "60"))
-VEC_CANDIDATES = int(os.getenv("VEC_CANDIDATES", "80"))
+# 检索参数 - 平衡质量和速度
+TOP_K = int(os.getenv("TOP_K", "25"))
+BM25_CANDIDATES = int(os.getenv("BM25_CANDIDATES", "100"))
+VEC_CANDIDATES = int(os.getenv("VEC_CANDIDATES", "150"))
 RRF_K = float(os.getenv("RRF_K", "60"))
-MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "20000"))
+MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "24000"))
 
-# 关闭HyDE以节省时间（每个问题少一次LLM调用）
-ENABLE_HYDE = os.getenv("ENABLE_HYDE", "false").lower() == "true"
+# HyDE 对质量有帮助，保持开启
+ENABLE_HYDE = os.getenv("ENABLE_HYDE", "true").lower() == "true"
 
 
 def _extract_years(text: str) -> Set[str]:
@@ -203,10 +203,7 @@ def _select_best_source_enhanced(
     - filename完全匹配：25分
     - page完全匹配：25分（前提是filename也对）
     
-    策略：
-    1. 首先找答案中数值/关键信息的精确来源
-    2. 然后考虑文件名相关性
-    3. 最后考虑重排序得分
+    核心策略：优先找到包含答案关键信息的精确来源
     """
     if not reranked_chunks:
         return ("", 0)
@@ -214,14 +211,12 @@ def _select_best_source_enhanced(
     # 从答案中提取关键信息
     answer_numbers = _extract_precise_numbers(answer)
     answer_years = _extract_years(answer)
-    answer_chinese = set(re.findall(r'[\u4e00-\u9fa5]{3,6}', answer))
+    # 提取答案中的关键短语（2-8字的中文词组）
+    answer_phrases = set(re.findall(r'[\u4e00-\u9fa5]{2,8}', answer))
     
     # 问题中的数值和年份
     question_numbers = _extract_precise_numbers(question)
     question_years = _extract_years(question)
-    
-    best_chunk = None
-    best_score = -1
     
     # 按文件组织chunks
     file_chunks: Dict[str, List[Dict]] = defaultdict(list)
@@ -229,56 +224,64 @@ def _select_best_source_enhanced(
         filename = chunk.get("filename", "")
         file_chunks[filename].append(chunk)
     
-    for chunk in reranked_chunks[:15]:  # 检查前15个结果
+    # 第一轮：找包含答案数值的chunk（最可靠）
+    if answer_numbers:
+        for chunk in reranked_chunks:
+            content = chunk.get("content", "")
+            chunk_numbers = _extract_precise_numbers(content)
+            # 如果chunk包含答案中的所有数值，直接返回
+            if answer_numbers.issubset(chunk_numbers):
+                filename = chunk.get("filename", "")
+                page = chunk.get("page", 0)
+                logger.debug(f"数值完全匹配: {filename}:{page}")
+                return (filename, page)
+    
+    # 第二轮：评分选择
+    best_chunk = None
+    best_score = -1
+    
+    for chunk in reranked_chunks[:20]:  # 检查前20个结果
         content = chunk.get("content", "")
         filename = chunk.get("filename", "")
-        page = chunk.get("page", 0)
         
         score = 0.0
         
-        # 策略1: 答案数值精确匹配（最高优先级）
+        # 策略1: 答案数值部分匹配
         if answer_numbers:
             chunk_numbers = _extract_precise_numbers(content)
             exact_matches = len(answer_numbers & chunk_numbers)
-            if exact_matches > 0:
-                # 数值完全匹配是强信号
-                score += exact_matches * 30
+            score += exact_matches * 50  # 高权重
         
-        # 策略2: 答案年份精确匹配
+        # 策略2: 答案年份匹配
         if answer_years:
             chunk_years = _extract_years(content)
             year_matches = len(answer_years & chunk_years)
-            score += year_matches * 15
+            score += year_matches * 20
         
-        # 策略3: 问题数值/年份匹配（次优先）
-        if question_numbers:
-            chunk_numbers = _extract_precise_numbers(content)
-            q_matches = len(question_numbers & chunk_numbers)
-            score += q_matches * 10
-        
+        # 策略3: 问题年份匹配（对于有年份的问题很重要）
         if question_years:
             chunk_years = _extract_years(content)
             q_year_matches = len(question_years & chunk_years)
-            score += q_year_matches * 8
+            score += q_year_matches * 15
         
-        # 策略4: 答案中文关键词重叠
-        chunk_chinese = set(re.findall(r'[\u4e00-\u9fa5]{3,6}', content))
-        chinese_overlap = len(answer_chinese & chunk_chinese)
-        score += chinese_overlap * 2
+        # 策略4: 答案关键短语匹配
+        chunk_text = content.lower()
+        phrase_matches = sum(1 for p in answer_phrases if p in content)
+        score += phrase_matches * 3
         
         # 策略5: 关键词匹配
-        for kw in keywords:
+        for kw in keywords[:10]:  # 前10个关键词
             if kw in content:
-                score += 5
+                score += 8
         
-        # 策略6: 文件名相关性加成
+        # 策略6: 文件名相关性
         filename_boost = _filename_relevance_boost(
             filename, question, keywords, question_type
         )
         score *= filename_boost
         
-        # 策略7: 重排序得分作为参考
-        score += chunk.get("_final_score", 0) * 5
+        # 策略7: 原始重排序得分
+        score += chunk.get("_final_score", 0) * 10
         
         if score > best_score:
             best_score = score
@@ -287,28 +290,34 @@ def _select_best_source_enhanced(
     if not best_chunk:
         best_chunk = reranked_chunks[0]
     
-    # 邻页回溯：如果答案中有数值，检查是否在相邻页有更好匹配
     filename = best_chunk.get("filename", "")
     page = best_chunk.get("page", 0)
     
+    # 邻页精确匹配：在同文件中找包含最多答案数值的页
     if answer_numbers and filename in file_chunks:
-        best_num_coverage = 0
-        best_page_candidate = page
+        best_coverage = 0
+        best_page = page
         
-        # 检查当前页及前后两页
-        for p in range(max(1, page - 2), page + 3):
-            for chunk in file_chunks[filename]:
-                if chunk.get("page") == p:
-                    content = chunk.get("content", "")
-                    chunk_numbers = _extract_precise_numbers(content)
-                    coverage = len(answer_numbers & chunk_numbers)
-                    if coverage > best_num_coverage:
-                        best_num_coverage = coverage
-                        best_page_candidate = p
+        # 计算当前页的覆盖率
+        for c in file_chunks[filename]:
+            if c.get("page") == page:
+                chunk_nums = _extract_precise_numbers(c.get("content", ""))
+                best_coverage = len(answer_numbers & chunk_nums)
+                break
         
-        if best_page_candidate != page:
-            logger.debug(f"邻页回溯: {page} -> {best_page_candidate}")
-            page = best_page_candidate
+        # 检查所有页（不只是邻页）
+        for c in file_chunks[filename]:
+            p = c.get("page", 0)
+            content = c.get("content", "")
+            chunk_nums = _extract_precise_numbers(content)
+            coverage = len(answer_numbers & chunk_nums)
+            if coverage > best_coverage:
+                best_coverage = coverage
+                best_page = p
+        
+        if best_page != page:
+            logger.debug(f"页码校正: {page} -> {best_page}")
+            page = best_page
     
     return (filename, page)
 
@@ -381,16 +390,13 @@ def search(question: str) -> Answer:
     logger.info(f"[Enhanced] Processing: '{question[:60]}...'")
 
     try:
-        # ===== 1. Query预处理（简化版，不用HyDE节省时间）=====
-        question_type = classify_question_type(question)
-        keywords = extract_keywords(question)
-        hypothetical_doc = None
+        # ===== 1. Query预处理 =====
+        processor = QueryProcessor(enable_hyde=ENABLE_HYDE)
+        query_info = processor.process(question)
         
-        # 仅在明确启用时使用HyDE
-        if ENABLE_HYDE:
-            processor = QueryProcessor(enable_hyde=True)
-            query_info = processor.process(question)
-            hypothetical_doc = query_info.get("hypothetical_doc")
+        question_type = query_info["question_type"]
+        keywords = query_info["keywords"]
+        hypothetical_doc = query_info.get("hypothetical_doc")
         
         logger.debug(f"Type: {question_type}, Keywords: {keywords[:5]}")
 

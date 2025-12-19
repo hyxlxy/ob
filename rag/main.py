@@ -97,18 +97,16 @@ if __name__ == "__main__":
     import time
     from concurrent.futures import ThreadPoolExecutor, as_completed
     
-    # 针对40分钟时限优化并行度
-    # 假设每个问题约30秒，50个问题需要25分钟（串行）
-    # 使用4个worker可以缩短到约7分钟
+    # 平衡速度和API限流
     if len(questions) <= 10:
-        max_workers = 3
-        delay_between = 0.1
+        max_workers = 2
+        delay_between = 0.3
     elif len(questions) <= 30:
-        max_workers = 4
-        delay_between = 0.1
+        max_workers = 3
+        delay_between = 0.2
     else:
-        max_workers = 5  # 大量问题时提高并发
-        delay_between = 0.05
+        max_workers = 4
+        delay_between = 0.15
     
     logger.info(f"Using {max_workers} workers with {delay_between}s delay for {len(questions)} questions")
     
