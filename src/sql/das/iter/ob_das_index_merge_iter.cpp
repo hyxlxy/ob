@@ -186,6 +186,7 @@ void ObDASIndexMergeIter::MergeResultBuffer::reset()
 }
 
 int ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn() {
+  adlog::DEBUG("ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn");
   int ret = OB_SUCCESS;
 
   auto make_topn_row = [&](TopNRow*& row) -> int {
@@ -409,12 +410,13 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
             LOG_WARN("failed to init merge result buffer", K(ret));
           } else {
             if (merge_rtdef_->enable_topn_pushdown_) {
-              result_buffer_.enable_topn_ = merge_rtdef_->enable_topn_pushdown_;
+              result_buffer_.enable_topn_ = true;
               result_buffer_.topn_limit_ = merge_rtdef_->topn_limit_;
               // adlog::DEBUG("result_buffer_.topn_limit_ =  ",)
               // result_buffer_.enable_topn_ = false;
               adlog::DEBUG(K(result_buffer_.topn_limit_));
             } else {
+              result_buffer_.enable_topn_ = false;
               adlog::DEBUG("result_buffer_.topn_limit _ 无");
             }
           }

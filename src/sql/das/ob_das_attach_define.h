@@ -211,7 +211,7 @@ public:
       : ObDASAttachCtDef(alloc, DAS_OP_INDEX_MERGE),
         merge_type_(INDEX_MERGE_INVALID), is_reverse_(false),
         merge_node_types_(alloc), rowkey_exprs_(alloc),
-        topn_limit_(-1),enable_topn_pushdown_(false) 
+        topn_limit_(-1),enable_topn_pushdown_(false) ,limit_expr_(nullptr)
   {}
 
   virtual ~ObDASIndexMergeCtDef() {}
@@ -221,8 +221,10 @@ public:
   /* child node types, include NODE_MERGE, NODE_SCAN, NDOE_FTS now */
   ObFixedArray<ObIndexMergeType, common::ObIAllocator> merge_node_types_;
   sql::ExprFixedArray rowkey_exprs_; // merge by rowkey
-  int64_t topn_limit_;  
-  bool enable_topn_pushdown_;  
+  int64_t topn_limit_;
+  bool enable_topn_pushdown_;
+  ObExpr *limit_expr_;
+  
 };
 
 struct ObDASIndexMergeRtDef : ObDASAttachRtDef

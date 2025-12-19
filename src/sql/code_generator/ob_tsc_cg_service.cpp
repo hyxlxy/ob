@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "ob_static_engine_cg.h"
 #define USING_LOG_PREFIX SQL_CG
 #include "ob_tsc_cg_service.h"
 #include "sql/code_generator/ob_static_engine_cg.h"
@@ -2621,6 +2622,54 @@ int ObTscCgService::generate_index_merge_ctdef(const ObLogTableScan &op,
         adlog::DEBUG("root_ctdef->topn_limit_ = path->topn_limit_: ", path->topn_limit_);
       }
     }
+
+    ObLogicalOperator *parent;  
+    {
+      auto && log_table_scan = const_cast<ObLogTableScan&>(op);
+      parent = log_table_scan.get_parent();
+    }
+    if (OB_NOT_NULL(parent) && parent->get_type() == log_op_def::LOG_SORT) {  
+      ObLogSort *limit_op = static_cast<ObLogSort*>(parent);  
+      if (OB_NOT_NULL(limit_op->get_topn_expr())) {//get_topn_expr
+        // 阿巴阿巴
+        adlog::DEBUG("1 limit_op->get_limit_expr()");
+        ObExpr *limit_expr = nullptr; 
+        auto && limit_raw_expr = limit_op->get_topn_expr();  
+        if (OB_FAIL(cg_.generate_rt_expr(*limit_raw_expr, limit_expr))) {  
+          LOG_WARN("1 failed to generate rt expr", K(ret));  
+        } else {  
+          root_ctdef->limit_expr_ = limit_expr;  
+          adlog::DEBUG("1 set limit_expr to root_ctdef");
+        }
+      } else  if (OB_NOT_NULL(limit_op->get_topk_limit_expr())) {
+        // 阿巴阿巴
+        adlog::DEBUG("1 limit_op->get_limit_expr()");
+        ObExpr *limit_expr = nullptr; 
+        auto && limit_raw_expr = limit_op->get_topk_limit_expr();  
+        if (OB_FAIL(cg_.generate_rt_expr(*limit_raw_expr, limit_expr))) {  
+          LOG_WARN("1 failed to generate rt expr", K(ret));  
+        } else {  
+          root_ctdef->limit_expr_ = limit_expr;  
+          adlog::DEBUG("1 set limit_expr to root_ctdef");
+        }
+      } 
+    } else if(OB_NOT_NULL(parent) && parent->get_type() == log_op_def::LOG_LIMIT){
+      adlog::DEBUG("父亲是LIMIT类型");
+      ObLogLimit *limit_op = static_cast<ObLogLimit*>(parent);  
+      if (OB_NOT_NULL(limit_op->get_limit_expr())) {
+        // 阿巴阿巴
+        adlog::DEBUG("2 limit_op->get_limit_expr()");
+        ObExpr *limit_expr = nullptr; 
+        auto && limit_raw_expr = limit_op->get_limit_expr();  
+        if (OB_FAIL(cg_.generate_rt_expr(*limit_raw_expr, limit_expr))) {  
+          LOG_WARN("failed to generate rt expr", K(ret));  
+        } else {  
+          root_ctdef->limit_expr_ = limit_expr;  
+          adlog::DEBUG("2 set limit_expr to root_ctdef");
+        }  
+      }
+    }
+
   }
   return ret;
 }

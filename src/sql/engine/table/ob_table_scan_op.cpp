@@ -1071,19 +1071,27 @@ int ObTableScanOp::init_attach_scan_rtdef(const ObDASBaseCtDef *attach_ctdef,
     attach_rtdef->eval_ctx_ = &eval_ctx_;
 
     //
-    if (attach_ctdef->op_type_ == DAS_OP_INDEX_MERGE) {  
+    if (attach_ctdef->op_type_ == DAS_OP_INDEX_MERGE) {
+      auto && non_const_ctdef = const_cast<ObDASBaseCtDef*>(attach_ctdef);
+      auto &&merge_ctdef = static_cast<ObDASIndexMergeCtDef*>(non_const_ctdef);
       ObDASIndexMergeRtDef *merge_rtdef = static_cast<ObDASIndexMergeRtDef*>(attach_rtdef);  
       int64_t limit = 0;  
       bool is_null = false;  
-      if (OB_NOT_NULL(MY_SPEC.limit_) &&   
-          OB_FAIL(calc_expr_int_value(*MY_SPEC.limit_, limit, is_null))) {  
-        LOG_WARN("failed to calc limit expr", K(ret));  
+      if (OB_NOT_NULL(merge_ctdef->limit_expr_) &&   
+          OB_FAIL(calc_expr_int_value(*merge_ctdef->limit_expr_, limit, is_null))) {
+        LOG_WARN("failed to calc limit expr", K(ret)); 
       } else if (!is_null && limit > 0) {  
         merge_rtdef->topn_limit_ = limit;  
         merge_rtdef->enable_topn_pushdown_ = true;
+        adlog::DEBUG("HHHHHHHH true ",limit);
+
       } else {
         merge_rtdef->enable_topn_pushdown_ = false;
+        adlog::DEBUG("HHHHHHHH false");
+        adlog::DEBUG("HHHHHHHH false ",limit);
+
       }
+
       adlog::DEBUG("HHHHHHHHHHHHHHHHHHHHHHHHHH");
     }  
 
