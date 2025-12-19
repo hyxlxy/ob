@@ -701,6 +701,7 @@ public:
   inline const common::ObIArray<bool> &get_filter_before_index_flags() const { return filter_before_index_back_; }
   inline const ObRawExpr *get_limit_expr() const { return limit_count_expr_; }
   inline ObRawExpr *get_limit_expr() { return limit_count_expr_; }
+  inline void set_limit_expr(ObRawExpr * one) { limit_count_expr_ = one; }
 
   inline void set_ad_limit_expr(ObRawExpr * one) { ad_limit_expr_ = one; }
   inline ObRawExpr *get_ad_limit_expr() { return ad_limit_expr_; }

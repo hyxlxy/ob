@@ -2631,11 +2631,11 @@ int ObTscCgService::generate_index_merge_ctdef(const ObLogTableScan &op,
       if (!log_table_scan.use_index_merge()) {
         adlog::DEBUG("ERROR not use index_merge");
       }
-      if(log_table_scan.get_ad_limit_expr() == nullptr){
+      if(log_table_scan.get_limit_expr() == nullptr){
         adlog::DEBUG("ERROR 之前的没传过来");
       }
       if (log_table_scan.use_index_merge() and
-          (log_table_scan.get_ad_limit_expr() != nullptr)) {
+          (log_table_scan.get_limit_expr() != nullptr)) {
         // 说明上层的sort已经被搞到这一层了
         adlog::DEBUG("说明上层的sort已经被搞到这一层了");
         log_table_scan.set_parent(nullptr);
@@ -2643,7 +2643,7 @@ int ObTscCgService::generate_index_merge_ctdef(const ObLogTableScan &op,
         {
           adlog::DEBUG("0 limit_op->get_limit_expr()");
           ObExpr *limit_expr = nullptr; 
-          auto && limit_raw_expr = log_table_scan.get_ad_limit_expr();  
+          auto && limit_raw_expr = log_table_scan.get_limit_expr();  
           if (OB_FAIL(cg_.generate_rt_expr(*limit_raw_expr, limit_expr))) {
             LOG_WARN("0 failed to generate rt expr", K(ret));
             adlog::DEBUG("ERROR 0 failed to generate rt expr");

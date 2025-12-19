@@ -2507,9 +2507,10 @@ int ObTableScanOp::get_next_batch_with_das(int64_t &count, int64_t capacity)
       ret = OB_ITER_END;
       LOG_DEBUG("get next row with das iter end", K(ret), K_(limit_param), K_(output_row_cnt));
     } else if (output_row_cnt_ + batch_size > limit_param_.limit_) {
-      batch_size = limit_param_.limit_ - output_row_cnt_;
+      batch_size = limit_param_.limit_ - output_row_cnt_ + 2;
     }
   }
+  adlog::DEBUG("怀疑： batch_size: ",batch_size);
   bool got_batch = false;
   while (OB_SUCC(ret) && !got_batch) {
     clear_evaluated_flag();
@@ -2690,7 +2691,9 @@ int ObTableScanOp::inner_get_next_batch_for_tsc(const int64_t max_row_cnt)
 {
   int ret = OB_SUCCESS;
   clear_evaluated_flag();  // 清除记录
-  int64_t batch_size = min(max_row_cnt, MY_SPEC.max_batch_size_);
+  // int64_t batch_size = min(max_row_cnt, MY_SPEC.max_batch_size_);
+  int64_t batch_size = MY_SPEC.max_batch_size_;
+  adlog::DEBUG("PPPPP: ",K(max_row_cnt),"  ",K(MY_SPEC.max_batch_size_));
   if (OB_UNLIKELY(0 == limit_param_.limit_)) { // 特判，如果limit是0
     // The number of involved partitions is 0 or limit is 0, directly return iter end
     brs_.size_ = 0;

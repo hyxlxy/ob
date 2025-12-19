@@ -142,6 +142,8 @@ int ObDASCacheLookupIter::inner_init(ObDASIterParam &param)
   const bool use_simulate_batch_row_cnt = simulate_batch_row_cnt > 0 && simulate_batch_row_cnt < default_batch_row_count;
 
   lookup_param.default_batch_row_count_  = use_simulate_batch_row_cnt ? simulate_batch_row_cnt : default_batch_row_count;
+  adlog::DEBUG("ObDASCacheLookupIter::inner_init(ObDASIterParam &param)");
+  adlog::DEBUG(K(lookup_param.default_batch_row_count_));
   LOG_DEBUG("simulate lookup row batch count", K(simulate_batch_row_cnt), K(default_batch_row_count));
 
   if (OB_FAIL(ObDASLocalLookupIter::inner_init(param))) {
