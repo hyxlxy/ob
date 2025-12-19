@@ -395,7 +395,8 @@ perf.script
 run_test_with_perf.sh
 tools/flamegraph/
 
-
+rag/data/__MACOSX/
+rag/data/dataset/
 *.md
 ob-mldr-test/
 canko/
