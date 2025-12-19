@@ -23,7 +23,7 @@ except ImportError:
 from src.integrations.embedding import generate_response as generate_embedding
 from src.integrations.vlm import generate_response as generate_vlm_response
 from src.parser.pdf import compress_image, pdf_page_to_image
-from src.prompt.vlm import VLM_IMAGE_EXTRACTION_PROMPT
+from src.prompt.vlm import VLM_IMAGE_EXTRACTION_PROMPT, select_prompt_by_content
 from src.split.split import split_text
 from src.storage.oceanbase import get_or_create_client
 
@@ -145,8 +145,10 @@ def process_pdf_file(
                     )
 
                     try:
+                        # 根据页面内容动态选择最匹配的VLM提示词
+                        vlm_prompt = select_prompt_by_content(page_text)
                         vlm_text = generate_vlm_response(
-                            VLM_IMAGE_EXTRACTION_PROMPT, images=page_image_path
+                            vlm_prompt, images=page_image_path
                         )
                         if vlm_text.strip():
                             logger.info(
@@ -178,7 +180,7 @@ def process_pdf_file(
                                     max_dimension=2048,
                                 )
                                 vlm_text = generate_vlm_response(
-                                    VLM_IMAGE_EXTRACTION_PROMPT,
+                                    vlm_prompt,  # 使用之前选择的提示词
                                     images=compressed_image_path,
                                 )
                                 if vlm_text.strip():

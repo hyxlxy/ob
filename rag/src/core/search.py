@@ -1,8 +1,10 @@
+import json
 import logging
 import os
+import re
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 import dotenv
 
@@ -72,6 +74,72 @@ def _rrf_fuse(bm25: List[Dict], dense: List[Dict], top_k: int) -> List[Dict]:
 
     fused = sorted(pos.values(), key=lambda x: scores[_key(x[1])], reverse=True)
     return [doc for _, doc in fused[:top_k]]
+
+
+def _parse_llm_json_output(llm_output: str, meta: List[Tuple[str, int]]) -> Dict:
+    """
+    解析LLM输出的JSON格式，提取answer、filename、page。
+    如果解析失败，使用降级策略。
+    
+    Args:
+        llm_output: LLM的原始输出
+        meta: 检索结果的元数据列表 [(filename, page), ...]
+    
+    Returns:
+        包含answer、filename、page的字典
+    """
+    default_filename = meta[0][0] if meta else ""
+    default_page = meta[0][1] if meta else 0
+    
+    try:
+        # 尝试从输出中提取JSON（处理markdown代码块）
+        json_match = re.search(r'```json\s*([\s\S]*?)\s*```', llm_output)
+        if json_match:
+            json_str = json_match.group(1)
+        else:
+            # 尝试直接解析整个输出
+            json_str = llm_output.strip()
+            # 如果输出包含其他文本，尝试找到JSON对象
+            brace_start = json_str.find('{')
+            brace_end = json_str.rfind('}')
+            if brace_start != -1 and brace_end != -1:
+                json_str = json_str[brace_start:brace_end+1]
+        
+        parsed = json.loads(json_str)
+        
+        answer_text = parsed.get("answer", "").strip()
+        filename = parsed.get("filename", "").strip()
+        page = parsed.get("page", 0)
+        
+        # 验证filename是否在meta中（防止LLM编造）
+        valid_filenames = {m[0] for m in meta}
+        if filename not in valid_filenames:
+            logger.warning(f"LLM输出的filename '{filename}' 不在检索结果中，使用默认值")
+            filename = default_filename
+            # 尝试匹配page
+            for m in meta:
+                if m[1] == page:
+                    filename = m[0]
+                    break
+        
+        # 确保page是整数
+        if isinstance(page, str):
+            page = int(page) if page.isdigit() else default_page
+        
+        return {
+            "answer": answer_text if answer_text else llm_output,
+            "filename": filename if filename else default_filename,
+            "page": page if page else default_page,
+        }
+        
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
+        logger.warning(f"JSON解析失败: {e}, 使用降级策略")
+        # 降级策略：直接使用LLM输出作为answer，来源取第一条
+        return {
+            "answer": llm_output.strip(),
+            "filename": default_filename,
+            "page": default_page,
+        }
 
 
 def _truncate_context(chunks: List[str], limit: int) -> List[str]:
@@ -173,17 +241,19 @@ def search(question: str) -> Answer:
             logger.warning("RRF 融合结果为空，回退使用BM25或向量结果")
             fused = (bm25_results or vec_results)[:TOP_K]
 
-        # 5) 组装上下文与元数据
+        # 5) 组装上下文与元数据（带来源标注）
         contexts: List[str] = []
         meta: List[Tuple[str, int]] = []
         seen = set()
-        for r in fused:
+        for idx, r in enumerate(fused):
             content = r.get("content", "").strip()
             filename = r.get("filename", "")
             page = r.get("page", 0)
             key = (filename, page)
             if content and key not in seen:
-                contexts.append(content)
+                # 为每个chunk添加来源标注，方便LLM识别
+                labeled_content = f"【片段{idx+1}｜来源：{filename}，第{page}页】\n{content}"
+                contexts.append(labeled_content)
                 meta.append(key)
                 seen.add(key)
 
@@ -196,11 +266,7 @@ def search(question: str) -> Answer:
         contexts = _truncate_context(contexts, MAX_CONTEXT_CHARS)
         context_text = "\n\n".join(contexts)
 
-        # 采用首条的文件与页作为主引用
-        if meta:
-            answer.filename, answer.page = meta[0]
-
-        # 6) 生成答案
+        # 6) 生成答案（LLM输出JSON格式，包含answer、filename、page）
         logger.debug("Generating answer using LLM model ...")
         prompt = QUERY_USER_PROMPT_TEMPLATE.format(
             context_text=context_text,
@@ -212,7 +278,14 @@ def search(question: str) -> Answer:
             {"role": "user", "content": prompt},
         ]
 
-        answer.answer = generate_llm_response(messages)
+        llm_output = generate_llm_response(messages)
+        
+        # 7) 解析LLM输出的JSON，提取answer、filename、page
+        parsed = _parse_llm_json_output(llm_output, meta)
+        answer.answer = parsed["answer"]
+        answer.filename = parsed["filename"]
+        answer.page = parsed["page"]
+        
         logger.debug(
             f"Query completed: question='{question[:50]}...', filename='{answer.filename}', page={answer.page}"
         )
