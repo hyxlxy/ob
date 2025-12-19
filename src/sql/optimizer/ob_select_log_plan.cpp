@@ -8991,7 +8991,7 @@ int ObSelectLogPlan::candi_allocate_order_by_if_losted(ObIArray<OrderItem> &orde
       bool can_skip_sort = false;  
       if (OB_NOT_NULL(top) && log_op_def::LOG_TABLE_SCAN == top->get_type()) {  
         ObLogTableScan *table_scan = static_cast<ObLogTableScan*>(top);  
-        if (table_scan->use_index_merge() and table_scan->get_limit_expr() != nullptr) {  
+        if (table_scan->use_index_merge() and table_scan->get_ad_limit_expr() != nullptr) {  
           can_skip_sort = true;  
           adlog::DEBUG("这里标识跳过");  
         }  

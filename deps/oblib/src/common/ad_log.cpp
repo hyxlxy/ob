@@ -22,7 +22,7 @@ void ensure_log_file_open() {
 void write_log_line(const std::string &level, const std::string &message) {
   ensure_log_file_open();
   std::lock_guard<std::mutex> lock(g_log_mutex);
-
+  
   auto now = std::chrono::system_clock::now();
   auto time_t = std::chrono::system_clock::to_time_t(now);
   auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
