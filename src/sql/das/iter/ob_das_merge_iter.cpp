@@ -905,9 +905,9 @@ int ObDASMergeIter::get_next_seq_rows(int64_t &count, int64_t capacity)
         LOG_WARN("unexpected das task op type", K(ret));
       } else {
         if (scan_op->is_local_task()) {
-          adlog::DEBUG("capacity可能要被改了： ",capacity);
+          // adlog::DEBUG("capacity可能要被改了： ",capacity);
           reset_datum_ptr(scan_op, capacity);
-          adlog::DEBUG("capacity出来啦： ",capacity);
+          // adlog::DEBUG("capacity出来啦： ",capacity);
 
         }
         if (OB_SUCC(ret)) {

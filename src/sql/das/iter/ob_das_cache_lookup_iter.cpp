@@ -299,7 +299,7 @@ int ObDASCacheLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
               std::min(capacity, std::min(max_size_, default_batch_row_count_ -
                                                          lookup_rowkey_cnt_));
           // index_capacity = 256;
-          adlog::DEBUG("KKKKKKKKKKKKK: ",K(capacity),"  ",K(max_size_),"   ", K(default_batch_row_count_), "  ",K(lookup_rowkey_cnt_));
+          // adlog::DEBUG("KKKKKKKKKKKKK: ",K(capacity),"  ",K(max_size_),"   ", K(default_batch_row_count_), "  ",K(lookup_rowkey_cnt_));
           index_table_iter_->clear_evaluated_flag();
           adlog::DEBUG("--------------INDEX_SCAN: index_table_iter_->get_next_rows-----------");
           if (OB_FAIL(index_table_iter_->get_next_rows(storage_count, index_capacity))) {
@@ -312,6 +312,7 @@ int ObDASCacheLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)
               ret = OB_SUCCESS;
             }
           }
+          adlog::DEBUG("get storage_count: ", storage_count);
           if (OB_SUCC(ret) && storage_count > 0) {
             if (OB_FAIL(add_rowkeys(storage_count))) {
               LOG_WARN("failed to add row keys", K(ret));

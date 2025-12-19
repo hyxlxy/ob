@@ -963,6 +963,10 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
   count = 0;  
   result_buffer_.reuse();
   adlog::DEBUG("result_buffer_.reuse();");
+
+  if (result_buffer_.enable_topn_) {
+    capacity += 100;
+  }
   
   while (OB_SUCC(ret) && count < capacity) {  
     /* try to fill each child store */  
