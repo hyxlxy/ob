@@ -4,8 +4,8 @@ from typing import List, Tuple
 
 def split_text(
     text: str,
-    max_chunk_size: int = 1200,
-    overlap: int = 150,
+    max_chunk_size: int = 1500,
+    overlap: int = 200,
     preserve_tables: bool = True,
 ) -> List[str]:
     """
@@ -113,8 +113,21 @@ def split_text(
             long_sentences = _split_long_paragraph(paragraph, max_chunk_size)
             chunks.extend(_with_overlap(long_sentences))
 
-    # 过滤空块和过短块
-    return [chunk for chunk in chunks if chunk.strip() and len(chunk.strip()) > 20]
+    # 过滤空块但保留包含数字的短块（可能是重要数据）
+    def is_valuable_chunk(chunk: str) -> bool:
+        chunk = chunk.strip()
+        if not chunk:
+            return False
+        # 包含数字的短块也保留
+        if len(chunk) > 50:
+            return True
+        # 短块但包含数字或百分比，保留
+        import re
+        if re.search(r'\d+(?:\.\d+)?(?:%|亿|万|百万|元|次|年)', chunk):
+            return True
+        return len(chunk) > 30
+    
+    return [chunk for chunk in chunks if is_valuable_chunk(chunk)]
 
 
 def extract_key_info(text: str) -> Tuple[List[str], List[str]]:
