@@ -143,8 +143,17 @@ int ObDASIndexMergeIter::MergeResultBuffer::init(int64_t max_size,
     exprs_ = exprs;
     alloc_ = &alloc;
     
-    // topn_limit_ = max_size;  // 设置堆容量限制  
-    // enable_topn_ = (topn_limit_ > 0);
+    // Initialize the heap with the proper allocator
+    if (OB_ISNULL(topn_heap_)) {
+      typedef common::ObBinaryHeap<TopNRow *, TopNCompare> HeapType;
+      topn_heap_ = OB_NEWx(HeapType, (&alloc), compare_, &alloc);
+      if (OB_ISNULL(topn_heap_)) {
+        ret = OB_ALLOCATE_MEMORY_FAILED;
+        LOG_WARN("failed to allocate topn heap", K(ret));
+      } else {
+        LOG_INFO("topn heap initialized successfully", K_(topn_limit));
+      }
+    }
   }
   return ret;
 }
@@ -181,102 +190,244 @@ void ObDASIndexMergeIter::MergeResultBuffer::reset()
 {
   result_store_iter_.reset();
   result_store_.reset();
-  if (enable_topn_) { 
-    topn_heap_.reset();
+  
+  if (enable_topn_ && topn_heap_ != nullptr) {
+    // Free all rows in heap before resetting
+    while (topn_heap_->count() > 0) {
+      TopNRow *row = topn_heap_->top();
+      topn_heap_->pop();
+      if (row != nullptr) {
+        if (row->row_data_ != nullptr) {
+          row->row_data_->~StoredRow();
+          alloc_->free(row->row_data_);
+        }
+        alloc_->free(row);
+      }
+    }
+    topn_heap_->reset();
+    
+    // DO NOT free the heap itself - it should persist across reset() calls
+    // The heap will be freed in the destructor or when the buffer is destroyed
   }
 }
 //ADVISE
 int ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn() {
-  adlog::DEBUG("ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn");
   int ret = OB_SUCCESS;
-
-  auto make_topn_row = [&](TopNRow*& row) -> int {
-    int ret = OB_SUCCESS;
-
-
-    double score = 0.0;  
-    ObSEArray<ObExpr *, 4> match_against_exprs;  
-      
-    for (int64_t i = 0; OB_SUCC(ret) && i < exprs_->count(); ++i) {  
-      ObExpr *expr = exprs_->at(i);  
-      if (OB_ISNULL(expr)) {  
-        ret = OB_ERR_UNEXPECTED;  
-      } else if (T_FUN_MATCH_AGAINST == expr->type_) {  
-        if (OB_FAIL(match_against_exprs.push_back(expr))) {  
-          LOG_WARN("failed to push back match against expr", K(ret));  
-        }  
-      }  
-    }  
-      
-    if (OB_SUCC(ret) && !match_against_exprs.empty()) {  
-      ObExpr *score_expr = match_against_exprs.at(0);  
-      ObDatum &score_datum = score_expr->locate_expr_datum(*eval_ctx_);  
-      if (!score_datum.is_null()) {  
-        score = score_datum.get_double();  
-      }  
-      adlog::DEBUG("直接获取的分数: ", score);  
-    }  
-
-    ObChunkDatumStore::StoredRow *stored_row = nullptr;  
-    if (OB_FAIL(result_store_.add_row(*exprs_, eval_ctx_, &stored_row))) {  
-      return ret;  
-    } else {
-      // 在add_row成功后检查
-      adlog::DEBUG("checking...");
-      if (OB_SUCC(ret) && OB_NOT_NULL(stored_row)) {  
-        adlog::DEBUG("stored_row cnt", K(stored_row->cnt_));  
-        for (int64_t i = 0; i < stored_row->cnt_; ++i) {  
-          adlog::DEBUG("datum", K(i), K(stored_row->cells()[i].is_null()));  
-        }  
+  
+  LOG_INFO("add_row_with_topn called", K_(enable_topn), K_(topn_limit));
+  
+  // Safety check
+  if (!enable_topn_ || topn_limit_ <= 0) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("add_row_with_topn called but topn not enabled", K(ret), K(enable_topn_), K(topn_limit_));
+    LOG_INFO("add_row_with_topn: returning due to topn not enabled");
+    return ret;
+  }
+  
+  if (OB_ISNULL(alloc_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("allocator is null", K(ret));
+    LOG_INFO("add_row_with_topn: returning due to null allocator");
+    return ret;
+  }
+  
+  if (OB_ISNULL(topn_heap_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("topn_heap is null", K(ret));
+    LOG_INFO("add_row_with_topn: returning due to null topn_heap");
+    return ret;
+  }
+  
+  double score = 0.0;
+  
+  if (OB_ISNULL(exprs_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("exprs is null", K(ret));
+    LOG_INFO("add_row_with_topn: returning due to null exprs");
+    return ret;
+  }
+  
+  if (OB_ISNULL(eval_ctx_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("eval_ctx is null", K(ret));
+    LOG_INFO("add_row_with_topn: returning due to null eval_ctx");
+    return ret;
+  }
+  
+  LOG_INFO("add_row_with_topn: starting score extraction", "exprs_count", exprs_->count());
+  
+  // Extract score from MATCH AGAINST expression
+  ObSEArray<ObExpr *, 4> match_against_exprs;
+  for (int64_t i = 0; OB_SUCC(ret) && i < exprs_->count(); ++i) {
+    ObExpr *expr = exprs_->at(i);
+    LOG_INFO("add_row_with_topn: checking expr", K(i), "expr_ptr", (void*)expr);
+    if (OB_ISNULL(expr)) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("null expr in exprs", K(ret), K(i));
+    } else if (T_FUN_MATCH_AGAINST == expr->type_) {
+      LOG_INFO("add_row_with_topn: found MATCH AGAINST expr", K(i));
+      if (OB_FAIL(match_against_exprs.push_back(expr))) {
+        LOG_WARN("failed to push back match against expr", K(ret));
       }
     }
-
-    adlog::DEBUG("构建的row的score: ", score);
-    row = OB_NEWx(TopNRow, alloc_, stored_row, score);   
-
-    return ret;
-  };
-
-  TopNRow *row = nullptr;
-  adlog::DEBUG("add_row_with_topn");
-  adlog::DEBUG("exprs count", K(exprs_->count()));  
-  adlog::DEBUG("eval_ctx ptr", K(eval_ctx_)); 
-  if (OB_FAIL(make_topn_row(row))) {
+  }
+  
+  LOG_INFO("add_row_with_topn: finished expr loop", "match_against_count", match_against_exprs.count(), K(ret));
+  
+  // Statistics counters
+  static int64_t total_rows = 0;
+  static int64_t skipped_null = 0;
+  static int64_t skipped_len_zero = 0;
+  static int64_t skipped_len_invalid = 0;
+  static int64_t valid_rows = 0;
+  total_rows++;
+  
+  if (OB_SUCC(ret) && !match_against_exprs.empty()) {
+    LOG_INFO("add_row_with_topn: about to extract score from match_against expr");
+    ObExpr *score_expr = match_against_exprs.at(0);
+    LOG_INFO("add_row_with_topn: got score_expr", "ptr", (void*)score_expr);
+    
+    if (OB_ISNULL(score_expr)) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("score_expr is null", K(ret));
+    } else {
+      // Always evaluate the expression to ensure we get the correct score
+      // The evaluated flag may be set but the datum content may not be correct
+      LOG_INFO("add_row_with_topn: about to evaluate score_expr");
+      ObDatum *eval_datum = nullptr;
+      if (OB_FAIL(score_expr->eval(*eval_ctx_, eval_datum))) {
+        LOG_WARN("failed to evaluate score expression", K(ret));
+      } else if (OB_ISNULL(eval_datum)) {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("eval_datum is null after evaluation", K(ret));
+      } else {
+        LOG_INFO("add_row_with_topn: evaluated score_expr", "is_null", eval_datum->is_null(), 
+                 "len", eval_datum->len_, "ptr", (void*)eval_datum->ptr_, 
+                 "expr_type", score_expr->type_, "datum_type", score_expr->datum_meta_.type_);
+        
+        // Handle NULL - this means no match, skip this row
+        if (eval_datum->is_null()) {
+          skipped_null++;
+          LOG_INFO("add_row_with_topn: score is null, skipping row", 
+                   "total_rows", total_rows, "skipped_null", skipped_null, 
+                   "skipped_len_zero", skipped_len_zero, "skipped_len_invalid", skipped_len_invalid,
+                   "valid_rows", valid_rows);
+          // Don't add this row to TopN heap - it has no valid score
+          return OB_SUCCESS;
+        }
+        
+        // Check if the datum length is correct for a double
+        if (eval_datum->len_ == sizeof(double)) {
+          // Normal case: valid double score
+          score = eval_datum->get_double();
+          LOG_INFO("add_row_with_topn: extracted score using get_double", K(score));
+        } else if (eval_datum->len_ == 0) {
+          // len=0 means score is 0.0
+          score = 0.0;
+          skipped_len_zero++;
+          LOG_INFO("add_row_with_topn: len=0, treating as score=0.0", 
+                   "total_rows", total_rows, "skipped_len_zero", skipped_len_zero);
+        } else {
+          // Invalid length - treat as score=0.0 to avoid crash
+          score = 0.0;
+          skipped_len_invalid++;
+          LOG_WARN("add_row_with_topn: invalid datum length, treating as score=0.0", 
+                   "len", eval_datum->len_, "expected", sizeof(double),
+                   "total_rows", total_rows, "skipped_len_invalid", skipped_len_invalid);
+        }
+      }
+    }
+  }
+  
+  valid_rows++;
+  LOG_INFO("add_row_with_topn: extracted score", K(score), K(ret),
+           "total_rows", total_rows, "skipped_null", skipped_null, 
+           "skipped_len_zero", skipped_len_zero, "skipped_len_invalid", skipped_len_invalid,
+           "valid_rows", valid_rows);
+  
+  // Create stored row - this allocates memory that we own
+  ObChunkDatumStore::StoredRow *stored_row = nullptr;
+  ObEvalCtx::BatchInfoScopeGuard batch_guard(*eval_ctx_);
+  batch_guard.set_batch_size(1);
+  batch_guard.set_batch_idx(0);
+  
+  LOG_INFO("add_row_with_topn: building stored row");
+  
+  if (OB_FAIL(ObChunkDatumStore::StoredRow::build(stored_row, *exprs_, *eval_ctx_, *alloc_))) {
+    LOG_WARN("failed to build stored row", K(ret));
     return ret;
   }
-  adlog::DEBUG("make_topn_row(row): row->score_: ",row->score_);
-  if (topn_heap_.empty() or topn_heap_.count() < topn_limit_) {
-    if (OB_FAIL(topn_heap_.push(row))) {
-      adlog::DEBUG("index merge iter: topn_heap push error");
-    } else {
-      adlog::DEBUG("push topn_heap: row->score_: ",row->score_);
+  
+  LOG_INFO("add_row_with_topn: stored row built successfully");
+  
+  // Create TopNRow wrapper
+  TopNRow *new_row = OB_NEWx(TopNRow, alloc_, stored_row, score);
+  if (OB_ISNULL(new_row)) {
+    ret = OB_ALLOCATE_MEMORY_FAILED;
+    LOG_WARN("failed to allocate TopNRow", K(ret));
+    if (stored_row != nullptr) {
+      stored_row->~StoredRow();
+      alloc_->free(stored_row);
     }
     return ret;
   }
-
-  TopNRow *heap_top = topn_heap_.top();  
-  if (OB_NOT_NULL(heap_top)) {  
-  }else{ // heap top竟然是空指针
-    adlog::DEBUG("NO WAY!!!! heap top nullptr");
-    return ret;
-  }
-
-  if (row->score_ <= heap_top->score_) {
-    adlog::DEBUG("row->score_ <= heap_top->score_ :", row->score_ , "  ",heap_top->score_);
-    alloc_->free(row);
-    // ret = OB_ERR_UNEXPECTED;
-    return ret;
-  }
-  topn_heap_.pop();
-  topn_heap_.push(row);
-  adlog::DEBUG("row->score_ > heap_top->score_ :", row->score_ ,"  ",heap_top->score_);
-
-  alloc_->free(heap_top);  
-  // if (OB_FAIL(topn_heap_.replace_top(row))) {  
-  //   LOG_WARN("failed to replace heap top", K(ret));  
-  // } else {    
-  // }  
   
+  LOG_INFO("add_row_with_topn: checking heap", "heap_count", topn_heap_->count(), K_(topn_limit));
+  
+  // If heap not full, just add
+  if (topn_heap_->count() < topn_limit_) {
+    if (OB_FAIL(topn_heap_->push(new_row))) {
+      LOG_WARN("failed to push to heap", K(ret));
+      if (stored_row != nullptr) {
+        stored_row->~StoredRow();
+        alloc_->free(stored_row);
+      }
+      alloc_->free(new_row);
+    }
+    return ret;
+  }
+  
+  // Heap is full - check if new row should replace top
+  TopNRow *heap_top = topn_heap_->top();
+  if (OB_ISNULL(heap_top)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("heap top is null", K(ret));
+    if (stored_row != nullptr) {
+      stored_row->~StoredRow();
+      alloc_->free(stored_row);
+    }
+    alloc_->free(new_row);
+    return ret;
+  }
+  
+  // If new score is higher than the minimum (top of min-heap), replace it
+  if (new_row->score_ > heap_top->score_) {
+    topn_heap_->pop();
+    
+    // Free the old top row
+    if (heap_top->row_data_ != nullptr) {
+      heap_top->row_data_->~StoredRow();
+      alloc_->free(heap_top->row_data_);
+    }
+    alloc_->free(heap_top);
+    
+    // Push new row
+    if (OB_FAIL(topn_heap_->push(new_row))) {
+      LOG_WARN("failed to push to heap after pop", K(ret));
+      if (stored_row != nullptr) {
+        stored_row->~StoredRow();
+        alloc_->free(stored_row);
+      }
+      alloc_->free(new_row);
+    }
+  } else {
+    // New row doesn't make the cut - free it
+    if (stored_row != nullptr) {
+      stored_row->~StoredRow();
+      alloc_->free(stored_row);
+    }
+    alloc_->free(new_row);
+  }
   
   return ret;
 }
@@ -285,110 +436,79 @@ int ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn() {
 int ObDASIndexMergeIter::MergeResultBuffer::to_expr_from_topn(int64_t &size)  
 {
   int ret = OB_SUCCESS;
-  adlog::DEBUG("MergeResultBuffer::to_expr_from_topn");
-  adlog::DEBUG("to_expr exprs count", K(exprs_->count()));  
-  adlog::DEBUG("to_expr eval_ctx ptr", K(eval_ctx_));
   common::ObArray<TopNRow *> sorted_rows;
-  adlog::DEBUG(K(topn_heap_.count()));
-  while (topn_heap_.count() > 0) {
-    auto &&top = topn_heap_.top();
+  
+  if (OB_ISNULL(topn_heap_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("topn_heap is null", K(ret));
+    return ret;
+  }
+  
+  // Extract all rows from heap
+  while (topn_heap_->count() > 0) {
+    TopNRow *top = topn_heap_->top();
     if (OB_FAIL(sorted_rows.push_back(top))) {
-      adlog::DEBUG("ERROR! sorted_row push_back error");
+      LOG_WARN("failed to push back to sorted_rows", K(ret));
+      break;
     }
-    topn_heap_.pop();
+    topn_heap_->pop();
   }
 
   if (OB_FAIL(ret)) {
-    adlog::DEBUG("MergeResultBuffer::to_expr_from_topn OB_FAIL(ret)");
+    // Clean up on error
+    for (int64_t i = 0; i < sorted_rows.count(); ++i) {
+      TopNRow *row = sorted_rows.at(i);
+      if (row != nullptr) {
+        if (row->row_data_ != nullptr) {
+          row->row_data_->~StoredRow();
+          alloc_->free(row->row_data_);
+        }
+        alloc_->free(row);
+      }
+    }
     return ret;
   }
-  adlog::DEBUG(K(sorted_rows.count()));
+  
+  // Sort by score descending (highest scores first)
   std::sort(sorted_rows.begin(), sorted_rows.end(),
             [](const TopNRow *a, const TopNRow *b) {
-              return a->score_ > b->score_; //
+              return a->score_ > b->score_;
             });
 
-//   { // debug
-// /*
-
-//       } else if (OB_FAIL(result_store_.init(UINT64_MAX, MTL_ID(), ObCtxIds::DEFAULT_CTX_ID, "DASIndexMerge"))) {
-//     LOG_WARN("failed to init result store", K(ret));
-//   } else {
-//     result_store_.set_allocator(alloc);
-// */
-//     ObChunkDatumStore debug_store("DebugTopN");
-//     if (OB_FAIL(debug_store.init(UINT64_MAX, MTL_ID(), ObCtxIds::DEFAULT_CTX_ID, "DASIndexMergeDebug"))) {
-//       LOG_WARN("debug store init failed", K(ret));
-//       return ret;
-//     } else {
-//       debug_store.set_allocator(*alloc_);
-//     }
-
-//     {
-//       ObEvalCtx::BatchInfoScopeGuard guard(*eval_ctx_);
-//       guard.set_batch_size(1);
-//       for (int64_t i = 0; OB_SUCC(ret) && i < sorted_rows.count(); ++i) {
-//         guard.set_batch_idx(0);
-//         TopNRow *row = sorted_rows.at(i);
-//         if (OB_NOT_NULL(row) && OB_NOT_NULL(row->row_data_)) {
-//           // 先把行写入 eval_ctx_
-//           if (OB_FAIL(row->row_data_->to_expr<true>(*exprs_, *eval_ctx_))) {
-//             LOG_WARN("to_expr failed", K(i));
-//           } else if (OB_FAIL(debug_store.add_row(*exprs_, eval_ctx_))) {
-//             LOG_WARN("debug_store add_row failed", K(i));
-//           }
-//         }
-//       }
-//     }
-
-//     // 用标准路径输出
-//     ObChunkDatumStore::Iterator iter;
-//     int64_t read_size = 0;
-//     if (OB_SUCC(ret)) {
-//       if (OB_FAIL(debug_store.begin(iter))) {
-//         LOG_WARN("debug_store begin failed", K(ret));
-//       } else if (OB_FAIL(iter.get_next_batch<true>(*exprs_, *eval_ctx_, 
-//                                                   sorted_rows.count(), read_size))) {
-//         LOG_WARN("get_next_batch from debug_store failed", K(ret));
-//       } else {
-//         size = read_size;
-//       }
-//     }
-//     adlog::DEBUG("ObChunkDatumStore::Iterator iter read_size: ",read_size);
-//   }
-  {  
-    ObEvalCtx::BatchInfoScopeGuard batch_info_guard(*eval_ctx_);  
-    batch_info_guard.set_batch_size(sorted_rows.count());  
-      
-    for (int64_t i = 0; OB_SUCC(ret) && i < sorted_rows.count(); ++i) {  
-      batch_info_guard.set_batch_idx(i);  
-      TopNRow *row = sorted_rows.at(i);  
-      if (OB_ISNULL(row) || OB_ISNULL(row->row_data_)) {  
-        ret = OB_ERR_UNEXPECTED;  
-        LOG_WARN("unexpected null row", K(ret));  
-      } else if (OB_FAIL(row->row_data_->to_expr<true>(*exprs_, *eval_ctx_))) {  
-        LOG_WARN("failed to convert row to expr", K(ret));
-      } else {
-        adlog::DEBUG("row->row_data_->to_expr<true>(*exprs_, *eval_ctx_) ok!");
-        adlog::DEBUG("index_merge里输出的 i: " , i, " score: ", row->score_);
+  // Convert sorted rows to expressions in batch
+  {
+    ObEvalCtx::BatchInfoScopeGuard batch_info_guard(*eval_ctx_);
+    batch_info_guard.set_batch_size(sorted_rows.count());
+    
+    for (int64_t i = 0; OB_SUCC(ret) && i < sorted_rows.count(); ++i) {
+      batch_info_guard.set_batch_idx(i);
+      TopNRow *row = sorted_rows.at(i);
+      if (OB_ISNULL(row) || OB_ISNULL(row->row_data_)) {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("unexpected null row", K(ret), K(i));
+      } else if (OB_FAIL(row->row_data_->to_expr<true>(*exprs_, *eval_ctx_))) {
+        LOG_WARN("failed to convert row to expr", K(ret), K(i));
       }
-    }  
-      
-    if (OB_SUCC(ret)) {  
-      size = sorted_rows.count();  
-    }
-
-    for (auto &&one : sorted_rows) {
-      // delete one;
-      alloc_->free(one);
-
     }
     
-  }  
-  // topn_heap_.reset();  
-  // result_store_iter_.reset();
-  // result_store_.reset();
-  return ret;  
+    if (OB_SUCC(ret)) {
+      size = sorted_rows.count();
+    }
+    
+    // Clean up all rows
+    for (int64_t i = 0; i < sorted_rows.count(); ++i) {
+      TopNRow *row = sorted_rows.at(i);
+      if (row != nullptr) {
+        if (row->row_data_ != nullptr) {
+          row->row_data_->~StoredRow();
+          alloc_->free(row->row_data_);
+        }
+        alloc_->free(row);
+      }
+    }
+  }
+  
+  return ret;
 }  
 
 
@@ -481,12 +601,10 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
             if (merge_rtdef_->enable_topn_pushdown_) {
               result_buffer_.enable_topn_ = true;
               result_buffer_.topn_limit_ = merge_rtdef_->topn_limit_;
-              // adlog::DEBUG("result_buffer_.topn_limit_ =  ",)
-              // result_buffer_.enable_topn_ = false;
-              adlog::DEBUG(K(result_buffer_.topn_limit_));
+              LOG_INFO("TopN pushdown ENABLED", K_(result_buffer_.topn_limit));
             } else {
               result_buffer_.enable_topn_ = false;
-              adlog::DEBUG("result_buffer_.topn_limit _ 无");
+              LOG_INFO("TopN pushdown DISABLED - enable_topn_pushdown is false");
             }
           }
         }
@@ -649,8 +767,10 @@ int ObDASIndexMergeIter::save_row_to_result_buffer() {
   // adlog::DEBUG()
   // if (!result_buffer_.enable_topn_ or true) {
   if (!result_buffer_.enable_topn_) {
+    LOG_INFO("save_row: using normal add_row");
     return result_buffer_.add_row();
   }
+  LOG_INFO("save_row: using TopN add_row_with_topn");
   return result_buffer_.add_row_with_topn();
 }
 
@@ -1061,8 +1181,8 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
           adlog::DEBUG("failed to save row to result buffer", K(ret));
       } else {
         count += 1;
-        if (result_buffer_.enable_topn_) { 
-          count = result_buffer_.topn_heap_.count();
+        if (result_buffer_.enable_topn_ && result_buffer_.topn_heap_ != nullptr) { 
+          count = result_buffer_.topn_heap_->count();
         }
       }
 

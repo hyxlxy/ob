@@ -141,8 +141,29 @@ public:
     MergeResultBuffer()
         : exprs_(nullptr), eval_ctx_(nullptr), max_size_(1),
           result_store_("DASIndexMerge"), result_store_iter_(),
-          topn_limit_(-1), enable_topn_(false),  topn_heap_(compare_, nullptr) 
+          topn_limit_(-1), enable_topn_(false), topn_heap_(nullptr), alloc_(nullptr)
     {}
+    ~MergeResultBuffer()
+    {
+      if (topn_heap_ != nullptr && alloc_ != nullptr) {
+        // Free all rows in heap
+        while (topn_heap_->count() > 0) {
+          TopNRow *row = topn_heap_->top();
+          topn_heap_->pop();
+          if (row != nullptr) {
+            if (row->row_data_ != nullptr) {
+              row->row_data_->~StoredRow();
+              alloc_->free(row->row_data_);
+            }
+            alloc_->free(row);
+          }
+        }
+        // Free the heap itself
+        topn_heap_->~ObBinaryHeap();
+        alloc_->free(topn_heap_);
+        topn_heap_ = nullptr;
+      }
+    }
     int init(int64_t max_size, ObEvalCtx *eval_ctx, const common::ObIArray<ObExpr*> *exprs, common::ObIAllocator &alloc);
     int add_row();
     int add_row_with_topn();  
@@ -179,13 +200,14 @@ public:
         if (OB_ISNULL(lhs) || OB_ISNULL(rhs)) {  
           return false;  
         }  
-        return lhs->score_ > rhs->score_;  
+        // Min heap: smallest score at top (for efficient TopN)
+        return lhs->score_ < rhs->score_;  
       }  
         
       int get_error_code() const { return common::OB_SUCCESS; }  
     };
     TopNCompare compare_;
-    common::ObBinaryHeap<TopNRow *, TopNCompare> topn_heap_;
+    common::ObBinaryHeap<TopNRow *, TopNCompare> *topn_heap_;
     common::ObIAllocator *alloc_;
   };
 
