@@ -55,8 +55,8 @@ if [ -f "build_${BUILD_TYPE}/src/observer/observer" ]; then
     file "build_${BUILD_TYPE}/src/observer/observer"
     
     # 创建符号链接方便使用
-    ln -sf "$(pwd)/build_${BUILD_TYPE}/src/observer/observer" ./observer_binary
-    log_info "已创建符号链接: ./observer_binary"
+    # ln -sf "$(pwd)/build_${BUILD_TYPE}/src/observer/observer" ./observer_binary
+    # log_info "已创建符号链接: ./observer_binary"
 else
     log_error "编译失败，observer二进制文件未找到"
     exit 1

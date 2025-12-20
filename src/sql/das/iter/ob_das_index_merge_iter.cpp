@@ -449,7 +449,8 @@ int ObDASIndexMergeIter::MergeResultBuffer::to_expr_from_topn(int64_t &size, int
   }
   
   // Extract all rows from heap
-  while (topn_heap_->count() > 0) {
+  while (topn_heap_->count() > 0 and sorted_rows.count() < capacity) {
+    // while (topn_heap_->count() > 0 ) {
     TopNRow *top = topn_heap_->top();
     if (OB_FAIL(sorted_rows.push_back(top))) {
       LOG_WARN("failed to push back to sorted_rows", K(ret));
@@ -1137,18 +1138,33 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
     LOG_INFO("[Two-Phase Retrieval] Phase1 parameters",
              K(matched_capacity), K(scan_limit));
   }
-  
-  // while (OB_SUCC(ret) && count < matched_capacity + 1 && scanned_rows < scan_limit) {  
-    while (OB_SUCC(ret) ) {  
-    /* try to fill each child store */  
 
-    // result_buffer_.topn_finish_ = false;
-    if (result_buffer_.enable_topn_ and result_buffer_.topn_finish_)
-      break;
+  if (result_buffer_.enable_topn_ and result_buffer_.topn_finish_) {
+    result_buffer_.to_expr_from_topn(count, capacity);
+    if (count == 0) {
+      ret  = OB_ITER_END;
+    } else {
+      ret = OB_SUCCESS;
+    }
+    return ret;
+  }
+  
+  // while (OB_SUCC(ret) && count < matched_capacity  && scanned_rows < scan_limit) {  
+  while (OB_SUCC(ret)) {  
+    // if (result_buffer_.enable_topn_ and result_buffer_.topn_finish_){
+    //   ret  = OB_ITER_END;
+    //   break;
+    // }
 
     if (!result_buffer_.enable_topn_ and count >= capacity)
       break;
-    
+
+    if (result_buffer_.enable_topn_) {
+      adlog::DEBUG("result_buffer_.enable_topn_: count: ",count, " ",K(capacity));
+      adlog::DEBUG("result_buffer_.enable_topn_: : ");
+    } else {
+      adlog::DEBUG("!result_buffer_.enable_topn_  count: ",count, " ",K(capacity));
+    }
 
     int64_t output_idx = OB_INVALID_INDEX;  
     int cmp_ret = 0;  
@@ -1310,6 +1326,9 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
   if(OB_FAIL(ret)){
     if (ret == OB_ITER_END) {
       adlog::DEBUG("intersect_get_next_rows : OB_FAIL(ret) ret == OB_ITER_END");
+      if (result_buffer_.enable_topn_) {
+        result_buffer_.topn_finish_ = true;
+      }
     } else {
       adlog::DEBUG("intersect_get_next_rows : OB_FAIL(ret)");
     }
@@ -1325,7 +1344,7 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
     if (result_buffer_.enable_topn_) {
       adlog::DEBUG("result_buffer_.to_expr_from_topn(count): ", count);
       int64_t tmp;
-      result_buffer_.topn_finish_ = true;
+      
       result_buffer_.to_expr_from_topn(count, capacity);
     } else if (OB_FAIL(result_buffer_.to_expr(count))) {
       adlog::DEBUG("WARNING! failed to convert result buffer to exprs", K(ret));  

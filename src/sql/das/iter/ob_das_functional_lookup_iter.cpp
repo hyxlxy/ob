@@ -184,7 +184,7 @@ int ObDASFuncLookupIter::inner_get_next_row()
 }
 
 int ObDASFuncLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity) {
-  adlog::DEBUG(" ObDASFuncLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)");
+  // adlog::DEBUG(" ObDASFuncLookupIter::inner_get_next_rows(int64_t &count, int64_t capacity)");
   int ret = OB_SUCCESS;
   ObDASScanIter *index_table_iter = static_cast<ObDASScanIter *>(index_table_iter_);
   storage::ObTableScanParam &index_scan_param = index_table_iter->get_scan_param();
