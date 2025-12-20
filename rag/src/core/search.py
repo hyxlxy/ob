@@ -28,11 +28,11 @@ OCEANBASE_DBNAME = os.getenv("OCEANBASE_DBNAME")
 TABLE_NAME = "rag_documents"
 
 # Retrieval parameters (configurable via env)
-TOP_K = int(os.getenv("TOP_K", "25"))  # 最终返回25个最相关chunk
-BM25_CANDIDATES = int(os.getenv("BM25_CANDIDATES", "200"))  # BM25召回200个候选
-VEC_CANDIDATES = int(os.getenv("VEC_CANDIDATES", "200"))    # 向量召回200个候选
+TOP_K = int(os.getenv("TOP_K", "20"))  # 最终返回20个最相关chunk（精简）
+BM25_CANDIDATES = int(os.getenv("BM25_CANDIDATES", "100"))  # BM25召回100个候选
+VEC_CANDIDATES = int(os.getenv("VEC_CANDIDATES", "150"))    # 向量召回150个候选
 RRF_K = float(os.getenv("RRF_K", "60"))  # RRF 常数项
-MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "30000"))  # 增加上下文长度到30000
+MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "20000"))  # 上下文长度20000（避免过长）
 
 
 def _is_numerical_query(query: str) -> bool:
@@ -42,54 +42,35 @@ def _is_numerical_query(query: str) -> bool:
 
 
 def _rewrite_query_with_llm(query: str) -> str:
-    """使用LLM改写查询，提取关键信息点"""
-    try:
-        from src.integrations.llm import generate_response
-        
-        prompt = f"""将以下问题改写为更适合检索的关键词组合，保留所有关键信息（数字、年份、专有名词等）。
-
-原问题：{query}
-
-要求：
-1. 提取核心关键词
-2. 保留所有数字和年份
-3. 保留专有名词（如"千味央厨"、"油条"等）
-4. 只输出关键词，用空格分隔，不要其他解释
-
-改写后的关键词："""
-        
-        rewritten = generate_response(
-            [{"role": "user", "content": prompt}],
-            model="qwen-turbo",  # 使用快速模型
-        ).strip()
-        
-        # 如果改写结果太短或太长，使用原查询
-        if len(rewritten) < 5 or len(rewritten) > len(query) * 3:
-            return query
-        
-        logger.debug(f"Query rewritten: '{query}' -> '{rewritten}'")
-        return rewritten
-    except Exception as e:
-        logger.warning(f"Query rewriting failed: {e}")
-        return query
+    """使用LLM改写查询，提取关键信息点（已禁用以提升速度）"""
+    # 禁用LLM改写，直接返回原查询
+    # LLM改写可能引入误差，且增加延迟
+    return query
 
 
 def _expand_query(query: str) -> str:
     """扩展查询，添加同义词和相关术语"""
-    # 财务术语映射
+    # 财务术语映射（扩展版）
     expansions = {
-        "营业收入": "营业收入 OR 营收 OR 收入",
-        "净利润": "净利润 OR 归母净利润 OR 利润",
-        "毛利率": "毛利率 OR 毛利",
-        "产能": "产能 OR 产量 OR 生产能力",
-        "产能利用率": "产能利用率 OR 产销率",
-        "客户": "客户 OR 大客户 OR 经销商",
-        "产品": "产品 OR 品类 OR SKU",
-        "费用率": "费用率 OR 销售费用率 OR 管理费用率",
-        "成立时间": "成立时间 OR 成立 OR 创立",
-        "定价": "定价 OR 定价方法 OR 定价策略",
-        "资产周转率": "资产周转率 OR 周转率",
-        "期间费用率": "期间费用率 OR 费用率",
+        "营业收入": "营业收入 OR 营收 OR 收入 OR 销售收入",
+        "净利润": "净利润 OR 归母净利润 OR 利润 OR 净利",
+        "毛利率": "毛利率 OR 毛利 OR 综合毛利率",
+        "产能": "产能 OR 产量 OR 生产能力 OR 产能规模",
+        "产能利用率": "产能利用率 OR 产销率 OR 开工率",
+        "客户": "客户 OR 大客户 OR 经销商 OR 客户群",
+        "产品": "产品 OR 品类 OR SKU OR 产品线",
+        "费用率": "费用率 OR 销售费用率 OR 管理费用率 OR 期间费用率",
+        "成立时间": "成立时间 OR 成立 OR 创立 OR 成立于",
+        "定价": "定价 OR 定价方法 OR 定价策略 OR 定价模式",
+        "资产周转率": "资产周转率 OR 周转率 OR 资产周转",
+        "期间费用率": "期间费用率 OR 费用率 OR 三费",
+        "销售费用率": "销售费用率 OR 销售费用 OR 销售费率",
+        "管理费用率": "管理费用率 OR 管理费用 OR 管理费率",
+        "市场": "市场 OR 市场份额 OR 市场规模",
+        "驱动因素": "驱动因素 OR 驱动 OR 推动因素 OR 关键因素",
+        "困境": "困境 OR 问题 OR 挑战 OR 难题",
+        "策略": "策略 OR 战略 OR 模式 OR 方法",
+        "创新": "创新 OR 研发 OR 新品 OR 产品创新",
     }
     
     expanded = query
@@ -103,7 +84,7 @@ def _expand_query(query: str) -> str:
         year = year_match.group(1)
         # 添加年份的不同表达形式
         if year not in expanded:
-            expanded += f" {year}"
+            expanded += f" {year}年"
     
     return expanded
 
@@ -378,37 +359,69 @@ def search(question: str) -> Answer:
             # 判断是否为数值型查询
             is_num_query = _is_numerical_query(query)
             
+            # 提取专有名词（千味央厨）
+            has_company_name = "千味央厨" in query
+            
             scored_chunks = []
             for idx, chunk in enumerate(chunks):
                 content = chunk.get("content", "")
                 
-                # 1. 关键词匹配分数（基础分）
+                # 1. 精确短语匹配（最高优先级）
+                exact_phrase_score = 0
+                # 提取查询中的关键短语（3-10字）
+                for i in range(len(query) - 2):
+                    phrase = query[i:i+10]
+                    if len(phrase) >= 3 and phrase in content:
+                        exact_phrase_score += 10
+                
+                # 2. 关键词匹配分数
                 match_score = sum(1 for term in query_terms if term in content)
                 
-                # 2. 数字匹配分数（对数值型查询很重要）
+                # 3. 数字精确匹配（对数值型查询极其重要）
                 number_score = 0
                 if is_num_query and query_numbers:
                     content_numbers = re.findall(r'\d+\.?\d*', content)
-                    number_score = sum(1 for num in query_numbers if num in content_numbers) * 3
+                    # 精确匹配加倍分数
+                    for num in query_numbers:
+                        if num in content_numbers:
+                            number_score += 5
+                        # 也检查数字是否作为文本出现
+                        if num in content:
+                            number_score += 3
                 
-                # 3. 年份匹配分数（对时间相关查询很重要）
+                # 4. 年份匹配（权重最高）
                 year_score = 0
                 if query_years:
-                    year_score = sum(1 for year in query_years if year in content) * 5
+                    for year in query_years:
+                        if year in content:
+                            year_score += 8  # 从5提升到8
                 
-                # 4. 原始排序位置分数（RRF已经做了初步排序）
+                # 5. 公司名称匹配
+                company_score = 0
+                if has_company_name and "千味央厨" in content:
+                    company_score = 2
+                
+                # 6. 原始排序位置分数
                 position_score = 1.0 / (idx + 1)
                 
-                # 5. 长度惩罚（太短的chunk可能信息不完整）
-                length_score = min(len(content) / 500, 1.0)
+                # 7. 长度适中性（500-1500字符最佳）
+                content_len = len(content)
+                if 500 <= content_len <= 1500:
+                    length_score = 1.0
+                elif content_len < 500:
+                    length_score = content_len / 500
+                else:
+                    length_score = 1500 / content_len
                 
-                # 综合评分
+                # 综合评分（调整权重）
                 total_score = (
-                    match_score * 2.0 +      # 关键词权重2
-                    number_score +            # 数字权重1
-                    year_score +              # 年份权重1
-                    position_score * 3.0 +    # 位置权重3
-                    length_score * 0.5        # 长度权重0.5
+                    exact_phrase_score * 1.0 +  # 精确短语权重1（新增）
+                    match_score * 2.0 +          # 关键词权重2
+                    number_score * 1.0 +         # 数字权重1（加强）
+                    year_score * 1.0 +           # 年份权重1（加强）
+                    company_score * 1.0 +        # 公司名称权重1（新增）
+                    position_score * 4.0 +       # 位置权重4（提升）
+                    length_score * 1.0           # 长度权重1（提升）
                 )
                 
                 scored_chunks.append((total_score, chunk))

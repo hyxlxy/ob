@@ -136,13 +136,13 @@ def process_pdf_file(
                     page_text = ""
 
                 # Step 2: Logic to determine if we need VLM
-                # If text is sparse (< 800 chars), it might be a chart/image-heavy page.
+                # If text is sparse (< 600 chars), it might be a chart/image-heavy page.
                 # We append VLM description to the extracted text to capture visual info.
-                # 提高阈值到800，确保更多页面使用VLM提取表格和图表
-                if len(page_text) < 800:
+                # 阈值600，平衡VLM使用和文本提取
+                if len(page_text) < 600:
                     page_image_path = pdf_page_to_image(pdf_file, page_num, dpi=100)
                     logger.debug(
-                        f"Page {page_num} text len={len(page_text)} (<500), engaging VLM. Image: {page_image_path}"
+                        f"Page {page_num} text len={len(page_text)} (<600), engaging VLM. Image: {page_image_path}"
                     )
 
                     try:
