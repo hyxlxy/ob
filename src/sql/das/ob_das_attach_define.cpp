@@ -285,8 +285,8 @@ int ObDASAttachSpec::set_calc_exprs_tree(ObDASAttachCtDef *root,
   return ret;
 }
 
-ObDASTwoPhaseIndexMergeCtDef::~ObDASTwoPhaseIndexMergeCtDef() {}
-ObDASTwoPhaseIndexMergeRtDef::~ObDASTwoPhaseIndexMergeRtDef() {}
+// ObDASTwoPhaseIndexMergeCtDef::~ObDASTwoPhaseIndexMergeCtDef() {}
+// ObDASTwoPhaseIndexMergeRtDef::~ObDASTwoPhaseIndexMergeRtDef() {}
 
 }  // namespace sql
 }  // namespace oceanbase
