@@ -211,10 +211,23 @@ void ObDASIndexMergeIter::MergeResultBuffer::reset()
   }
 }
 //ADVISE
-int ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn() {
+int ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn()
+{
   int ret = OB_SUCCESS;
+  double score = 0.0;
   
   LOG_INFO("add_row_with_topn called", K_(enable_topn), K_(topn_limit));
+  
+  LOG_INFO("add_row_with_topn: starting score extraction", "exprs_count", exprs_->count());
+  
+  // Debug: print all expressions in output
+  for (int64_t i = 0; i < exprs_->count(); ++i) {
+    ObExpr *expr = exprs_->at(i);
+    if (expr) {
+      LOG_INFO("add_row_with_topn: output expr", K(i), "type", expr->type_, "type_name", 
+               (expr->type_ == T_FUN_MATCH_AGAINST ? "MATCH_AGAINST" : "OTHER"));
+    }
+  }
   
   // Safety check
   if (!enable_topn_ || topn_limit_ <= 0) {
@@ -237,8 +250,6 @@ int ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn() {
     LOG_INFO("add_row_with_topn: returning due to null topn_heap");
     return ret;
   }
-  
-  double score = 0.0;
   
   if (OB_ISNULL(exprs_)) {
     ret = OB_ERR_UNEXPECTED;
@@ -291,55 +302,48 @@ int ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn() {
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("score_expr is null", K(ret));
     } else {
-      // Always evaluate the expression to ensure we get the correct score
-      // The evaluated flag may be set but the datum content may not be correct
-      LOG_INFO("add_row_with_topn: about to evaluate score_expr");
-      ObDatum *eval_datum = nullptr;
-      if (OB_FAIL(score_expr->eval(*eval_ctx_, eval_datum))) {
-        LOG_WARN("failed to evaluate score expression", K(ret));
-      } else if (OB_ISNULL(eval_datum)) {
-        ret = OB_ERR_UNEXPECTED;
-        LOG_WARN("eval_datum is null after evaluation", K(ret));
+      // Use locate_expr_datum to get the datum that should have been filled by to_expr()
+      const ObDatum &score_datum = score_expr->locate_expr_datum(*eval_ctx_);
+      bool is_evaluated = score_expr->get_eval_info(*eval_ctx_).evaluated_;
+      LOG_INFO("add_row_with_topn: located score_datum", "is_null", score_datum.is_null(), 
+               "len", score_datum.len_, "ptr", (void*)score_datum.ptr_, "is_evaluated", is_evaluated);
+      
+      // Handle NULL - this means no match, skip this row
+      if (score_datum.is_null()) {
+        skipped_null++;
+        LOG_INFO("add_row_with_topn: score is null, skipping row", 
+                 "total_rows", total_rows, "skipped_null", skipped_null, 
+                 "skipped_len_zero", skipped_len_zero, "skipped_len_invalid", skipped_len_invalid,
+                 "valid_rows", valid_rows);
+        return OB_SUCCESS;
+      }
+      
+      // Check if the datum length is correct for a double
+      if (score_datum.len_ == sizeof(double)) {
+        // Normal case: valid double score
+        score = score_datum.get_double();
+        valid_rows++;
+        LOG_INFO("add_row_with_topn: extracted score using get_double", K(score));
+      } else if (score_datum.len_ == 0) {
+        // len=0 means no match (score=0.0)
+        // Still add it to heap - don't skip!
+        score = 0.0;
+        skipped_len_zero++;
+        valid_rows++;
+        LOG_INFO("add_row_with_topn: len=0, treating as score=0.0", 
+                 "total_rows", total_rows, "skipped_len_zero", skipped_len_zero);
       } else {
-        LOG_INFO("add_row_with_topn: evaluated score_expr", "is_null", eval_datum->is_null(), 
-                 "len", eval_datum->len_, "ptr", (void*)eval_datum->ptr_, 
-                 "expr_type", score_expr->type_, "datum_type", score_expr->datum_meta_.type_);
-        
-        // Handle NULL - this means no match, skip this row
-        if (eval_datum->is_null()) {
-          skipped_null++;
-          LOG_INFO("add_row_with_topn: score is null, skipping row", 
-                   "total_rows", total_rows, "skipped_null", skipped_null, 
-                   "skipped_len_zero", skipped_len_zero, "skipped_len_invalid", skipped_len_invalid,
-                   "valid_rows", valid_rows);
-          // Don't add this row to TopN heap - it has no valid score
-          return OB_SUCCESS;
-        }
-        
-        // Check if the datum length is correct for a double
-        if (eval_datum->len_ == sizeof(double)) {
-          // Normal case: valid double score
-          score = eval_datum->get_double();
-          LOG_INFO("add_row_with_topn: extracted score using get_double", K(score));
-        } else if (eval_datum->len_ == 0) {
-          // len=0 means score is 0.0
-          score = 0.0;
-          skipped_len_zero++;
-          LOG_INFO("add_row_with_topn: len=0, treating as score=0.0", 
-                   "total_rows", total_rows, "skipped_len_zero", skipped_len_zero);
-        } else {
-          // Invalid length - treat as score=0.0 to avoid crash
-          score = 0.0;
-          skipped_len_invalid++;
-          LOG_WARN("add_row_with_topn: invalid datum length, treating as score=0.0", 
-                   "len", eval_datum->len_, "expected", sizeof(double),
-                   "total_rows", total_rows, "skipped_len_invalid", skipped_len_invalid);
-        }
+        // Invalid length - treat as score=0.0 to avoid crash
+        score = 0.0;
+        skipped_len_invalid++;
+        valid_rows++;
+        LOG_WARN("add_row_with_topn: invalid datum length, treating as score=0.0", 
+                 "len", score_datum.len_, "expected", sizeof(double),
+                 "total_rows", total_rows, "skipped_len_invalid", skipped_len_invalid);
       }
     }
   }
   
-  valid_rows++;
   LOG_INFO("add_row_with_topn: extracted score", K(score), K(ret),
            "total_rows", total_rows, "skipped_null", skipped_null, 
            "skipped_len_zero", skipped_len_zero, "skipped_len_invalid", skipped_len_invalid,
@@ -583,14 +587,21 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
             LOG_WARN("failed to init row store", K(ret));
           } else if (OB_FAIL(extract_match_against_exprs(*child->get_output(), match_against_exprs))) {
             LOG_WARN("failed to extract match against exprs", K(ret));
-          } else if (FALSE_IT(child_match_against_expr.set_allocator(&alloc))) {
-          } else if (OB_FAIL(child_match_against_expr.assign(match_against_exprs))) {
-            LOG_WARN("failed to assign match against exprs", K(ret));
-          } else if (child_scan_rtdef != nullptr) {
-            // need to prepare scan param for normal scan node
-            if (OB_ISNULL(child_scan_param = OB_NEWx(ObTableScanParam, &alloc))) {
-              ret = OB_ALLOCATE_MEMORY_FAILED;
-              LOG_WARN("failed to allocate child scan param", K(ret));
+          } else {
+            LOG_INFO("inner_init: extracted match_against_exprs from child", K(i), 
+                     "child_output_count", child->get_output()->count(),
+                     "match_count", match_against_exprs.count());
+          }
+          if (OB_SUCC(ret)) {
+            child_match_against_expr.set_allocator(&alloc);
+            if (OB_FAIL(child_match_against_expr.assign(match_against_exprs))) {
+              LOG_WARN("failed to assign match against exprs", K(ret));
+            } else if (child_scan_rtdef != nullptr) {
+              // need to prepare scan param for normal scan node
+              if (OB_ISNULL(child_scan_param = OB_NEWx(ObTableScanParam, &alloc))) {
+                ret = OB_ALLOCATE_MEMORY_FAILED;
+                LOG_WARN("failed to allocate child scan param", K(ret));
+              }
             }
           }
         }
@@ -745,6 +756,7 @@ int ObDASIndexMergeIter::extract_match_against_exprs(const common::ObIArray<ObEx
 int ObDASIndexMergeIter::fill_default_values_for_union(const common::ObIArray<ObExpr*> &exprs)
 {
   int ret = OB_SUCCESS;
+  LOG_INFO("fill_default_values_for_union called", "exprs_count", exprs.count());
   for (int64_t i = 0; OB_SUCC(ret) && i < exprs.count(); ++i) {
     ObExpr *expr = exprs.at(i);
     if (OB_ISNULL(expr) || OB_UNLIKELY(T_FUN_MATCH_AGAINST != expr->type_)) {
@@ -756,6 +768,7 @@ int ObDASIndexMergeIter::fill_default_values_for_union(const common::ObIArray<Ob
       batch_info_guard.set_batch_idx(0);
       ObDatum &datum = expr->locate_datum_for_write(*eval_ctx_);
       datum.set_double(0.0);
+      LOG_INFO("fill_default_values_for_union: set score to 0.0", K(i), "len_after", datum.len_);
       expr->set_evaluated_flag(*eval_ctx_);
       expr->set_evaluated_projected(*eval_ctx_);
     }
@@ -764,8 +777,12 @@ int ObDASIndexMergeIter::fill_default_values_for_union(const common::ObIArray<Ob
 }
 
 int ObDASIndexMergeIter::save_row_to_result_buffer() {
-  // adlog::DEBUG()
-  // if (!result_buffer_.enable_topn_ or true) {
+  int ret = OB_SUCCESS;
+  
+  // Note: MATCH_AGAINST expressions should already be properly filled by union_get_next_rows()
+  // or intersect_get_next_rows() before calling this function.
+  // We just save the row to the result buffer.
+  
   if (!result_buffer_.enable_topn_) {
     LOG_INFO("save_row: using normal add_row");
     return result_buffer_.add_row();
@@ -946,6 +963,8 @@ int ObDASIndexMergeIter::inner_get_next_row()
 int ObDASIndexMergeIter::inner_get_next_rows(int64_t &count, int64_t capacity)
 {
   int ret = OB_SUCCESS;
+  LOG_INFO("===== inner_get_next_rows CALLED =====", K(count), K(capacity), 
+           "merge_type", (merge_type_ == INDEX_MERGE_UNION ? "UNION" : "INTERSECT"));
   clear_evaluated_flag();
   if (OB_FAIL((this->*get_next_rows_)(count, capacity))) {
     if (ret != OB_ITER_END) {
@@ -1289,6 +1308,28 @@ int ObDASIndexMergeIter::union_get_next_row() {
     if (OB_SUCC(ret)) {
       if (OB_FAIL(child_stores_.at(output_idx).to_expr())) {
         LOG_WARN("failed to convert store row to expr", K(ret));
+      } else {
+        // Evaluate MATCH AGAINST expressions from output_ (not from child)
+        // because MATCH AGAINST may not be in child->get_output()
+        LOG_INFO("union_get_next_row: checking output_ for MATCH AGAINST", "output_count", output_->count());
+        int match_count = 0;
+        for (int64_t i = 0; OB_SUCC(ret) && i < output_->count(); ++i) {
+          ObExpr *expr = output_->at(i);
+          LOG_INFO("union_get_next_row: checking expr", K(i), "expr_type", (expr ? expr->type_ : -1));
+          if (OB_NOT_NULL(expr) && T_FUN_MATCH_AGAINST == expr->type_) {
+            match_count++;
+            LOG_INFO("union_get_next_row: found MATCH AGAINST expr, evaluating", K(i));
+            ObDatum *datum = nullptr;
+            if (OB_FAIL(expr->eval(*eval_ctx_, datum))) {
+              LOG_WARN("failed to evaluate match against expr in union_get_next_row", K(ret), K(i));
+            } else {
+              LOG_INFO("union_get_next_row: evaluated match_against expr from output_", K(i), 
+                       "is_null", datum->is_null(), "len", datum->len_, 
+                       "score", (datum->len_ == sizeof(double) ? datum->get_double() : 0.0));
+            }
+          }
+        }
+        LOG_INFO("union_get_next_row: finished checking output_", "match_count", match_count);
       }
     }
   }
@@ -1296,6 +1337,7 @@ int ObDASIndexMergeIter::union_get_next_row() {
 }
 
 int ObDASIndexMergeIter::union_get_next_rows(int64_t &count, int64_t capacity) {
+  LOG_INFO("===== union_get_next_rows CALLED =====", K(count), K(capacity));
   adlog::DEBUG("ObDASIndexMergeIter::union_get_next_rows");
   int ret = OB_SUCCESS;
 
@@ -1402,11 +1444,61 @@ int ObDASIndexMergeIter::union_get_next_rows(int64_t &count, int64_t capacity) {
         if (OB_FAIL(child_stores_.at(output_idx).to_expr())) {
           LOG_WARN("failed to convert store row to expr", K(ret));
         } else {
+          // CRITICAL FIX: After to_expr(), ensure all MATCH_AGAINST in output_ are filled
+          // The selected child (output_idx) may not have MATCH_AGAINST in its output.
+          // We must operate in the correct batch context (batch_idx=0, batch_size=1)
+          
+          ObEvalCtx::BatchInfoScopeGuard batch_info_guard(*eval_ctx_);
+          batch_info_guard.set_batch_size(1);
+          batch_info_guard.set_batch_idx(0);
+          
+          LOG_INFO("union_get_next_rows: ensuring MATCH_AGAINST is filled", 
+                   "output_idx", output_idx);
+          
+          // Extract all MATCH_AGAINST expressions from output_
+          ObSEArray<ObExpr *, 4> match_against_exprs;
+          for (int64_t i = 0; OB_SUCC(ret) && i < output_->count(); ++i) {
+            ObExpr *expr = output_->at(i);
+            if (OB_NOT_NULL(expr) && T_FUN_MATCH_AGAINST == expr->type_) {
+              if (OB_FAIL(match_against_exprs.push_back(expr))) {
+                LOG_WARN("failed to push back match against expr", K(ret));
+              }
+            }
+          }
+          
+          // Check and fill each MATCH_AGAINST expression
+          for (int64_t i = 0; OB_SUCC(ret) && i < match_against_exprs.count(); ++i) {
+            ObExpr *expr = match_against_exprs.at(i);
+            bool is_evaluated = expr->get_eval_info(*eval_ctx_).evaluated_;
+            const ObDatum &datum = expr->locate_expr_datum(*eval_ctx_);
+            
+            LOG_INFO("union_get_next_rows: checking MATCH_AGAINST", K(i), 
+                     "is_evaluated", is_evaluated, "len", datum.len_, "is_null", datum.is_null());
+            
+            // Check if properly filled: evaluated AND (len==0 OR len==sizeof(double))
+            bool is_valid = is_evaluated && (datum.len_ == 0 || datum.len_ == sizeof(double));
+            
+            if (!is_valid) {
+              // Not properly filled - fill with default 0.0
+              // This happens when output_idx points to a child without MATCH_AGAINST
+              ObDatum &dst_datum = expr->locate_datum_for_write(*eval_ctx_);
+              dst_datum.set_double(0.0);
+              expr->set_evaluated_flag(*eval_ctx_);
+              LOG_INFO("union_get_next_rows: filled MATCH_AGAINST with default 0.0", 
+                       "was_evaluated", is_evaluated, "old_len", datum.len_);
+            } else {
+              double score = (datum.len_ == sizeof(double)) ? datum.get_double() : 0.0;
+              LOG_INFO("union_get_next_rows: MATCH_AGAINST already valid", K(i), "score", score);
+            }
+          }
+          
           // now we get a available result row, save it to result buffer
-          if (OB_FAIL(save_row_to_result_buffer())) {
-            LOG_WARN("failed to save row to result buffer", K(ret));
-          } else {
-            count += 1;
+          if (OB_SUCC(ret)) {
+            if (OB_FAIL(save_row_to_result_buffer())) {
+              LOG_WARN("failed to save row to result buffer", K(ret));
+            } else {
+              count += 1;
+            }
           }
         }
       }
@@ -1421,6 +1513,7 @@ int ObDASIndexMergeIter::union_get_next_rows(int64_t &count, int64_t capacity) {
       LOG_WARN("failed to convert result buffer to exprs", K(ret));
     }
   }
+  LOG_INFO("===== union_get_next_rows RETURNING =====", K(ret), K(count));
   return ret;
 }
 // ADVISE
