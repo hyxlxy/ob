@@ -28,11 +28,50 @@ OCEANBASE_DBNAME = os.getenv("OCEANBASE_DBNAME")
 TABLE_NAME = "rag_documents"
 
 # Retrieval parameters (configurable via env)
-TOP_K = int(os.getenv("TOP_K", "30"))  # 增加召回数量到30
-BM25_CANDIDATES = int(os.getenv("BM25_CANDIDATES", "150"))  # 增加BM25候选
-VEC_CANDIDATES = int(os.getenv("VEC_CANDIDATES", "180"))    # 增加向量候选
+TOP_K = int(os.getenv("TOP_K", "25"))  # 最终返回25个最相关chunk
+BM25_CANDIDATES = int(os.getenv("BM25_CANDIDATES", "200"))  # BM25召回200个候选
+VEC_CANDIDATES = int(os.getenv("VEC_CANDIDATES", "200"))    # 向量召回200个候选
 RRF_K = float(os.getenv("RRF_K", "60"))  # RRF 常数项
-MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "25000"))  # 增加上下文长度
+MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "30000"))  # 增加上下文长度到30000
+
+
+def _is_numerical_query(query: str) -> bool:
+    """判断是否为数值型查询"""
+    numerical_keywords = ["多少", "数量", "百分比", "比例", "增长", "下降", "率", "亿", "万", "元", "次"]
+    return any(kw in query for kw in numerical_keywords) or bool(re.search(r'\d{4}', query))
+
+
+def _rewrite_query_with_llm(query: str) -> str:
+    """使用LLM改写查询，提取关键信息点"""
+    try:
+        from src.integrations.llm import generate_response
+        
+        prompt = f"""将以下问题改写为更适合检索的关键词组合，保留所有关键信息（数字、年份、专有名词等）。
+
+原问题：{query}
+
+要求：
+1. 提取核心关键词
+2. 保留所有数字和年份
+3. 保留专有名词（如"千味央厨"、"油条"等）
+4. 只输出关键词，用空格分隔，不要其他解释
+
+改写后的关键词："""
+        
+        rewritten = generate_response(
+            [{"role": "user", "content": prompt}],
+            model="qwen-turbo",  # 使用快速模型
+        ).strip()
+        
+        # 如果改写结果太短或太长，使用原查询
+        if len(rewritten) < 5 or len(rewritten) > len(query) * 3:
+            return query
+        
+        logger.debug(f"Query rewritten: '{query}' -> '{rewritten}'")
+        return rewritten
+    except Exception as e:
+        logger.warning(f"Query rewriting failed: {e}")
+        return query
 
 
 def _expand_query(query: str) -> str:
@@ -49,6 +88,8 @@ def _expand_query(query: str) -> str:
         "费用率": "费用率 OR 销售费用率 OR 管理费用率",
         "成立时间": "成立时间 OR 成立 OR 创立",
         "定价": "定价 OR 定价方法 OR 定价策略",
+        "资产周转率": "资产周转率 OR 周转率",
+        "期间费用率": "期间费用率 OR 费用率",
     }
     
     expanded = query
@@ -57,7 +98,6 @@ def _expand_query(query: str) -> str:
             expanded = expanded.replace(term, f"({expansion})")
     
     # 如果查询包含年份，确保也搜索相关年份
-    import re
     year_match = re.search(r'(20\d{2})', query)
     if year_match:
         year = year_match.group(1)
@@ -121,6 +161,56 @@ def _rrf_fuse(bm25: List[Dict], dense: List[Dict], top_k: int) -> List[Dict]:
     return [doc for _, doc in fused[:top_k]]
 
 
+def _validate_and_fix_answer(answer_text: str, filename: str, page: int, meta: List[Tuple[str, int]]) -> Dict:
+    """
+    验证和修正答案，确保格式正确
+    
+    Args:
+        answer_text: 答案文本
+        filename: 文件名
+        page: 页码
+        meta: 检索结果的元数据列表
+    
+    Returns:
+        修正后的答案字典
+    """
+    # 1. 验证filename是否在meta中
+    valid_filenames = {m[0] for m in meta}
+    if filename not in valid_filenames:
+        logger.warning(f"Filename '{filename}' 不在检索结果中，尝试修正")
+        # 尝试模糊匹配
+        for valid_fn in valid_filenames:
+            if filename in valid_fn or valid_fn in filename:
+                logger.info(f"模糊匹配成功: '{filename}' -> '{valid_fn}'")
+                filename = valid_fn
+                break
+        else:
+            # 如果还是找不到，使用第一个
+            filename = meta[0][0]
+            page = meta[0][1]
+            logger.warning(f"使用默认来源: {filename}, page {page}")
+    
+    # 2. 验证page是否合理（1-100之间）
+    if not isinstance(page, int) or page < 1 or page > 100:
+        logger.warning(f"Page {page} 不合理，尝试从meta中查找")
+        for m in meta:
+            if m[0] == filename:
+                page = m[1]
+                break
+    
+    # 3. 清理答案文本
+    answer_text = answer_text.strip()
+    # 移除可能的markdown格式
+    answer_text = re.sub(r'\*\*(.+?)\*\*', r'\1', answer_text)
+    answer_text = re.sub(r'__(.+?)__', r'\1', answer_text)
+    
+    return {
+        "answer": answer_text,
+        "filename": filename,
+        "page": page,
+    }
+
+
 def _parse_llm_json_output(llm_output: str, meta: List[Tuple[str, int]]) -> Dict:
     """
     解析LLM输出的JSON格式，提取answer、filename、page。
@@ -156,26 +246,14 @@ def _parse_llm_json_output(llm_output: str, meta: List[Tuple[str, int]]) -> Dict
         filename = parsed.get("filename", "").strip()
         page = parsed.get("page", 0)
         
-        # 验证filename是否在meta中（防止LLM编造）
-        valid_filenames = {m[0] for m in meta}
-        if filename not in valid_filenames:
-            logger.warning(f"LLM输出的filename '{filename}' 不在检索结果中，使用默认值")
-            filename = default_filename
-            # 尝试匹配page
-            for m in meta:
-                if m[1] == page:
-                    filename = m[0]
-                    break
-        
         # 确保page是整数
         if isinstance(page, str):
             page = int(page) if page.isdigit() else default_page
         
-        return {
-            "answer": answer_text if answer_text else llm_output,
-            "filename": filename if filename else default_filename,
-            "page": page if page else default_page,
-        }
+        # 验证和修正答案
+        result = _validate_and_fix_answer(answer_text, filename, page, meta)
+        
+        return result
         
     except (json.JSONDecodeError, KeyError, ValueError) as e:
         logger.warning(f"JSON解析失败: {e}, 使用降级策略")
@@ -286,29 +364,61 @@ def search(question: str) -> Answer:
             logger.warning("RRF 融合结果为空，回退使用BM25或向量结果")
             fused = (bm25_results or vec_results)[:TOP_K * 2]
 
-        # 5) 简单重排序：优先选择包含问题关键词的chunk
-        def _simple_rerank(chunks: List[Dict], query: str, top_k: int) -> List[Dict]:
-            """基于关键词匹配的简单重排序"""
+        # 5) 增强重排序：结合关键词、数值、年份等多维度特征
+        def _advanced_rerank(chunks: List[Dict], query: str, top_k: int) -> List[Dict]:
+            """基于多维度特征的高级重排序"""
             # 提取查询中的关键词（去除常见停用词）
-            stop_words = {"的", "是", "在", "有", "和", "与", "等", "了", "吗", "呢", "什么", "如何", "怎样", "多少"}
+            stop_words = {"的", "是", "在", "有", "和", "与", "等", "了", "吗", "呢", "什么", "如何", "怎样", "多少", "哪些"}
             query_terms = [w for w in query if w not in stop_words and len(w) > 1]
             
+            # 提取查询中的数字和年份
+            query_numbers = re.findall(r'\d+\.?\d*', query)
+            query_years = re.findall(r'20\d{2}', query)
+            
+            # 判断是否为数值型查询
+            is_num_query = _is_numerical_query(query)
+            
             scored_chunks = []
-            for chunk in chunks:
+            for idx, chunk in enumerate(chunks):
                 content = chunk.get("content", "")
-                # 计算关键词匹配分数
+                
+                # 1. 关键词匹配分数（基础分）
                 match_score = sum(1 for term in query_terms if term in content)
-                # 结合原始排序位置（越靠前越好）
-                position_score = 1.0 / (chunks.index(chunk) + 1)
-                total_score = match_score * 2 + position_score
+                
+                # 2. 数字匹配分数（对数值型查询很重要）
+                number_score = 0
+                if is_num_query and query_numbers:
+                    content_numbers = re.findall(r'\d+\.?\d*', content)
+                    number_score = sum(1 for num in query_numbers if num in content_numbers) * 3
+                
+                # 3. 年份匹配分数（对时间相关查询很重要）
+                year_score = 0
+                if query_years:
+                    year_score = sum(1 for year in query_years if year in content) * 5
+                
+                # 4. 原始排序位置分数（RRF已经做了初步排序）
+                position_score = 1.0 / (idx + 1)
+                
+                # 5. 长度惩罚（太短的chunk可能信息不完整）
+                length_score = min(len(content) / 500, 1.0)
+                
+                # 综合评分
+                total_score = (
+                    match_score * 2.0 +      # 关键词权重2
+                    number_score +            # 数字权重1
+                    year_score +              # 年份权重1
+                    position_score * 3.0 +    # 位置权重3
+                    length_score * 0.5        # 长度权重0.5
+                )
+                
                 scored_chunks.append((total_score, chunk))
             
             # 按分数排序并返回top_k
             scored_chunks.sort(key=lambda x: x[0], reverse=True)
             return [chunk for _, chunk in scored_chunks[:top_k]]
         
-        # 应用重排序
-        fused = _simple_rerank(fused, question, TOP_K)
+        # 应用增强重排序
+        fused = _advanced_rerank(fused, question, TOP_K)
 
         # 6) 组装上下文与元数据（带来源标注）
         contexts: List[str] = []
