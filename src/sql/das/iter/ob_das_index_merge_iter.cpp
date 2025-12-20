@@ -779,6 +779,10 @@ int ObDASIndexMergeIter::fill_default_values_for_union(const common::ObIArray<Ob
 int ObDASIndexMergeIter::save_row_to_result_buffer() {
   int ret = OB_SUCCESS;
   
+  LOG_INFO("===== save_row_to_result_buffer CALLED =====", 
+           "enable_topn", result_buffer_.enable_topn_,
+           "merge_type", merge_type_);
+  
   // Note: MATCH_AGAINST expressions should already be properly filled by union_get_next_rows()
   // or intersect_get_next_rows() before calling this function.
   // We just save the row to the result buffer.
@@ -951,6 +955,8 @@ int ObDASIndexMergeIter::inner_release()
 int ObDASIndexMergeIter::inner_get_next_row()
 {
   int ret = OB_SUCCESS;
+  LOG_INFO("===== inner_get_next_row CALLED (SINGLE ROW MODE) =====",
+           "merge_type", merge_type_);
   clear_evaluated_flag();
   if (OB_FAIL((this->*get_next_row_)())) {
     if (ret != OB_ITER_END) {
@@ -1240,6 +1246,7 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
 
 
 int ObDASIndexMergeIter::union_get_next_row() {
+  LOG_INFO("===== union_get_next_row CALLED (SINGLE ROW MODE) =====");
   adlog::DEBUG("ObDASIndexMergeIter::union_get_next_row");
   
   int ret = OB_SUCCESS;
