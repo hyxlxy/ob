@@ -170,7 +170,7 @@ public:
     int to_expr(int64_t size);
     void reuse();
     void reset();
-    int to_expr_from_topn(int64_t &size);
+    int to_expr_from_topn(int64_t &size, int64_t capacity);
   public:
     const common::ObIArray<ObExpr*> *exprs_;
     ObEvalCtx *eval_ctx_;
@@ -181,7 +181,7 @@ public:
 
     int64_t topn_limit_;
     bool enable_topn_;
-
+    bool topn_finish_{false};
     struct TopNRow {  
       TopNRow() : row_data_(nullptr), score_(0.0) {}  
       TopNRow(ObChunkDatumStore::StoredRow *row, double score)   

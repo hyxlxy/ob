@@ -191,24 +191,24 @@ void ObDASIndexMergeIter::MergeResultBuffer::reset()
   result_store_iter_.reset();
   result_store_.reset();
   
-  if (enable_topn_ && topn_heap_ != nullptr) {
-    // Free all rows in heap before resetting
-    while (topn_heap_->count() > 0) {
-      TopNRow *row = topn_heap_->top();
-      topn_heap_->pop();
-      if (row != nullptr) {
-        if (row->row_data_ != nullptr) {
-          row->row_data_->~StoredRow();
-          alloc_->free(row->row_data_);
-        }
-        alloc_->free(row);
-      }
-    }
-    topn_heap_->reset();
+  // if (enable_topn_ && topn_heap_ != nullptr) {
+  //   // Free all rows in heap before resetting
+  //   while (topn_heap_->count() > 0) {
+  //     TopNRow *row = topn_heap_->top();
+  //     topn_heap_->pop();
+  //     if (row != nullptr) {
+  //       if (row->row_data_ != nullptr) {
+  //         row->row_data_->~StoredRow();
+  //         alloc_->free(row->row_data_);
+  //       }
+  //       alloc_->free(row);
+  //     }
+  //   }
+  //   topn_heap_->reset();
     
-    // DO NOT free the heap itself - it should persist across reset() calls
-    // The heap will be freed in the destructor or when the buffer is destroyed
-  }
+  //   // DO NOT free the heap itself - it should persist across reset() calls
+  //   // The heap will be freed in the destructor or when the buffer is destroyed
+  // }
 }
 //ADVISE
 int ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn()
@@ -437,7 +437,7 @@ int ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn()
 }
 
 
-int ObDASIndexMergeIter::MergeResultBuffer::to_expr_from_topn(int64_t &size)  
+int ObDASIndexMergeIter::MergeResultBuffer::to_expr_from_topn(int64_t &size, int64_t capacity)  
 {
   int ret = OB_SUCCESS;
   common::ObArray<TopNRow *> sorted_rows;
@@ -624,10 +624,13 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
           } else {
             if (merge_rtdef_->enable_topn_pushdown_) {
               result_buffer_.enable_topn_ = true;
+              result_buffer_.topn_finish_ = false;
               // 两阶段检索：粗排保留 100x 候选（如 limit=10 则保留 1000个）
               result_buffer_.topn_limit_ = merge_rtdef_->topn_limit_ * 100;
             } else {
               result_buffer_.enable_topn_ = false;
+              result_buffer_.topn_finish_ = false;
+
             }
           }
         }
@@ -1135,8 +1138,18 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
              K(matched_capacity), K(scan_limit));
   }
   
-  while (OB_SUCC(ret) && count < matched_capacity && scanned_rows < scan_limit) {  
+  // while (OB_SUCC(ret) && count < matched_capacity + 1 && scanned_rows < scan_limit) {  
+    while (OB_SUCC(ret) ) {  
     /* try to fill each child store */  
+
+    // result_buffer_.topn_finish_ = false;
+    if (result_buffer_.enable_topn_ and result_buffer_.topn_finish_)
+      break;
+
+    if (!result_buffer_.enable_topn_ and count >= capacity)
+      break;
+    
+
     int64_t output_idx = OB_INVALID_INDEX;  
     int cmp_ret = 0;  
     int64_t child_rows_cnt = 0;  
@@ -1312,7 +1325,8 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
     if (result_buffer_.enable_topn_) {
       adlog::DEBUG("result_buffer_.to_expr_from_topn(count): ", count);
       int64_t tmp;
-      result_buffer_.to_expr_from_topn(tmp);
+      result_buffer_.topn_finish_ = true;
+      result_buffer_.to_expr_from_topn(count, capacity);
     } else if (OB_FAIL(result_buffer_.to_expr(count))) {
       adlog::DEBUG("WARNING! failed to convert result buffer to exprs", K(ret));  
       LOG_WARN("failed to convert result buffer to exprs", K(ret));  
@@ -1604,7 +1618,7 @@ int ObDASIndexMergeIter::union_get_next_rows(int64_t &count, int64_t capacity) {
     if (result_buffer_.enable_topn_) {
       LOG_INFO("UNION: using TopN to_expr_from_topn", K(count));
       int64_t tmp;
-      result_buffer_.to_expr_from_topn(tmp);
+      result_buffer_.to_expr_from_topn(count, capacity);
     } else if (OB_FAIL(result_buffer_.to_expr(count))) {
       LOG_WARN("failed to convert result buffer to exprs", K(ret));
     }
