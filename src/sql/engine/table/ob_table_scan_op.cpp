@@ -1069,6 +1069,31 @@ int ObTableScanOp::init_attach_scan_rtdef(const ObDASBaseCtDef *attach_ctdef,
     attach_rtdef->ctdef_ = attach_ctdef;
     attach_rtdef->children_cnt_ = attach_ctdef->children_cnt_;
     attach_rtdef->eval_ctx_ = &eval_ctx_;
+
+    if (attach_ctdef->op_type_ == DAS_OP_INDEX_MERGE) {
+      auto && non_const_ctdef = const_cast<ObDASBaseCtDef*>(attach_ctdef);
+      auto &&merge_ctdef = static_cast<ObDASIndexMergeCtDef*>(non_const_ctdef);
+      ObDASIndexMergeRtDef *merge_rtdef = static_cast<ObDASIndexMergeRtDef*>(attach_rtdef);  
+      int64_t limit = 0;  
+      bool is_null = false;  
+      if (OB_NOT_NULL(merge_ctdef->limit_expr_) &&   
+          OB_FAIL(calc_expr_int_value(*merge_ctdef->limit_expr_, limit, is_null))) {
+        LOG_WARN("failed to calc limit expr", K(ret)); 
+      } else if (!is_null && limit > 0) {  
+        merge_rtdef->topn_limit_ = limit;  
+        merge_rtdef->enable_topn_pushdown_ = true;
+        adlog::DEBUG("HHHHHHHH true ",limit);
+
+      } else {
+        merge_rtdef->enable_topn_pushdown_ = false;
+        adlog::DEBUG("HHHHHHHH false");
+        adlog::DEBUG("HHHHHHHH false ",limit);
+
+      }
+
+      adlog::DEBUG("HHHHHHHHHHHHHHHHHHHHHHHHHH");
+    }  
+
     if (attach_ctdef->children_cnt_ > 0) {
       if (OB_ISNULL(attach_rtdef->children_ = OB_NEW_ARRAY(ObDASBaseRtDef*,
                                                            &ctx_.get_allocator(),

@@ -98,7 +98,7 @@ OB_SERIALIZE_MEMBER((ObDASDomainIdMergeCtDef, ObDASAttachCtDef), domain_types_);
 
 OB_SERIALIZE_MEMBER((ObDASDomainIdMergeRtDef, ObDASAttachRtDef));
 
-OB_SERIALIZE_MEMBER((ObDASIndexMergeCtDef, ObDASAttachCtDef), merge_type_, is_reverse_, merge_node_types_, rowkey_exprs_); // FARM COMPAT WHITELIST
+OB_SERIALIZE_MEMBER((ObDASIndexMergeCtDef, ObDASAttachCtDef), merge_type_, is_reverse_, merge_node_types_, rowkey_exprs_, topn_limit_,enable_topn_pushdown_,limit_expr_); // FARM COMPAT WHITELIST
 
 OB_SERIALIZE_MEMBER((ObDASIndexMergeRtDef, ObDASAttachRtDef));
 
@@ -284,6 +284,9 @@ int ObDASAttachSpec::set_calc_exprs_tree(ObDASAttachCtDef *root,
   }
   return ret;
 }
+
+ObDASTwoPhaseIndexMergeCtDef::~ObDASTwoPhaseIndexMergeCtDef() {}
+ObDASTwoPhaseIndexMergeRtDef::~ObDASTwoPhaseIndexMergeRtDef() {}
 
 }  // namespace sql
 }  // namespace oceanbase

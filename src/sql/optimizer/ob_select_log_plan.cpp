@@ -26,7 +26,7 @@
 #include "sql/optimizer/ob_log_window_function.h"
 #include "sql/optimizer/ob_log_topk.h"
 #include "sql/optimizer/ob_log_expand.h"
-
+#include "common/ad_log.h"
 using namespace oceanbase;
 using namespace sql;
 using namespace oceanbase::common;
@@ -5494,6 +5494,42 @@ int ObSelectLogPlan::allocate_plan_top()
         LOG_TRACE("succeed to allocate root exchange", K(candidates_.candidate_plans_.count()));
       }
     }
+
+    // 在这里看能不能消除掉sort
+    if (OB_SUCC(ret)) {  
+      for (int64_t i = 0; OB_SUCC(ret) && i < candidates_.candidate_plans_.count(); i++) {
+        ObLogicalOperator *&top = candidates_.candidate_plans_.at(i).plan_tree_;
+        if (OB_ISNULL(top) || log_op_def::LOG_SORT != top->get_type()) {
+          continue;
+        }
+        ObLogicalOperator *child = top->get_child(0);
+        if (OB_ISNULL(child) or
+            log_op_def::LOG_TABLE_SCAN != child->get_type()) {
+          adlog::DEBUG("下层不是table scan啊");
+          continue;
+        }
+
+        ObLogTableScan *table_scan = static_cast<ObLogTableScan *>(child);
+        if (!table_scan->use_index_merge()) {
+          adlog::DEBUG("下层用的不是index merge 啊");
+          continue;
+        }
+        adlog::DEBUG("下层用的是index merge");
+        ObLogSort *sort_op = static_cast<ObLogSort *>(top);
+
+        if (sort_op->get_topn_expr() != nullptr) {
+          table_scan->set_limit_expr(sort_op->get_topn_expr());
+          sort_op->set_topn_expr(nullptr);
+          adlog::DEBUG("把sort里面的limit_expr放到了当前的table_"
+                        "scan的limit_count_expr里了");
+          table_scan->set_parent(nullptr);
+        }
+
+        top = child;
+
+
+      }  
+    }
   }
   return ret;
 }
@@ -8913,9 +8949,24 @@ int ObSelectLogPlan::candi_allocate_order_by_if_losted(ObIArray<OrderItem> &orde
     for (int64_t i = 0; OB_SUCC(ret) && i < candidates_.candidate_plans_.count(); i++) {
       ObLogicalOperator *top = candidates_.candidate_plans_.at(i).plan_tree_;
       CandidatePlan &plan = candidates_.candidate_plans_.at(i);
-      if (OB_FAIL(create_order_by_plan(plan.plan_tree_, order_items, NULL, false))) {
-        LOG_WARN("failed to create order by plan", K(ret));
-      } else if (OB_FAIL(order_by_plans.push_back(plan))) {
+
+      bool can_skip_sort = false;  
+      if (OB_NOT_NULL(top) && log_op_def::LOG_TABLE_SCAN == top->get_type()) {  
+        ObLogTableScan *table_scan = static_cast<ObLogTableScan*>(top);  
+        if (table_scan->use_index_merge() and table_scan->get_limit_expr() != nullptr) {  
+          can_skip_sort = true;  
+          adlog::DEBUG("这里标识跳过");  
+        }  
+      }  
+
+      if (!can_skip_sort) {  
+        if (OB_FAIL(create_order_by_plan(plan.plan_tree_, order_items, NULL, false))) {  
+          LOG_WARN("failed to create order by plan", K(ret));  
+        }
+      }
+
+      
+      if (OB_FAIL(order_by_plans.push_back(plan))) {
         LOG_WARN("failed to push back", K(ret));
       } else if (top != candidates_.candidate_plans_.at(i).plan_tree_) {
         re_allocate_happened = true;

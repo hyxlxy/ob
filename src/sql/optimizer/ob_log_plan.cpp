@@ -47,7 +47,7 @@
 #include "share/vector_index/ob_vector_index_util.h"
 #include "sql/optimizer/ob_log_expand.h"
 #include "share/ob_fts_index_builder_util.h"
-
+#include "common/ad_log.h"
 using namespace oceanbase;
 using namespace sql;
 using namespace oceanbase::common;
@@ -7220,6 +7220,47 @@ int ObLogPlan::candi_allocate_order_by(bool &need_limit,
       } else if (is_reliable) {
         ret = limit_plans.push_back(candidate_plan);
       } else {
+
+
+        // 在这里试试看能不能把sort算子给去掉 advise 
+        adlog::DEBUG("在这里试试看能不能把sort算子给去掉");
+        do {
+          // break;
+          int ret = OB_SUCCESS;
+          ObLogicalOperator *&top = candidate_plan.plan_tree_;
+          if (OB_ISNULL(top) || log_op_def::LOG_SORT != top->get_type()) {  
+            // 不是sort算子，无需处理  
+            adlog::DEBUG("不是sort算子啊");
+          } else {  
+            ObLogSort *sort_op = static_cast<ObLogSort*>(top);  
+            ObLogicalOperator *child = sort_op->get_child(0);  
+            if (OB_NOT_NULL(child) && log_op_def::LOG_TABLE_SCAN == child->get_type()) {
+              ObLogTableScan *table_scan = static_cast<ObLogTableScan *>(child);
+              if (table_scan->use_index_merge()) {
+                // 使用的index merge
+                adlog::DEBUG("下层用的是index merge");
+                // get_limit_expr
+                // auto && limit_expr = table_scan->get_limit_expr();
+                if (sort_op->get_topn_expr() != nullptr) {
+                  // (limit_expr) = (sort_op->get_topn_expr());
+                  table_scan->set_limit_expr(sort_op->get_topn_expr());
+                  sort_op->set_topn_expr(nullptr);
+                  adlog::DEBUG("把sort里面的limit_expr放到了当前的table_"
+                               "scan的limit_count_expr里了");
+                  table_scan->set_parent(nullptr);
+                }
+                top = child;
+              }
+              else {
+                adlog::DEBUG("但是下层使用的不是index merge");
+              }
+            } else {
+              adlog::DEBUG("下层不是table scan啊");
+            }  
+          } 
+
+        }while(0);
+
         ret = order_by_plans.push_back(candidate_plan);
       }
     }
