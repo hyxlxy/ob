@@ -4,19 +4,19 @@ from typing import List
 
 def split_text(
     text: str,
-    max_chunk_size: int = 50,
-    overlap: int = 600,
+    max_chunk_size: int = 800,
+    overlap: int = 100,
 ) -> List[str]:
     """
     将文本按段落优先切分；当段落过长时再按句子边界切分，并使用少量重叠以保持上下文连续性。
     
-    针对财务报告优化：使用较小的chunk大小(400字符)，确保每个chunk聚焦单一知识点，
-    提升检索精准度。实际答案通常较短，小chunk更容易被精准匹配。
+    针对财务报告优化：使用适中的chunk大小(800字符)，平衡上下文完整性和检索精准度。
+    财报问答通常需要一定的上下文才能准确理解数据含义。
 
     Args:
         text: 待切分文本
-        max_chunk_size: 单块最大字符数（400字符适配财报数据特点）
-        overlap: 邻接块之间的重叠字符数（50字符避免关键信息被割裂）
+        max_chunk_size: 单块最大字符数（800字符适配财报数据特点）
+        overlap: 邻接块之间的重叠字符数（100字符避免关键信息被割裂）
 
     Returns:
         文本块列表

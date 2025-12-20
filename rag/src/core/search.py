@@ -28,26 +28,71 @@ OCEANBASE_DBNAME = os.getenv("OCEANBASE_DBNAME")
 TABLE_NAME = "rag_documents"
 
 # Retrieval parameters (configurable via env)
-TOP_K = int(os.getenv("TOP_K", "20"))  # 增加召回数量
-BM25_CANDIDATES = int(os.getenv("BM25_CANDIDATES", str(TOP_K * 5)))  # 100
-VEC_CANDIDATES = int(os.getenv("VEC_CANDIDATES", str(TOP_K * 6)))    # 120
+TOP_K = int(os.getenv("TOP_K", "30"))  # 增加召回数量到30
+BM25_CANDIDATES = int(os.getenv("BM25_CANDIDATES", "150"))  # 增加BM25候选
+VEC_CANDIDATES = int(os.getenv("VEC_CANDIDATES", "180"))    # 增加向量候选
 RRF_K = float(os.getenv("RRF_K", "60"))  # RRF 常数项
-MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "20000"))
+MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "25000"))  # 增加上下文长度
+
+
+def _expand_query(query: str) -> str:
+    """扩展查询，添加同义词和相关术语"""
+    # 财务术语映射
+    expansions = {
+        "营业收入": "营业收入 OR 营收 OR 收入",
+        "净利润": "净利润 OR 归母净利润 OR 利润",
+        "毛利率": "毛利率 OR 毛利",
+        "产能": "产能 OR 产量 OR 生产能力",
+        "产能利用率": "产能利用率 OR 产销率",
+        "客户": "客户 OR 大客户 OR 经销商",
+        "产品": "产品 OR 品类 OR SKU",
+        "费用率": "费用率 OR 销售费用率 OR 管理费用率",
+        "成立时间": "成立时间 OR 成立 OR 创立",
+        "定价": "定价 OR 定价方法 OR 定价策略",
+    }
+    
+    expanded = query
+    for term, expansion in expansions.items():
+        if term in query:
+            expanded = expanded.replace(term, f"({expansion})")
+    
+    # 如果查询包含年份，确保也搜索相关年份
+    import re
+    year_match = re.search(r'(20\d{2})', query)
+    if year_match:
+        year = year_match.group(1)
+        # 添加年份的不同表达形式
+        if year not in expanded:
+            expanded += f" {year}"
+    
+    return expanded
 
 
 def _build_fts_query(query: str) -> Dict:
+    # 扩展查询以提高召回
+    expanded_query = _expand_query(query)
     return {
         "bool": {
-            "must": [
+            "should": [
                 {
                     "query_string": {
                         "fields": ["content"],
                         "type": "best_fields",
-                        "query": query,
+                        "query": expanded_query,
                         "minimum_should_match": "30%",
+                        "boost": 2.0,  # 精确匹配权重更高
+                    }
+                },
+                {
+                    "query_string": {
+                        "fields": ["content"],
+                        "type": "phrase",
+                        "query": query,
+                        "boost": 3.0,  # 短语匹配权重最高
                     }
                 }
-            ]
+            ],
+            "minimum_should_match": 1,
         }
     }
 
@@ -236,12 +281,36 @@ def search(question: str) -> Answer:
             return answer
 
         # 4) RRF 融合并去重
-        fused = _rrf_fuse(bm25_results, vec_results, TOP_K)
+        fused = _rrf_fuse(bm25_results, vec_results, TOP_K * 2)  # 先取2倍候选用于重排序
         if not fused:
             logger.warning("RRF 融合结果为空，回退使用BM25或向量结果")
-            fused = (bm25_results or vec_results)[:TOP_K]
+            fused = (bm25_results or vec_results)[:TOP_K * 2]
 
-        # 5) 组装上下文与元数据（带来源标注）
+        # 5) 简单重排序：优先选择包含问题关键词的chunk
+        def _simple_rerank(chunks: List[Dict], query: str, top_k: int) -> List[Dict]:
+            """基于关键词匹配的简单重排序"""
+            # 提取查询中的关键词（去除常见停用词）
+            stop_words = {"的", "是", "在", "有", "和", "与", "等", "了", "吗", "呢", "什么", "如何", "怎样", "多少"}
+            query_terms = [w for w in query if w not in stop_words and len(w) > 1]
+            
+            scored_chunks = []
+            for chunk in chunks:
+                content = chunk.get("content", "")
+                # 计算关键词匹配分数
+                match_score = sum(1 for term in query_terms if term in content)
+                # 结合原始排序位置（越靠前越好）
+                position_score = 1.0 / (chunks.index(chunk) + 1)
+                total_score = match_score * 2 + position_score
+                scored_chunks.append((total_score, chunk))
+            
+            # 按分数排序并返回top_k
+            scored_chunks.sort(key=lambda x: x[0], reverse=True)
+            return [chunk for _, chunk in scored_chunks[:top_k]]
+        
+        # 应用重排序
+        fused = _simple_rerank(fused, question, TOP_K)
+
+        # 6) 组装上下文与元数据（带来源标注）
         contexts: List[str] = []
         meta: List[Tuple[str, int]] = []
         seen = set()
@@ -266,7 +335,7 @@ def search(question: str) -> Answer:
         contexts = _truncate_context(contexts, MAX_CONTEXT_CHARS)
         context_text = "\n\n".join(contexts)
 
-        # 6) 生成答案（LLM输出JSON格式，包含answer、filename、page）
+        # 7) 生成答案（LLM输出JSON格式，包含answer、filename、page）
         logger.debug("Generating answer using LLM model ...")
         prompt = QUERY_USER_PROMPT_TEMPLATE.format(
             context_text=context_text,
@@ -280,7 +349,7 @@ def search(question: str) -> Answer:
 
         llm_output = generate_llm_response(messages)
         
-        # 7) 解析LLM输出的JSON，提取answer、filename、page
+        # 8) 解析LLM输出的JSON，提取answer、filename、page
         parsed = _parse_llm_json_output(llm_output, meta)
         answer.answer = parsed["answer"]
         answer.filename = parsed["filename"]
