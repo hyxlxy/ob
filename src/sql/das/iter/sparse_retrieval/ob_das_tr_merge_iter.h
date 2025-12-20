@@ -182,6 +182,12 @@ public:
   int get_query_max_score(double &score) {
     return sparse_retrieval_iter_->get_query_max_score(score);
   }
+  
+  // BMW Two-Phase: 设置BMW迭代器的初始阈值
+  int set_bmw_initial_threshold(double threshold);
+  
+  // BMW Two-Phase: 检查是否使用BMW模式
+  bool is_bmw_mode() const;
 private:
   int init_das_iter_scan_params();
   static int init_das_iter_scan_param(

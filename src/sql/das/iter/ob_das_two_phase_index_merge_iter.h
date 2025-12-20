@@ -1,9 +1,14 @@
-// 头文件：ob_das_two_phase_index_merge_iter.h
+#ifndef OB_DAS_TWO_PHASE_INDEX_MERGE_ITER_H_
+#define OB_DAS_TWO_PHASE_INDEX_MERGE_ITER_H_
 
-#include "sql/das/iter/ob_das_index_merge_iter.h"
 #include "sql/das/iter/ob_das_iter.h"
-#include <cstdint>
-#include <cstdio>
+#include "lib/container/ob_se_array.h"
+#include "lib/allocator/ob_allocator.h"
+
+namespace oceanbase
+{
+namespace sql
+{
 
 class ObDASTwoPhaseIndexMergeIter : public ObDASIter  
 {  
@@ -14,12 +19,16 @@ public:
                       first_stage_limit_(0),  
                       second_stage_limit_(0),  
                       child_iters_(nullptr),  
-                      child_cnt_(0) {}  
+                      child_cnt_(0),
+                      scalar_filters_(nullptr),
+                      match_against_exprs_(nullptr) {}  
       
-    int64_t first_stage_limit_;    // 第一阶段限制(3*n)  
-    int64_t second_stage_limit_;   // 第二阶段top-n  
-    ObDASIter **child_iters_;      // 子迭代器数组  
-    int64_t child_cnt_;            // 子迭代器数量  
+    int64_t first_stage_limit_;              // 第一阶段限制(3*n)  
+    int64_t second_stage_limit_;             // 第二阶段top-n  
+    ObDASIter **child_iters_;                // 子迭代器数组  
+    int64_t child_cnt_;                      // 子迭代器数量
+    const common::ObIArray<ObExpr*> *scalar_filters_;  // 标量过滤条件
+    const common::ObIArray<ObExpr*> *match_against_exprs_; // MATCH AGAINST 表达式
   };  
   
   struct ScoredRow  
@@ -47,7 +56,9 @@ private:
   // 计算行分数  
   double calculate_score(const ObDatumRow *row);  
   // 从缓冲区获取下一个结果  
-  int get_next_result_from_buffer();  
+  int get_next_result_from_buffer();
+  // 应用标量过滤条件
+  bool apply_scalar_filter(const ObDatumRow *row);  
   
   // 子迭代器管理  
   ObDASIter **child_iters_;  
@@ -75,5 +86,15 @@ private:
     
   double min_score_;  
   int64_t first_stage_limit_;  
-  int64_t second_stage_limit_;  
+  int64_t second_stage_limit_;
+  
+  // 标量过滤和 MATCH AGAINST 表达式
+  const common::ObIArray<ObExpr*> *scalar_filters_;
+  const common::ObIArray<ObExpr*> *match_against_exprs_;
+  // 注：output_ 和 eval_ctx_ 使用基类 ObDASIter 的成员  
 };
+
+} // namespace sql
+} // namespace oceanbase
+
+#endif // OB_DAS_TWO_PHASE_INDEX_MERGE_ITER_H_

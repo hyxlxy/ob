@@ -7241,16 +7241,14 @@ int ObLogPlan::candi_allocate_order_by(bool &need_limit,
                 // get_limit_expr
                 // auto && limit_expr = table_scan->get_limit_expr();
                 if (sort_op->get_topn_expr() != nullptr) {
-                  // (limit_expr) = (sort_op->get_topn_expr());
+                  // BMW 两阶段方案：跳过 Sort 算子，在 Index Merge 层完成排序
                   table_scan->set_limit_expr(sort_op->get_topn_expr());
-                  // 保留 Sort 算子用于精排（两阶段检索）
-                  // sort_op->set_topn_expr(nullptr);
-                  adlog::DEBUG("把sort里面的limit_expr放到了当前的table_"
-                               "scan的limit_count_expr里了");
-                  // table_scan->set_parent(nullptr);
+                  sort_op->set_topn_expr(nullptr);
+                  adlog::DEBUG("[BMW Two-Phase] 把sort里面的limit_expr放到了table_scan，跳过Sort算子");
+                  table_scan->set_parent(nullptr);
                 }
-                // 保留 Sort 算子，不跳过
-                // top = child;
+                // BMW 两阶段：跳过 Sort 算子
+                top = child;
               }
               else {
                 adlog::DEBUG("但是下层使用的不是index merge");

@@ -266,6 +266,11 @@ private:
   int extract_match_against_exprs(const common::ObIArray<ObExpr*> &exprs, common::ObIArray<ObExpr*> &match_against_exprs);
   int fill_default_values_for_union(const common::ObIArray<ObExpr*> &exprs);
   int save_row_to_result_buffer();
+  
+  // BMW Two-Phase methods
+  int execute_phase1_collect_fallback(int64_t limit, double &min_score);
+  int execute_phase2_bmw_collection(int64_t amplified_limit);
+  int supplement_with_fallback(int64_t target_count);
 
 private:
   ObIndexMergeType merge_type_;
@@ -292,6 +297,21 @@ private:
   // only relevance score in fulltext search for now.
   common::ObFixedArray<ExprFixedArray, common::ObIAllocator> child_match_against_exprs_;
   MergeResultBuffer result_buffer_;
+  
+  // BMW Two-Phase fallback data
+  struct FallbackRow {
+    common::ObSEArray<ObDatum, 16> datums_;  // 存储行数据
+    double score_;
+    FallbackRow() : score_(0.0) {}
+    
+    TO_STRING_KV(K_(score), "datum_count", datums_.count());
+  };
+  common::ObArray<FallbackRow> fallback_rows_;  // 阶段1的保底数据
+  double phase1_min_score_;  // 阶段1记录的最小分数
+  
+  // Separate scan params for Phase1 and Phase2 to avoid OB_INIT_TWICE
+  common::ObFixedArray<ObTableScanParam*, common::ObIAllocator> phase1_scan_params_;
+  common::ObFixedArray<ObTableScanParam*, common::ObIAllocator> phase2_scan_params_;
 
 public:
       // ADVISE

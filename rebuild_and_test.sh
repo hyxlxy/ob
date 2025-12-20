@@ -12,7 +12,7 @@ echo ""
 echo "=========================================="
 echo "Step 2: Destroying old cluster"
 echo "=========================================="
-./tools/deploy/obd.sh destroy -n obcluster || true
+./tools/deploy/ obd.sh  destroy --rm -n obcluster|| true
 
 echo ""
 echo "=========================================="

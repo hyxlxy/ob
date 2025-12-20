@@ -17,7 +17,9 @@
 #include <cstdint>
 #define USING_LOG_PREFIX SQL_DAS
 #include "sql/das/iter/ob_das_index_merge_iter.h"
+#include "sql/das/iter/ob_das_iter_define.h"
 #include "src/sql/das/ob_das_attach_define.h"
+#include "sql/das/iter/sparse_retrieval/ob_das_tr_merge_iter.h"
 namespace oceanbase
 {
 using namespace common;
@@ -479,11 +481,33 @@ int ObDASIndexMergeIter::MergeResultBuffer::to_expr_from_topn(int64_t &size)
               return a->score_ > b->score_;
             });
   
-  // 两阶段检索日志：粗排阶段完成
-  LOG_INFO("[Two-Phase Retrieval] Phase1 (coarse ranking) complete",
-           "candidates_count", sorted_rows.count(),
-           "top_score", (sorted_rows.count() > 0 ? sorted_rows.at(0)->score_ : 0.0),
-           "last_score", (sorted_rows.count() > 0 ? sorted_rows.at(sorted_rows.count()-1)->score_ : 0.0));
+  // BMW 两阶段：从 2N 候选中筛选最终的 N 条
+  int64_t total_candidates = sorted_rows.count();
+  int64_t final_limit = topn_limit_ / 2;  // 原始 limit（因为 topn_limit_ 已经是 2N）
+  if (final_limit > 0 && sorted_rows.count() > final_limit) {
+    // 只保留最终的 N 条（已按分数降序排列）
+    // 释放多余的行
+    for (int64_t i = final_limit; i < sorted_rows.count(); ++i) {
+      TopNRow *row = sorted_rows.at(i);
+      if (row != nullptr) {
+        if (row->row_data_ != nullptr) {
+          row->row_data_->~StoredRow();
+          alloc_->free(row->row_data_);
+        }
+        alloc_->free(row);
+      }
+    }
+    // 调整数组大小（移除多余元素）
+    while (sorted_rows.count() > final_limit) {
+      sorted_rows.pop_back();
+    }
+  }
+  
+  LOG_INFO("[BMW Two-Phase] Candidates collected and filtered",
+           "total_candidates", total_candidates,
+           "final_results", sorted_rows.count(),
+           "最高分", (sorted_rows.count() > 0 ? sorted_rows.at(0)->score_ : 0.0),
+           "最低分(min_score)", (sorted_rows.count() > 0 ? sorted_rows.at(sorted_rows.count()-1)->score_ : 0.0));
 
   // Convert sorted rows to expressions in batch
   {
@@ -524,9 +548,18 @@ int ObDASIndexMergeIter::MergeResultBuffer::to_expr_from_topn(int64_t &size)
 
 int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
 {
-  adlog::DEBUG("index merge iter use!!!");
-  adlog::DEBUG("ObDASIndexMergeIter::inner_init start");
   int ret = OB_SUCCESS;
+  LOG_INFO("ObDASIndexMergeIter::inner_init start", K(this), K(param.type_));
+  
+  if (OB_UNLIKELY(ObDASIterType::DAS_ITER_INDEX_MERGE != param.type_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("inner init das iter with bad param type", K(param), K(ret));
+  } else {
+    // Add stack trace to help identify where this is being called from
+    LOG_INFO("ObDASIndexMergeIter::inner_init stack trace");
+    LOG_INFO("Stack trace: ", K(lbt()));
+  }
+  
   if (ObDASIterType::DAS_ITER_INDEX_MERGE != param.type_) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("inner init das iter with bad param type", K(param));
@@ -548,11 +581,16 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
     // top_n_count_ = param.limit_param_;
     // adlog::DEBUG("top_n_count: ", top_n_count_);
     
-    // CRITICAL FIX: Increase max_size_ when TopN is enabled to match expanded capacity
-    if (merge_rtdef_->enable_topn_pushdown_) {
-      // Original max_size_ is typically 256, increase it to support larger capacity
-      max_size_ = max_size_ * 2 + 200;  // Ensure it's larger than capacity (310)
-      LOG_INFO("Increased max_size_ for TopN pushdown", "original", 256, "new", max_size_);
+    // BMW 两阶段：增大 max_size_ 以支持 2N 候选的收集
+    if (merge_rtdef_->enable_topn_pushdown_ && merge_rtdef_->topn_limit_ > 0) {
+      // 需要容纳 2N 条候选数据
+      int64_t required_size = merge_rtdef_->topn_limit_ * 2;
+      if (max_size_ < required_size) {
+        max_size_ = required_size + 100;  // 额外预留一些空间
+        LOG_INFO("[BMW Two-Phase] Increased max_size for candidates",
+                 "original", 256, "new", max_size_,
+                 "topn_limit", merge_rtdef_->topn_limit_);
+      }
     }
     
     lib::ContextParam context_param;
@@ -572,6 +610,8 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
       child_scan_params_.set_allocator(&alloc);
       child_tablet_ids_.set_allocator(&alloc);
       child_match_against_exprs_.set_allocator(&alloc);
+      phase1_scan_params_.set_allocator(&alloc);
+      phase2_scan_params_.set_allocator(&alloc);
       int64_t child_cnt = index_merge_param.child_iters_->count();
       if (OB_FAIL(child_iters_.assign(*index_merge_param.child_iters_))) {
         LOG_WARN("failed to assign child iters", K(ret));
@@ -585,6 +625,10 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
         LOG_WARN("failed to prepare allocate child tablet ids", K(ret));
       } else if (OB_FAIL(child_match_against_exprs_.prepare_allocate(child_cnt))) {
         LOG_WARN("failed to prepare allocate child match against exprs", K(ret));
+      } else if (OB_FAIL(phase1_scan_params_.prepare_allocate(child_cnt))) {
+        LOG_WARN("failed to prepare allocate phase1 scan params", K(ret));
+      } else if (OB_FAIL(phase2_scan_params_.prepare_allocate(child_cnt))) {
+        LOG_WARN("failed to prepare allocate phase2 scan params", K(ret));
       } else {
         ObArray<ObExpr*> match_against_exprs;
         for (int64_t i = 0; OB_SUCC(ret) && i < child_cnt; i++) {
@@ -592,6 +636,8 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
           IndexMergeRowStore &row_store = child_stores_.at(i);
           ObDASScanRtDef *child_scan_rtdef = child_scan_rtdefs_.at(i);
           ObTableScanParam *&child_scan_param = child_scan_params_.at(i);
+          ObTableScanParam *&phase1_scan_param = phase1_scan_params_.at(i);
+          ObTableScanParam *&phase2_scan_param = phase2_scan_params_.at(i);
           ExprFixedArray &child_match_against_expr = child_match_against_exprs_.at(i);
           if (OB_ISNULL(child) || OB_ISNULL(child->get_output())) {
             ret = OB_ERR_UNEXPECTED;
@@ -614,6 +660,12 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
               if (OB_ISNULL(child_scan_param = OB_NEWx(ObTableScanParam, &alloc))) {
                 ret = OB_ALLOCATE_MEMORY_FAILED;
                 LOG_WARN("failed to allocate child scan param", K(ret));
+              } else if (OB_ISNULL(phase1_scan_param = OB_NEWx(ObTableScanParam, &alloc))) {
+                ret = OB_ALLOCATE_MEMORY_FAILED;
+                LOG_WARN("failed to allocate phase1 scan param", K(ret));
+              } else if (OB_ISNULL(phase2_scan_param = OB_NEWx(ObTableScanParam, &alloc))) {
+                ret = OB_ALLOCATE_MEMORY_FAILED;
+                LOG_WARN("failed to allocate phase2 scan param", K(ret));
               }
             }
           }
@@ -622,23 +674,46 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
           if (OB_FAIL(result_buffer_.init(max_size_, eval_ctx_, output_, mem_ctx_->get_malloc_allocator()))) {
             LOG_WARN("failed to init merge result buffer", K(ret));
           } else {
+            // BMW 两阶段方案实现：
+            // 启用 TopN heap，但容量设为 20N，收集足够的候选
+            // 然后在 to_expr_from_topn 中只输出最终的 N 条
             if (merge_rtdef_->enable_topn_pushdown_) {
               result_buffer_.enable_topn_ = true;
-              // 两阶段检索：粗排保留 100x 候选（如 limit=10 则保留 1000个）
-              result_buffer_.topn_limit_ = merge_rtdef_->topn_limit_ * 100;
+              // 关键：TopN heap 容量设为 2N，保留更多候选
+              result_buffer_.topn_limit_ = merge_rtdef_->topn_limit_ * 2;
+              LOG_INFO("[BMW Two-Phase] TopN heap enabled with amplified capacity",
+                       "original_limit", merge_rtdef_->topn_limit_,
+                       "heap_capacity", result_buffer_.topn_limit_);
             } else {
               result_buffer_.enable_topn_ = false;
             }
+            
+            LOG_INFO("ObDASIndexMergeIter::inner_init completed successfully");
+            // The base class will set inited_ after this method returns successfully
+          }
+        }
+        
+        // Cleanup if initialization failed
+        if (OB_FAIL(ret)) {
+          LOG_WARN("ObDASIndexMergeIter::inner_init failed", K(ret), K(lbt()));
+          if (OB_NOT_NULL(mem_ctx_)) {
+            inner_release();
           }
         }
       }
     }
   }
-  // if (OB_SUCC(ret)) {
-  //   if (OB_FAIL(init_two_phase(param))) {
-  //     return ret;
-  //   }
-  // }
+  
+  // 启用两阶段优化
+  if (OB_SUCC(ret) && merge_rtdef_->enable_topn_pushdown_ && merge_rtdef_->topn_limit_ > 0) {
+    enable_two_phase_ = true;
+    has_executed_two_phase_ = false;
+    phase1_min_score_ = 0.0;
+    
+    LOG_INFO("[BMW Two-Phase] Two-phase mode enabled",
+             "topn_limit", merge_rtdef_->topn_limit_);
+  }
+  
   adlog::DEBUG("ObDASIndexMergeIter::inner_init end");
 
   return ret;
@@ -655,10 +730,18 @@ int ObDASIndexMergeIter::init_scan_param(const share::ObLSID &ls_id,
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("invalid argument", K(ret), KPC(ctdef), KPC(rtdef), K(ls_id), K(tablet_id));
   } else {
+    // Manually reset the scan parameter to ensure a clean state
+    scan_param.key_ranges_.reuse();
+    scan_param.ss_key_ranges_.reuse();
+    scan_param.mbr_filters_.reuse();
+    
     uint64_t tenant_id = MTL_ID();
     scan_param.tenant_id_ = tenant_id;
+    
+    // Initialize attributes with proper memory context
     scan_param.key_ranges_.set_attr(ObMemAttr(tenant_id, "ScanParamKR"));
     scan_param.ss_key_ranges_.set_attr(ObMemAttr(tenant_id, "ScanParamSSKR"));
+    
     scan_param.tx_lock_timeout_ = rtdef->tx_lock_timeout_;
     scan_param.index_id_ = ctdef->ref_table_id_;
     scan_param.is_get_ = ctdef->is_get_;
@@ -679,17 +762,34 @@ int ObDASIndexMergeIter::init_scan_param(const share::ObLSID &ls_id,
     scan_param.row2exprs_projector_ = rtdef->p_row2exprs_projector_;
     scan_param.schema_version_ = ctdef->schema_version_;
     scan_param.tenant_schema_version_ = rtdef->tenant_schema_version_;
+    
+    // BMW 两阶段：放大子迭代器的 limit，让 BMW 返回更多候选
+    // 然后在 Index Merge 层面再做最终的 TopN 筛选
     scan_param.limit_param_ = rtdef->limit_param_;
+    if (merge_rtdef_->enable_topn_pushdown_ && merge_rtdef_->topn_limit_ > 0) {
+      // 放大 limit 到 2倍，提高召回率
+      scan_param.limit_param_.limit_ = merge_rtdef_->topn_limit_ * 2;
+      scan_param.limit_param_.offset_ = 0;
+      LOG_INFO("[BMW Two-Phase] Amplified child iter limit",
+               "original_limit", merge_rtdef_->topn_limit_,
+               "amplified_limit", scan_param.limit_param_.limit_);
+    }
+    
     scan_param.need_scn_ = rtdef->need_scn_;
     scan_param.pd_storage_flag_ = ctdef->pd_expr_spec_.pd_storage_flag_.pd_flag_;
     scan_param.fb_snapshot_ = rtdef->fb_snapshot_;
     scan_param.fb_read_tx_uncommitted_ = rtdef->fb_read_tx_uncommitted_;
     scan_param.ls_id_ = ls_id;
     scan_param.tablet_id_ = tablet_id;
+    
     if (!ctdef->pd_expr_spec_.pushdown_filters_.empty()) {
       scan_param.op_filters_ = &ctdef->pd_expr_spec_.pushdown_filters_;
     }
-    scan_param.pd_storage_filters_ = rtdef->p_pd_expr_op_->pd_storage_filters_;
+    
+    if (OB_NOT_NULL(rtdef->p_pd_expr_op_)) {
+      scan_param.pd_storage_filters_ = rtdef->p_pd_expr_op_->pd_storage_filters_;
+    }
+    
     if (OB_NOT_NULL(tx_desc_)) {
       scan_param.tx_id_ = tx_desc_->get_tx_id();
     } else {
@@ -705,10 +805,14 @@ int ObDASIndexMergeIter::init_scan_param(const share::ObLSID &ls_id,
       LOG_ERROR("null snapshot", K(ret), KPC_(snapshot));
     }
 
-    if (FAILEDx(scan_param.column_ids_.assign(ctdef->access_column_ids_))) {
-      LOG_WARN("failed to init column ids", K(ret));
-    } else if (OB_FAIL(prepare_scan_ranges(scan_param, rtdef))) {
-      LOG_WARN("failed to prepare scan ranges", K(ret));
+    if (OB_SUCC(ret)) {
+      // Clear any existing column IDs before assigning new ones
+      scan_param.column_ids_.reuse();
+      if (OB_FAIL(scan_param.column_ids_.assign(ctdef->access_column_ids_))) {
+        LOG_WARN("failed to init column ids", K(ret));
+      } else if (OB_FAIL(prepare_scan_ranges(scan_param, rtdef))) {
+        LOG_WARN("failed to prepare scan ranges", K(ret));
+      }
     }
   }
   return ret;
@@ -720,12 +824,19 @@ int ObDASIndexMergeIter::prepare_scan_ranges(ObTableScanParam &scan_param, const
   if (OB_ISNULL(rtdef)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("unexpected nullptr scan rtdef", K(ret));
-  } else if (OB_FAIL(scan_param.key_ranges_.assign(rtdef->key_ranges_))) {
-    LOG_WARN("failed to assign key ranges", K(ret));
-  } else if (OB_FAIL(scan_param.ss_key_ranges_.assign(rtdef->ss_key_ranges_))) {
-    LOG_WARN("failed to assign ss key ranges", K(ret));
-  } else if (OB_FAIL(scan_param.mbr_filters_.assign(rtdef->mbr_filters_))) {
-    LOG_WARN("failed to assign mbr filters", K(ret));
+  } else {
+    // Clear any existing ranges to prevent double initialization
+    scan_param.key_ranges_.reuse();
+    scan_param.ss_key_ranges_.reuse();
+    scan_param.mbr_filters_.reuse();
+    
+    if (OB_FAIL(scan_param.key_ranges_.assign(rtdef->key_ranges_))) {
+      LOG_WARN("failed to assign key ranges", K(ret));
+    } else if (OB_FAIL(scan_param.ss_key_ranges_.assign(rtdef->ss_key_ranges_))) {
+      LOG_WARN("failed to assign ss key ranges", K(ret));
+    } else if (OB_FAIL(scan_param.mbr_filters_.assign(rtdef->mbr_filters_))) {
+      LOG_WARN("failed to assign mbr filters", K(ret));
+    }
   }
 
   LOG_TRACE("index merge iter prepare scan ranges", K(scan_param), KPC(rtdef), K(ret));
@@ -810,6 +921,9 @@ int ObDASIndexMergeIter::save_row_to_result_buffer() {
 int ObDASIndexMergeIter::do_table_scan()
 {
   int ret = OB_SUCCESS;
+  // For BMW two-phase, use phase1_scan_params_ for initial scan
+  bool use_phase1_params = (enable_two_phase_ && phase1_scan_params_.count() > 0);
+  
   for (int64_t i = 0; OB_SUCC(ret) && i < child_scan_rtdefs_.count(); ++i) {
     ObDASScanRtDef *scan_rtdef = child_scan_rtdefs_.at(i);
     ObDASIter *iter = child_iters_.at(i);
@@ -818,14 +932,20 @@ int ObDASIndexMergeIter::do_table_scan()
       LOG_WARN("unexpected nullptr iter", K(ret));
     } else if (scan_rtdef != nullptr) {
       const ObDASScanCtDef *scan_ctdef = static_cast<const ObDASScanCtDef*>(scan_rtdef->ctdef_);
-      ObTableScanParam *scan_param = child_scan_params_.at(i);
+      ObTableScanParam *scan_param = use_phase1_params ? phase1_scan_params_.at(i) : child_scan_params_.at(i);
       if (OB_ISNULL(scan_ctdef) || OB_ISNULL(scan_param)) {
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("unexpected nullptr child scan info", K(scan_ctdef), K(scan_param), K(ret));
       } else if (OB_FAIL(init_scan_param(ls_id_, child_tablet_ids_.at(i), scan_ctdef, scan_rtdef, *scan_param))) {
         LOG_WARN("failed to init child scan param", K(ret));
-      } else if (OB_FAIL(iter->do_table_scan())) {
-        LOG_WARN("child iter failed to do table scan", K(ret));
+      } else {
+        // Update child_scan_params_ to point to the active scan param
+        if (use_phase1_params) {
+          child_scan_params_.at(i) = scan_param;
+        }
+        if (OB_FAIL(iter->do_table_scan())) {
+          LOG_WARN("child iter failed to do table scan", K(ret));
+        }
       }
     } else if (OB_FAIL(iter->do_table_scan())) {
       LOG_WARN("child iter failed to do table scan", K(ret));
@@ -881,6 +1001,7 @@ int ObDASIndexMergeIter::set_ls_tablet_ids(const ObLSID &ls_id, const ObDASRelat
   const ObIArray<ObTabletID> &index_merge_tablet_ids = related_tablet_ids.index_merge_tablet_ids_;
   for (int64_t i = 0; OB_SUCC(ret) && i < child_scan_rtdefs_.count(); ++i) {
     ObDASScanRtDef *scan_rtdef = child_scan_rtdefs_.at(i);
+    ObDASIter *iter = child_iters_.at(i);
     if (scan_rtdef != nullptr) {
       const ObDASScanCtDef *scan_ctdef = static_cast<const ObDASScanCtDef*>(scan_rtdef->ctdef_);
       if (OB_ISNULL(scan_ctdef)) {
@@ -888,6 +1009,26 @@ int ObDASIndexMergeIter::set_ls_tablet_ids(const ObLSID &ls_id, const ObDASRelat
         LOG_WARN("unexpected nullptr scan ctdef", K(ret));
       } else {
         child_tablet_ids_.at(i) = index_merge_tablet_ids.at(scan_ctdef->index_merge_idx_);
+      }
+    } else if (OB_NOT_NULL(iter) && iter->get_type() == DAS_ITER_TEXT_RETRIEVAL_MERGE) {
+      // For TR Merge iterator, set ls_id and tablet_ids through its interface
+      ObDASTRMergeIter *tr_iter = static_cast<ObDASTRMergeIter*>(iter);
+      
+      // Use fts_tablet_ids_ array if available, otherwise fall back to direct fields
+      ObDASFTSTabletID fts_tablet_id;
+      if (related_tablet_ids.fts_tablet_ids_.count() > 0) {
+        // Use the first FTS tablet ID from the array
+        // TODO: In multi-FTS scenarios, we may need to use ir_rtdef->fts_idx_ to select the correct one
+        fts_tablet_id = related_tablet_ids.fts_tablet_ids_.at(0);
+      } else {
+        // Fall back to direct fields for single FTS index
+        fts_tablet_id.inv_idx_tablet_id_ = related_tablet_ids.inv_idx_tablet_id_;
+        fts_tablet_id.fwd_idx_tablet_id_ = related_tablet_ids.fwd_idx_tablet_id_;
+        fts_tablet_id.domain_id_idx_tablet_id_ = related_tablet_ids.domain_id_idx_tablet_id_;
+      }
+      
+      if (OB_FAIL(tr_iter->set_related_tablet_ids(ls_id, fts_tablet_id))) {
+        LOG_WARN("failed to set related tablet ids for TR merge iter", K(ret), K(ls_id));
       }
     }
   }
@@ -934,33 +1075,87 @@ int ObDASIndexMergeIter::inner_reuse()
 
 int ObDASIndexMergeIter::inner_release()
 {
-
   int ret = OB_SUCCESS;
-  child_iters_.reset();
-  child_scan_rtdefs_.reset();
-  child_tablet_ids_.reset();
-  for (int64_t i = 0; i < child_stores_.count(); ++i) {
-    child_stores_.at(i).reset();
+  
+  LOG_INFO("DASIndexMerge: starting inner_release");
+  
+  // Release all child iterators
+  for (int64_t i = 0; i < child_iters_.count(); ++i) {
+    if (OB_NOT_NULL(child_iters_.at(i))) {
+      int tmp_ret = child_iters_.at(i)->release();
+      if (OB_SUCCESS != tmp_ret) {
+        LOG_WARN("failed to release child iter", K(tmp_ret), K(i));
+        ret = COVER_SUCC(tmp_ret);
+      }
+      // Set to null after release to prevent double-free
+      child_iters_.at(i) = nullptr;
+    }
   }
-  child_stores_.reset();
+  
+  // Free scan params
   for (int64_t i = 0; i < child_scan_params_.count(); ++i) {
     ObTableScanParam *scan_param = child_scan_params_.at(i);
-    if (scan_param != nullptr) {
+    if (OB_NOT_NULL(scan_param)) {
+      LOG_INFO("DASIndexMerge: destroying scan param", KP(scan_param));
       scan_param->destroy_schema_guard();
       scan_param->snapshot_.reset();
       scan_param->destroy();
+      // Explicitly free the memory
+      if (OB_NOT_NULL(mem_ctx_)) {
+        mem_ctx_->get_arena_allocator().free(scan_param);
+      } else {
+        LOG_WARN_RET(OB_ERR_UNEXPECTED, "mem_ctx_ is null when trying to free scan_param");
+      }
+      child_scan_params_.at(i) = nullptr;
     }
   }
+  
+  // Reset all arrays and clear their contents
+  for (int64_t i = 0; i < child_stores_.count(); ++i) {
+    child_stores_.at(i).reset();
+  }
+  
+  // Reset result buffer
+  result_buffer_.reset();
+  
+  // Reset all arrays
+  child_iters_.reset();
+  child_stores_.reset();
+  child_scan_rtdefs_.reset();
+  child_scan_params_.reset();
+  child_tablet_ids_.reset();
+  
+  // Clear match against expressions
   for (int64_t i = 0; i < child_match_against_exprs_.count(); ++i) {
     child_match_against_exprs_.at(i).reset();
   }
   child_match_against_exprs_.reset();
-  result_buffer_.reset();
+  
+  // Release memory context if exists
   if (OB_NOT_NULL(mem_ctx_)) {
+    // Log without trying to print memory context pointer
+    LOG_INFO("DASIndexMerge: destroying memory context");
     mem_ctx_->reset_remain_one_page();
     DESTROY_CONTEXT(mem_ctx_);
     mem_ctx_ = nullptr;
   }
+  
+  // Reset other members to initial state
+  merge_type_ = INDEX_MERGE_INVALID;
+  rowkey_exprs_ = nullptr;
+  merge_ctdef_ = nullptr;
+  merge_rtdef_ = nullptr;
+  tx_desc_ = nullptr;
+  snapshot_ = nullptr;
+  is_reverse_ = false;
+  
+  // Reset two-phase execution state
+  enable_two_phase_ = false;
+  has_executed_two_phase_ = false;
+  phase1_min_score_ = 0.0;
+  
+  LOG_INFO("DASIndexMerge: inner_release completed");
+  
   return ret;
 }
 
@@ -1116,23 +1311,65 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
   int ret = OB_SUCCESS;
   adlog::DEBUG("ObDASIndexMergeIter::intersect_get_next_rows start");
 
-  
   count = 0;  
   result_buffer_.reuse();
   adlog::DEBUG("result_buffer_.reuse();");
 
+  // BMW两阶段优化
+  if (enable_two_phase_ && !has_executed_two_phase_ && 
+      merge_rtdef_->enable_topn_pushdown_ && merge_rtdef_->topn_limit_ > 0) {
+    
+    LOG_INFO("[BMW Two-Phase] Starting two-phase execution",
+             "topn_limit", merge_rtdef_->topn_limit_);
+    
+    // 阶段1：普通Index Merge收集N条保底数据，记录min_score
+    double min_score = 0.0;
+    if (OB_FAIL(execute_phase1_collect_fallback(merge_rtdef_->topn_limit_, min_score))) {
+      LOG_WARN("[BMW Two-Phase] Phase 1 failed", K(ret));
+      return ret;
+    }
+    
+    LOG_INFO("[BMW Two-Phase] Phase 1 completed",
+             "fallback_count", fallback_rows_.count(),
+             "min_score", min_score);
+    
+    // 阶段2：BMW正常执行，收集2N候选
+    int64_t amplified_limit = merge_rtdef_->topn_limit_ * 2;
+    if (OB_FAIL(execute_phase2_bmw_collection(amplified_limit))) {
+      LOG_WARN("[BMW Two-Phase] Phase 2 failed", K(ret));
+      return ret;
+    }
+    
+    LOG_INFO("[BMW Two-Phase] Phase 2 completed",
+             "candidate_count", result_buffer_.topn_heap_ ? result_buffer_.topn_heap_->count() : 0);
+    
+    // 阶段3：如果候选不足N条，用保底数据补充
+    if (OB_FAIL(supplement_with_fallback(merge_rtdef_->topn_limit_))) {
+      LOG_WARN("[BMW Two-Phase] Supplement failed", K(ret));
+      return ret;
+    }
+    
+    has_executed_two_phase_ = true;
+    count = result_buffer_.topn_heap_ ? result_buffer_.topn_heap_->count() : 0;
+    
+    LOG_INFO("[BMW Two-Phase] Two-phase execution completed",
+             "final_count", count,
+             "fallback_min_score", min_score);
+    
+    return ret;
+  }
+
+  // 单阶段逻辑（fallback）
   int64_t matched_capacity = capacity;
   int64_t scan_limit = capacity * 10;
   int64_t scanned_rows = 0;
   
-  if (result_buffer_.enable_topn_) {
-    // 两阶段检索参数：
-    // matched_capacity: 粗排候选数（如 1000）
-    // scan_limit: 扫描行数上限（如 10000）
-    matched_capacity = result_buffer_.topn_limit_;  // 直接使用 topn_limit
-    scan_limit = matched_capacity * 10;  // 扫描 10x 候选数的行
-    LOG_INFO("[Two-Phase Retrieval] Phase1 parameters",
-             K(matched_capacity), K(scan_limit));
+  if (result_buffer_.enable_topn_ && result_buffer_.topn_limit_ > 0) {
+    matched_capacity = result_buffer_.topn_limit_;
+    scan_limit = matched_capacity * 10;
+    LOG_INFO("[BMW Single-Phase] Collecting with TopN heap",
+             "heap_capacity", matched_capacity,
+             "scan_limit", scan_limit);
   }
   
   while (OB_SUCC(ret) && count < matched_capacity && scanned_rows < scan_limit) {  
@@ -1454,9 +1691,9 @@ int ObDASIndexMergeIter::union_get_next_rows(int64_t &count, int64_t capacity) {
   count = 0;
   result_buffer_.reuse();
   
+  // BMW 两阶段：UNION 模式也使用 TopN heap
   if (result_buffer_.enable_topn_) {
-    // 两阶段检索：UNION 模式也使用粗排候选数
-    capacity = result_buffer_.topn_limit_;
+    capacity = result_buffer_.topn_limit_;  // TopN heap 已是 2N
   }
   
   while (OB_SUCC(ret) && count < capacity) {
@@ -1711,6 +1948,248 @@ bool ObDASIndexMergeIter::check_mixed_query_with_fts() {
   }
 
   return has_fts_iter_;
+}
+
+// BMW Two-Phase Implementation
+
+// 阶段1：普通Index Merge收集N条保底数据，记录min_score
+int ObDASIndexMergeIter::execute_phase1_collect_fallback(int64_t limit, double &min_score)
+{
+  int ret = OB_SUCCESS;
+  
+  fallback_rows_.reuse();
+  min_score = 0.0;
+  
+  LOG_INFO("[BMW Phase1] Starting fallback collection", K(limit));
+  
+  // 临时禁用TopN heap，使用普通收集
+  bool original_enable_topn = result_buffer_.enable_topn_;
+  result_buffer_.enable_topn_ = false;
+  
+  int64_t collected = 0;
+  
+  // 使用现有的intersect逻辑收集数据
+  while (OB_SUCC(ret) && collected < limit) {
+    // 调用单行收集
+    if (OB_FAIL(intersect_get_next_row())) {
+      if (ret == OB_ITER_END) {
+        ret = OB_SUCCESS;
+        break;
+      }
+      LOG_WARN("failed to get next row in phase1", K(ret));
+      break;
+    }
+    
+    // 提取分数
+    double score = 0.0;
+    for (int64_t i = 0; i < output_->count(); i++) {
+      ObExpr *expr = output_->at(i);
+      if (OB_NOT_NULL(expr) && T_FUN_MATCH_AGAINST == expr->type_) {
+        const ObDatum &datum = expr->locate_expr_datum(*eval_ctx_);
+        if (!datum.is_null() && datum.len_ == sizeof(double)) {
+          score = datum.get_double();
+          break;
+        }
+      }
+    }
+    
+    // 保存到fallback_rows_
+    FallbackRow fallback_row;
+    fallback_row.score_ = score;
+    
+    // 复制行数据
+    for (int64_t i = 0; OB_SUCC(ret) && i < output_->count(); i++) {
+      ObExpr *expr = output_->at(i);
+      if (OB_NOT_NULL(expr)) {
+        const ObDatum &datum = expr->locate_expr_datum(*eval_ctx_);
+        if (OB_FAIL(fallback_row.datums_.push_back(datum))) {
+          LOG_WARN("failed to push datum", K(ret));
+        }
+      }
+    }
+    
+    if (OB_SUCC(ret)) {
+      if (OB_FAIL(fallback_rows_.push_back(fallback_row))) {
+        LOG_WARN("failed to push fallback row", K(ret));
+      } else {
+        collected++;
+      }
+    }
+  }
+  
+  // 恢复TopN heap设置
+  result_buffer_.enable_topn_ = original_enable_topn;
+  
+  // 计算min_score
+  if (OB_SUCC(ret) && fallback_rows_.count() > 0) {
+    min_score = fallback_rows_.at(0).score_;
+    for (int64_t i = 1; i < fallback_rows_.count(); i++) {
+      if (fallback_rows_.at(i).score_ < min_score) {
+        min_score = fallback_rows_.at(i).score_;
+      }
+    }
+    phase1_min_score_ = min_score;
+  }
+  
+  LOG_INFO("[BMW Phase1] Fallback collection completed",
+           "collected", fallback_rows_.count(),
+           "min_score", min_score,
+           K(ret));
+  
+  return ret;
+}
+
+// 阶段2：BMW正常执行，收集放大的候选
+int ObDASIndexMergeIter::execute_phase2_bmw_collection(int64_t amplified_limit)
+{
+  int ret = OB_SUCCESS;
+  
+  LOG_INFO("[BMW Phase2] Starting BMW collection",
+           "amplified_limit", amplified_limit,
+           "fallback_min_score", phase1_min_score_);
+  
+  // Initialize phase2_scan_params_ for each child to avoid OB_INIT_TWICE
+  for (int64_t i = 0; OB_SUCC(ret) && i < child_scan_rtdefs_.count(); ++i) {
+    ObDASScanRtDef *scan_rtdef = child_scan_rtdefs_.at(i);
+    if (scan_rtdef != nullptr) {
+      const ObDASScanCtDef *scan_ctdef = static_cast<const ObDASScanCtDef*>(scan_rtdef->ctdef_);
+      ObTableScanParam *phase2_scan_param = phase2_scan_params_.at(i);
+      if (OB_ISNULL(scan_ctdef) || OB_ISNULL(phase2_scan_param)) {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("unexpected nullptr child scan info", K(scan_ctdef), K(phase2_scan_param), K(ret));
+      } else {
+        // Use index i directly to get tablet_id, same as do_table_scan
+        ObTabletID tablet_id = child_tablet_ids_.at(i);
+        if (OB_FAIL(init_scan_param(ls_id_, tablet_id, scan_ctdef, scan_rtdef, *phase2_scan_param))) {
+          LOG_WARN("failed to init phase2 scan param", K(ret), K(i));
+        } else if (OB_FAIL(prepare_scan_ranges(*phase2_scan_param, scan_rtdef))) {
+          LOG_WARN("failed to prepare phase2 scan ranges", K(ret), K(i));
+        } else {
+          // Replace child_scan_params_ with phase2_scan_params_ for Phase2
+          child_scan_params_.at(i) = phase2_scan_param;
+          LOG_INFO("[BMW Phase2] Initialized phase2 scan param", K(i));
+        }
+      }
+    }
+  }
+  
+  // Rescan child iterators with fresh phase2 scan params
+  if (OB_SUCC(ret)) {
+    for (int64_t i = 0; OB_SUCC(ret) && i < child_iters_.count(); ++i) {
+      ObDASIter *iter = child_iters_.at(i);
+      if (OB_ISNULL(iter)) {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("unexpected nullptr iter", K(ret));
+      } else if (OB_FAIL(iter->rescan())) {
+        LOG_WARN("child iter failed to rescan for phase2", K(ret), K(i));
+      }
+    }
+  }
+  
+  // 重置child stores
+  for (int64_t i = 0; i < child_stores_.count(); i++) {
+    child_stores_.at(i).reuse();
+    child_stores_.at(i).iter_end_ = false;
+  }
+  
+  // 启用TopN heap，容量为amplified_limit
+  result_buffer_.enable_topn_ = true;
+  result_buffer_.topn_limit_ = amplified_limit;
+  
+  // 重新初始化TopN heap
+  if (OB_NOT_NULL(result_buffer_.topn_heap_)) {
+    result_buffer_.topn_heap_->reset();
+  } else {
+    void *heap_buf = result_buffer_.alloc_->alloc(sizeof(common::ObBinaryHeap<MergeResultBuffer::TopNRow *, MergeResultBuffer::TopNCompare>));
+    if (OB_ISNULL(heap_buf)) {
+      ret = OB_ALLOCATE_MEMORY_FAILED;
+      LOG_WARN("failed to allocate TopN heap", K(ret));
+      return ret;
+    }
+    result_buffer_.topn_heap_ = new(heap_buf) common::ObBinaryHeap<MergeResultBuffer::TopNRow *, MergeResultBuffer::TopNCompare>(result_buffer_.compare_, result_buffer_.alloc_);
+  }
+  
+  // 使用intersect逻辑收集数据到TopN heap
+  // BMW迭代器内部已经应用了min_score阈值，这里直接收集即可
+  int64_t collected = 0;
+  int64_t scan_limit = amplified_limit * 10;
+  
+  while (OB_SUCC(ret) && collected < amplified_limit && collected < scan_limit) {
+    if (OB_FAIL(intersect_get_next_row())) {
+      if (ret == OB_ITER_END) {
+        ret = OB_SUCCESS;
+        break;
+      }
+      LOG_WARN("failed to get next row in phase2", K(ret));
+      break;
+    }
+    
+    // 添加到TopN heap（BMW已经过滤了低分行）
+    if (OB_FAIL(result_buffer_.add_row_with_topn())) {
+      LOG_WARN("failed to add row to TopN heap", K(ret));
+    } else {
+      collected++;
+    }
+  }
+  
+  LOG_INFO("[BMW Phase2] BMW collection completed",
+           "collected", collected,
+           "heap_count", result_buffer_.topn_heap_ ? result_buffer_.topn_heap_->count() : 0,
+           "bmw_threshold", phase1_min_score_,
+           K(ret));
+  
+  return ret;
+}
+
+// 阶段3：如果候选不足，用保底数据补充
+int ObDASIndexMergeIter::supplement_with_fallback(int64_t target_count)
+{
+  int ret = OB_SUCCESS;
+  
+  int64_t current_count = result_buffer_.topn_heap_ ? result_buffer_.topn_heap_->count() : 0;
+  
+  if (current_count >= target_count) {
+    LOG_INFO("[BMW Supplement] No supplement needed",
+             "current_count", current_count,
+             "target_count", target_count);
+    return ret;
+  }
+  
+  int64_t need_count = target_count - current_count;
+  int64_t supplemented = 0;
+  
+  LOG_INFO("[BMW Supplement] Starting supplement",
+           "current_count", current_count,
+           "need_count", need_count,
+           "fallback_available", fallback_rows_.count());
+  
+  // 从fallback_rows_中补充数据
+  for (int64_t i = 0; OB_SUCC(ret) && i < fallback_rows_.count() && supplemented < need_count; i++) {
+    const FallbackRow &fallback_row = fallback_rows_.at(i);
+    
+    // 将fallback_row的数据复制到output_表达式
+    for (int64_t j = 0; j < output_->count() && j < fallback_row.datums_.count(); j++) {
+      ObExpr *expr = output_->at(j);
+      if (OB_NOT_NULL(expr)) {
+        expr->locate_expr_datum(*eval_ctx_) = fallback_row.datums_.at(j);
+        expr->get_eval_info(*eval_ctx_).evaluated_ = true;
+      }
+    }
+    
+    // 添加到TopN heap
+    if (OB_FAIL(result_buffer_.add_row_with_topn())) {
+      LOG_WARN("failed to add fallback row to heap", K(ret));
+    } else {
+      supplemented++;
+    }
+  }
+  
+  LOG_INFO("[BMW Supplement] Supplement completed",
+           "supplemented", supplemented,
+           "final_count", result_buffer_.topn_heap_ ? result_buffer_.topn_heap_->count() : 0,
+           K(ret));
+  
+  return ret;
 }
 
 }  // namespace sql

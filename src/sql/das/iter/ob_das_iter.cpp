@@ -45,12 +45,13 @@ int ObDASIter::init(ObDASIterParam &param)
   int ret = OB_SUCCESS;
   if (OB_UNLIKELY(inited_)) {
     ret = OB_INIT_TWICE;
-    LOG_WARN("das iter init twice", K(ret));
+    LOG_WARN("das iter init twice", K(ret), K(lbt()));
+    LOG_WARN("Stack trace for double init: ", K(lbt()));
   } else if (!param.is_valid()) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("invalid das iter param", K(param), K(ret));
   } else {
-    inited_ = true;
+    // Set inited_ to true only after inner_init() succeeds
     type_ = param.type_;
     max_size_ = param.max_size_;
     eval_ctx_ = param.eval_ctx_;
@@ -59,6 +60,9 @@ int ObDASIter::init(ObDASIterParam &param)
     group_id_expr_ = param.group_id_expr_;
     if (OB_FAIL(inner_init(param))) {
       LOG_WARN("failed to inner init das iter", K(param), K(ret));
+    } else {
+      inited_ = true;
+      LOG_DEBUG("das iter init success");
     }
   }
 
@@ -83,6 +87,16 @@ int ObDASIter::release()
   int ret = OB_SUCCESS;
   int child_ret = OB_SUCCESS;
   int tmp_ret = OB_SUCCESS;
+  
+  // Only proceed with release if we're actually initialized
+  if (!inited_) {
+    LOG_INFO("DAS iter release called but not initialized, skipping");
+    return OB_SUCCESS;
+  }
+  
+  LOG_INFO("DAS iter release start", K(this), K(type_));
+  
+  // First release all children
   for (uint32_t i = 0; i < children_cnt_; i++) {
     if (OB_ISNULL(children_[i])) {
       tmp_ret = OB_ERR_UNEXPECTED;
@@ -92,12 +106,17 @@ int ObDASIter::release()
     }
     child_ret = tmp_ret;
   }
+  
+  // Then release self
   if (OB_FAIL(inner_release())) {
     LOG_WARN("failed to inner release das iter", K(ret), KPC(this));
   } else {
     ret = child_ret;
   }
+  
+  // Always reset inited_ last
   inited_ = false;
+  LOG_INFO("DAS iter release completed", K(this), K(type_));
   children_cnt_ = 0;
   children_ = nullptr;
   group_id_expr_ = nullptr;

@@ -5518,16 +5518,15 @@ int ObSelectLogPlan::allocate_plan_top()
         ObLogSort *sort_op = static_cast<ObLogSort *>(top);
         
         if (sort_op->get_topn_expr() != nullptr) {
+          // BMW 两阶段方案：跳过 Sort 算子
           table_scan->set_limit_expr(sort_op->get_topn_expr());
-          // 保留 Sort 算子用于精排（两阶段检索）
-          // sort_op->set_topn_expr(nullptr);
-          adlog::DEBUG("把sort里面的limit_expr放到了当前的table_"
-                       "scan的limit_count_expr里了");
-          // table_scan->set_parent(nullptr);
+          sort_op->set_topn_expr(nullptr);
+          adlog::DEBUG("[BMW Two-Phase] 把sort里面的limit_expr放到了table_scan");
+          table_scan->set_parent(nullptr);
         }
 
-        // 保留 Sort 算子，不跳过
-        // top = child;
+        // BMW 两阶段：跳过 Sort 算子
+        top = child;
        
       
           // // 在这里试试看能不能把sort算子给去掉 advise 
@@ -8990,21 +8989,21 @@ int ObSelectLogPlan::candi_allocate_order_by_if_losted(ObIArray<OrderItem> &orde
       CandidatePlan &plan = candidates_.candidate_plans_.at(i);
 
 
-      // 保留 Sort 算子用于精排（两阶段检索）
-      // bool can_skip_sort = false;  
-      // if (OB_NOT_NULL(top) && log_op_def::LOG_TABLE_SCAN == top->get_type()) {  
-      //   ObLogTableScan *table_scan = static_cast<ObLogTableScan*>(top);  
-      //   if (table_scan->use_index_merge() and table_scan->get_limit_expr() != nullptr) {  
-      //     can_skip_sort = true;  
-      //     adlog::DEBUG("这里标识跳过");  
-      //   }  
-      // }  
+      // BMW 两阶段：跳过 Sort 算子
+      bool can_skip_sort = false;  
+      if (OB_NOT_NULL(top) && log_op_def::LOG_TABLE_SCAN == top->get_type()) {  
+        ObLogTableScan *table_scan = static_cast<ObLogTableScan*>(top);  
+        if (table_scan->use_index_merge() and table_scan->get_limit_expr() != nullptr) {  
+          can_skip_sort = true;  
+          adlog::DEBUG("[BMW Two-Phase] 这里标识跳过Sort算子");  
+        }  
+      }  
         
-      // if (!can_skip_sort) {  
+      if (!can_skip_sort) {  
         if (OB_FAIL(create_order_by_plan(plan.plan_tree_, order_items, NULL, false))) {  
           LOG_WARN("failed to create order by plan", K(ret));  
         }  
-      // }  
+      }  
 
       // if (OB_FAIL(create_order_by_plan(plan.plan_tree_, order_items, NULL, false))) {
       //   LOG_WARN("failed to create order by plan", K(ret));

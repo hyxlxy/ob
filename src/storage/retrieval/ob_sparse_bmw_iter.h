@@ -39,6 +39,17 @@ public:
       ObIAllocator &iter_allocator,
       ObSRDaaTRelevanceCollector &relevance_collector);
   virtual int get_next_rows(const int64_t capacity, int64_t &count) override;
+  
+  // BMW Two-Phase: 设置初始阈值（用于phase1的min_score）
+  // 必须是public，以便外部调用
+  int set_initial_threshold(double initial_threshold) {
+    initial_threshold_ = initial_threshold;
+    LOG_INFO("[BMW] Set initial threshold", K(initial_threshold_));
+    return OB_SUCCESS;
+  }
+  
+  double get_initial_threshold() const { return initial_threshold_; }
+  
 protected:
   virtual int process_collected_row(const ObDatum &id_datum, const double relevance) override;
   virtual int init_before_wand_process() { return OB_SUCCESS; }
@@ -49,9 +60,11 @@ protected:
   int next_pivot_range(int64_t &skip_range_cnt);
   int evaluate_pivot(const int64_t pivot_iter_idx);
   int evaluate_pivot_range(const int64_t pivot_iter_idx, bool &is_candidate);
+  
   double get_top_k_threshold()
   {
-    return top_k_heap_.empty() ? 0.0 : top_k_heap_.top().relevance_;
+    // 关键修改：堆为空时返回预设的初始阈值（而非0）
+    return top_k_heap_.empty() ? initial_threshold_ : top_k_heap_.top().relevance_;
   }
 
 private:
@@ -105,6 +118,9 @@ protected:
   ObDomainIdCmp domain_id_cmp_;
   ObFixedArray<ObDocIdExt, ObIAllocator> id_cache_;
   BMWStatus status_;
+  
+  // BMW Two-Phase: 初始阈值（默认0，保持原有逻辑兼容）
+  double initial_threshold_ = 0.0;
 };
 
 

@@ -18,6 +18,7 @@
 #include "ob_das_tr_merge_iter.h"
 #include "sql/das/ob_das_ir_define.h"
 #include "common/ad_log.h"
+#include "storage/retrieval/ob_sparse_bmw_iter.h"
 namespace oceanbase
 {
 using namespace share;
@@ -1516,6 +1517,43 @@ int ObDASTRMergeIter::init_topk_limit()
     }
   }
   return ret;
+}
+
+// BMW Two-Phase: 设置BMW迭代器的初始阈值
+int ObDASTRMergeIter::set_bmw_initial_threshold(double threshold)
+{
+  int ret = OB_SUCCESS;
+  
+  if (OB_ISNULL(sparse_retrieval_iter_)) {
+    ret = OB_NOT_INIT;
+    LOG_WARN("[BMW Two-Phase] sparse_retrieval_iter not initialized", K(ret));
+  } else {
+    // 尝试转换为BMW迭代器
+    storage::ObSRBMWIterImpl *bmw_iter = dynamic_cast<storage::ObSRBMWIterImpl*>(sparse_retrieval_iter_);
+    if (OB_NOT_NULL(bmw_iter)) {
+      if (OB_FAIL(bmw_iter->set_initial_threshold(threshold))) {
+        LOG_WARN("[BMW Two-Phase] failed to set initial threshold", K(ret), K(threshold));
+      } else {
+        LOG_INFO("[BMW Two-Phase] Successfully set BMW initial threshold", 
+                 K(threshold), "iter_type", "BMW");
+      }
+    } else {
+      // 不是BMW模式，忽略
+      LOG_DEBUG("[BMW Two-Phase] Not BMW mode, skip setting threshold");
+    }
+  }
+  
+  return ret;
+}
+
+// BMW Two-Phase: 检查是否使用BMW模式
+bool ObDASTRMergeIter::is_bmw_mode() const
+{
+  if (OB_ISNULL(sparse_retrieval_iter_)) {
+    return false;
+  }
+  storage::ObSRBMWIterImpl *bmw_iter = dynamic_cast<storage::ObSRBMWIterImpl*>(sparse_retrieval_iter_);
+  return OB_NOT_NULL(bmw_iter);
 }
 
 } // namespace sql
