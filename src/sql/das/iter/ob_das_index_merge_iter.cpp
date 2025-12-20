@@ -478,6 +478,12 @@ int ObDASIndexMergeIter::MergeResultBuffer::to_expr_from_topn(int64_t &size)
             [](const TopNRow *a, const TopNRow *b) {
               return a->score_ > b->score_;
             });
+  
+  // 两阶段检索日志：粗排阶段完成
+  LOG_INFO("[Two-Phase Retrieval] Phase1 (coarse ranking) complete",
+           "candidates_count", sorted_rows.count(),
+           "top_score", (sorted_rows.count() > 0 ? sorted_rows.at(0)->score_ : 0.0),
+           "last_score", (sorted_rows.count() > 0 ? sorted_rows.at(sorted_rows.count()-1)->score_ : 0.0));
 
   // Convert sorted rows to expressions in batch
   {
@@ -618,7 +624,8 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
           } else {
             if (merge_rtdef_->enable_topn_pushdown_) {
               result_buffer_.enable_topn_ = true;
-              result_buffer_.topn_limit_ = merge_rtdef_->topn_limit_ * 20;
+              // 两阶段检索：粗排保留 100x 候选（如 limit=10 则保留 1000个）
+              result_buffer_.topn_limit_ = merge_rtdef_->topn_limit_ * 100;
             } else {
               result_buffer_.enable_topn_ = false;
             }
@@ -1119,8 +1126,13 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
   int64_t scanned_rows = 0;
   
   if (result_buffer_.enable_topn_) {
-    matched_capacity += 200;
-    scan_limit = matched_capacity * 20;
+    // 两阶段检索参数：
+    // matched_capacity: 粗排候选数（如 1000）
+    // scan_limit: 扫描行数上限（如 10000）
+    matched_capacity = result_buffer_.topn_limit_;  // 直接使用 topn_limit
+    scan_limit = matched_capacity * 10;  // 扫描 10x 候选数的行
+    LOG_INFO("[Two-Phase Retrieval] Phase1 parameters",
+             K(matched_capacity), K(scan_limit));
   }
   
   while (OB_SUCC(ret) && count < matched_capacity && scanned_rows < scan_limit) {  
@@ -1443,7 +1455,8 @@ int ObDASIndexMergeIter::union_get_next_rows(int64_t &count, int64_t capacity) {
   result_buffer_.reuse();
   
   if (result_buffer_.enable_topn_) {
-    capacity += 200;
+    // 两阶段检索：UNION 模式也使用粗排候选数
+    capacity = result_buffer_.topn_limit_;
   }
   
   while (OB_SUCC(ret) && count < capacity) {
