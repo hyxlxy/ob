@@ -542,6 +542,13 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
     // top_n_count_ = param.limit_param_;
     // adlog::DEBUG("top_n_count: ", top_n_count_);
     
+    // CRITICAL FIX: Increase max_size_ when TopN is enabled to match expanded capacity
+    if (merge_rtdef_->enable_topn_pushdown_) {
+      // Original max_size_ is typically 256, increase it to support larger capacity
+      max_size_ = max_size_ * 2 + 200;  // Ensure it's larger than capacity (310)
+      LOG_INFO("Increased max_size_ for TopN pushdown", "original", 256, "new", max_size_);
+    }
+    
     lib::ContextParam context_param;
     context_param.set_mem_attr(MTL_ID(), "DASIndexMerge", ObCtxIds::DEFAULT_CTX_ID)
         .set_properties(lib::USE_TL_PAGE_OPTIONAL);
@@ -611,11 +618,9 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
           } else {
             if (merge_rtdef_->enable_topn_pushdown_) {
               result_buffer_.enable_topn_ = true;
-              result_buffer_.topn_limit_ = merge_rtdef_->topn_limit_;
-              LOG_INFO("TopN pushdown ENABLED", K_(result_buffer_.topn_limit));
+              result_buffer_.topn_limit_ = merge_rtdef_->topn_limit_ * 20;
             } else {
               result_buffer_.enable_topn_ = false;
-              LOG_INFO("TopN pushdown DISABLED - enable_topn_pushdown is false");
             }
           }
         }
@@ -1109,11 +1114,16 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
   result_buffer_.reuse();
   adlog::DEBUG("result_buffer_.reuse();");
 
+  int64_t matched_capacity = capacity;
+  int64_t scan_limit = capacity * 10;
+  int64_t scanned_rows = 0;
+  
   if (result_buffer_.enable_topn_) {
-    capacity += 100;
+    matched_capacity += 200;
+    scan_limit = matched_capacity * 20;
   }
   
-  while (OB_SUCC(ret) && count < capacity) {  
+  while (OB_SUCC(ret) && count < matched_capacity && scanned_rows < scan_limit) {  
     /* try to fill each child store */  
     int64_t output_idx = OB_INVALID_INDEX;  
     int cmp_ret = 0;  
@@ -1166,9 +1176,18 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
 
     if (OB_FAIL(ret)) {
       adlog::DEBUG("WARNING OB_FAIL(RET)");
-    } else if (output_idx == OB_INVALID_INDEX) {  
-      ret = OB_ITER_END;
-      adlog::DEBUG("ret = OB_ITER_END");
+    } else if (output_idx == OB_INVALID_INDEX) {
+      // No more data from children
+      // If we have collected some matches, break and return them
+      // Otherwise, return OB_ITER_END
+      if (count > 0) {
+        LOG_INFO("INTERSECT: No more data, but have matches to return", 
+                 "count", count, "scanned_rows", scanned_rows);
+        break;  // Exit loop and return collected data
+      } else {
+        ret = OB_ITER_END;
+        adlog::DEBUG("ret = OB_ITER_END");
+      }
     } else {    
       bool all_matched = true;
       for (int64_t i = 0; OB_SUCC(ret) && i < child_stores_.count(); i++) {
@@ -1191,23 +1210,72 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
         adlog::DEBUG("OB_FAIL(ret)");
         continue;
       }
+      
+      // Count this as a scanned row (we checked all children for a match)
+      scanned_rows++;
+      
       if (!all_matched) {
         child_stores_.at(output_idx).cur_idx_++;  
-        continue;
+        continue;  // Not a match, continue scanning
       }
+      // CRITICAL FIX: Call to_expr() for ALL children to fill their expressions
+      LOG_INFO("===== INTERSECT FIX: calling to_expr() for all children =====", 
+               "output_idx", output_idx, "child_count", child_stores_.count());
+      
       for (int64_t i = 0; OB_SUCC(ret) && i < child_stores_.count(); i++) {
-        if (output_idx == i) {  
-          continue;
+        if (OB_FAIL(child_stores_.at(i).to_expr())) {
+          LOG_WARN("failed to convert store row to expr", K(ret), K(i));
         }
-        child_stores_.at(i).to_expr();
       }
-      child_stores_.at(output_idx).to_expr();
-      if (OB_FAIL(save_row_to_result_buffer())) {
-          adlog::DEBUG("failed to save row to result buffer", K(ret));
-      } else {
-        count += 1;
-        if (result_buffer_.enable_topn_ && result_buffer_.topn_heap_ != nullptr) { 
-          count = result_buffer_.topn_heap_->count();
+      
+      // CRITICAL FIX PART 2: Copy MATCH_AGAINST values from child exprs to output_
+      // Problem: output_ may have different ObExpr* objects than child exprs, even for the same expression
+      // Solution: For each MATCH_AGAINST in output_, find the corresponding expr in child that has it,
+      // and copy the datum value. IMPORTANT: Keep batch context (batch_idx=0) active until save_row_to_result_buffer!
+      if (OB_SUCC(ret)) {
+        ObEvalCtx::BatchInfoScopeGuard batch_guard(*eval_ctx_);
+        batch_guard.set_batch_size(1);
+        batch_guard.set_batch_idx(0);
+        
+        for (int64_t out_idx = 0; OB_SUCC(ret) && out_idx < output_->count(); ++out_idx) {
+          ObExpr *output_expr = output_->at(out_idx);
+          if (OB_NOT_NULL(output_expr) && T_FUN_MATCH_AGAINST == output_expr->type_) {
+            // Find this MATCH_AGAINST in child exprs
+            bool found = false;
+            for (int64_t child_idx = 0; !found && child_idx < child_stores_.count(); ++child_idx) {
+              const ObIArray<ObExpr*> *child_exprs = child_stores_.at(child_idx).exprs_;
+              if (child_exprs != nullptr) {
+                for (int64_t child_expr_idx = 0; !found && child_expr_idx < child_exprs->count(); ++child_expr_idx) {
+                  ObExpr *child_expr = child_exprs->at(child_expr_idx);
+                  if (child_expr != nullptr && child_expr->type_ == T_FUN_MATCH_AGAINST) {
+                    // Found MATCH_AGAINST in child - copy its value to output_
+                    const ObDatum &child_datum = child_expr->locate_expr_datum(*eval_ctx_);
+                    ObDatum &output_datum = output_expr->locate_datum_for_write(*eval_ctx_);
+                    output_datum = child_datum;  // Copy datum
+                    output_expr->set_evaluated_flag(*eval_ctx_);
+                    found = true;
+                    LOG_INFO("INTERSECT: Copied MATCH_AGAINST from child to output", 
+                             "child_idx", child_idx, "len", child_datum.len_,
+                             "score", (child_datum.len_ == sizeof(double) ? child_datum.get_double() : 0.0));
+                  }
+                }
+              }
+            }
+            if (!found) {
+              LOG_WARN("INTERSECT: MATCH_AGAINST in output_ not found in any child!", "out_idx", out_idx);
+            }
+          }
+        }
+        
+        // IMPORTANT: Call save_row_to_result_buffer INSIDE the BatchInfoScopeGuard
+        // to ensure batch_idx=0 is still active when add_row_with_topn accesses the datum
+        if (OB_FAIL(save_row_to_result_buffer())) {
+            LOG_WARN("failed to save row to result buffer", K(ret));
+        } else {
+          count += 1;
+          if (result_buffer_.enable_topn_ && result_buffer_.topn_heap_ != nullptr) { 
+            count = result_buffer_.topn_heap_->count();
+          }
         }
       }
 
@@ -1246,7 +1314,6 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
 
 
 int ObDASIndexMergeIter::union_get_next_row() {
-  LOG_INFO("===== union_get_next_row CALLED (SINGLE ROW MODE) =====");
   adlog::DEBUG("ObDASIndexMergeIter::union_get_next_row");
   
   int ret = OB_SUCCESS;
@@ -1374,6 +1441,11 @@ int ObDASIndexMergeIter::union_get_next_rows(int64_t &count, int64_t capacity) {
 
   count = 0;
   result_buffer_.reuse();
+  
+  if (result_buffer_.enable_topn_) {
+    capacity += 200;
+  }
+  
   while (OB_SUCC(ret) && count < capacity) {
     /* try to fill each child store */
     int64_t output_idx = OB_INVALID_INDEX;
@@ -1448,63 +1520,63 @@ int ObDASIndexMergeIter::union_get_next_rows(int64_t &count, int64_t capacity) {
         }
       }
       if (OB_SUCC(ret)) {
-        if (OB_FAIL(child_stores_.at(output_idx).to_expr())) {
-          LOG_WARN("failed to convert store row to expr", K(ret));
-        } else {
-          // CRITICAL FIX: After to_expr(), ensure all MATCH_AGAINST in output_ are filled
-          // The selected child (output_idx) may not have MATCH_AGAINST in its output.
-          // We must operate in the correct batch context (batch_idx=0, batch_size=1)
+        // CRITICAL FIX: Call to_expr() for ALL children to fill their expressions
+        LOG_INFO("===== UNION FIX: calling to_expr() for all children =====", 
+                 "output_idx", output_idx, "child_count", child_stores_.count());
+        
+        for (int64_t i = 0; OB_SUCC(ret) && i < child_stores_.count(); i++) {
+          if (child_stores_.at(i).have_data()) {
+            if (OB_FAIL(child_stores_.at(i).to_expr())) {
+              LOG_WARN("failed to convert store row to expr", K(ret), K(i));
+            }
+          }
+        }
+        
+        // CRITICAL FIX PART 2: Copy MATCH_AGAINST values from child exprs to output_
+        // Same fix as INTERSECT mode - must copy datum values to output_ expressions
+        if (OB_SUCC(ret)) {
+          ObEvalCtx::BatchInfoScopeGuard batch_guard(*eval_ctx_);
+          batch_guard.set_batch_size(1);
+          batch_guard.set_batch_idx(0);
           
-          ObEvalCtx::BatchInfoScopeGuard batch_info_guard(*eval_ctx_);
-          batch_info_guard.set_batch_size(1);
-          batch_info_guard.set_batch_idx(0);
-          
-          LOG_INFO("union_get_next_rows: ensuring MATCH_AGAINST is filled", 
-                   "output_idx", output_idx);
-          
-          // Extract all MATCH_AGAINST expressions from output_
-          ObSEArray<ObExpr *, 4> match_against_exprs;
-          for (int64_t i = 0; OB_SUCC(ret) && i < output_->count(); ++i) {
-            ObExpr *expr = output_->at(i);
-            if (OB_NOT_NULL(expr) && T_FUN_MATCH_AGAINST == expr->type_) {
-              if (OB_FAIL(match_against_exprs.push_back(expr))) {
-                LOG_WARN("failed to push back match against expr", K(ret));
+          for (int64_t out_idx = 0; OB_SUCC(ret) && out_idx < output_->count(); ++out_idx) {
+            ObExpr *output_expr = output_->at(out_idx);
+            if (OB_NOT_NULL(output_expr) && T_FUN_MATCH_AGAINST == output_expr->type_) {
+              // Find this MATCH_AGAINST in child exprs
+              bool found = false;
+              for (int64_t child_idx = 0; !found && child_idx < child_stores_.count(); ++child_idx) {
+                const ObIArray<ObExpr*> *child_exprs = child_stores_.at(child_idx).exprs_;
+                if (child_exprs != nullptr) {
+                  for (int64_t child_expr_idx = 0; !found && child_expr_idx < child_exprs->count(); ++child_expr_idx) {
+                    ObExpr *child_expr = child_exprs->at(child_expr_idx);
+                    if (child_expr != nullptr && child_expr->type_ == T_FUN_MATCH_AGAINST) {
+                      // Found MATCH_AGAINST in child - copy its value to output_
+                      const ObDatum &child_datum = child_expr->locate_expr_datum(*eval_ctx_);
+                      ObDatum &output_datum = output_expr->locate_datum_for_write(*eval_ctx_);
+                      output_datum = child_datum;  // Copy datum
+                      output_expr->set_evaluated_flag(*eval_ctx_);
+                      found = true;
+                      LOG_INFO("UNION: Copied MATCH_AGAINST from child to output", 
+                               "child_idx", child_idx, "len", child_datum.len_,
+                               "score", (child_datum.len_ == sizeof(double) ? child_datum.get_double() : 0.0));
+                    }
+                  }
+                }
+              }
+              if (!found) {
+                LOG_WARN("UNION: MATCH_AGAINST in output_ not found in any child!", "out_idx", out_idx);
               }
             }
           }
           
-          // Check and fill each MATCH_AGAINST expression
-          for (int64_t i = 0; OB_SUCC(ret) && i < match_against_exprs.count(); ++i) {
-            ObExpr *expr = match_against_exprs.at(i);
-            bool is_evaluated = expr->get_eval_info(*eval_ctx_).evaluated_;
-            const ObDatum &datum = expr->locate_expr_datum(*eval_ctx_);
-            
-            LOG_INFO("union_get_next_rows: checking MATCH_AGAINST", K(i), 
-                     "is_evaluated", is_evaluated, "len", datum.len_, "is_null", datum.is_null());
-            
-            // Check if properly filled: evaluated AND (len==0 OR len==sizeof(double))
-            bool is_valid = is_evaluated && (datum.len_ == 0 || datum.len_ == sizeof(double));
-            
-            if (!is_valid) {
-              // Not properly filled - fill with default 0.0
-              // This happens when output_idx points to a child without MATCH_AGAINST
-              ObDatum &dst_datum = expr->locate_datum_for_write(*eval_ctx_);
-              dst_datum.set_double(0.0);
-              expr->set_evaluated_flag(*eval_ctx_);
-              LOG_INFO("union_get_next_rows: filled MATCH_AGAINST with default 0.0", 
-                       "was_evaluated", is_evaluated, "old_len", datum.len_);
-            } else {
-              double score = (datum.len_ == sizeof(double)) ? datum.get_double() : 0.0;
-              LOG_INFO("union_get_next_rows: MATCH_AGAINST already valid", K(i), "score", score);
-            }
-          }
-          
-          // now we get a available result row, save it to result buffer
-          if (OB_SUCC(ret)) {
-            if (OB_FAIL(save_row_to_result_buffer())) {
-              LOG_WARN("failed to save row to result buffer", K(ret));
-            } else {
-              count += 1;
+          // IMPORTANT: Call save_row_to_result_buffer INSIDE the BatchInfoScopeGuard
+          // to ensure batch_idx=0 is still active when add_row_with_topn accesses the datum
+          if (OB_FAIL(save_row_to_result_buffer())) {
+            LOG_WARN("failed to save row to result buffer", K(ret));
+          } else {
+            count += 1;
+            if (result_buffer_.enable_topn_ && result_buffer_.topn_heap_ != nullptr) { 
+              count = result_buffer_.topn_heap_->count();
             }
           }
         }
@@ -1516,7 +1588,11 @@ int ObDASIndexMergeIter::union_get_next_rows(int64_t &count, int64_t capacity) {
     ret = OB_SUCCESS;
   }
   if (OB_SUCC(ret) && count > 0) {
-    if (OB_FAIL(result_buffer_.to_expr(count))) {
+    if (result_buffer_.enable_topn_) {
+      LOG_INFO("UNION: using TopN to_expr_from_topn", K(count));
+      int64_t tmp;
+      result_buffer_.to_expr_from_topn(tmp);
+    } else if (OB_FAIL(result_buffer_.to_expr(count))) {
       LOG_WARN("failed to convert result buffer to exprs", K(ret));
     }
   }
