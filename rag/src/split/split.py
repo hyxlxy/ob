@@ -5,7 +5,7 @@ from typing import List
 def split_text(
     text: str,
     max_chunk_size: int = 50,
-    overlap: int = 50,
+    overlap: int = 600,
 ) -> List[str]:
     """
     将文本按段落优先切分；当段落过长时再按句子边界切分，并使用少量重叠以保持上下文连续性。
