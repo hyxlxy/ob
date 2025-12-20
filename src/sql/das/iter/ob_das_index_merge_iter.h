@@ -141,7 +141,7 @@ public:
     MergeResultBuffer()
         : exprs_(nullptr), eval_ctx_(nullptr), max_size_(1),
           result_store_("DASIndexMerge"), result_store_iter_(),
-          topn_limit_(-1), enable_topn_(false), topn_heap_(nullptr), alloc_(nullptr)
+          topn_limit_(-1), enable_topn_(false), topn_heap_(nullptr), topn_heap_out_(nullptr),alloc_(nullptr)
     {}
     ~MergeResultBuffer()
     {
@@ -163,6 +163,26 @@ public:
         alloc_->free(topn_heap_);
         topn_heap_ = nullptr;
       }
+
+      if (topn_heap_out_ != nullptr && alloc_ != nullptr) {
+        // Free all rows in heap
+        while (topn_heap_out_->count() > 0) {
+          TopNRow *row = topn_heap_out_->top();
+          topn_heap_out_->pop();
+          if (row != nullptr) {
+            if (row->row_data_ != nullptr) {
+              row->row_data_->~StoredRow();
+              alloc_->free(row->row_data_);
+            }
+            alloc_->free(row);
+          }
+        }
+        // Free the heap itself
+        topn_heap_out_->~ObBinaryHeap();
+        alloc_->free(topn_heap_out_);
+        topn_heap_out_ = nullptr;
+      }
+
     }
     int init(int64_t max_size, ObEvalCtx *eval_ctx, const common::ObIArray<ObExpr*> *exprs, common::ObIAllocator &alloc);
     int add_row();
@@ -182,6 +202,7 @@ public:
     int64_t topn_limit_;
     bool enable_topn_;
     bool topn_finish_{false};
+    bool first_flag_{true};
     struct TopNRow {  
       TopNRow() : row_data_(nullptr), score_(0.0) {}  
       TopNRow(ObChunkDatumStore::StoredRow *row, double score)   
@@ -201,13 +222,30 @@ public:
           return false;  
         }  
         // Min heap: smallest score at top (for efficient TopN)
-        return lhs->score_ < rhs->score_;  
+        return lhs->score_ > rhs->score_;  
       }  
         
       int get_error_code() const { return common::OB_SUCCESS; }  
     };
+
+    struct TopNCompareOut {  
+      public:  
+        bool operator()(const TopNRow *lhs, const TopNRow *rhs) const  
+        {  
+          if (OB_ISNULL(lhs) || OB_ISNULL(rhs)) {  
+            return false;  
+          }  
+          // Min heap: smallest score at top (for efficient TopN)
+          return lhs->score_ < rhs->score_;  
+        }  
+          
+        int get_error_code() const { return common::OB_SUCCESS; }  
+      };
+
     TopNCompare compare_;
+    TopNCompareOut compare_out_;
     common::ObBinaryHeap<TopNRow *, TopNCompare> *topn_heap_;
+    common::ObBinaryHeap<TopNRow *, TopNCompareOut> *topn_heap_out_;
     common::ObIAllocator *alloc_;
   };
 

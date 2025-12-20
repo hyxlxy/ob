@@ -7244,13 +7244,13 @@ int ObLogPlan::candi_allocate_order_by(bool &need_limit,
                   // (limit_expr) = (sort_op->get_topn_expr());
                   table_scan->set_limit_expr(sort_op->get_topn_expr());
                   // 保留 Sort 算子用于精排（两阶段检索）
-                  // sort_op->set_topn_expr(nullptr);
+                  sort_op->set_topn_expr(nullptr);
                   adlog::DEBUG("把sort里面的limit_expr放到了当前的table_"
                                "scan的limit_count_expr里了");
-                  // table_scan->set_parent(nullptr);
+                  table_scan->set_parent(nullptr);
                 }
                 // 保留 Sort 算子，不跳过
-                // top = child;
+                top = child;
               }
               else {
                 adlog::DEBUG("但是下层使用的不是index merge");

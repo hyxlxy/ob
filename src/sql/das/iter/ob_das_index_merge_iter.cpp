@@ -154,6 +154,18 @@ int ObDASIndexMergeIter::MergeResultBuffer::init(int64_t max_size,
         LOG_INFO("topn heap initialized successfully", K_(topn_limit));
       }
     }
+
+    if (OB_ISNULL(topn_heap_out_)) {
+      typedef common::ObBinaryHeap<TopNRow *, TopNCompareOut> HeapType;
+      topn_heap_out_ = OB_NEWx(HeapType, (&alloc), compare_out_, &alloc);
+      if (OB_ISNULL(topn_heap_out_)) {
+        ret = OB_ALLOCATE_MEMORY_FAILED;
+        LOG_WARN("failed to allocate topn heap", K(ret));
+      } else {
+        LOG_INFO("topn heap initialized successfully", K_(topn_limit));
+      }
+    }
+
   }
   return ret;
 }
@@ -375,7 +387,7 @@ int ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn()
     }
     return ret;
   }
-  
+  adlog::DEBUG("产生的分数： ", new_row->score_ );
   LOG_INFO("add_row_with_topn: checking heap", "heap_count", topn_heap_->count(), K_(topn_limit));
   
   // If heap not full, just add
@@ -436,7 +448,7 @@ int ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn()
   return ret;
 }
 
-
+//advise
 int ObDASIndexMergeIter::MergeResultBuffer::to_expr_from_topn(int64_t &size, int64_t capacity)  
 {
   int ret = OB_SUCCESS;
@@ -447,16 +459,36 @@ int ObDASIndexMergeIter::MergeResultBuffer::to_expr_from_topn(int64_t &size, int
     LOG_WARN("topn_heap is null", K(ret));
     return ret;
   }
+
+  if (OB_ISNULL(topn_heap_out_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("topn_heap_out_ is null", K(ret));
+    return ret;
+  }
+
+  if (first_flag_) {
+    adlog::DEBUG("开始转移 ： topn_heap_->count(): ",topn_heap_->count());
+    while (topn_heap_->count() > 0) {
+      TopNRow *top = topn_heap_->top();
+      adlog::DEBUG("top: score: ", top->score_);
+      if (OB_FAIL(topn_heap_out_->push(top))) {
+        LOG_WARN("failed to push  to topn_heap_out_", K(ret));
+        break;
+      }
+      topn_heap_->pop();
+    }
+    first_flag_ = false;
+  }
   
   // Extract all rows from heap
-  while (topn_heap_->count() > 0 and sorted_rows.count() < capacity) {
+  while (topn_heap_out_->count() > 0 and sorted_rows.count() < capacity) {
     // while (topn_heap_->count() > 0 ) {
-    TopNRow *top = topn_heap_->top();
+    TopNRow *top = topn_heap_out_->top();
     if (OB_FAIL(sorted_rows.push_back(top))) {
       LOG_WARN("failed to push back to sorted_rows", K(ret));
       break;
     }
-    topn_heap_->pop();
+    topn_heap_out_->pop();
   }
 
   if (OB_FAIL(ret)) {
@@ -494,6 +526,7 @@ int ObDASIndexMergeIter::MergeResultBuffer::to_expr_from_topn(int64_t &size, int
     for (int64_t i = 0; OB_SUCC(ret) && i < sorted_rows.count(); ++i) {
       batch_info_guard.set_batch_idx(i);
       TopNRow *row = sorted_rows.at(i);
+      adlog::DEBUG("输出的分数 i: ", i , " socre: ", row->score_);
       if (OB_ISNULL(row) || OB_ISNULL(row->row_data_)) {
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("unexpected null row", K(ret), K(i));
@@ -626,12 +659,13 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
             if (merge_rtdef_->enable_topn_pushdown_) {
               result_buffer_.enable_topn_ = true;
               result_buffer_.topn_finish_ = false;
+              result_buffer_.first_flag_ = true;
               // 两阶段检索：粗排保留 100x 候选（如 limit=10 则保留 1000个）
-              result_buffer_.topn_limit_ = merge_rtdef_->topn_limit_ * 100;
+              result_buffer_.topn_limit_ = merge_rtdef_->topn_limit_ * 1;
             } else {
               result_buffer_.enable_topn_ = false;
               result_buffer_.topn_finish_ = false;
-
+              result_buffer_.first_flag_ = true;
             }
           }
         }
@@ -1159,12 +1193,12 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
     if (!result_buffer_.enable_topn_ and count >= capacity)
       break;
 
-    if (result_buffer_.enable_topn_) {
-      adlog::DEBUG("result_buffer_.enable_topn_: count: ",count, " ",K(capacity));
-      adlog::DEBUG("result_buffer_.enable_topn_: : ");
-    } else {
-      adlog::DEBUG("!result_buffer_.enable_topn_  count: ",count, " ",K(capacity));
-    }
+    // if (result_buffer_.enable_topn_) {
+    //   adlog::DEBUG("result_buffer_.enable_topn_: count: ",count, " ",K(capacity));
+    //   adlog::DEBUG("result_buffer_.enable_topn_: : ");
+    // } else {
+    //   adlog::DEBUG("!result_buffer_.enable_topn_  count: ",count, " ",K(capacity));
+    // }
 
     int64_t output_idx = OB_INVALID_INDEX;  
     int cmp_ret = 0;  
