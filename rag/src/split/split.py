@@ -4,19 +4,19 @@ from typing import List
 
 def split_text(
     text: str,
-    max_chunk_size: int = 1000,
-    overlap: int = 150,
+    max_chunk_size: int = 800,
+    overlap: int = 100,
 ) -> List[str]:
     """
     将文本按段落优先切分；当段落过长时再按句子边界切分，并使用少量重叠以保持上下文连续性。
     
-    针对财务报告优化：使用较大的chunk大小(1000字符)，确保表格和数据的完整性。
-    财报问答通常需要完整的上下文才能准确理解数据含义，特别是表格数据。
+    针对财务报告优化：使用适中的chunk大小(800字符)，平衡上下文完整性和检索精准度。
+    财报问答通常需要一定的上下文才能准确理解数据含义。
 
     Args:
         text: 待切分文本
-        max_chunk_size: 单块最大字符数（1000字符适配财报数据特点）
-        overlap: 邻接块之间的重叠字符数（150字符避免关键信息被割裂）
+        max_chunk_size: 单块最大字符数（800字符适配财报数据特点）
+        overlap: 邻接块之间的重叠字符数（100字符避免关键信息被割裂）
 
     Returns:
         文本块列表
@@ -28,9 +28,6 @@ def split_text(
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     text = text.strip()
-    
-    # 检测是否包含表格标记（Markdown表格或特殊标注）
-    has_table = bool(re.search(r'[|｜].*[|｜]|表\d+|【.*表.*】', text))
 
     # 按双换行视为段落
     paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
@@ -65,10 +62,7 @@ def split_text(
         return out
 
     for paragraph in paragraphs:
-        # 如果包含表格且不太长，尽量保持完整
-        if has_table and len(paragraph) <= max_chunk_size * 1.5:
-            chunks.append(paragraph[:max_chunk_size * 2])  # 允许表格chunk稍大
-        elif len(paragraph) <= max_chunk_size:
+        if len(paragraph) <= max_chunk_size:
             chunks.append(paragraph)
         else:
             # 先按句子切分再组块并加重叠

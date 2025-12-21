@@ -28,11 +28,11 @@ OCEANBASE_DBNAME = os.getenv("OCEANBASE_DBNAME")
 TABLE_NAME = "rag_documents"
 
 # Retrieval parameters (configurable via env)
-TOP_K = int(os.getenv("TOP_K", "20"))  # 最终返回20个最相关chunk（精简）
-BM25_CANDIDATES = int(os.getenv("BM25_CANDIDATES", "100"))  # BM25召回100个候选
-VEC_CANDIDATES = int(os.getenv("VEC_CANDIDATES", "150"))    # 向量召回150个候选
+TOP_K = int(os.getenv("TOP_K", "30"))  # 最终返回30个最相关chunk
+BM25_CANDIDATES = int(os.getenv("BM25_CANDIDATES", "120"))  # BM25召回120个候选
+VEC_CANDIDATES = int(os.getenv("VEC_CANDIDATES", "120"))    # 向量召回120个候选（与BM25平衡）
 RRF_K = float(os.getenv("RRF_K", "60"))  # RRF 常数项
-MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "20000"))  # 上下文长度20000（避免过长）
+MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "25000"))  # 上下文长度25000
 
 
 def _is_numerical_query(query: str) -> bool:
@@ -92,27 +92,46 @@ def _expand_query(query: str) -> str:
 def _build_fts_query(query: str) -> Dict:
     # 扩展查询以提高召回
     expanded_query = _expand_query(query)
-    return {
-        "bool": {
-            "should": [
-                {
-                    "query_string": {
-                        "fields": ["content"],
-                        "type": "best_fields",
-                        "query": expanded_query,
-                        "minimum_should_match": "30%",
-                        "boost": 2.0,  # 精确匹配权重更高
-                    }
-                },
-                {
-                    "query_string": {
-                        "fields": ["content"],
-                        "type": "phrase",
-                        "query": query,
-                        "boost": 3.0,  # 短语匹配权重最高
+    
+    # 提取年份和数字，给予额外boost
+    years = re.findall(r'20\d{2}', query)
+    numbers = re.findall(r'\d+\.?\d*', query)
+    
+    should_clauses = [
+        {
+            "query_string": {
+                "fields": ["content"],
+                "type": "best_fields",
+                "query": expanded_query,
+                "minimum_should_match": "30%",
+                "boost": 1.5,  # 扩展查询基础权重
+            }
+        },
+        {
+            "query_string": {
+                "fields": ["content"],
+                "type": "phrase",
+                "query": query,  # 原始查询短语匹配
+                "boost": 3.0,  # 短语匹配权重最高
+            }
+        }
+    ]
+    
+    # 如果有年份，添加年份精确匹配
+    if years:
+        for year in years:
+            should_clauses.append({
+                "match": {
+                    "content": {
+                        "query": year,
+                        "boost": 2.5  # 年份匹配高权重
                     }
                 }
-            ],
+            })
+    
+    return {
+        "bool": {
+            "should": should_clauses,
             "minimum_should_match": 1,
         }
     }
@@ -303,11 +322,11 @@ def search(question: str) -> Answer:
             "knn": {
                 "field": "vector",
                 "k": VEC_CANDIDATES,
-                "num_candidates": max(VEC_CANDIDATES, 128),
+                "num_candidates": max(VEC_CANDIDATES * 2, 256),  # 增加候选池
                 "query_vector": question_embedding,
                 # 不强行加文本过滤，避免召回过窄
                 # "filter": fts_query,
-                "similarity": float(os.getenv("SIMILARITY_THRESHOLD", "0.2")),
+                "similarity": float(os.getenv("SIMILARITY_THRESHOLD", "0.15")),  # 降低阈值，提高召回
             },
             "from": 0,
             "size": VEC_CANDIDATES,
@@ -345,83 +364,47 @@ def search(question: str) -> Answer:
             logger.warning("RRF 融合结果为空，回退使用BM25或向量结果")
             fused = (bm25_results or vec_results)[:TOP_K * 2]
 
-        # 5) 增强重排序：结合关键词、数值、年份等多维度特征
-        def _advanced_rerank(chunks: List[Dict], query: str, top_k: int) -> List[Dict]:
-            """基于多维度特征的高级重排序"""
+        # 5) 简化重排序：关键词+年份+数字+位置
+        def _simple_rerank(chunks: List[Dict], query: str, top_k: int) -> List[Dict]:
+            """基于关键特征的简化重排序"""
             # 提取查询中的关键词（去除常见停用词）
             stop_words = {"的", "是", "在", "有", "和", "与", "等", "了", "吗", "呢", "什么", "如何", "怎样", "多少", "哪些"}
             query_terms = [w for w in query if w not in stop_words and len(w) > 1]
             
-            # 提取查询中的数字和年份
-            query_numbers = re.findall(r'\d+\.?\d*', query)
+            # 提取查询中的年份
             query_years = re.findall(r'20\d{2}', query)
             
             # 判断是否为数值型查询
             is_num_query = _is_numerical_query(query)
             
-            # 提取专有名词（千味央厨）
-            has_company_name = "千味央厨" in query
-            
             scored_chunks = []
             for idx, chunk in enumerate(chunks):
                 content = chunk.get("content", "")
                 
-                # 1. 精确短语匹配（最高优先级）
-                exact_phrase_score = 0
-                # 提取查询中的关键短语（3-10字）
-                for i in range(len(query) - 2):
-                    phrase = query[i:i+10]
-                    if len(phrase) >= 3 and phrase in content:
-                        exact_phrase_score += 10
-                
-                # 2. 关键词匹配分数
+                # 1. 关键词匹配分数
                 match_score = sum(1 for term in query_terms if term in content)
                 
-                # 3. 数字精确匹配（对数值型查询极其重要）
-                number_score = 0
-                if is_num_query and query_numbers:
-                    content_numbers = re.findall(r'\d+\.?\d*', content)
-                    # 精确匹配加倍分数
-                    for num in query_numbers:
-                        if num in content_numbers:
-                            number_score += 5
-                        # 也检查数字是否作为文本出现
-                        if num in content:
-                            number_score += 3
-                
-                # 4. 年份匹配（权重最高）
+                # 2. 年份匹配（对时间相关查询很重要）
                 year_score = 0
                 if query_years:
-                    for year in query_years:
-                        if year in content:
-                            year_score += 8  # 从5提升到8
+                    year_score = sum(5 for year in query_years if year in content)
                 
-                # 5. 公司名称匹配
-                company_score = 0
-                if has_company_name and "千味央厨" in content:
-                    company_score = 2
+                # 3. 数字匹配（对数值型查询重要）
+                number_score = 0
+                if is_num_query:
+                    query_numbers = re.findall(r'\d+\.?\d*', query)
+                    if query_numbers:
+                        number_score = sum(3 for num in query_numbers if num in content)
                 
-                # 6. 原始排序位置分数
+                # 4. 原始排序位置分数（RRF已经做了初步排序，信任它）
                 position_score = 1.0 / (idx + 1)
                 
-                # 7. 长度适中性（500-1500字符最佳）
-                content_len = len(content)
-                if 500 <= content_len <= 1500:
-                    length_score = 1.0
-                elif content_len < 500:
-                    length_score = content_len / 500
-                else:
-                    length_score = 1500 / content_len
-                
-                # 综合评分（调整权重）
+                # 综合评分（简化权重）
                 total_score = (
-                    exact_phrase_score * 1.0 +  # 精确短语权重1（新增）
-                    match_score * 2.0 +          # 关键词权重2
-                    number_score * 1.0 +         # 数字权重1（加强）
-                    year_score * 1.0 +           # 年份权重1（加强）
-                    company_score * 1.0 +        # 公司名称权重1（新增）
-                    position_score * 4.0 +       # 位置权重4（提升）
-                    length_score * 1.0           # 长度权重1（提升）
+                    match_score * 1.5 +      # 关键词权重1.5
+                    year_score +              # 年份权重1
+                    number_score +            # 数字权重1
+                    position_score * 5.0      # 位置权重5（最重要，信任RRF）
                 )
                 
                 scored_chunks.append((total_score, chunk))
@@ -430,8 +413,8 @@ def search(question: str) -> Answer:
             scored_chunks.sort(key=lambda x: x[0], reverse=True)
             return [chunk for _, chunk in scored_chunks[:top_k]]
         
-        # 应用增强重排序
-        fused = _advanced_rerank(fused, question, TOP_K)
+        # 应用简化重排序
+        fused = _simple_rerank(fused, question, TOP_K)
 
         # 6) 组装上下文与元数据（带来源标注）
         contexts: List[str] = []
