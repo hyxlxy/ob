@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <cstdint>
 #define USING_LOG_PREFIX STORAGE
 
 #include "ob_text_retrieval_token_iter.h"
@@ -718,6 +719,64 @@ int ObTextRetrievalDaaTTokenIter::get_next_row() {
   int ret = OB_SUCCESS;
   bool need_load = false;
 
+  if (cache_iter_ and !cache_iter_->have_done_flag_ and need_to_fill_cache_iter_flag_) {
+    int las_cur_idx_ = cur_idx_;
+    // 这里就强制让他跑完，看看效果
+    adlog::DEBUG("开始强制跑完");
+    while (OB_SUCC(ret)) {
+
+      if (eval_ctx_->is_vectorized() && OB_FAIL(token_iter_->get_next_batch(max_batch_size_, count_))) {
+        if (OB_UNLIKELY(OB_ITER_END != ret)) {
+          LOG_WARN("failed to get batch rows from inverted index", K(ret));
+          if (cache_iter_) {
+            cache_iter_->have_done_flag_ = true;
+          }
+          adlog::DEBUG("WARNING! 缓存迭代器 failed to get batch rows from "
+                       "inverted index");
+          return ret;
+        } else if (count_ != 0) {
+          ret = OB_SUCCESS;
+          need_load = true;
+          adlog::DEBUG("ObTextRetrievalDaaTTokenIter::get_next_row() 最后一轮了");
+          if (OB_NOT_NULL(relevance_expr_)) {
+            if (OB_FAIL(save_relevances_and_docids())) {
+              LOG_WARN("failed to evaluate simarity expr", K(ret));
+            }
+          } else if (OB_FAIL(save_docids())) {
+              LOG_WARN("failed to save doc ids", K(ret));
+          }
+          if (cache_iter_) {
+            cache_iter_->have_done_flag_ = true;
+          }
+          adlog::DEBUG(" ObTextRetrievalDaaTTokenIter::get_next_row() OB_ITER_END == ret");
+          break;
+        } else {
+          if (cache_iter_) {
+            cache_iter_->have_done_flag_ = true;
+          }
+          adlog::DEBUG(" ObTextRetrievalDaaTTokenIter::get_next_row() OB_ITER_END == ret");
+          adlog::DEBUG("阿巴 count = 0");
+          break;
+        }
+      } else {
+        need_load = true;
+      }
+      if (OB_SUCC(ret) && need_load) {
+        if (OB_NOT_NULL(relevance_expr_)) {
+          if (OB_FAIL(save_relevances_and_docids())) {
+            LOG_WARN("failed to evaluate simarity expr", K(ret));
+          }
+        } else if (OB_FAIL(save_docids())) {
+            LOG_WARN("failed to save doc ids", K(ret));
+        }
+      }
+
+    }
+    cur_idx_ = las_cur_idx_;
+    //到这里就强制跑完了
+
+  }
+
   if (cache_iter_ and cache_iter_->have_done_flag_ ) {
     // 代表他指的迭代器可以使用了，那么就直接调用它的对应的缓存迭代器吧.ObTRDaaTTokenCacheIter
     if (!cache_iter_->is_created_flag_) {
@@ -731,11 +790,16 @@ int ObTextRetrievalDaaTTokenIter::get_next_row() {
     return cache_iter_->get_next_row();
   }
 
+
+
   // adlog::DEBUG("没有使用缓存迭代器： ObTextRetrievalDaaTTokenIter::get_next_row()");
   if (OB_LIKELY((++cur_idx_) < count_)) {
   } else if (!eval_ctx_->is_vectorized() && (OB_FAIL(token_iter_->get_next_row()))) {
     if (OB_UNLIKELY(OB_ITER_END != ret)) {
       LOG_WARN("failed to get row from inverted index", K(ret));
+    } else {
+      adlog::DEBUG(" ObTextRetrievalDaaTTokenIter::get_next_row() token_iter_->get_next_row()");
+      
     }
   } else if (!eval_ctx_->is_vectorized() && FALSE_IT(count_ = 1)) {
   } else if (eval_ctx_->is_vectorized() && OB_FAIL(token_iter_->get_next_batch(max_batch_size_, count_))) {
@@ -759,11 +823,13 @@ int ObTextRetrievalDaaTTokenIter::get_next_row() {
       if (cache_iter_) {
         cache_iter_->have_done_flag_ = true;
       }
+      adlog::DEBUG(" ObTextRetrievalDaaTTokenIter::get_next_row() OB_ITER_END == ret");
       return ret;
     } else {
       if (cache_iter_) {
         cache_iter_->have_done_flag_ = true;
       }
+      adlog::DEBUG(" ObTextRetrievalDaaTTokenIter::get_next_row() OB_ITER_END == ret");
       adlog::DEBUG("阿巴 count = 0");
     }
   } else {
@@ -806,7 +872,7 @@ int ObTextRetrievalDaaTTokenIter::save_relevances_and_docids()
     // adlog::DEBUG(K(cache_iter_->have_done_flag_));
     // if(cache_iter_){ adlog::DEBUG("cache_iter_ is not nullptr"); }
     // else { adlog::DEBUG("cache_iter_ is nullptr"); }
-    if (OB_SUCC(ret) && cache_iter_ != nullptr && (!cache_iter_->have_done_flag_)) {  
+    if (OB_SUCC(ret) && cache_iter_ != nullptr && (!cache_iter_->have_done_flag_) && need_to_fill_cache_iter_flag_) {  
       // adlog::DEBUG("ObTextRetrievalDaaTTokenIter::save_relevances_and_docids() 开始把数据放进去缓存了");
       if (OB_FAIL(cache_iter_->add_data(relevance_, doc_id_, count_))) {  
         adlog::DEBUG("failed to add data to cache", K(ret));  
@@ -1282,7 +1348,12 @@ int ObTRDaaTTokenCacheIter::get_curr_score(double &score) const
     adlog::DEBUG("ObTRDaaTTokenCacheIter::get_curr_score invalid cache state", K(ret), K_(cur_idx), K_(total_count));
   } else {
     // adlog::DEBUG("缓存迭代器： ObTRDaaTTokenCacheIter::get_curr_score");
-    score = cached_relevance_[cur_idx_];  
+    // score = cached_relevance_[cur_idx_];
+    if (cached_relevance_ptr_) {
+      score = (*cached_relevance_ptr_)[cur_idx_];
+    } else {
+      score = cached_relevance_[cur_idx_];
+    }
   }  
   return ret;  
 }  
@@ -1295,7 +1366,11 @@ int ObTRDaaTTokenCacheIter::get_curr_id(const ObDatum *&datum) const
     adlog::DEBUG("ObTRDaaTTokenCacheIter::get_curr_id invalid cache state", K(ret), K_(cur_idx), K_(total_count));  
   } else {  
     // adlog::DEBUG("缓存迭代器： ObTRDaaTTokenCacheIter::get_curr_id");
-    datum = &cached_doc_id_[cur_idx_].get_datum();  
+    if (cached_doc_id_ptr_) {
+      datum = &((*cached_doc_id_ptr_)[cur_idx_]).get_datum();
+    } else { 
+      datum = &cached_doc_id_[cur_idx_].get_datum();
+    }
   }  
   return ret;  
 }  
@@ -1306,14 +1381,23 @@ int ObTRDaaTTokenCacheIter::get_dim_max_score(double &score)
   if (OB_UNLIKELY(!have_done_flag_ || total_count_ == 0)) {  
     ret = OB_NOT_INIT;  
     adlog::DEBUG("ObTRDaaTTokenCacheIter::get_dim_max_score cache not ready or empty", K(ret), K_(total_count));  
-  } else {  
-
-    score = cached_relevance_[0];  
-    for (int64_t i = 1; i < total_count_; ++i) {  
-      if (cached_relevance_[i] > score) {  
-        score = cached_relevance_[i];  
+  } else {
+    if (cached_relevance_ptr_) {
+      score = (*cached_relevance_ptr_)[0];
+      for (int64_t i = 1; i < total_count_; ++i) {
+        if ((*cached_relevance_ptr_)[i] > score) {
+          score = (*cached_relevance_ptr_)[i];
+        }
+      }
+    }
+    else{
+      score = cached_relevance_[0];  
+      for (int64_t i = 1; i < total_count_; ++i) {  
+        if (cached_relevance_[i] > score) {  
+          score = cached_relevance_[i];  
+        }  
       }  
-    }  
+    }
   }  
   return ret;  
 }  
@@ -1323,11 +1407,19 @@ int ObTRDaaTTokenCacheIter::init_from_cache(ObTRDaaTTokenCacheIter *one)
   int ret = OB_SUCCESS;  
   if (OB_ISNULL(one) || !one->have_done_flag_) {  
     ret = OB_INVALID_ARGUMENT;  
-    adlog::DEBUG("invalid cache template", K(ret));  
-  } else {  
-    if (OB_FAIL(cached_relevance_.assign(one->cached_relevance_))) {  
+    adlog::DEBUG("invalid cache template", K(ret));
+  } else {
+
+    cached_relevance_ptr_ = &one->cached_relevance_;
+    cached_doc_id_ptr_ = &one->cached_doc_id_;
+
+    if((!cached_doc_id_ptr_) or (!cached_relevance_ptr_)){
+      adlog::DEBUG("ERROR 竟然没有取好地址");
+    }
+
+    if (!cached_relevance_ptr_ and OB_FAIL(cached_relevance_.assign(one->cached_relevance_))) {  
       LOG_WARN("failed to assign relevance array", K(ret));  
-    } else if (OB_FAIL(cached_doc_id_.assign(one->cached_doc_id_))) {  
+    } else if (!cached_doc_id_ptr_ and OB_FAIL(cached_doc_id_.assign(one->cached_doc_id_))) {  
       LOG_WARN("failed to assign doc_id array", K(ret));  
     } else {  
       total_count_ = one->total_count_;  

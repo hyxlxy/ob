@@ -158,7 +158,9 @@ public:
 
   
   ObSEArray<double,64, ModulePageAllocator > cached_relevance_;  
+  ObSEArray<double,64, ModulePageAllocator >* cached_relevance_ptr_{nullptr};  
   ObSEArray<ObDocIdExt,64, ModulePageAllocator > cached_doc_id_;  
+  ObSEArray<ObDocIdExt,64, ModulePageAllocator >* cached_doc_id_ptr_{nullptr};  
   int64_t cur_idx_;
   int64_t total_count_;
   bool is_created_flag_{false};
@@ -191,7 +193,8 @@ public:
     return ret;
   }
   // ADVISE
-  mutable ObTRDaaTTokenCacheIter* cache_iter_{nullptr};
+  mutable ObTRDaaTTokenCacheIter *cache_iter_{nullptr};
+  bool need_to_fill_cache_iter_flag_{false};
 private:
   int save_relevances_and_docids();
   int save_docids();

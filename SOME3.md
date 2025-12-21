@@ -1,3 +1,20 @@
+obclient [test]>   SELECT id,base_id ,  docid_col, MATCH(fulltext_col) AGAINST('text') as _score FROM test_insert_en WHERE     id<1000 and base_id in ('base_id_1','base_id_2', 'base_id_3') and MATCH(fulltext_col) AGAINST('text') and id < 1000 ORDER BY _score DESC limit 10;
++-----+-----------+--------------+--------------------+
+| id  | base_id   | docid_col    | _score             |
++-----+-----------+--------------+--------------------+
+|  17 | base_id_1 | doc-en-14104 | 3.6712478278194753 |
+| 809 | base_id_2 | doc-en-16325 |  3.662114094665175 |
+| 135 | base_id_1 | doc-en-9908  | 3.6457901932021235 |
+| 320 | base_id_1 | doc-en-7032  | 3.6247728427465273 |
+| 471 | base_id_1 | doc-en-5742  | 3.5770686335447186 |
+| 841 | base_id_2 | doc-en-4360  |   3.53673317394405 |
+| 232 | base_id_1 | doc-en-4910  | 3.4015741122762164 |
+| 382 | base_id_1 | doc-en-14867 |  3.333069482076175 |
+| 576 | base_id_2 | doc-en-1021  | 3.3232487456484945 |
+| 509 | base_id_2 | doc-en-16007 |  3.320338849298478 |
++-----+-----------+--------------+--------------------+
+
+
 ```c++
 
 int ObJoinOrder::create_one_index_merge_path(const uint64_t table_id,
