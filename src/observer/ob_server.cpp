@@ -76,6 +76,7 @@
 #include "storage/fts/dict/ob_ft_cache.h"
 #include "common/ob_target_specific.h"
 #include "storage/fts/dict/ob_gen_dic_loader.h"
+#include "storage/retrieval/ob_token_posting_cache.h"
 #include "plugin/sys/ob_plugin_mgr.h"
 #include "share/ob_license_utils.h"
 #include "rpc/obrpc/ob_rpc_net_handler.h"
@@ -2627,6 +2628,10 @@ int ObServer::init_global_kvcache()
   } else if (OB_FAIL(ObResourceMgr::get_instance().set_cache_washer(
       ObKVGlobalCache::get_instance()))) {
     LOG_ERROR("Fail to set_cache_washer", KR(ret));
+  } else if (OB_FAIL(storage::ObTokenPostingCache::get_instance().init("TokenPostingCache", 1))) {
+    LOG_WARN("Fail to init token posting cache", KR(ret));
+  } else {
+    LOG_INFO("Token posting cache initialized successfully");
   }
 
   return ret;

@@ -1059,6 +1059,7 @@ ob_set_subtarget(ob_storage retrieval
   retrieval/ob_sparse_utils.cpp
   retrieval/ob_sparse_lookup_iter.cpp
   retrieval/ob_text_retrieval_token_iter.cpp
+  retrieval/ob_token_posting_cache.cpp
   retrieval/ob_text_daat_iter.cpp
   retrieval/ob_text_taat_iter.cpp
   retrieval/ob_spiv_daat_iter.cpp

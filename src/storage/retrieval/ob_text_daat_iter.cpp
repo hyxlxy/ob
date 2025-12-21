@@ -49,15 +49,7 @@ void ObTextDaaTIter::reset() {
   // this class can know the type of dim_iters_, but ObSRDaaTIterImpl maybe not
   if (OB_NOT_NULL(dim_iters_)) {
     for (int64_t i = 0; i < dim_iters_->count(); ++i) {
-      // static_cast<ObTextRetrievalDaaTTokenIter *>(dim_iters_->at(i))->reset();
-      if (auto &&dim_iter =
-              dynamic_cast<ObTRDaaTTokenCacheIter *>(dim_iters_->at(i))) {
-        dim_iter->cur_idx_ = -1;
-      } else {
-        // 说明还是之前的类型
-        static_cast<ObTextRetrievalDaaTTokenIter *>(dim_iters_->at(i))->reset();
-
-      }
+      static_cast<ObTextRetrievalDaaTTokenIter *>(dim_iters_->at(i))->reset();
     }
   }
   ObSRDaaTIterImpl::reset();
@@ -74,15 +66,7 @@ void ObTextDaaTIter::reuse(const bool switch_tablet)
   }
   if (OB_NOT_NULL(dim_iters_)) {
     for (int64_t i = 0; i < dim_iters_->count(); ++i) {
-      // static_cast<ObTextRetrievalDaaTTokenIter *>(dim_iters_->at(i))->reuse();
-      if (auto &&dim_iter =
-        dynamic_cast<ObTRDaaTTokenCacheIter *>(dim_iters_->at(i))) {
-          dim_iter->cur_idx_ = -1;
-      } else {
-        // 说明还是之前的类型
-        static_cast<ObTextRetrievalDaaTTokenIter *>(dim_iters_->at(i))->reuse();
-
-      }
+      static_cast<ObTextRetrievalDaaTTokenIter *>(dim_iters_->at(i))->reuse();
     }
   }
   ObSRDaaTIterImpl::reuse(switch_tablet);

@@ -6,7 +6,7 @@ echo "=========================================="
 echo "Step 1: Compiling OceanBase"
 echo "=========================================="
 cd /root/ob
-bash build.sh release -DOB_USE_CCACHE=ON --make -j3
+bash build.sh release -DOB_USE_CCACHE=ON --init --make -j3
 
 echo ""
 echo "=========================================="

@@ -23,6 +23,8 @@
 #include "sql/das/ob_das_ir_define.h"
 #include "ob_block_max_iter.h"
 #include "ob_i_sparse_retrieval_iter.h"
+#include "ob_token_posting_cache.h"  // 包含完整定义
+
 namespace oceanbase
 {
 namespace storage
@@ -137,40 +139,13 @@ private:
   DISALLOW_COPY_AND_ASSIGN(ObTextRetrievalTokenIter);
 };
 
-// ADVISE
-class ObTRDaaTTokenCacheIter : public ObISRDaaTDimIter {  
-public:  
-  ObTRDaaTTokenCacheIter(common::ObIAllocator *alloc);  
-  virtual ~ObTRDaaTTokenCacheIter() {}  
-  
-  // 实现基类接口  
-  virtual int get_next_row() override;  
-  virtual int advance_to(const ObDatum &id_datum) override;  
-  virtual int get_curr_score(double &score) const override;  
-  virtual int get_curr_id(const ObDatum *&datum) const override;  
-  virtual int get_dim_max_score(double &score) override;  
-  
-  int init_from_cache(ObTRDaaTTokenCacheIter *one);
-  
-  int add_data(const ObFixedArray<double, ObIAllocator> &relevance,
-               const ObFixedArray<ObDocIdExt, ObIAllocator> &doc_id,
-               int64_t count);
-
-  // 使用 ObSEArray 支持动态扩展，避免 ObFixedArray 的容量限制
-  ObSEArray<double, 256> cached_relevance_;  
-  ObSEArray<ObDocIdExt, 256> cached_doc_id_;  
-  int64_t cur_idx_;
-  int64_t total_count_;
-  bool is_created_flag_{false};
-  bool have_done_flag_{false};
-  common::ObIAllocator *allocator_;  
-};
+// 注意：ObTRDaaTTokenCacheIter 已删除，改用 ob_kvcache 框架
 
 class ObTextRetrievalDaaTTokenIter final : public ObISRDaaTDimIter
 {
 public:
   ObTextRetrievalDaaTTokenIter();
-  virtual ~ObTextRetrievalDaaTTokenIter() {}
+  virtual ~ObTextRetrievalDaaTTokenIter();
   int init(const ObTextRetrievalScanIterParam &iter_param);
   void reuse();
   void reset();
@@ -190,12 +165,21 @@ public:
     }
     return ret;
   }
-  // ADVISE
-  mutable ObTRDaaTTokenCacheIter* cache_iter_{nullptr};
+  
+  // ob_kvcache 缓存支持（public 以便外部调用）
+  int try_load_from_cache(const common::ObString &token);  // 尝试从缓存加载
+  int save_to_cache(const common::ObString &token);  // 保存到缓存
+  
 private:
   int save_relevances_and_docids();
   int save_docids();
-  int force_full_scan_for_cache();  // 强制全扫描以填充缓存
+  bool using_cache_;  // 是否正在使用缓存数据
+  const double *cached_relevance_;  // 缓存的相关性数组
+  const ObDocIdExt *cached_doc_id_;  // 缓存的文档ID数组
+  int64_t cached_count_;  // 缓存的数据量
+  int64_t cache_read_idx_;  // 当前缓存读取位置
+  storage::ObTokenPostingCacheHandle cache_handle_;  // 缓存句柄
+  common::ObString current_token_;  // 当前token（用于缓存）
   ObArenaAllocator *allocator_;
   ObTextRetrievalTokenIter *token_iter_;
   sql::ObEvalCtx *eval_ctx_;
@@ -208,7 +192,6 @@ private:
   ObFixedArray<ObDocIdExt, ObIAllocator> doc_id_;
   common::ObDatumCmpFuncType cmp_func_;
   bool is_inited_;
-  bool full_scan_done_;  // 是否已完成全扫描
   DISALLOW_COPY_AND_ASSIGN(ObTextRetrievalDaaTTokenIter);
 };
 
