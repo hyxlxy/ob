@@ -228,74 +228,74 @@ int ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn()
   int ret = OB_SUCCESS;
   double score = 0.0;
   
-  LOG_INFO("add_row_with_topn called", K_(enable_topn), K_(topn_limit));
+  // LOG_INFO("add_row_with_topn called", K_(enable_topn), K_(topn_limit));
   
-  LOG_INFO("add_row_with_topn: starting score extraction", "exprs_count", exprs_->count());
+  // LOG_INFO("add_row_with_topn: starting score extraction", "exprs_count", exprs_->count());
   
   // Debug: print all expressions in output
-  for (int64_t i = 0; i < exprs_->count(); ++i) {
-    ObExpr *expr = exprs_->at(i);
-    if (expr) {
-      LOG_INFO("add_row_with_topn: output expr", K(i), "type", expr->type_, "type_name", 
-               (expr->type_ == T_FUN_MATCH_AGAINST ? "MATCH_AGAINST" : "OTHER"));
-    }
-  }
+  // for (int64_t i = 0; i < exprs_->count(); ++i) {
+  //   ObExpr *expr = exprs_->at(i);
+  //   if (expr) {
+  //     // LOG_INFO("add_row_with_topn: output expr", K(i), "type", expr->type_, "type_name", 
+  //     //          (expr->type_ == T_FUN_MATCH_AGAINST ? "MATCH_AGAINST" : "OTHER"));
+  //   }
+  // }
   
   // Safety check
   if (!enable_topn_ || topn_limit_ <= 0) {
     ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("add_row_with_topn called but topn not enabled", K(ret), K(enable_topn_), K(topn_limit_));
-    LOG_INFO("add_row_with_topn: returning due to topn not enabled");
+    // LOG_WARN("add_row_with_topn called but topn not enabled", K(ret), K(enable_topn_), K(topn_limit_));
+    // LOG_INFO("add_row_with_topn: returning due to topn not enabled");
     return ret;
   }
   
   if (OB_ISNULL(alloc_)) {
     ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("allocator is null", K(ret));
-    LOG_INFO("add_row_with_topn: returning due to null allocator");
+    // LOG_WARN("allocator is null", K(ret));
+    // LOG_INFO("add_row_with_topn: returning due to null allocator");
     return ret;
   }
   
   if (OB_ISNULL(topn_heap_)) {
     ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("topn_heap is null", K(ret));
-    LOG_INFO("add_row_with_topn: returning due to null topn_heap");
+    // LOG_WARN("topn_heap is null", K(ret));
+    // LOG_INFO("add_row_with_topn: returning due to null topn_heap");
     return ret;
   }
   
   if (OB_ISNULL(exprs_)) {
     ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("exprs is null", K(ret));
-    LOG_INFO("add_row_with_topn: returning due to null exprs");
+    // LOG_WARN("exprs is null", K(ret));
+    // LOG_INFO("add_row_with_topn: returning due to null exprs");
     return ret;
   }
   
   if (OB_ISNULL(eval_ctx_)) {
     ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("eval_ctx is null", K(ret));
-    LOG_INFO("add_row_with_topn: returning due to null eval_ctx");
+    // LOG_WARN("eval_ctx is null", K(ret));
+    // LOG_INFO("add_row_with_topn: returning due to null eval_ctx");
     return ret;
   }
   
-  LOG_INFO("add_row_with_topn: starting score extraction", "exprs_count", exprs_->count());
+  // LOG_INFO("add_row_with_topn: starting score extraction", "exprs_count", exprs_->count());
   
   // Extract score from MATCH AGAINST expression
   ObSEArray<ObExpr *, 4> match_against_exprs;
   for (int64_t i = 0; OB_SUCC(ret) && i < exprs_->count(); ++i) {
     ObExpr *expr = exprs_->at(i);
-    LOG_INFO("add_row_with_topn: checking expr", K(i), "expr_ptr", (void*)expr);
+    // LOG_INFO("add_row_with_topn: checking expr", K(i), "expr_ptr", (void*)expr);
     if (OB_ISNULL(expr)) {
       ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("null expr in exprs", K(ret), K(i));
+      // LOG_WARN("null expr in exprs", K(ret), K(i));
     } else if (T_FUN_MATCH_AGAINST == expr->type_) {
-      LOG_INFO("add_row_with_topn: found MATCH AGAINST expr", K(i));
+      // LOG_INFO("add_row_with_topn: found MATCH AGAINST expr", K(i));
       if (OB_FAIL(match_against_exprs.push_back(expr))) {
-        LOG_WARN("failed to push back match against expr", K(ret));
+        // LOG_WARN("failed to push back match against expr", K(ret));
       }
     }
   }
   
-  LOG_INFO("add_row_with_topn: finished expr loop", "match_against_count", match_against_exprs.count(), K(ret));
+  // LOG_INFO("add_row_with_topn: finished expr loop", "match_against_count", match_against_exprs.count(), K(ret));
   
   // Statistics counters
   static int64_t total_rows = 0;
@@ -306,27 +306,27 @@ int ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn()
   total_rows++;
   
   if (OB_SUCC(ret) && !match_against_exprs.empty()) {
-    LOG_INFO("add_row_with_topn: about to extract score from match_against expr");
+    // LOG_INFO("add_row_with_topn: about to extract score from match_against expr");
     ObExpr *score_expr = match_against_exprs.at(0);
-    LOG_INFO("add_row_with_topn: got score_expr", "ptr", (void*)score_expr);
+    // LOG_INFO("add_row_with_topn: got score_expr", "ptr", (void*)score_expr);
     
     if (OB_ISNULL(score_expr)) {
       ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("score_expr is null", K(ret));
+      // LOG_WARN("score_expr is null", K(ret));
     } else {
       // Use locate_expr_datum to get the datum that should have been filled by to_expr()
       const ObDatum &score_datum = score_expr->locate_expr_datum(*eval_ctx_);
       bool is_evaluated = score_expr->get_eval_info(*eval_ctx_).evaluated_;
-      LOG_INFO("add_row_with_topn: located score_datum", "is_null", score_datum.is_null(), 
-               "len", score_datum.len_, "ptr", (void*)score_datum.ptr_, "is_evaluated", is_evaluated);
+      // LOG_INFO("add_row_with_topn: located score_datum", "is_null", score_datum.is_null(), 
+      //          "len", score_datum.len_, "ptr", (void*)score_datum.ptr_, "is_evaluated", is_evaluated);
       
       // Handle NULL - this means no match, skip this row
       if (score_datum.is_null()) {
         skipped_null++;
-        LOG_INFO("add_row_with_topn: score is null, skipping row", 
-                 "total_rows", total_rows, "skipped_null", skipped_null, 
-                 "skipped_len_zero", skipped_len_zero, "skipped_len_invalid", skipped_len_invalid,
-                 "valid_rows", valid_rows);
+        // LOG_INFO("add_row_with_topn: score is null, skipping row", 
+        //          "total_rows", total_rows, "skipped_null", skipped_null, 
+        //          "skipped_len_zero", skipped_len_zero, "skipped_len_invalid", skipped_len_invalid,
+        //          "valid_rows", valid_rows);
         return OB_SUCCESS;
       }
       
@@ -335,31 +335,31 @@ int ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn()
         // Normal case: valid double score
         score = score_datum.get_double();
         valid_rows++;
-        LOG_INFO("add_row_with_topn: extracted score using get_double", K(score));
+        // LOG_INFO("add_row_with_topn: extracted score using get_double", K(score));
       } else if (score_datum.len_ == 0) {
         // len=0 means no match (score=0.0)
         // Still add it to heap - don't skip!
         score = 0.0;
         skipped_len_zero++;
         valid_rows++;
-        LOG_INFO("add_row_with_topn: len=0, treating as score=0.0", 
-                 "total_rows", total_rows, "skipped_len_zero", skipped_len_zero);
+        // LOG_INFO("add_row_with_topn: len=0, treating as score=0.0", 
+        //          "total_rows", total_rows, "skipped_len_zero", skipped_len_zero);
       } else {
         // Invalid length - treat as score=0.0 to avoid crash
         score = 0.0;
         skipped_len_invalid++;
         valid_rows++;
-        LOG_WARN("add_row_with_topn: invalid datum length, treating as score=0.0", 
-                 "len", score_datum.len_, "expected", sizeof(double),
-                 "total_rows", total_rows, "skipped_len_invalid", skipped_len_invalid);
+        // LOG_WARN("add_row_with_topn: invalid datum length, treating as score=0.0", 
+        //          "len", score_datum.len_, "expected", sizeof(double),
+        //          "total_rows", total_rows, "skipped_len_invalid", skipped_len_invalid);
       }
     }
   }
   
-  LOG_INFO("add_row_with_topn: extracted score", K(score), K(ret),
-           "total_rows", total_rows, "skipped_null", skipped_null, 
-           "skipped_len_zero", skipped_len_zero, "skipped_len_invalid", skipped_len_invalid,
-           "valid_rows", valid_rows);
+  // LOG_INFO("add_row_with_topn: extracted score", K(score), K(ret),
+  //          "total_rows", total_rows, "skipped_null", skipped_null, 
+  //          "skipped_len_zero", skipped_len_zero, "skipped_len_invalid", skipped_len_invalid,
+  //          "valid_rows", valid_rows);
   
   // Create stored row - this allocates memory that we own
   ObChunkDatumStore::StoredRow *stored_row = nullptr;
@@ -367,20 +367,20 @@ int ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn()
   batch_guard.set_batch_size(1);
   batch_guard.set_batch_idx(0);
   
-  LOG_INFO("add_row_with_topn: building stored row");
+  // LOG_INFO("add_row_with_topn: building stored row");
   
   if (OB_FAIL(ObChunkDatumStore::StoredRow::build(stored_row, *exprs_, *eval_ctx_, *alloc_))) {
-    LOG_WARN("failed to build stored row", K(ret));
+    // LOG_WARN("failed to build stored row", K(ret));
     return ret;
   }
   
-  LOG_INFO("add_row_with_topn: stored row built successfully");
+  // LOG_INFO("add_row_with_topn: stored row built successfully");
   
   // Create TopNRow wrapper
   TopNRow *new_row = OB_NEWx(TopNRow, alloc_, stored_row, score);
   if (OB_ISNULL(new_row)) {
     ret = OB_ALLOCATE_MEMORY_FAILED;
-    LOG_WARN("failed to allocate TopNRow", K(ret));
+    // LOG_WARN("failed to allocate TopNRow", K(ret));
     if (stored_row != nullptr) {
       stored_row->~StoredRow();
       alloc_->free(stored_row);
@@ -388,12 +388,12 @@ int ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn()
     return ret;
   }
   adlog::DEBUG("产生的分数： ", new_row->score_ );
-  LOG_INFO("add_row_with_topn: checking heap", "heap_count", topn_heap_->count(), K_(topn_limit));
+  // LOG_INFO("add_row_with_topn: checking heap", "heap_count", topn_heap_->count(), K_(topn_limit));
   
   // If heap not full, just add
   if (topn_heap_->count() < topn_limit_) {
     if (OB_FAIL(topn_heap_->push(new_row))) {
-      LOG_WARN("failed to push to heap", K(ret));
+      // LOG_WARN("failed to push to heap", K(ret));
       if (stored_row != nullptr) {
         stored_row->~StoredRow();
         alloc_->free(stored_row);
@@ -407,7 +407,7 @@ int ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn()
   TopNRow *heap_top = topn_heap_->top();
   if (OB_ISNULL(heap_top)) {
     ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("heap top is null", K(ret));
+    // LOG_WARN("heap top is null", K(ret));
     if (stored_row != nullptr) {
       stored_row->~StoredRow();
       alloc_->free(stored_row);
@@ -429,7 +429,7 @@ int ObDASIndexMergeIter::MergeResultBuffer::add_row_with_topn()
     
     // Push new row
     if (OB_FAIL(topn_heap_->push(new_row))) {
-      LOG_WARN("failed to push to heap after pop", K(ret));
+      // LOG_WARN("failed to push to heap after pop", K(ret));
       if (stored_row != nullptr) {
         stored_row->~StoredRow();
         alloc_->free(stored_row);
@@ -467,65 +467,44 @@ int ObDASIndexMergeIter::MergeResultBuffer::to_expr_from_topn(int64_t &size, int
   }
 
   if (first_flag_) {
-    adlog::DEBUG("开始转移 ： topn_heap_->count(): ",topn_heap_->count());
+    adlog::DEBUG("开始转移 ： topn_heap_->count(): ", topn_heap_->count());
+    out_arr_.reserve(topn_heap_->count());
     while (topn_heap_->count() > 0) {
       TopNRow *top = topn_heap_->top();
       adlog::DEBUG("top: score: ", top->score_);
-      if (OB_FAIL(topn_heap_out_->push(top))) {
-        LOG_WARN("failed to push  to topn_heap_out_", K(ret));
+
+      if (OB_FAIL(out_arr_.push_back(top))) {
+        adlog::DEBUG("failed to push  to topn_heap_out_", K(ret));
         break;
       }
       topn_heap_->pop();
+
     }
     first_flag_ = false;
-  }
-  
-  // Extract all rows from heap
-  while (topn_heap_out_->count() > 0 and sorted_rows.count() < capacity) {
-    // while (topn_heap_->count() > 0 ) {
-    TopNRow *top = topn_heap_out_->top();
-    if (OB_FAIL(sorted_rows.push_back(top))) {
-      LOG_WARN("failed to push back to sorted_rows", K(ret));
-      break;
-    }
-    topn_heap_out_->pop();
+    arr_cur_idx_ = -1;
+    std::sort(out_arr_.begin(), out_arr_.end(),
+    [](const TopNRow *a, const TopNRow *b) {
+      return a->score_ > b->score_;
+    });
   }
 
-  if (OB_FAIL(ret)) {
-    // Clean up on error
-    for (int64_t i = 0; i < sorted_rows.count(); ++i) {
-      TopNRow *row = sorted_rows.at(i);
-      if (row != nullptr) {
-        if (row->row_data_ != nullptr) {
-          row->row_data_->~StoredRow();
-          alloc_->free(row->row_data_);
-        }
-        alloc_->free(row);
-      }
-    }
+  if (arr_cur_idx_ == out_arr_.count() - 1) {
+    size = 0;
     return ret;
   }
-  
-  // Sort by score descending (highest scores first)
-  std::sort(sorted_rows.begin(), sorted_rows.end(),
-            [](const TopNRow *a, const TopNRow *b) {
-              return a->score_ > b->score_;
-            });
-  
-  // 两阶段检索日志：粗排阶段完成
-  LOG_INFO("[Two-Phase Retrieval] Phase1 (coarse ranking) complete",
-           "candidates_count", sorted_rows.count(),
-           "top_score", (sorted_rows.count() > 0 ? sorted_rows.at(0)->score_ : 0.0),
-           "last_score", (sorted_rows.count() > 0 ? sorted_rows.at(sorted_rows.count()-1)->score_ : 0.0));
+
+  int64_t begin_idx_ = arr_cur_idx_ + 1;
+  int64_t end_idx_ = std::min(arr_cur_idx_ + capacity + 1, out_arr_.count());
+
 
   // Convert sorted rows to expressions in batch
   {
     ObEvalCtx::BatchInfoScopeGuard batch_info_guard(*eval_ctx_);
-    batch_info_guard.set_batch_size(sorted_rows.count());
+    batch_info_guard.set_batch_size(end_idx_ - begin_idx_);
     
-    for (int64_t i = 0; OB_SUCC(ret) && i < sorted_rows.count(); ++i) {
+    for (int64_t i = begin_idx_; OB_SUCC(ret) && i < end_idx_; ++i) {
       batch_info_guard.set_batch_idx(i);
-      TopNRow *row = sorted_rows.at(i);
+      TopNRow *row = out_arr_.at(i);
       adlog::DEBUG("输出的分数 i: ", i , " socre: ", row->score_);
       if (OB_ISNULL(row) || OB_ISNULL(row->row_data_)) {
         ret = OB_ERR_UNEXPECTED;
@@ -536,12 +515,12 @@ int ObDASIndexMergeIter::MergeResultBuffer::to_expr_from_topn(int64_t &size, int
     }
     
     if (OB_SUCC(ret)) {
-      size = sorted_rows.count();
+      size = end_idx_ - begin_idx_;
     }
     
     // Clean up all rows
-    for (int64_t i = 0; i < sorted_rows.count(); ++i) {
-      TopNRow *row = sorted_rows.at(i);
+    for (int64_t i = begin_idx_; OB_SUCC(ret) && i < end_idx_; ++i) {
+      TopNRow *row = out_arr_.at(i);
       if (row != nullptr) {
         if (row->row_data_ != nullptr) {
           row->row_data_->~StoredRow();
@@ -550,10 +529,12 @@ int ObDASIndexMergeIter::MergeResultBuffer::to_expr_from_topn(int64_t &size, int
         alloc_->free(row);
       }
     }
+
+    arr_cur_idx_ = end_idx_ - 1;
   }
   
   return ret;
-}  
+}
 
 
 int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
@@ -583,10 +564,10 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
     // adlog::DEBUG("top_n_count: ", top_n_count_);
     
     // CRITICAL FIX: Increase max_size_ when TopN is enabled to match expanded capacity
-    if (merge_rtdef_->enable_topn_pushdown_) {
+    if (merge_rtdef_->enable_topn_pushdown_ ) {
       // Original max_size_ is typically 256, increase it to support larger capacity
-      max_size_ = max_size_ * 2 + 200;  // Ensure it's larger than capacity (310)
-      LOG_INFO("Increased max_size_ for TopN pushdown", "original", 256, "new", max_size_);
+      // max_size_ = max_size_ * 2 + 200;  // Ensure it's larger than capacity (310)
+      // LOG_INFO("Increased max_size_ for TopN pushdown", "original", 256, "new", max_size_);
     }
     
     lib::ContextParam context_param;
@@ -635,9 +616,9 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
           } else if (OB_FAIL(extract_match_against_exprs(*child->get_output(), match_against_exprs))) {
             LOG_WARN("failed to extract match against exprs", K(ret));
           } else {
-            LOG_INFO("inner_init: extracted match_against_exprs from child", K(i), 
-                     "child_output_count", child->get_output()->count(),
-                     "match_count", match_against_exprs.count());
+            // LOG_INFO("inner_init: extracted match_against_exprs from child", K(i), 
+            //          "child_output_count", child->get_output()->count(),
+            //          "match_count", match_against_exprs.count());
           }
           if (OB_SUCC(ret)) {
             child_match_against_expr.set_allocator(&alloc);
@@ -661,7 +642,7 @@ int ObDASIndexMergeIter::inner_init(ObDASIterParam &param)
               result_buffer_.topn_finish_ = false;
               result_buffer_.first_flag_ = true;
               // 两阶段检索：粗排保留 100x 候选（如 limit=10 则保留 1000个）
-              result_buffer_.topn_limit_ = merge_rtdef_->topn_limit_ * 1;
+              result_buffer_.topn_limit_ = merge_rtdef_->topn_limit_ ;
             } else {
               result_buffer_.enable_topn_ = false;
               result_buffer_.topn_finish_ = false;
@@ -829,19 +810,19 @@ int ObDASIndexMergeIter::fill_default_values_for_union(const common::ObIArray<Ob
 int ObDASIndexMergeIter::save_row_to_result_buffer() {
   int ret = OB_SUCCESS;
   
-  LOG_INFO("===== save_row_to_result_buffer CALLED =====", 
-           "enable_topn", result_buffer_.enable_topn_,
-           "merge_type", merge_type_);
+  // LOG_INFO("===== save_row_to_result_buffer CALLED =====", 
+  //          "enable_topn", result_buffer_.enable_topn_,
+  //          "merge_type", merge_type_);
   
   // Note: MATCH_AGAINST expressions should already be properly filled by union_get_next_rows()
   // or intersect_get_next_rows() before calling this function.
   // We just save the row to the result buffer.
   
   if (!result_buffer_.enable_topn_) {
-    LOG_INFO("save_row: using normal add_row");
+    // LOG_INFO("save_row: using normal add_row");
     return result_buffer_.add_row();
   }
-  LOG_INFO("save_row: using TopN add_row_with_topn");
+  // LOG_INFO("save_row: using TopN add_row_with_topn");
   return result_buffer_.add_row_with_topn();
 }
 
@@ -1005,8 +986,8 @@ int ObDASIndexMergeIter::inner_release()
 int ObDASIndexMergeIter::inner_get_next_row()
 {
   int ret = OB_SUCCESS;
-  LOG_INFO("===== inner_get_next_row CALLED (SINGLE ROW MODE) =====",
-           "merge_type", merge_type_);
+  // LOG_INFO("===== inner_get_next_row CALLED (SINGLE ROW MODE) =====",
+  //          "merge_type", merge_type_);
   clear_evaluated_flag();
   if (OB_FAIL((this->*get_next_row_)())) {
     if (ret != OB_ITER_END) {
@@ -1019,8 +1000,8 @@ int ObDASIndexMergeIter::inner_get_next_row()
 int ObDASIndexMergeIter::inner_get_next_rows(int64_t &count, int64_t capacity)
 {
   int ret = OB_SUCCESS;
-  LOG_INFO("===== inner_get_next_rows CALLED =====", K(count), K(capacity), 
-           "merge_type", (merge_type_ == INDEX_MERGE_UNION ? "UNION" : "INTERSECT"));
+  // LOG_INFO("===== inner_get_next_rows CALLED =====", K(count), K(capacity), 
+  //          "merge_type", (merge_type_ == INDEX_MERGE_UNION ? "UNION" : "INTERSECT"));
   clear_evaluated_flag();
   if (OB_FAIL((this->*get_next_rows_)(count, capacity))) {
     if (ret != OB_ITER_END) {
@@ -1163,15 +1144,15 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
   int64_t scan_limit = capacity * 10;
   int64_t scanned_rows = 0;
   
-  if (result_buffer_.enable_topn_) {
-    // 两阶段检索参数：
-    // matched_capacity: 粗排候选数（如 1000）
-    // scan_limit: 扫描行数上限（如 10000）
-    matched_capacity = result_buffer_.topn_limit_;  // 直接使用 topn_limit
-    scan_limit = matched_capacity * 10;  // 扫描 10x 候选数的行
-    LOG_INFO("[Two-Phase Retrieval] Phase1 parameters",
-             K(matched_capacity), K(scan_limit));
-  }
+  // if (result_buffer_.enable_topn_) {
+  //   // 两阶段检索参数：
+  //   // matched_capacity: 粗排候选数（如 1000）
+  //   // scan_limit: 扫描行数上限（如 10000）
+  //   matched_capacity = result_buffer_.topn_limit_;  // 直接使用 topn_limit
+  //   scan_limit = matched_capacity * 10;  // 扫描 10x 候选数的行
+  //   // LOG_INFO("[Two-Phase Retrieval] Phase1 parameters",
+  //   //          K(matched_capacity), K(scan_limit));
+  // }
 
   if (result_buffer_.enable_topn_ and result_buffer_.topn_finish_) {
     result_buffer_.to_expr_from_topn(count, capacity);
@@ -1256,8 +1237,8 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
       // If we have collected some matches, break and return them
       // Otherwise, return OB_ITER_END
       if (count > 0) {
-        LOG_INFO("INTERSECT: No more data, but have matches to return", 
-                 "count", count, "scanned_rows", scanned_rows);
+        // LOG_INFO("INTERSECT: No more data, but have matches to return", 
+        //          "count", count, "scanned_rows", scanned_rows);
         break;  // Exit loop and return collected data
       } else {
         ret = OB_ITER_END;
@@ -1294,8 +1275,8 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
         continue;  // Not a match, continue scanning
       }
       // CRITICAL FIX: Call to_expr() for ALL children to fill their expressions
-      LOG_INFO("===== INTERSECT FIX: calling to_expr() for all children =====", 
-               "output_idx", output_idx, "child_count", child_stores_.count());
+      // LOG_INFO("===== INTERSECT FIX: calling to_expr() for all children =====", 
+      //          "output_idx", output_idx, "child_count", child_stores_.count());
       
       for (int64_t i = 0; OB_SUCC(ret) && i < child_stores_.count(); i++) {
         if (OB_FAIL(child_stores_.at(i).to_expr())) {
@@ -1329,9 +1310,9 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
                     output_datum = child_datum;  // Copy datum
                     output_expr->set_evaluated_flag(*eval_ctx_);
                     found = true;
-                    LOG_INFO("INTERSECT: Copied MATCH_AGAINST from child to output", 
-                             "child_idx", child_idx, "len", child_datum.len_,
-                             "score", (child_datum.len_ == sizeof(double) ? child_datum.get_double() : 0.0));
+                    // LOG_INFO("INTERSECT: Copied MATCH_AGAINST from child to output", 
+                    //          "child_idx", child_idx, "len", child_datum.len_,
+                    //          "score", (child_datum.len_ == sizeof(double) ? child_datum.get_double() : 0.0));
                   }
                 }
               }
@@ -1377,7 +1358,6 @@ int ObDASIndexMergeIter::intersect_get_next_rows(int64_t &count, int64_t capacit
 
     if (result_buffer_.enable_topn_) {
       adlog::DEBUG("result_buffer_.to_expr_from_topn(count): ", count);
-      int64_t tmp;
       
       result_buffer_.to_expr_from_topn(count, capacity);
     } else if (OB_FAIL(result_buffer_.to_expr(count))) {

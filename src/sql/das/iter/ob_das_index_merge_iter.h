@@ -246,6 +246,8 @@ public:
     TopNCompareOut compare_out_;
     common::ObBinaryHeap<TopNRow *, TopNCompare> *topn_heap_;
     common::ObBinaryHeap<TopNRow *, TopNCompareOut> *topn_heap_out_;
+    common::ObArray<TopNRow *> out_arr_;
+    int64_t arr_cur_idx_{-1};
     common::ObIAllocator *alloc_;
   };
 
