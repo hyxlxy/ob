@@ -650,7 +650,8 @@ ObTextRetrievalDaaTTokenIter::ObTextRetrievalDaaTTokenIter()
     relevance_(),
     doc_id_(),
     cmp_func_(nullptr),
-    is_inited_(false)
+    is_inited_(false),
+    full_scan_done_(false)
 {
 }
 
@@ -701,6 +702,7 @@ void ObTextRetrievalDaaTTokenIter::reuse()
 {
   cur_idx_ = -1;
   count_ = 0;
+  full_scan_done_ = false;
   token_iter_->reuse();
 }
 
@@ -711,27 +713,101 @@ void ObTextRetrievalDaaTTokenIter::reset()
   token_iter_->reset();
   cur_idx_ = -1;
   count_ = 0;
+  full_scan_done_ = false;
+}
+
+// 强制全扫描以填充缓存
+int ObTextRetrievalDaaTTokenIter::force_full_scan_for_cache() {
+  int ret = OB_SUCCESS;
+  
+  if (full_scan_done_ || !cache_iter_ || cache_iter_->have_done_flag_) {
+    return OB_SUCCESS;  // 已经扫描过或不需要扫描
+  }
+  
+  LOG_INFO("[TokenCache] Starting force full scan for cache");
+  int64_t total_scanned = 0;
+  
+  while (OB_SUCC(ret)) {
+    int64_t batch_count = 0;
+    
+    if (!eval_ctx_->is_vectorized()) {
+      if (OB_FAIL(token_iter_->get_next_row())) {
+        if (OB_ITER_END == ret) {
+          ret = OB_SUCCESS;
+          break;
+        }
+        LOG_WARN("failed to get row from inverted index", K(ret));
+      } else {
+        batch_count = 1;
+      }
+    } else {
+      if (OB_FAIL(token_iter_->get_next_batch(max_batch_size_, batch_count))) {
+        if (OB_ITER_END == ret) {
+          ret = OB_SUCCESS;
+          if (batch_count > 0) {
+            // 处理最后一批数据
+          } else {
+            break;
+          }
+        } else {
+          LOG_WARN("failed to get batch rows from inverted index", K(ret));
+          break;
+        }
+      }
+    }
+    
+    if (OB_SUCC(ret) && batch_count > 0) {
+      count_ = batch_count;
+      if (OB_NOT_NULL(relevance_expr_)) {
+        if (OB_FAIL(save_relevances_and_docids())) {
+          LOG_WARN("failed to save relevances and docids", K(ret));
+        }
+      } else if (OB_FAIL(save_docids())) {
+        LOG_WARN("failed to save doc ids", K(ret));
+      }
+      total_scanned += batch_count;
+    }
+  }
+  
+  if (OB_SUCC(ret)) {
+    full_scan_done_ = true;
+    if (cache_iter_) {
+      cache_iter_->have_done_flag_ = true;
+      LOG_INFO("[TokenCache] Force full scan completed", K(total_scanned), 
+               K_(cache_iter_->total_count));
+    }
+    // 重置迭代器位置以便从头开始读取
+    cur_idx_ = -1;
+    count_ = 0;
+  }
+  
+  return ret;
 }
 
 // Sparse Retrieval Dimension Iter Interfaces
 int ObTextRetrievalDaaTTokenIter::get_next_row() {
   int ret = OB_SUCCESS;
   bool need_load = false;
+  
+  // 如果需要缓存且还没完成全扫描，先强制全扫描
+  if (cache_iter_ && !cache_iter_->have_done_flag_ && !full_scan_done_) {
+    if (OB_FAIL(force_full_scan_for_cache())) {
+      LOG_WARN("failed to force full scan for cache", K(ret));
+      return ret;
+    }
+  }
 
   if (cache_iter_ and cache_iter_->have_done_flag_ ) {
     // 代表他指的迭代器可以使用了，那么就直接调用它的对应的缓存迭代器吧.ObTRDaaTTokenCacheIter
     if (!cache_iter_->is_created_flag_) {
-      // 这里会导致内存泄漏，以后要注意修复
       cache_iter_ = TokenCacheMg::get_instance().create_iter_from_cache(cache_iter_);
       cache_iter_->is_created_flag_ = true;
     }
     cache_iter_->cur_idx_ = cur_idx_;
     ++cur_idx_;
-    adlog::DEBUG("使用了内置的缓存迭代器");
+    LOG_INFO("[TokenCache] Using cached iterator in get_next_row", K_(cur_idx));
     return cache_iter_->get_next_row();
   }
-
-  // adlog::DEBUG("没有使用缓存迭代器： ObTextRetrievalDaaTTokenIter::get_next_row()");
   if (OB_LIKELY((++cur_idx_) < count_)) {
   } else if (!eval_ctx_->is_vectorized() && (OB_FAIL(token_iter_->get_next_row()))) {
     if (OB_UNLIKELY(OB_ITER_END != ret)) {
@@ -744,11 +820,11 @@ int ObTextRetrievalDaaTTokenIter::get_next_row() {
       if (cache_iter_) {
         cache_iter_->have_done_flag_ = true;
       }
-      adlog::DEBUG("WARNING! 缓存迭代器 failed to get batch rows from inverted index");
+      LOG_INFO("[TokenCache] Cache iter marked done - failed to get batch rows");
     } else if (count_ != 0) {
       ret = OB_SUCCESS;
       need_load = true;
-      adlog::DEBUG("ObTextRetrievalDaaTTokenIter::get_next_row() 最后一轮了");
+      LOG_INFO("[TokenCache] Last batch of data", K_(count));
       if (OB_NOT_NULL(relevance_expr_)) {
         if (OB_FAIL(save_relevances_and_docids())) {
           LOG_WARN("failed to evaluate simarity expr", K(ret));
@@ -758,13 +834,14 @@ int ObTextRetrievalDaaTTokenIter::get_next_row() {
       }
       if (cache_iter_) {
         cache_iter_->have_done_flag_ = true;
+        LOG_INFO("[TokenCache] Cache iter marked done - last batch completed", K_(count));
       }
       return ret;
     } else {
       if (cache_iter_) {
         cache_iter_->have_done_flag_ = true;
+        LOG_INFO("[TokenCache] Cache iter marked done - count = 0");
       }
-      adlog::DEBUG("阿巴 count = 0");
     }
   } else {
     need_load = true;
@@ -801,16 +878,13 @@ int ObTextRetrievalDaaTTokenIter::save_relevances_and_docids()
         }
       }
     }
-    // 把这个结果也给我放到缓存里面去，哎我焯，希望QPS能多一点吧
-    // adlog::DEBUG("检测是否可以缓存数据");
-    // adlog::DEBUG(K(cache_iter_->have_done_flag_));
-    // if(cache_iter_){ adlog::DEBUG("cache_iter_ is not nullptr"); }
-    // else { adlog::DEBUG("cache_iter_ is nullptr"); }
+    // 将数据添加到缓存
     if (OB_SUCC(ret) && cache_iter_ != nullptr && (!cache_iter_->have_done_flag_)) {  
-      // adlog::DEBUG("ObTextRetrievalDaaTTokenIter::save_relevances_and_docids() 开始把数据放进去缓存了");
       if (OB_FAIL(cache_iter_->add_data(relevance_, doc_id_, count_))) {  
-        adlog::DEBUG("failed to add data to cache", K(ret));  
-      }  
+        LOG_WARN("[TokenCache] Failed to add data to cache", K(ret), K_(count));  
+      } else {
+        LOG_INFO("[TokenCache] Added data to cache", K_(count), K_(cache_iter_->total_count));
+      }
     }  
   }
   return ret;
@@ -832,8 +906,7 @@ int ObTextRetrievalDaaTTokenIter::save_docids()
         };
       }
     }
-    // 从火焰图里貌似没看到这个函数的调用，那就先不写缓存了
-    adlog::DEBUG("WARNING! ObTextRetrievalDaaTTokenIter::save_docids()");
+    LOG_INFO("[TokenCache] save_docids called (no relevance)", K_(count));
   }
   return ret;
 }
@@ -891,9 +964,7 @@ int ObTextRetrievalDaaTTokenIter::get_curr_score(double &score) const
 
   
   if (cache_iter_ and cache_iter_->have_done_flag_ ) {
-    // 代表他指的迭代器可以使用了，那么就直接调用它的对应的缓存迭代器吧.
     if (!cache_iter_->is_created_flag_) {
-      // 这里会导致内存泄漏，以后要注意修复
       cache_iter_ = TokenCacheMg::get_instance().create_iter_from_cache(cache_iter_);
       cache_iter_->is_created_flag_ = true;
     }
@@ -915,9 +986,7 @@ int ObTextRetrievalDaaTTokenIter::get_curr_id(const ObDatum *&id_datum) const
   int ret = OB_SUCCESS;
 
   if (cache_iter_ and cache_iter_->have_done_flag_ ) {
-    // 代表他指的迭代器可以使用了，那么就直接调用它的对应的缓存迭代器吧.
     if (!cache_iter_->is_created_flag_) {
-      // 这里会导致内存泄漏，以后要注意修复
       cache_iter_ = TokenCacheMg::get_instance().create_iter_from_cache(cache_iter_);
       cache_iter_->is_created_flag_ = true;
     }
@@ -1229,23 +1298,21 @@ ObTRDaaTTokenCacheIter();
 */
 
 ObTRDaaTTokenCacheIter::ObTRDaaTTokenCacheIter(common::ObIAllocator *alloc)
-    : cur_idx_(-1), total_count_(0), is_created_flag_(false),
-      have_done_flag_(false), allocator_(alloc)  
+    : cached_relevance_(), cached_doc_id_(),
+      cur_idx_(-1), total_count_(0), is_created_flag_(false),
+      have_done_flag_(false), allocator_(alloc)
 {  
-  // cached_relevance_.set_allocator(allocator_);  
-  // cached_doc_id_.set_allocator(allocator_);  
+  // ObSEArray 会自动管理内存，支持动态扩展，无需手动初始化
 }
 
 int ObTRDaaTTokenCacheIter::get_next_row() {
-  // adlog::DEBUG("调用了缓存迭代器的 get_next_row");
   int ret = OB_SUCCESS;  
   if (OB_UNLIKELY(!have_done_flag_)) {  
     ret = OB_NOT_INIT;  
-    adlog::DEBUG("ObTRDaaTTokenCacheIter::get_next_row cache iter not ready", K(ret));  
+    LOG_INFO("[CacheIter] Cache iter not ready", K(ret));  
   } else if (cur_idx_ >= total_count_ - 1) {
     ret = OB_ITER_END;
-    // cur_idx_ = -1;  
-    adlog::DEBUG("缓存迭代器： 返回 OB_ITER_END");
+    LOG_INFO("[CacheIter] Reached end of cache", K_(cur_idx), K_(total_count));
   } else {
     ++cur_idx_;
   }  
@@ -1253,7 +1320,7 @@ int ObTRDaaTTokenCacheIter::get_next_row() {
 }  
   
 int ObTRDaaTTokenCacheIter::advance_to(const ObDatum &id_datum) {
-  adlog::DEBUG("WARNING! ObTRDaaTTokenCacheIter::advance_to");
+  LOG_INFO("[CacheIter] advance_to called (not implemented)");
   return OB_NOT_INIT;
   // int ret = OB_SUCCESS;  
   // if (OB_UNLIKELY(!have_done_flag_)) {  
@@ -1279,9 +1346,8 @@ int ObTRDaaTTokenCacheIter::get_curr_score(double &score) const
   int ret = OB_SUCCESS;  
   if (OB_UNLIKELY(!have_done_flag_ || cur_idx_ >= total_count_ || cur_idx_ < 0)) {  
     ret = OB_ARRAY_OUT_OF_RANGE;  
-    adlog::DEBUG("ObTRDaaTTokenCacheIter::get_curr_score invalid cache state", K(ret), K_(cur_idx), K_(total_count));
+    LOG_WARN("[CacheIter] Invalid cache state in get_curr_score", K(ret), K_(cur_idx), K_(total_count));
   } else {
-    // adlog::DEBUG("缓存迭代器： ObTRDaaTTokenCacheIter::get_curr_score");
     score = cached_relevance_[cur_idx_];  
   }  
   return ret;  
@@ -1292,9 +1358,8 @@ int ObTRDaaTTokenCacheIter::get_curr_id(const ObDatum *&datum) const
   int ret = OB_SUCCESS;  
   if (OB_UNLIKELY(!have_done_flag_ || cur_idx_ >= total_count_ || cur_idx_ < 0)) {  
     ret = OB_ARRAY_OUT_OF_RANGE;  
-    adlog::DEBUG("ObTRDaaTTokenCacheIter::get_curr_id invalid cache state", K(ret), K_(cur_idx), K_(total_count));  
+    LOG_WARN("[CacheIter] Invalid cache state in get_curr_id", K(ret), K_(cur_idx), K_(total_count));  
   } else {  
-    // adlog::DEBUG("缓存迭代器： ObTRDaaTTokenCacheIter::get_curr_id");
     datum = &cached_doc_id_[cur_idx_].get_datum();  
   }  
   return ret;  
@@ -1305,7 +1370,7 @@ int ObTRDaaTTokenCacheIter::get_dim_max_score(double &score)
   int ret = OB_SUCCESS;  
   if (OB_UNLIKELY(!have_done_flag_ || total_count_ == 0)) {  
     ret = OB_NOT_INIT;  
-    adlog::DEBUG("ObTRDaaTTokenCacheIter::get_dim_max_score cache not ready or empty", K(ret), K_(total_count));  
+    LOG_WARN("[CacheIter] Cache not ready or empty in get_dim_max_score", K(ret), K_(total_count));  
   } else {  
 
     score = cached_relevance_[0];  
@@ -1323,7 +1388,7 @@ int ObTRDaaTTokenCacheIter::init_from_cache(ObTRDaaTTokenCacheIter *one)
   int ret = OB_SUCCESS;  
   if (OB_ISNULL(one) || !one->have_done_flag_) {  
     ret = OB_INVALID_ARGUMENT;  
-    adlog::DEBUG("invalid cache template", K(ret));  
+    LOG_WARN("[CacheIter] Invalid cache template", K(ret));  
   } else {  
     if (OB_FAIL(cached_relevance_.assign(one->cached_relevance_))) {  
       LOG_WARN("failed to assign relevance array", K(ret));  
@@ -1334,7 +1399,7 @@ int ObTRDaaTTokenCacheIter::init_from_cache(ObTRDaaTTokenCacheIter *one)
       cur_idx_ = -1;  
       have_done_flag_ = true;
       is_created_flag_ = false;
-      // adlog::DEBUG("缓存迭代器： 从cache拷贝过来了一个");
+      LOG_INFO("[CacheIter] Initialized from cache template", K_(total_count));
     }  
   }  
   return ret;  
@@ -1344,20 +1409,18 @@ int ObTRDaaTTokenCacheIter::add_data(const ObFixedArray<double, ObIAllocator> &r
                                      const ObFixedArray<ObDocIdExt, ObIAllocator> &doc_id,  
                                      int64_t count)  
 {
-  // adlog::DEBUG("ObTRDaaTTokenCacheIter::add_data start");
-  // adlog::DEBUG(K(count));
   int ret = OB_SUCCESS;  
   if (OB_UNLIKELY(count <= 0 || relevance.count() < count || doc_id.count() < count)) {  
     ret = OB_INVALID_ARGUMENT;  
-    adlog::DEBUG("invalid count or array size", K(ret), K(count),   
+    LOG_WARN("[CacheIter] Invalid count or array size", K(ret), K(count),   
              K(relevance.count()), K(doc_id.count()));  
   } else {  
       
     for (int64_t i = 0; OB_SUCC(ret) && i < count; ++i) {  
       if (OB_FAIL(cached_relevance_.push_back(relevance[i]))) {  
-        adlog::DEBUG("failed to push back relevance", K(ret));  
+        LOG_WARN("[CacheIter] Failed to push back relevance", K(ret));  
       } else if (OB_FAIL(cached_doc_id_.push_back(doc_id[i]))) {  
-        adlog::DEBUG("failed to push back doc_id", K(ret));  
+        LOG_WARN("[CacheIter] Failed to push back doc_id", K(ret));  
       }  
     }  
       
@@ -1365,7 +1428,6 @@ int ObTRDaaTTokenCacheIter::add_data(const ObFixedArray<double, ObIAllocator> &r
       total_count_ += count;    
     }
   }
-  // adlog::DEBUG("ObTRDaaTTokenCacheIter::add_data end");
   
   return ret;  
 }  

@@ -156,9 +156,9 @@ public:
                const ObFixedArray<ObDocIdExt, ObIAllocator> &doc_id,
                int64_t count);
 
-  
-  ObSEArray<double,64, ModulePageAllocator > cached_relevance_;  
-  ObSEArray<ObDocIdExt,64, ModulePageAllocator > cached_doc_id_;  
+  // 使用 ObSEArray 支持动态扩展，避免 ObFixedArray 的容量限制
+  ObSEArray<double, 256> cached_relevance_;  
+  ObSEArray<ObDocIdExt, 256> cached_doc_id_;  
   int64_t cur_idx_;
   int64_t total_count_;
   bool is_created_flag_{false};
@@ -195,6 +195,7 @@ public:
 private:
   int save_relevances_and_docids();
   int save_docids();
+  int force_full_scan_for_cache();  // 强制全扫描以填充缓存
   ObArenaAllocator *allocator_;
   ObTextRetrievalTokenIter *token_iter_;
   sql::ObEvalCtx *eval_ctx_;
@@ -207,6 +208,7 @@ private:
   ObFixedArray<ObDocIdExt, ObIAllocator> doc_id_;
   common::ObDatumCmpFuncType cmp_func_;
   bool is_inited_;
+  bool full_scan_done_;  // 是否已完成全扫描
   DISALLOW_COPY_AND_ASSIGN(ObTextRetrievalDaaTTokenIter);
 };
 

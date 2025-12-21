@@ -77,20 +77,74 @@ struct ObDASTRMergeIterParam : public ObDASIterParam
 
 class ObGlobalTokenCacheManager {  
 private:  
-  hash::ObHashMap<ObString, ObTRDaaTTokenCacheIter*> global_cache_map_;
-  common::ObArenaAllocator allocator_; 
+  struct CacheEntry {
+    ObTRDaaTTokenCacheIter *iter_;
+    ObString token_;
+    int64_t access_time_;
+    CacheEntry *prev_;
+    CacheEntry *next_;
+    
+    CacheEntry() : iter_(nullptr), token_(), access_time_(0), prev_(nullptr), next_(nullptr) {}
+  };
+  
+  hash::ObHashMap<ObString, CacheEntry*> global_cache_map_;
+  common::ObArenaAllocator allocator_;
+  CacheEntry *lru_head_;  // 最近使用的
+  CacheEntry *lru_tail_;  // 最久未使用的
+  int64_t cache_count_;
+  static const int64_t MAX_CACHE_SIZE = 100;  // 最多缓存100个token
+  lib::ObMutex mutex_;  // 保护并发访问
 
+  void move_to_head(CacheEntry *entry) {
+    if (entry == lru_head_) return;
+    
+    // 从当前位置移除
+    if (entry->prev_) entry->prev_->next_ = entry->next_;
+    if (entry->next_) entry->next_->prev_ = entry->prev_;
+    if (entry == lru_tail_) lru_tail_ = entry->prev_;
+    
+    // 移到头部
+    entry->next_ = lru_head_;
+    entry->prev_ = nullptr;
+    if (lru_head_) lru_head_->prev_ = entry;
+    lru_head_ = entry;
+    if (!lru_tail_) lru_tail_ = entry;
+  }
+  
+  void evict_lru() {
+    if (!lru_tail_ || cache_count_ <= MAX_CACHE_SIZE) return;
+    
+    CacheEntry *to_evict = lru_tail_;
+    lru_tail_ = to_evict->prev_;
+    if (lru_tail_) lru_tail_->next_ = nullptr;
+    else lru_head_ = nullptr;
+    
+    global_cache_map_.erase_refactored(to_evict->token_);
+    if (to_evict->iter_) {
+      to_evict->iter_->~ObTRDaaTTokenCacheIter();
+    }
+    cache_count_--;
+    LOG_INFO("[TokenCache] Evicted LRU cache entry", "token", to_evict->token_, K_(cache_count));
+  }
   
 public:  
-  ObGlobalTokenCacheManager(): allocator_(ObMemAttr(MTL_ID(), "TokenCacheAlloc")) {  
+  ObGlobalTokenCacheManager(): 
+      allocator_(ObMemAttr(MTL_ID(), "TokenCacheAlloc")),
+      lru_head_(nullptr),
+      lru_tail_(nullptr),
+      cache_count_(0) {  
     global_cache_map_.create(1024, ObMemAttr(MTL_ID(), "TokenCache"));  
   }  
+  
   ~ObGlobalTokenCacheManager() {  
-    for (auto iter = global_cache_map_.begin(); iter != global_cache_map_.end(); ++iter) {  
-      if (iter->second) {  
-        delete iter->second;  
-      }  
-    }  
+    CacheEntry *cur = lru_head_;
+    while (cur) {
+      CacheEntry *next = cur->next_;
+      if (cur->iter_) {
+        cur->iter_->~ObTRDaaTTokenCacheIter();
+      }
+      cur = next;
+    }
     global_cache_map_.destroy();
   }
   
@@ -124,17 +178,71 @@ public:
     return new_iter;
   }
   
-  ObTRDaaTTokenCacheIter* get_cache_iter(const ObString &token) {  
-    ObTRDaaTTokenCacheIter *cache_iter = nullptr;  
-    global_cache_map_.get_refactored(token, cache_iter);  
-    return cache_iter;  
+  ObTRDaaTTokenCacheIter* get_cache_iter(const ObString &token) {
+    lib::ObMutexGuard guard(mutex_);
+    CacheEntry *entry = nullptr;
+    if (OB_SUCCESS == global_cache_map_.get_refactored(token, entry) && entry) {
+      move_to_head(entry);
+      entry->access_time_ = ObTimeUtility::current_time();
+      return entry->iter_;
+    }
+    return nullptr;  
   }  
     
-  int cache_iter(const ObString &token, ObTRDaaTTokenCacheIter *iter) {  
-    return global_cache_map_.set_refactored(token, iter, 1);  
+  int cache_iter(const ObString &token, ObTRDaaTTokenCacheIter *iter) {
+    lib::ObMutexGuard guard(mutex_);
+    int ret = OB_SUCCESS;
+    
+    // 检查是否已存在
+    CacheEntry *existing = nullptr;
+    if (OB_SUCCESS == global_cache_map_.get_refactored(token, existing)) {
+      return OB_SUCCESS;  // 已存在，不重复添加
+    }
+    
+    // 需要淘汰旧条目
+    if (cache_count_ >= MAX_CACHE_SIZE) {
+      evict_lru();
+    }
+    
+    // 创建新条目
+    void *buf = allocator_.alloc(sizeof(CacheEntry));
+    if (OB_ISNULL(buf)) {
+      return OB_ALLOCATE_MEMORY_FAILED;
+    }
+    
+    CacheEntry *entry = new(buf) CacheEntry();
+    entry->iter_ = iter;
+    
+    // 深拷贝token字符串
+    char *token_buf = static_cast<char*>(allocator_.alloc(token.length()));
+    if (OB_ISNULL(token_buf)) {
+      return OB_ALLOCATE_MEMORY_FAILED;
+    }
+    MEMCPY(token_buf, token.ptr(), token.length());
+    entry->token_.assign_ptr(token_buf, token.length());
+    entry->access_time_ = ObTimeUtility::current_time();
+    
+    // 添加到LRU头部
+    entry->next_ = lru_head_;
+    entry->prev_ = nullptr;
+    if (lru_head_) lru_head_->prev_ = entry;
+    lru_head_ = entry;
+    if (!lru_tail_) lru_tail_ = entry;
+    
+    // 添加到HashMap
+    ret = global_cache_map_.set_refactored(entry->token_, entry, 0);
+    if (OB_SUCCESS == ret) {
+      cache_count_++;
+      LOG_INFO("[TokenCache] Cached new token", "token", entry->token_, K_(cache_count));
+    }
+    
+    return ret;  
   }
 };
 using TokenCacheMg = ObGlobalTokenCacheManager;
+
+// 强制全扫描标志
+static const bool FORCE_FULL_SCAN_FOR_CACHE = true;
 
 class ObDASTRMergeIter : public ObDASIter
 {

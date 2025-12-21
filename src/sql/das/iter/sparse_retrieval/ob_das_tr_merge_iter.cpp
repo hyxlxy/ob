@@ -18,6 +18,8 @@
 #include "ob_das_tr_merge_iter.h"
 #include "sql/das/ob_das_ir_define.h"
 #include "common/ad_log.h"
+#include "lib/time/ob_time_utility.h"
+#include "lib/oblog/ob_log_module.h"
 namespace oceanbase
 {
 using namespace share;
@@ -413,56 +415,46 @@ int ObDASTRMergeIter::create_dim_iters()
       {
         auto && current_token = query_tokens_.at(i);
         std::string one(current_token.ptr(), current_token.length());
-        adlog::DEBUG("token:", one);
+        LOG_INFO("[TokenCache] Processing token", K(i), "token", one.c_str());
       }
-      // if (cache_iter and cache_iter->have_done_flag_) {
-      //   // adlog::DEBUG("cached_iter and cached_iter.have_done_flag_");
-      //   adlog::DEBUG("开始使用之前的缓存迭代器了");
-      //   auto &&dim_iter_tmp =
-      //       TokenCacheMg::get_instance().create_iter_from_cache(cache_iter);
-      //   ObISRDaaTDimIter *dim_iter_tmp_2 = dim_iter_tmp; 
-      //   // adlog::DEBUG("放进去了缓存迭代器");
-      //   if (OB_FAIL(dim_iters_.push_back(dim_iter_tmp_2))) {
-      //     adlog::DEBUG("WARNING! failed to push back dim iter", K(ret));
-      //   }
-      // } else {
-      //   if (OB_FAIL(init_dim_iter_param(iter_param, i))) {
-      //     LOG_WARN("failed to init create tr iter param", K(ret));
-      //   } else if (OB_ISNULL(dim_iter = OB_NEWx(ObTextRetrievalDaaTTokenIter, &myself_allocator_))) {
-      //     ret = OB_ALLOCATE_MEMORY_FAILED;
-      //     LOG_WARN("failed to allocate memory for text retrieval daat token iter", K(ret));
-      //   } else if (OB_FAIL(dim_iter->init(iter_param))) {
-      //       LOG_WARN("failed to init text retrieval daat token iter", K(ret));
-      //   } else if (OB_FAIL(dim_iters_.push_back(dim_iter))) {
-      //     LOG_WARN("failed to push back dim iter", K(ret));
-      //   }
+      
+      // 如果缓存已经完成，直接使用缓存迭代器
+      if (cache_iter and cache_iter->have_done_flag_) {
+        LOG_INFO("[TokenCache] Using cached iterator for token", K(i));
+        auto &&dim_iter_tmp =
+            TokenCacheMg::get_instance().create_iter_from_cache(cache_iter);
+        ObISRDaaTDimIter *dim_iter_tmp_2 = dim_iter_tmp; 
+        if (OB_FAIL(dim_iters_.push_back(dim_iter_tmp_2))) {
+          LOG_WARN("[TokenCache] Failed to push back cached dim iter", K(ret));
+        }
+      } else {
+        // 创建新的迭代器
+        if (OB_FAIL(init_dim_iter_param(iter_param, i))) {
+          LOG_WARN("failed to init create tr iter param", K(ret));
+        } else if (OB_ISNULL(dim_iter = OB_NEWx(ObTextRetrievalDaaTTokenIter, &myself_allocator_))) {
+          ret = OB_ALLOCATE_MEMORY_FAILED;
+          LOG_WARN("failed to allocate memory for text retrieval daat token iter", K(ret));
+        } else if (OB_FAIL(dim_iter->init(iter_param))) {
+            LOG_WARN("failed to init text retrieval daat token iter", K(ret));
+        } else if (OB_FAIL(dim_iters_.push_back(dim_iter))) {
+          LOG_WARN("failed to push back dim iter", K(ret));
+        }
 
-      //   // 如果cached_iter有值
-      //   //  代表之前已经有人搞出来过cache_iter了，但是还没有弄完，
-      //   // 那么我们这个就正常走就行，也不需要存数据
-      //   if (!cache_iter) {
-      //     // adlog::DEBUG("!cache_iter");
-      //     // 如果之前没有人创建过，那么这次就创建出来
-      //     dim_iter->cache_iter_ =
-      //         TokenCacheMg::get_instance().create_cache_iter();
-          
-      //     TokenCacheMg::get_instance().cache_iter(query_tokens_.at(i), dim_iter->cache_iter_);
-      //   } else {
-      //     adlog::DEBUG("缓存迭代器存在");
-      //     adlog::DEBUG(K(cache_iter->have_done_flag_));
-      //     dim_iter->cache_iter_ = cache_iter;
-      //   }
-      // }
-
-      if (OB_FAIL(init_dim_iter_param(iter_param, i))) {
-        LOG_WARN("failed to init create tr iter param", K(ret));
-      } else if (OB_ISNULL(dim_iter = OB_NEWx(ObTextRetrievalDaaTTokenIter, &myself_allocator_))) {
-        ret = OB_ALLOCATE_MEMORY_FAILED;
-        LOG_WARN("failed to allocate memory for text retrieval daat token iter", K(ret));
-      } else if (OB_FAIL(dim_iter->init(iter_param))) {
-          LOG_WARN("failed to init text retrieval daat token iter", K(ret));
-      } else if (OB_FAIL(dim_iters_.push_back(dim_iter))) {
-        LOG_WARN("failed to push back dim iter", K(ret));
+        // 设置缓存迭代器
+        if (OB_SUCC(ret)) {
+          if (!cache_iter) {
+            // 如果之前没有人创建过，那么这次就创建出来
+            LOG_INFO("[TokenCache] Creating new cache for token", K(i));
+            dim_iter->cache_iter_ =
+                TokenCacheMg::get_instance().create_cache_iter();
+            if (OB_NOT_NULL(dim_iter->cache_iter_)) {
+              TokenCacheMg::get_instance().cache_iter(query_tokens_.at(i), dim_iter->cache_iter_);
+            }
+          } else {
+            LOG_INFO("[TokenCache] Reusing existing cache placeholder for token", K(i));
+            dim_iter->cache_iter_ = cache_iter;
+          }
+        }
       }
     }
   } else if (taat_mode_) { //ad taat
