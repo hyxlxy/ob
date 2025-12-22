@@ -468,12 +468,19 @@ int ObTextRetrievalTokenIter::load_more_data_to_cache(int64_t need_data_cnt) {
              K(token_name_));
     adlog::DEBUG("怎么会 origin_iter 会 空指针");
   } else {  
-    // 获取或创建缓存数据  
-    TokenCacheData *cache_data = cache_mgr.get_cache_data(token_name_);  
+    // 获取或创建缓存数据（通过 ObKVCache 获取并使用 handle 保护）
+    const TokenCacheData *cache_data_const = nullptr;
+    common::ObKVCacheHandle local_handle;
+    if (OB_FAIL(cache_mgr.get_cache_data(token_name_, cache_data_const, local_handle))) {
+      if (OB_ENTRY_NOT_EXIST != ret) {
+        LOG_WARN("failed to get cache data", K(ret));
+      }
+      cache_data_const = nullptr;
+    }
+    TokenCacheData *cache_data = const_cast<TokenCacheData*>(cache_data_const);
     if (OB_ISNULL(cache_data)) {
-
       adlog::DEBUG("ERROR! 竟然没有cache_data");
-    }  
+    }
       
     // 从原始迭代器扫描数据并添加到缓存  
     int64_t loaded_count = 0;  
@@ -613,31 +620,47 @@ int ObTextRetrievalTokenIter::init_with_cache() {
   adlog::DEBUG("初始化缓存 开始");
   int ret = OB_SUCCESS;  
       
-  TCManager &cache_mgr = TCManager::get_instance();  
-  auto && cache_data = cache_mgr.get_cache_data(token_name_);
+  TCManager &cache_mgr = TCManager::get_instance();
+  const TokenCacheData *cache_data = nullptr;
+  common::ObKVCacheHandle cache_handle;
+  // 尝试通过 ObKVCache 获取缓存（会返回需要由 handle 保护的指针）
+  if (OB_FAIL(cache_mgr.get_cache_data(token_name_, cache_data, cache_handle))) {
+    // 若不是不存在错误，打印日志，但不阻塞初始化
+    if (OB_ENTRY_NOT_EXIST != ret) {
+      LOG_WARN("failed to get cache data from kvcache", K(ret));
+    }
+    cache_data = nullptr;
+  }
 
   if (cache_data == nullptr) {
     adlog::DEBUG("之前没有过 缓存迭代器");
 
-    // 这里考虑一下要不要用缓存
-    if (cache_mgr.cache_map_.size() >= cache_mgr.map_max_size_) {
-      //不用缓存了
+    // 这里考虑一下要不要用缓存：使用 token_cache_.count() 作为近似大小
+    if (cache_mgr.token_cache_.count() >= cache_mgr.map_max_size_) {
+      // 不用缓存了
     } else {
-      
-      
-      TokenCacheData *new_cache_data = nullptr;  
-      TCManager::get_instance().create_cache_data(token_name_, new_cache_data);  
-        
-      own_cache_data_ = new_cache_data;
-      // new一个新的token_iter，用于推进缓存
-      TCManager::get_instance().create_token_iter(token_name_, tem_param_);
-      auto && origin_iter = TCManager::get_instance().get_origin_iter(token_name_);
-      origin_iter->first_init_flag_ = true;
-      origin_iter->use_cache_ = false;
+      const TokenCacheData *new_cache_data = nullptr;
+      common::ObKVCacheHandle new_handle;
+      if (OB_FAIL(TCManager::get_instance().create_cache_data(token_name_, new_cache_data, new_handle))) {
+        LOG_WARN("failed to create cache data", K(ret), K(token_name_));
+      } else {
+        own_cache_data_ = const_cast<TokenCacheData*>(new_cache_data);
+        // 将 handle 转移到本迭代器以保护缓存对象生命周期
+        token_cache_handle_.move_from(new_handle);
+        // new一个新的token_iter，用于推进缓存
+        TCManager::get_instance().create_token_iter(token_name_, tem_param_);
+        auto && origin_iter = TCManager::get_instance().get_origin_iter(token_name_);
+        if (origin_iter) {
+          origin_iter->first_init_flag_ = true;
+          origin_iter->use_cache_ = false;
+        }
+      }
     }
   } else {
     adlog::DEBUG("之前存在 缓存迭代器");
-    own_cache_data_ = cache_data;
+    own_cache_data_ = const_cast<TokenCacheData*>(cache_data);
+    // 保持 handle，防止被回收
+    token_cache_handle_.move_from(cache_handle);
   }
   cache_read_idx_ = 0;
   last_read_count_ = 0;
@@ -1067,8 +1090,18 @@ int ObTextRetrievalDaaTTokenIter::force_build_cache() {
   int ret = OB_SUCCESS;
   adlog::DEBUG(" 强制构建缓存 开始");
   // 创建缓存数据， 这个cache_data就是放到map里面的内容，我们写数据就直接写到cache_data里面
-  ADCacheData *cache_data;
-  ADManager::get_one().create_cache_data(token_name_, cache_data);
+  const ADCacheData *cache_data_const = nullptr;
+  common::ObKVCacheHandle cache_handle;
+  if (OB_FAIL(ADManager::get_one().create_cache_data(token_name_, cache_data_const, cache_handle))) {
+    LOG_WARN("failed to create ad cache data", K(ret), K(token_name_));
+    // proceed without cache_data (will write to local then try to put later)
+    cache_data_const = nullptr;
+  }
+  ADCacheData *cache_data = const_cast<ADCacheData*>(cache_data_const);
+  // 如果创建成功，需要保持 handle 以保护缓存内对象生命周期
+  if (cache_handle.is_valid()) {
+    ad_cache_handle_.move_from(cache_handle);
+  }
 
   auto &&save_data = [&]() ->void {
     if (OB_FAIL(relevance_expr_->eval_batch(*eval_ctx_, *token_iter_->get_skip(), count_))) {
@@ -1124,26 +1157,46 @@ int ObTextRetrievalDaaTTokenIter::init_with_cache() {
   adlog::DEBUG("初始化缓存 开始");
   int ret = OB_SUCCESS;  
       
-  ADManager &cache_mgr = ADManager::get_one();  
-  auto && cache_data = cache_mgr.get_cache_data(token_name_);  
-    
-  if (cache_data && cache_data->is_completed_) {  
+  ADManager &cache_mgr = ADManager::get_one();
+  const ADCacheData *cache_data_const = nullptr;
+  common::ObKVCacheHandle cache_handle;
+  if (OB_FAIL(cache_mgr.get_cache_data(token_name_, cache_data_const, cache_handle))) {
+    if (OB_ENTRY_NOT_EXIST != ret) {
+      LOG_WARN("failed to get ad cache data", K(ret), K(token_name_));
+    }
+    cache_data_const = nullptr;
+  }
+
+  if (cache_data_const && cache_data_const->is_completed_) {
     use_cache_ = true;
     cache_read_idx_ = -1;
-    own_cache_data_ = cache_data;
+    own_cache_data_ = const_cast<ADCacheData*>(cache_data_const);
+    // 保持 handle，防止被回收
+    ad_cache_handle_.move_from(cache_handle);
     adlog::DEBUG("原本有好了的缓存 直接使用");
   } else {
-    // 如果没有的话，这里就要进行判断了.
-    // 如果原本就没有缓存的话，那么它会担负起 强制缓存的内容
-    // 如果是有缓存的， 但是没有完成（这种情况不太可能）
-    // 或者说 是因为被淘汰了，那么走之前的路径
-    if (cache_data == nullptr) {
-      force_build_cache();
-      use_cache_ = true;
-      cache_read_idx_ = -1;
-      own_cache_data_ = cache_mgr.get_cache_data(token_name_);
-      adlog::DEBUG("初始化缓存 结束");
-      return ret;
+    if (cache_data_const == nullptr) {
+      // 创建并强制构建缓存
+      const ADCacheData *new_cache_const = nullptr;
+      common::ObKVCacheHandle new_handle;
+      if (OB_FAIL(ADManager::get_one().create_cache_data(token_name_, new_cache_const, new_handle))) {
+        LOG_WARN("failed to create ad cache data", K(ret), K(token_name_));
+      } else {
+        own_cache_data_ = const_cast<ADCacheData*>(new_cache_const);
+        ad_cache_handle_.move_from(new_handle);
+        force_build_cache();
+        use_cache_ = true;
+        cache_read_idx_ = -1;
+        // refresh own_cache_data_ in case force_build_cache updated it
+        const ADCacheData *ref = nullptr;
+        common::ObKVCacheHandle tmp_handle;
+        if (OB_SUCC(ADManager::get_one().get_cache_data(token_name_, ref, tmp_handle))) {
+          own_cache_data_ = const_cast<ADCacheData*>(ref);
+          ad_cache_handle_.move_from(tmp_handle);
+        }
+        adlog::DEBUG("初始化缓存 结束");
+        return ret;
+      }
     }
     use_cache_ = false;
     adlog::DEBUG("没有使用缓存");

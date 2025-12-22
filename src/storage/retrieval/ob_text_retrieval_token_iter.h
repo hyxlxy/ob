@@ -147,6 +147,7 @@ public:
   int64_t cache_read_idx_{0};            
   int64_t last_read_count_{0};
   bool use_cache_{false};
+  common::ObKVCacheHandle token_cache_handle_;
   ObString token_name_;
   bool first_init_flag_{false};
   bool need_fiil_flag_{false};
@@ -218,94 +219,89 @@ private:
   DISALLOW_COPY_AND_ASSIGN(ObTextRetrievalTokenIter);
 };
 
-class TokenCacheManager {  
-public:  
-  hash::ObHashMap<ObString, TokenCacheData*> cache_map_;  
+class TokenCacheManager {
+public:
+  // 使用系统原生 ObKVCache 存储 TokenCacheData（替换原先的 hash map）
+  ObKVCache<ObString, TokenCacheData> token_cache_;
+  // 保留 origin_iter_map_ 用于存放原始迭代器指针（迭代器较复杂，不直接放入 ObKVCache）
   hash::ObHashMap<ObString, ObTextRetrievalTokenIter*> origin_iter_map_;
   common::ObArenaAllocator allocator_;
   int64_t map_max_size_{50};
-    
-public:  
-  TokenCacheManager() : allocator_(ObMemAttr(MTL_ID(), "TokenCacheAlloc")) {
-    cache_map_.create(map_max_size_, "TokenCache", "TokenCache");
-    origin_iter_map_.create(map_max_size_,"Iter","TokenIter");
-  }  
-    
-  ~TokenCacheManager() {  
-    for (auto iter = cache_map_.begin(); iter != cache_map_.end(); ++iter) {  
-      if (iter->second) {  
-        iter->second->~TokenCacheData();  
-        allocator_.free(iter->second);
-      }  
-    }  
-    cache_map_.destroy();  
 
-    for (auto iter = origin_iter_map_.begin(); iter != origin_iter_map_.end(); ++iter) {  
-      if (iter->second) {  
-        iter->second->~ObTextRetrievalTokenIter();  
-        allocator_.free(iter->second);
-      }  
-    }  
-    origin_iter_map_.destroy();
-  }  
-    
-  static TokenCacheManager& get_instance() {  
-    static TokenCacheManager instance;  
-    return instance;  
-  }  
-    
-  TokenCacheData* get_cache_data(const ObString &token) {  
-    TokenCacheData *cached_data = nullptr;  
-    cache_map_.get_refactored(token, cached_data);  
-    return cached_data;  
-  }  
-    
-  int create_cache_data(const ObString &token, TokenCacheData *&cached_data) {  
-    int ret = OB_SUCCESS;  
-    void *buf = allocator_.alloc(sizeof(TokenCacheData));  
-    if (OB_ISNULL(buf)) {  
-      ret = OB_ALLOCATE_MEMORY_FAILED;  
-    } else {  
-      cached_data = new(buf) TokenCacheData();  
-      ret = cache_map_.set_refactored(token, cached_data);  
-    }  
-    return ret;  
+public:
+  TokenCacheManager() : allocator_(ObMemAttr(MTL_ID(), "TokenCacheAlloc")) {
+    // 初始化 ObKVCache 实例（参数 priority/mem_pct 可按需调整）
+    int tmp_ret = token_cache_.init("TokenCacheData", 1, 100);
+    if (OB_UNLIKELY(OB_SUCCESS != tmp_ret)) {
+      LOG_WARN("failed to init token_cache_", K(tmp_ret));
+    }
+    origin_iter_map_.create(map_max_size_,"Iter","TokenIter");
   }
 
-  ObTextRetrievalTokenIter* get_origin_iter(const ObString &token) {  
-    ObTextRetrievalTokenIter *cached_data = nullptr;  
-    origin_iter_map_.get_refactored(token, cached_data);  
-    return cached_data;  
-  }  
-    
-  int push_origin_iter(const ObString &token, ObTextRetrievalTokenIter *&cached_data) {  
-    int ret = OB_SUCCESS;  
-      
-    ret = origin_iter_map_.set_refactored(token, cached_data);  
-    
+  ~TokenCacheManager() {
+    // 销毁 token cache，并记录错误
+    int tmp_ret = OB_SUCCESS;
+    token_cache_.destroy();
+    // origin iter map cleanup
+
+    for (auto iter = origin_iter_map_.begin(); iter != origin_iter_map_.end(); ++iter) {
+      if (iter->second) {
+        iter->second->~ObTextRetrievalTokenIter();
+        allocator_.free(iter->second);
+      }
+    }
+    origin_iter_map_.destroy();
+  }
+
+  static TokenCacheManager& get_instance() {
+    static TokenCacheManager instance;
+    return instance;
+  }
+
+  // 获取缓存数据（返回值通过 pvalue, handle 保护；调用方需保持 handle 有效直至不再访问返回指针）
+  int get_cache_data(const ObString &token, const TokenCacheData *&pvalue, common::ObKVCacheHandle &handle) {
+    pvalue = nullptr;
+    return token_cache_.get(token, pvalue, handle);
+  }
+
+  // 创建或获取缓存数据（put 并返回指向缓存中对象的指针与 handle）
+  int create_cache_data(const ObString &token, const TokenCacheData *&pvalue, common::ObKVCacheHandle &handle) {
+    TokenCacheData tmp;
+    return token_cache_.put_and_fetch(token, tmp, pvalue, handle, true);
+  }
+
+  ObTextRetrievalTokenIter* get_origin_iter(const ObString &token) {
+    ObTextRetrievalTokenIter *cached_data = nullptr;
+    origin_iter_map_.get_refactored(token, cached_data);
+    return cached_data;
+  }
+
+  int push_origin_iter(const ObString &token, ObTextRetrievalTokenIter *&cached_data) {
+    int ret = OB_SUCCESS;
+    ret = origin_iter_map_.set_refactored(token, cached_data);
     return ret;
   }
 
-  int create_token_iter(const ObString &token, const ObTextRetrievalScanIterParam &orig_param) {  
-    int ret = OB_SUCCESS;  
+  int create_token_iter(const ObString &token, const ObTextRetrievalScanIterParam &orig_param) {
+    int ret = OB_SUCCESS;
 
-    // 创建新的param，使用Manager的分配器  
-    ObTextRetrievalScanIterParam new_param = orig_param;  
-    new_param.allocator_ = &allocator_;  // 替换分配器  
+    // 创建新的param，使用Manager的分配器
+    ObTextRetrievalScanIterParam new_param = orig_param;
+    new_param.allocator_ = &allocator_;  // 替换分配器
 
-    // 创建新迭代器  
-    void *buf = allocator_.alloc(sizeof(ObTextRetrievalTokenIter));  
-    if (OB_ISNULL(buf)) {  
-      ret = OB_ALLOCATE_MEMORY_FAILED;  
-    } else {  
-      auto && new_iter = new(buf) ObTextRetrievalTokenIter();  
-      if (OB_FAIL(new_iter->init(new_param))) {  
-        LOG_WARN("failed to init token iter", K(ret));  
-      } else if (OB_FAIL(origin_iter_map_.set_refactored(token, new_iter))) {  
-        LOG_WARN("failed to store iter", K(ret));  
-      }  
-    }  
-    return ret;  
+    // 创建新迭代器（放在 manager 的 arena 中）
+    void *buf = allocator_.alloc(sizeof(ObTextRetrievalTokenIter));
+    if (OB_ISNULL(buf)) {
+      ret = OB_ALLOCATE_MEMORY_FAILED;
+    } else {
+      auto && new_iter = new(buf) ObTextRetrievalTokenIter();
+      if (OB_FAIL(new_iter->init(new_param))) {
+        LOG_WARN("failed to init token iter", K(ret));
+      } else if (OB_FAIL(origin_iter_map_.set_refactored(token, new_iter))) {
+        LOG_WARN("failed to store iter", K(ret));
+      }
+    }
+    return ret;
   }
 
 };
@@ -618,34 +614,35 @@ public:
 
 class ADManager {  
 public:  
-  hash::ObHashMap<ObString, ADCacheData*> cache_map_;  
+  // 使用系统原生 ObKVCache 存储 ADCacheData
+  ObKVCache<ObString, ADCacheData> ad_cache_;
   common::ObArenaAllocator allocator_;
   ADManager() {
-    cache_map_.create(1024, "TokenCache", "TokenCache");
+    int tmp_ret = ad_cache_.init("ADTokenCache", 1, 100);
+    if (OB_UNLIKELY(OB_SUCCESS != tmp_ret)) {
+      LOG_WARN("failed to init ad_cache_", K(tmp_ret));
+    }
+  }
+  ~ADManager() {
+    ad_cache_.destroy();
   }
 public:  
   static ADManager& get_one() {  
     static ADManager instance;  
     return instance;  
   }  
-    
-  ADCacheData* get_cache_data(const ObString &token) {  
-    ADCacheData *cached_data = nullptr;  
-    cache_map_.get_refactored(token, cached_data);  
-    return cached_data;  
-  }  
-    
-  int create_cache_data(const ObString &token, ADCacheData *&cached_data) {  
-    int ret = OB_SUCCESS;  
-    void *buf = allocator_.alloc(sizeof(ADCacheData));  
-    if (OB_ISNULL(buf)) {  
-      ret = OB_ALLOCATE_MEMORY_FAILED;  
-    } else {  
-      cached_data = new(buf) ADCacheData();  
-      ret = cache_map_.set_refactored(token, cached_data);  
-    }  
-    return ret;  
-  }  
+ 
+  // 获取缓存数据（返回 pvalue + handle，调用方需保持 handle 有效）
+  int get_cache_data(const ObString &token, const ADCacheData *&pvalue, common::ObKVCacheHandle &handle) {
+    pvalue = nullptr;
+    return ad_cache_.get(token, pvalue, handle);
+  }
+
+  // 创建或获取缓存数据（put 并返回指向缓存中对象的指针与 handle）
+  int create_cache_data(const ObString &token, const ADCacheData *&pvalue, common::ObKVCacheHandle &handle) {
+    ADCacheData tmp;
+    return ad_cache_.put_and_fetch(token, tmp, pvalue, handle, true);
+  }
 };
 
 class ObTextRetrievalDaaTTokenIter final : public ObISRDaaTDimIter
@@ -684,6 +681,7 @@ public:
   ADCacheData * own_cache_data_{nullptr};  
   bool use_cache_{false};  
   int64_t cache_read_idx_{-1};
+  common::ObKVCacheHandle ad_cache_handle_;
   
   ObString token_name_;
   int force_build_cache();
