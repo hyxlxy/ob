@@ -1167,7 +1167,9 @@ int BtreeIterator<BtreeKey, BtreeVal>::scan_batch()
         start_exclude_ = true;
       }
     }
-    iter_->reset();
+    // Optimization: Don't reset iterator to preserve path state
+    // This avoids expensive find_path() calls in subsequent scan_batch()
+    // iter_->reset();
   }
   if (OB_SUCCESS != ret) {
     is_iter_end_ = true;
