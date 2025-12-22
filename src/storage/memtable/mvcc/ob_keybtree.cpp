@@ -451,6 +451,19 @@ int ScanHandle<BtreeKey, BtreeVal>::scan_forward()
   BtreeNode* node = nullptr;
   int pos = 0;
   MultibitSet *index = &this->index_;
+  
+  // Fast path: if we're in a leaf node, try to move within it
+  if (OB_SUCC(path_.top(node, pos)) && node->is_leaf()) {
+    int next_pos = node->get_next_active_child(pos);
+    if (next_pos < node->size(index)) {
+      // Still within the same leaf, just update position without pop/push
+      path_.update_top_pos(next_pos);
+      return OB_SUCCESS;
+    }
+    // Leaf exhausted, fall through to cross-node movement
+  }
+  
+  // Slow path: cross-node movement
   while(OB_SUCCESS == ret) {
     if (OB_FAIL(path_.pop(node, pos))) {
       ret = OB_ITER_END;
@@ -480,6 +493,19 @@ int ScanHandle<BtreeKey, BtreeVal>::scan_backward()
   BtreeNode *node = nullptr;
   int pos = 0;
   MultibitSet *index = &this->index_;
+  
+  // Fast path: if we're in a leaf node, try to move within it
+  if (OB_SUCC(path_.top(node, pos)) && node->is_leaf()) {
+    int prev_pos = node->get_prev_active_child(pos);
+    if (prev_pos >= 0) {
+      // Still within the same leaf, just update position without pop/push
+      path_.update_top_pos(prev_pos);
+      return OB_SUCCESS;
+    }
+    // Leaf exhausted, fall through to cross-node movement
+  }
+  
+  // Slow path: cross-node movement
   while(OB_SUCCESS == ret) {
     if (OB_FAIL(path_.pop(node, pos))) {
       ret = OB_ITER_END;
@@ -1167,9 +1193,7 @@ int BtreeIterator<BtreeKey, BtreeVal>::scan_batch()
         start_exclude_ = true;
       }
     }
-    // Optimization: Don't reset iterator to preserve path state
-    // This avoids expensive find_path() calls in subsequent scan_batch()
-    // iter_->reset();
+    iter_->reset();
   }
   if (OB_SUCCESS != ret) {
     is_iter_end_ = true;

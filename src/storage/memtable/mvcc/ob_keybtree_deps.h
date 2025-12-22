@@ -396,6 +396,11 @@ public:
   OB_INLINE void resize(int64_t depth) { depth_ = std::max(depth, 0l); }
   OB_INLINE void set_is_found(bool is_found = true) { is_found_ = is_found; }
   bool get_is_found() { return is_found_; }
+  OB_INLINE void update_top_pos(int new_pos) {
+    if (depth_ > 0) {
+      path_[depth_ - 1].pos_ = new_pos;
+    }
+  }
 private:
   int64_t depth_;
   Item path_[MAX_DEPTH];
