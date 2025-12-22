@@ -222,13 +222,15 @@ class TokenCacheManager {
 public:  
   hash::ObHashMap<ObString, TokenCacheData*> cache_map_;  
   hash::ObHashMap<ObString, ObTextRetrievalTokenIter*> origin_iter_map_;
+  hash::ObHashMap<ObString, int64_t> cnt_map_;
   common::ObArenaAllocator allocator_;
-  int64_t map_max_size_{50};
+  int64_t map_max_size_{200};
     
 public:  
   TokenCacheManager() : allocator_(ObMemAttr(MTL_ID(), "TokenCacheAlloc")) {
     cache_map_.create(map_max_size_, "TokenCache", "TokenCache");
     origin_iter_map_.create(map_max_size_,"Iter","TokenIter");
+    cnt_map_.create(map_max_size_,"aaaaa","bvbbbb");
   }  
     
   ~TokenCacheManager() {  
@@ -247,6 +249,7 @@ public:
       }  
     }  
     origin_iter_map_.destroy();
+    cnt_map_.destroy();
   }  
     
   static TokenCacheManager& get_instance() {  
@@ -308,8 +311,130 @@ public:
     return ret;  
   }
 
+  bool can_have_cache(const ObString &token) {
+    int64_t current_count = 0;  
+    int ret = OB_SUCCESS;
+    if (OB_FAIL(cnt_map_.get_refactored(token, current_count))) {  
+      if (OB_HASH_NOT_EXIST == ret) {  
+        ret = cnt_map_.set_refactored(token, 1, 0);  
+      }  
+    } else {  
+      ret = cnt_map_.set_refactored(token, current_count + 1, 1);
+    }
+    if(current_count >= 1) return true;
+    return false;
+  }
+
 };
 
+// class DDManager {  
+//   public:  
+//     hash::ObHashMap<ObString, TokenCacheData*> cache_map_;  
+//     hash::ObHashMap<ObString, ObTextRetrievalDaaTTokenIter*> origin_iter_map_;
+//     hash::ObHashMap<ObString, int64_t> cnt_map_;
+//     common::ObArenaAllocator allocator_;
+//     int64_t map_max_size_{150};
+      
+//   public:  
+//   DDManager() : allocator_(ObMemAttr(MTL_ID(), "TokenCacheAlloc")) {
+//       cache_map_.create(map_max_size_, "TokenCache", "TokenCache");
+//       origin_iter_map_.create(map_max_size_,"Iter","TokenIter");
+//       cnt_map_.create(map_max_size_,"aaaaa","bvbbbb");
+//     }  
+      
+//     ~DDManager() {  
+//       for (auto iter = cache_map_.begin(); iter != cache_map_.end(); ++iter) {  
+//         if (iter->second) {  
+//           iter->second->~TokenCacheData();  
+//           allocator_.free(iter->second);
+//         }  
+//       }  
+//       cache_map_.destroy();  
+  
+//       for (auto iter = origin_iter_map_.begin(); iter != origin_iter_map_.end(); ++iter) {  
+//         if (iter->second) {  
+//           iter->second->~ObTextRetrievalDaaTTokenIter();  
+//           allocator_.free(iter->second);
+//         }  
+//       }  
+//       origin_iter_map_.destroy();
+//       cnt_map_.destroy();
+//     }  
+      
+//     static DDManager& get_instance() {  
+//       static DDManager instance;  
+//       return instance;  
+//     }  
+      
+//     TokenCacheData* get_cache_data(const ObString &token) {  
+//       TokenCacheData *cached_data = nullptr;  
+//       cache_map_.get_refactored(token, cached_data);  
+//       return cached_data;  
+//     }  
+      
+//     int create_cache_data(const ObString &token, TokenCacheData *&cached_data) {  
+//       int ret = OB_SUCCESS;  
+//       void *buf = allocator_.alloc(sizeof(TokenCacheData));  
+//       if (OB_ISNULL(buf)) {  
+//         ret = OB_ALLOCATE_MEMORY_FAILED;  
+//       } else {  
+//         cached_data = new(buf) TokenCacheData();  
+//         ret = cache_map_.set_refactored(token, cached_data);  
+//       }  
+//       return ret;  
+//     }
+  
+//     ObTextRetrievalDaaTTokenIter* get_origin_iter(const ObString &token) {  
+//       ObTextRetrievalDaaTTokenIter *cached_data = nullptr;  
+//       origin_iter_map_.get_refactored(token, cached_data);  
+//       return cached_data;  
+//     }  
+      
+//     int push_origin_iter(const ObString &token, ObTextRetrievalDaaTTokenIter *&cached_data) {  
+//       int ret = OB_SUCCESS;  
+        
+//       ret = origin_iter_map_.set_refactored(token, cached_data);  
+      
+//       return ret;
+//     }
+  
+//     int create_token_iter(const ObString &token, const ObTextRetrievalScanIterParam &orig_param) {  
+//       int ret = OB_SUCCESS;  
+  
+//       // 创建新的param，使用Manager的分配器  
+//       ObTextRetrievalScanIterParam new_param = orig_param;  
+//       new_param.allocator_ = &allocator_;  // 替换分配器  
+  
+//       // 创建新迭代器  
+//       void *buf = allocator_.alloc(sizeof(ObTextRetrievalDaaTTokenIter));  
+//       if (OB_ISNULL(buf)) {  
+//         ret = OB_ALLOCATE_MEMORY_FAILED;  
+//       } else {  
+//         auto && new_iter = new(buf) ObTextRetrievalDaaTTokenIter();  
+//         if (OB_FAIL(new_iter->init(new_param))) {  
+//           LOG_WARN("failed to init token iter", K(ret));  
+//         } else if (OB_FAIL(origin_iter_map_.set_refactored(token, new_iter))) {  
+//           LOG_WARN("failed to store iter", K(ret));  
+//         }  
+//       }  
+//       return ret;  
+//     }
+  
+//     bool can_have_cache(const ObString &token) {
+//       int64_t current_count = 0;  
+//       int ret = OB_SUCCESS;
+//       if (OB_FAIL(cnt_map_.get_refactored(token, current_count))) {  
+//         if (OB_HASH_NOT_EXIST == ret) {  
+//           ret = cnt_map_.set_refactored(token, 1, 0);  
+//         }  
+//       } else {  
+//         ret = cnt_map_.set_refactored(token, current_count + 1, 1);
+//       }
+//       if(current_count >= 6) return true;
+//       return false;
+//     }
+  
+//   };
 
 
 
