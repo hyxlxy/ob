@@ -75,23 +75,123 @@ struct ObDASTRMergeIterParam : public ObDASIterParam
   };
 };
 
-class ObGlobalTokenCacheManager {  
-private:  
-  hash::ObHashMap<ObString, ObTRDaaTTokenCacheIter*> global_cache_map_;
-  common::ObArenaAllocator allocator_; 
+// class ObGlobalTokenCacheManager {  
+// private:  
+//   hash::ObHashMap<ObString, ObTRDaaTTokenCacheIter*> global_cache_map_;
+//   common::ObArenaAllocator allocator_; 
 
   
+// public:  
+//   ObGlobalTokenCacheManager(): allocator_(ObMemAttr(MTL_ID(), "TokenCacheAlloc")) {  
+//     global_cache_map_.create(1024, ObMemAttr(MTL_ID(), "TokenCache"));  
+//   }  
+//   ~ObGlobalTokenCacheManager() {  
+//     for (auto iter = global_cache_map_.begin(); iter != global_cache_map_.end(); ++iter) {  
+//       if (iter->second) {  
+//         delete iter->second;  
+//       }  
+//     }  
+//     global_cache_map_.destroy();
+//   }
+  
+//   static ObGlobalTokenCacheManager& get_instance() {  
+//     static ObGlobalTokenCacheManager instance;  
+//     return instance;  
+//   }
+
+//   ObTRDaaTTokenCacheIter* create_cache_iter() {  
+//     void *buf = allocator_.alloc(sizeof(ObTRDaaTTokenCacheIter));  
+//     if (OB_NOT_NULL(buf)) {  
+//       return new(buf) ObTRDaaTTokenCacheIter(&allocator_);  
+//     }  
+//     return nullptr;
+//   }
+  
+//   ObTRDaaTTokenCacheIter* create_iter_from_cache(ObTRDaaTTokenCacheIter *cache_iter) {  
+//     int ret = OB_SUCCESS;
+//     ObTRDaaTTokenCacheIter *new_iter = nullptr;  
+//     if (OB_ISNULL(cache_iter) || !cache_iter->have_done_flag_) {  
+//       return nullptr;  
+//     }    
+//     void *buf = allocator_.alloc(sizeof(ObTRDaaTTokenCacheIter));  
+//     if (OB_ISNULL(buf)) {  
+//       return nullptr;  
+//     }  
+//     new_iter = new(buf) ObTRDaaTTokenCacheIter(&allocator_);  
+//     if (OB_FAIL(new_iter->init_from_cache(cache_iter))) {  
+//       return nullptr;  
+//     }  
+//     return new_iter;
+//   }
+  
+//   ObTRDaaTTokenCacheIter* get_cache_iter(const ObString &token) {  
+//     ObTRDaaTTokenCacheIter *cache_iter = nullptr;  
+//     global_cache_map_.get_refactored(token, cache_iter);  
+//     return cache_iter;  
+//   }  
+    
+//   int cache_iter(const ObString &token, ObTRDaaTTokenCacheIter *iter) {  
+//     return global_cache_map_.set_refactored(token, iter, 1);  
+//   }
+// };
+// using TokenCacheMg = ObGlobalTokenCacheManager;
+
+
+class ObGlobalTokenCacheManager {  
 public:  
-  ObGlobalTokenCacheManager(): allocator_(ObMemAttr(MTL_ID(), "TokenCacheAlloc")) {  
-    global_cache_map_.create(1024, ObMemAttr(MTL_ID(), "TokenCache"));  
+  hash::ObHashMap<ObString, ObTRDaaTTokenCacheIter*> global_cache_map_;
+  hash::ObHashMap<ObString, bool> no_tokens_map_;  
+  common::ObArenaAllocator allocator_; 
+  common::ObList<ObString, common::ObIAllocator> lru_list_;  
+  // std::list<ObString> lru_list_;
+  int64_t max_cache_count_ = 500;
+  
+public:
+  int evict_lru() {
+    adlog::DEBUG("evict_lru() start");
+    int ret = OB_SUCCESS;  
+    // if (lru_list_.empty()) {  
+    //   return ret;  
+    // }  
+      
+    // ObString oldest_token = lru_list_.get_last();  
+    // lru_list_.erase(lru_list_.last());  
+      
+    // ObTRDaaTTokenCacheIter *iter = nullptr;    
+    // if (OB_SUCCESS == global_cache_map_.get_refactored(oldest_token, iter)) {    
+    //   if (OB_NOT_NULL(iter)) {  
+    //     iter->~ObTRDaaTTokenCacheIter();  
+    //     allocator_.free(iter);  
+    //   }  
+    // }    
+    // global_cache_map_.erase_refactored(oldest_token);
+    // no_tokens_map_.set_refactored(oldest_token, true, 1);
+    // adlog::DEBUG("evict_lru() end");
+    
+    return ret;  
+  }
+  int update_lru(const ObString &token) {
+    // adlog::DEBUG("update_lru start");
+    // if (lru_list_.count(token) > 0) {  
+    //   lru_list_.erase(token);  
+    // }  
+    // lru_list_.push_front(token);  
+    // adlog::DEBUG("update_lru end");
+    return OB_SUCCESS;  
+  }  
+  ObGlobalTokenCacheManager(): allocator_(ObMemAttr(MTL_ID(), "TokenCacheAlloc")),lru_list_(allocator_) {  
+    global_cache_map_.create(512, ObMemAttr(MTL_ID(), "TokenCache"));  
+    no_tokens_map_.create(512, ObMemAttr(MTL_ID(), "NoTokenList"));
   }  
   ~ObGlobalTokenCacheManager() {  
-    for (auto iter = global_cache_map_.begin(); iter != global_cache_map_.end(); ++iter) {  
-      if (iter->second) {  
-        delete iter->second;  
+    for (auto iter = global_cache_map_.begin(); iter != global_cache_map_.end(); ++iter) {
+      if (iter->second) {
+        iter->second->~ObTRDaaTTokenCacheIter();
+        allocator_.free(iter->second);  
       }  
-    }  
+    }
     global_cache_map_.destroy();
+    no_tokens_map_.destroy();
   }
   
   static ObGlobalTokenCacheManager& get_instance() {  
@@ -99,7 +199,14 @@ public:
     return instance;  
   }
 
-  ObTRDaaTTokenCacheIter* create_cache_iter() {  
+  bool is_no_token(const ObString &token) {  
+    bool flag = false;  
+    no_tokens_map_.get_refactored(token, flag);  
+    return flag;  
+  }
+
+  ObTRDaaTTokenCacheIter *create_cache_iter() {
+    // adlog::DEBUG("create_cache_iter start");
     void *buf = allocator_.alloc(sizeof(ObTRDaaTTokenCacheIter));  
     if (OB_NOT_NULL(buf)) {  
       return new(buf) ObTRDaaTTokenCacheIter(&allocator_);  
@@ -119,18 +226,42 @@ public:
     }  
     new_iter = new(buf) ObTRDaaTTokenCacheIter(&allocator_);  
     if (OB_FAIL(new_iter->init_from_cache(cache_iter))) {  
+      new_iter->~ObTRDaaTTokenCacheIter();
+      allocator_.free(buf);
       return nullptr;  
     }  
     return new_iter;
   }
-  
-  ObTRDaaTTokenCacheIter* get_cache_iter(const ObString &token) {  
+
+  ObTRDaaTTokenCacheIter *get_cache_iter(const ObString &token) {
+    adlog::DEBUG("get_cache_iter(const ObString &token) start");
     ObTRDaaTTokenCacheIter *cache_iter = nullptr;  
-    global_cache_map_.get_refactored(token, cache_iter);  
-    return cache_iter;  
-  }  
+    if (OB_SUCCESS == global_cache_map_.get_refactored(token, cache_iter)) {  
+      update_lru(token);
+    }
+    adlog::DEBUG("get_cache_iter(const ObString &token) end");
     
-  int cache_iter(const ObString &token, ObTRDaaTTokenCacheIter *iter) {  
+    return cache_iter;  
+  }
+
+
+  int cache_iter(const ObString &token, ObTRDaaTTokenCacheIter *iter) {
+    adlog::DEBUG("cache_iter start");
+    ObTRDaaTTokenCacheIter *existing_iter = nullptr;  
+    if (OB_SUCCESS == global_cache_map_.get_refactored(token, existing_iter)) {  
+      // 移动到LRU头部  
+      update_lru(token);  
+      return OB_SUCCESS;  
+    }  
+    int ret = OB_SUCCESS;
+    if (lru_list_.size() >= max_cache_count_) {    
+      if (OB_FAIL(evict_lru())) {  
+        adlog::DEBUG("ERROR! failed to evict lru");  
+        return ret;  
+      }  
+    }
+    lru_list_.push_front(token);
+    adlog::DEBUG("cache_iter end");
     return global_cache_map_.set_refactored(token, iter, 1);  
   }
 };

@@ -23,6 +23,7 @@
 #include "sql/das/ob_das_ir_define.h"
 #include "ob_block_max_iter.h"
 #include "ob_i_sparse_retrieval_iter.h"
+#include <cstdint>
 namespace oceanbase
 {
 namespace storage
@@ -66,6 +67,76 @@ struct ObTextRetrievalScanIterParam
   bool inv_idx_agg_cache_mode_;
 };
 
+class TokenCacheData {  
+public:  
+  ObSEArray<double, 64, ModulePageAllocator> relevance_scores_;  
+  ObSEArray<ObDocIdExt, 64, ModulePageAllocator> doc_ids_;  
+  int64_t total_count_;  
+  bool is_completed_;  
+    
+  TokenCacheData() : total_count_(0), is_completed_(false) {}
+
+  int add_data(double relevance, ObDocIdExt &doc_id, int64_t count) {
+    int ret = OB_SUCCESS;  
+    if (count <= 0) {  
+      return ret;  
+    }  
+    if (OB_FAIL(relevance_scores_.push_back(relevance))) {  
+      LOG_WARN("failed to push back relevance score", K(ret));  
+    } else if (OB_FAIL(doc_ids_.push_back(doc_id))) {  
+      LOG_WARN("failed to push back doc id", K(ret));  
+      relevance_scores_.pop_back();  
+    } else {  
+      total_count_ += count;  
+    }  
+    return ret;  
+  }  
+  
+};
+class TokenCacheManager {  
+public:  
+  hash::ObHashMap<ObString, TokenCacheData*> cache_map_;  
+  common::ObArenaAllocator allocator_;  
+    
+public:  
+  TokenCacheManager() : allocator_(ObMemAttr(MTL_ID(), "TokenCacheAlloc")) {  
+    cache_map_.create(1024, "TokenCache", "TokenCache");  
+  }  
+    
+  ~TokenCacheManager() {  
+    for (auto iter = cache_map_.begin(); iter != cache_map_.end(); ++iter) {  
+      if (iter->second) {  
+        iter->second->~TokenCacheData();  
+      }  
+    }  
+    cache_map_.destroy();  
+  }  
+    
+  static TokenCacheManager& get_instance() {  
+    static TokenCacheManager instance;  
+    return instance;  
+  }  
+    
+  TokenCacheData* get_cache_data(const ObString &token) {  
+    TokenCacheData *cached_data = nullptr;  
+    cache_map_.get_refactored(token, cached_data);  
+    return cached_data;  
+  }  
+    
+  int create_cache_data(const ObString &token, TokenCacheData *&cached_data) {  
+    int ret = OB_SUCCESS;  
+    void *buf = allocator_.alloc(sizeof(TokenCacheData));  
+    if (OB_ISNULL(buf)) {  
+      ret = OB_ALLOCATE_MEMORY_FAILED;  
+    } else {  
+      cached_data = new(buf) TokenCacheData();  
+      ret = cache_map_.set_refactored(token, cached_data);  
+    }  
+    return ret;  
+  }  
+};
+using TCManager = TokenCacheManager;
+using TCData = TokenCacheData;
 class ObTextRetrievalTokenIter final : public ObISparseRetrievalDimIter
 {
 public:
@@ -81,6 +152,21 @@ public:
   virtual int get_next_batch(const int64_t capacity, int64_t &count) override;
   virtual int advance_to(const ObDatum &id_datum) override;
   virtual int update_scan_param(const ObString &token, common::ObArenaAllocator &allocator);
+
+  TokenCacheData *own_cache_data_{nullptr};    
+  int64_t cache_read_idx_{0};            
+  int64_t last_read_count_{0};
+  bool use_cache_{false};
+  ObString token_name_;
+  bool first_init_flag_{false};
+  int force_build_cache();
+  int init_with_cache();
+  int extract_batch_data(int64_t batch_count,
+                         ObFixedArray<double, ObIAllocator> &relevances,
+                         ObFixedArray<ObDocIdExt, ObIAllocator> &doc_ids);
+  int get_next_batch_with_cache(const int64_t capacity, int64_t &count);
+  int get_cache_data(int64_t idx, double &relevance, ObDocIdExt &doc_id);  
+
 public:
   sql::ObBitVector *get_skip() { return skip_; }
   int get_token_doc_cnt(int64_t &token_doc_cnt) const;
@@ -166,11 +252,57 @@ public:
   common::ObIAllocator *allocator_;  
 };
 
+class ADCacheData {  
+public:  
+  ObSEArray<double, 64, ModulePageAllocator> relevance_scores_;  
+  ObSEArray<ObDocIdExt, 64, ModulePageAllocator> doc_ids_;  
+  int64_t total_count_;  
+  bool is_completed_;  
+    
+  ADCacheData() : total_count_(0), is_completed_(false) {}  
+    
+  int add_data(const ObFixedArray<double, ObIAllocator> &relevance,
+    const ObFixedArray<ObDocIdExt, ObIAllocator> &doc_id,
+    int64_t count);
+};
+
+class ADManager {  
+public:  
+  hash::ObHashMap<ObString, ADCacheData*> cache_map_;  
+  common::ObArenaAllocator allocator_;
+  ADManager() {
+    cache_map_.create(1024, "TokenCache", "TokenCache");
+  }
+public:  
+  static ADManager& get_one() {  
+    static ADManager instance;  
+    return instance;  
+  }  
+    
+  ADCacheData* get_cache_data(const ObString &token) {  
+    ADCacheData *cached_data = nullptr;  
+    cache_map_.get_refactored(token, cached_data);  
+    return cached_data;  
+  }  
+    
+  int create_cache_data(const ObString &token, ADCacheData *&cached_data) {  
+    int ret = OB_SUCCESS;  
+    void *buf = allocator_.alloc(sizeof(ADCacheData));  
+    if (OB_ISNULL(buf)) {  
+      ret = OB_ALLOCATE_MEMORY_FAILED;  
+    } else {  
+      cached_data = new(buf) ADCacheData();  
+      ret = cache_map_.set_refactored(token, cached_data);  
+    }  
+    return ret;  
+  }  
+};
+
 class ObTextRetrievalDaaTTokenIter final : public ObISRDaaTDimIter
 {
 public:
   ObTextRetrievalDaaTTokenIter();
-  virtual ~ObTextRetrievalDaaTTokenIter() {}
+  virtual ~ObTextRetrievalDaaTTokenIter();
   int init(const ObTextRetrievalScanIterParam &iter_param);
   void reuse();
   void reset();
@@ -180,8 +312,12 @@ public:
   virtual int get_curr_score(double &score) const override;
   virtual int get_curr_id(const ObDatum *&id_datum) const override;
 public:
-  int get_token_doc_cnt(int64_t &token_doc_cnt) const { return token_iter_->get_token_doc_cnt(token_doc_cnt); }
+  int get_token_doc_cnt(int64_t &token_doc_cnt) const {
+    adlog::DEBUG("WARNING! get_token_doc_cnt(int64_t &token_doc_cnt)");
+    return token_iter_->get_token_doc_cnt(token_doc_cnt);
+  }
   virtual int get_dim_max_score(double &score) override {
+    adlog::DEBUG("WARNING! get_dim_max_score(double &score)");
     int ret = OB_SUCCESS;
     score = token_iter_->get_max_token_relevance();
     if (OB_UNLIKELY(score < 0.0)) {
@@ -191,8 +327,20 @@ public:
     return ret;
   }
   // ADVISE
-  mutable ObTRDaaTTokenCacheIter* cache_iter_{nullptr};
-private:
+  // mutable ObTRDaaTTokenCacheIter *cache_iter_{nullptr};
+  // mutable ObTRDaaTTokenCacheIter *own_cache_iter_{nullptr};
+  // bool need_to_fill_cache_iter_flag_{false};
+
+  ADCacheData * own_cache_data_{nullptr};  
+  bool use_cache_{false};  
+  int64_t cache_read_idx_{-1};
+  
+  ObString token_name_;
+  int force_build_cache();
+  int init_with_cache();
+  bool init_with_cache_flag_{false};
+
+public:
   int save_relevances_and_docids();
   int save_docids();
   ObArenaAllocator *allocator_;
