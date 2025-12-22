@@ -68,34 +68,84 @@ struct ObTextRetrievalScanIterParam
   bool inv_idx_agg_cache_mode_;
 };
 
-class TokenCacheData {  
-public:  
-  ObSEArray<double, 64, ModulePageAllocator> relevance_scores_;  
-  ObSEArray<ObDocIdExt, 64, ModulePageAllocator> doc_ids_;  
-  int64_t total_count_;  
-  bool is_completed_;  
-    
-  TokenCacheData() : total_count_(0), is_completed_(false) {}
-
-  int add_data(double relevance, ObDocIdExt &doc_id, int64_t count) {
-    int ret = OB_SUCCESS;  
-    if (count <= 0) {  
+class TokenCacheData : public common::ObIKVCacheValue {  
+  public:  
+    ObSEArray<double, 64, ModulePageAllocator> relevance_scores_;  
+    ObSEArray<ObDocIdExt, 64, ModulePageAllocator> doc_ids_;  
+    int64_t total_count_;  
+    bool is_completed_;  
+      
+    TokenCacheData() : total_count_(0), is_completed_(false) {}  
+      
+    // 实现ObIKVCacheValue接口  
+    virtual int64_t size() const override {  
+      return sizeof(*this) + relevance_scores_.size() * sizeof(double) + doc_ids_.size() * sizeof(ObDocIdExt);  
+    }  
+      
+    virtual int deep_copy(char *buf, const int64_t buf_len, ObIKVCacheValue *&value) const override {  
+      int ret = OB_SUCCESS;  
+      if (OB_ISNULL(buf) || buf_len < size()) {  
+        ret = OB_INVALID_ARGUMENT;  
+      } else {  
+        TokenCacheData *new_data = new(buf) TokenCacheData();  
+        if (OB_FAIL(new_data->relevance_scores_.assign(relevance_scores_))) {  
+          return ret;  
+        }  
+        if (OB_FAIL(new_data->doc_ids_.assign(doc_ids_))) {  
+          return ret;  
+        }  
+        new_data->total_count_ = total_count_;  
+        new_data->is_completed_ = is_completed_;  
+        value = new_data;  
+      }  
       return ret;  
     }  
-    if (OB_FAIL(relevance_scores_.push_back(relevance))) {  
-      LOG_WARN("failed to push back relevance score", K(ret));  
-    } else if (OB_FAIL(doc_ids_.push_back(doc_id))) {  
-      LOG_WARN("failed to push back doc id", K(ret));  
-      relevance_scores_.pop_back();  
-    } else {  
-      total_count_ += count;  
+      
+    int add_data(double relevance, ObDocIdExt &doc_id, int64_t count) {  
+      int ret = OB_SUCCESS;  
+      if (count <= 0) {  
+        return ret;  
+      }  
+        
+      if (OB_FAIL(relevance_scores_.push_back(relevance))) {  
+        LOG_WARN("failed to push back relevance score", K(ret));  
+      } else if (OB_FAIL(doc_ids_.push_back(doc_id))) {  
+        LOG_WARN("failed to push back doc id", K(ret));  
+        relevance_scores_.pop_back(); // 回滚  
+      } else {  
+        total_count_++;  
+      }  
+      return ret;  
     }  
-    return ret;  
-  }  
-  
-};
+  };
 
 using TCData = TokenCacheData;
+
+class ObTextRetrievalTokenIterValue : public common::ObIKVCacheValue {  
+  public:  
+    ObTextRetrievalTokenIter *iter_;  
+      
+    ObTextRetrievalTokenIterValue() : iter_(nullptr) {}  
+    ObTextRetrievalTokenIterValue(ObTextRetrievalTokenIter *iter) : iter_(iter) {}  
+      
+    virtual ~ObTextRetrievalTokenIterValue() {}  
+      
+    virtual int64_t size() const override {  
+      return sizeof(*this);  
+    }  
+      
+    virtual int deep_copy(char *buf, const int64_t buf_len, ObIKVCacheValue *&value) const override {  
+      int ret = OB_SUCCESS;  
+      if (OB_ISNULL(buf) || buf_len < size()) {  
+        ret = OB_INVALID_ARGUMENT;  
+      } else {  
+        // 注意：这里只是复制指针，实际迭代器对象需要在其他地方管理  
+        ObTextRetrievalTokenIterValue *new_value = new(buf) ObTextRetrievalTokenIterValue(iter_);  
+        value = new_value;  
+      }  
+      return ret;  
+    }  
+  };
 
 
 class TokenCacheKey : public common::ObIKVCacheKey {  
@@ -361,7 +411,7 @@ private:
         handle.cache_data_ = cached_data;  
           
         const TokenCacheData *stored_data = nullptr;  
-        if (OB_FAIL(cache_data_.put_and_fetch(key, *cached_data, stored_data, handle))) {  
+        if (OB_FAIL(cache_data.put_and_fetch(key, *cached_data, stored_data, handle))) {  
           LOG_WARN("failed to put cache data", K(ret));  
         }  
       }    
