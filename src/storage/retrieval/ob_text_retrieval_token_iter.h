@@ -68,171 +68,64 @@ struct ObTextRetrievalScanIterParam
   bool inv_idx_agg_cache_mode_;
 };
 
-class TokenCacheData : public common::ObIKVCacheValue {  
-  public:  
-    ObSEArray<double, 64, ModulePageAllocator> relevance_scores_;  
-    ObSEArray<ObDocIdExt, 64, ModulePageAllocator> doc_ids_;  
-    int64_t total_count_;  
-    bool is_completed_;  
-      
-    TokenCacheData() : total_count_(0), is_completed_(false) {}  
-      
-    // 实现ObIKVCacheValue接口  
-    virtual int64_t size() const override {  
-      return sizeof(*this) + relevance_scores_.size() * sizeof(double) + doc_ids_.size() * sizeof(ObDocIdExt);  
-    }  
-      
-    virtual int deep_copy(char *buf, const int64_t buf_len, ObIKVCacheValue *&value) const override {  
-      int ret = OB_SUCCESS;  
-      if (OB_ISNULL(buf) || buf_len < size()) {  
-        ret = OB_INVALID_ARGUMENT;  
-      } else {  
-        TokenCacheData *new_data = new(buf) TokenCacheData();  
-        if (OB_FAIL(new_data->relevance_scores_.assign(relevance_scores_))) {  
-          return ret;  
-        }  
-        if (OB_FAIL(new_data->doc_ids_.assign(doc_ids_))) {  
-          return ret;  
-        }  
-        new_data->total_count_ = total_count_;  
-        new_data->is_completed_ = is_completed_;  
-        value = new_data;  
-      }  
-      return ret;  
-    }  
-      
-    int add_data(double relevance, ObDocIdExt &doc_id, int64_t count) {  
-      int ret = OB_SUCCESS;  
-      if (count <= 0) {  
-        return ret;  
-      }  
-        
-      if (OB_FAIL(relevance_scores_.push_back(relevance))) {  
-        LOG_WARN("failed to push back relevance score", K(ret));  
-      } else if (OB_FAIL(doc_ids_.push_back(doc_id))) {  
-        LOG_WARN("failed to push back doc id", K(ret));  
-        relevance_scores_.pop_back(); // 回滚  
-      } else {  
-        total_count_++;  
-      }  
-      return ret;  
-    }  
-  };
-
-using TCData = TokenCacheData;
-
-class ObTextRetrievalTokenIterValue : public common::ObIKVCacheValue {  
-  public:  
-    ObTextRetrievalTokenIter *iter_;  
-      
-    ObTextRetrievalTokenIterValue() : iter_(nullptr) {}  
-    ObTextRetrievalTokenIterValue(ObTextRetrievalTokenIter *iter) : iter_(iter) {}  
-      
-    virtual ~ObTextRetrievalTokenIterValue() {}  
-      
-    virtual int64_t size() const override {  
-      return sizeof(*this);  
-    }  
-      
-    virtual int deep_copy(char *buf, const int64_t buf_len, ObIKVCacheValue *&value) const override {  
-      int ret = OB_SUCCESS;  
-      if (OB_ISNULL(buf) || buf_len < size()) {  
-        ret = OB_INVALID_ARGUMENT;  
-      } else {  
-        // 注意：这里只是复制指针，实际迭代器对象需要在其他地方管理  
-        ObTextRetrievalTokenIterValue *new_value = new(buf) ObTextRetrievalTokenIterValue(iter_);  
-        value = new_value;  
-      }  
-      return ret;  
-    }  
-  };
-
-
-class TokenCacheKey : public common::ObIKVCacheKey {  
+class TokenCacheData {  
 public:  
-  TokenCacheKey() : tenant_id_(OB_INVALID_TENANT_ID) {}  
-  TokenCacheKey(const common::ObString &token, uint64_t tenant_id)   
-    : token_(token), tenant_id_(tenant_id) {}  
+  ObSEArray<double, 64, ModulePageAllocator> relevance_scores_;  
+  ObSEArray<ObDocIdExt, 64, ModulePageAllocator> doc_ids_;  
+  int64_t total_count_;  
+  bool is_completed_;  
     
-  virtual ~TokenCacheKey() {}  
-    
-  // 实现ObIKVCacheKey接口  
-  virtual bool operator==(const ObIKVCacheKey &other) const override {  
-    const TokenCacheKey &other_key = static_cast<const TokenCacheKey&>(other);  
-    return token_ == other_key.token_ && tenant_id_ == other_key.tenant_id_;  
-  }  
-    
-  virtual uint64_t hash() const override {  
-    uint64_t hash_val = 0;  
-    hash_val = common::murmurhash(&tenant_id_, sizeof(tenant_id_), hash_val);  
-    hash_val = token_.hash(hash_val);  
-    return hash_val;  
-  }  
-    
-  virtual uint64_t get_tenant_id() const override { return tenant_id_; }  
-    
-  virtual int64_t size() const override { return sizeof(*this) + token_.length(); }  
-    
-  virtual int deep_copy(char *buf, const int64_t buf_len, ObIKVCacheKey *&key) const override {  
-    int ret = common::OB_SUCCESS;  
-    if (OB_ISNULL(buf) || OB_UNLIKELY(buf_len < size())) {  
-      ret = common::OB_INVALID_ARGUMENT;  
-    } else {  
-      TokenCacheKey *new_key = new(buf) TokenCacheKey();  
-      if (OB_FAIL(new_key->deep_copy_token(token_, buf + sizeof(TokenCacheKey), buf_len - sizeof(TokenCacheKey)))) {  
-        return ret;  
-      }  
-      new_key->tenant_id_ = tenant_id_;  
-      key = new_key;  
-    }  
-    return ret;
-  }
-  // 添加deep_copy_token方法  
-  int deep_copy_token(const common::ObString &token, char *buf, const int64_t buf_len) {  
+  TokenCacheData() : total_count_(0), is_completed_(false) {}
+
+  int add_data(double relevance, ObDocIdExt &doc_id, int64_t count) {
     int ret = OB_SUCCESS;  
-    if (OB_ISNULL(buf) || buf_len < token.length()) {  
-      ret = OB_INVALID_ARGUMENT;  
+    if (count <= 0) {  
+      return ret;  
+    }  
+    if (OB_FAIL(relevance_scores_.push_back(relevance))) {  
+      LOG_WARN("failed to push back relevance score", K(ret));  
+    } else if (OB_FAIL(doc_ids_.push_back(doc_id))) {  
+      LOG_WARN("failed to push back doc id", K(ret));  
+      relevance_scores_.pop_back();  
     } else {  
-      token_.assign_ptr(buf, token.length());  
-      MEMCPY(buf, token.ptr(), token.length());  
+      total_count_ += count;  
     }  
     return ret;  
   }  
   
-private:  
-  common::ObString token_;  
-  uint64_t tenant_id_;  
 };
 
-class ObTextRetrievalTokenIter;
-class TokenCacheHandle {  
-  public:  
-    TokenCacheHandle() : hazptr_holder_() {}  
-    ~TokenCacheHandle() { reset(); }  
+using TCData = TokenCacheData;
+
+// class
+// class TokenCacheHandle {  
+//   public:  
+//     TokenCacheHandle() : hazptr_holder_() {}  
+//     ~TokenCacheHandle() { reset(); }  
       
-    void reset() {  
-      hazptr_holder_.reset();  
-    }  
+//     void reset() {  
+//       hazptr_holder_.reset();  
+//     }  
       
-    bool is_valid() const {  
-      return hazptr_holder_.is_valid();  
-    }  
+//     bool is_valid() const {  
+//       return hazptr_holder_.is_valid();  
+//     }  
       
-    TokenCacheData* get_cache_data() const {  
-      return cache_data_;  
-    }  
+//     TokenCacheData* get_cache_data() const {  
+//       return cache_data_;  
+//     }  
       
-    ObTextRetrievalTokenIter* get_origin_iter() const {  
-      return origin_iter_;  
-    }  
+//     ObTextRetrievalTokenIter* get_origin_iter() const {  
+//       return origin_iter_;  
+//     }  
       
-  private:  
-    ObKVCacheHandle hazptr_holder_;  
-    TokenCacheData* cache_data_;  
-    ObTextRetrievalTokenIter* origin_iter_;  
+//   private:  
+//     ObKVCacheHandle hazptr_holder_;  
+//     TokenCacheData* cache_data_;  
+//     ObTextRetrievalTokenIter* origin_iter_;  
       
-    friend class TokenCacheManager;  
-  };  
+//     friend class TokenCacheManager;  
+//   };  
 
 class ObTextRetrievalTokenIter final : public ObISparseRetrievalDimIter
 {
@@ -257,7 +150,7 @@ public:
   ObString token_name_;
   bool first_init_flag_{false};
   bool need_fiil_flag_{false};
-  TokenCacheHandle handle_;
+  // TokenCacheHandle handle_;
   ObTextRetrievalScanIterParam tem_param_;
   int force_build_cache();
   int init_with_cache();
@@ -325,138 +218,358 @@ private:
   DISALLOW_COPY_AND_ASSIGN(ObTextRetrievalTokenIter);
 };
 
-
-
+class TokenCacheManager {  
+public:  
+  hash::ObHashMap<ObString, TokenCacheData*> cache_map_;  
+  hash::ObHashMap<ObString, ObTextRetrievalTokenIter*> origin_iter_map_;
+  common::ObArenaAllocator allocator_;
+  int64_t map_max_size_{50};
     
-  class TokenCacheManager {  
-  public:  
-    static TokenCacheManager& get_instance() {  
-      static TokenCacheManager instance;  
-      return instance;  
-    }  
-      
-    int init() {  
-      iter_cache_.init("aaaaa",1,10);
-      return token_cache_.init("TokenCache", 1, 10);  
-    }  
-      
-    void destroy() {  
-      token_cache_.destroy();  
-      iter_cache_.destroy();
-    }  
-      
-    // 获取缓存数据，通过handle保护  
-    int get_cache_data(const ObString &token, TokenCacheHandle &handle) {  
-      int ret = OB_SUCCESS;  
-      TokenCacheKey key(token, MTL_ID());  
-      const TokenCacheData *cache_data = nullptr;  
-        
-      if (OB_FAIL(token_cache_.get(key, cache_data, handle.hazptr_holder_))) {  
-        if (OB_ENTRY_NOT_EXIST != ret) {  
-          LOG_WARN("failed to get cache data", K(ret));  
-        }  
-      } else if (OB_NOT_NULL(cache_data)) {  
-        handle.cache_data_ = const_cast<TokenCacheData*>(cache_data);  
+public:  
+  TokenCacheManager() : allocator_(ObMemAttr(MTL_ID(), "TokenCacheAlloc")) {
+    cache_map_.create(map_max_size_, "TokenCache", "TokenCache");
+    origin_iter_map_.create(map_max_size_,"Iter","TokenIter");
+  }  
+    
+  ~TokenCacheManager() {  
+    for (auto iter = cache_map_.begin(); iter != cache_map_.end(); ++iter) {  
+      if (iter->second) {  
+        iter->second->~TokenCacheData();  
+        allocator_.free(iter->second);
       }  
-        
-      return ret;  
     }  
-      
-    int put_cache_data(const common::ObString &token, TokenCacheData &cache_data) {  
-      int ret = common::OB_SUCCESS;  
-      TokenCacheKey key(token, MTL_ID());  
-        
-      if (OB_FAIL(token_cache_.put(key, cache_data, true))) {  
-        LOG_WARN("failed to put cache data", K(ret));  
-      }  
-      return ret;  
-    }  
-      
-    // 获取原始迭代器，通过handle保护  
-    int get_origin_iter(const ObString &token, TokenCacheHandle &handle) {  
-      int ret = OB_SUCCESS;  
-      const ObTextRetrievalTokenIter *origin_iter = nullptr;  
-      TokenCacheKey key(token, MTL_ID());  
-      if (OB_FAIL(iter_cache_.get(key, origin_iter, handle.hazptr_holder_))) {  
-        if (OB_ENTRY_NOT_EXIST != ret) {  
-          LOG_WARN("failed to get origin iter", K(ret));  
-        }  
-      } else if (OB_NOT_NULL(origin_iter)) {  
-        handle.origin_iter_ = const_cast<ObTextRetrievalTokenIter*>(origin_iter);  
-      }  
-        
-      return ret;  
-    }  
-      
-    // 存储原始迭代器  
-    int put_origin_iter(const ObString &token, ObTextRetrievalTokenIter *origin_iter) {  
-      int ret = common::OB_SUCCESS;  
+    cache_map_.destroy();  
 
-      TokenCacheKey key(token, MTL_ID());  
-      if (OB_FAIL(iter_cache_.put(key, *origin_iter, true))) {  
-        LOG_WARN("failed to put cache data", K(ret));  
+    for (auto iter = origin_iter_map_.begin(); iter != origin_iter_map_.end(); ++iter) {  
+      if (iter->second) {  
+        iter->second->~ObTextRetrievalTokenIter();  
+        allocator_.free(iter->second);
       }  
-      return ret;
-    }
-
-    int create_cache_data(const ObString &token, TokenCacheHandle &handle) {    
-      int ret = OB_SUCCESS;    
-      TokenCacheKey key(token, MTL_ID());  
-        
-      void *buf = allocator_.alloc(sizeof(TokenCacheData));    
-      if (OB_ISNULL(buf)) {    
-        ret = OB_ALLOCATE_MEMORY_FAILED;    
-      } else {    
-        TokenCacheData* cached_data = new(buf) TokenCacheData();  
-        handle.cache_data_ = cached_data;  
-          
-        const TokenCacheData *stored_data = nullptr;  
-        if (OB_FAIL(cache_data.put_and_fetch(key, *cached_data, stored_data, handle))) {  
-          LOG_WARN("failed to put cache data", K(ret));  
-        }  
-      }    
-      return ret;    
-    }
-
-    int create_token_iter(const ObString &token,  
-                          const ObTextRetrievalScanIterParam &orig_param,  
-                          TokenCacheHandle &handle) {  
-    int ret = OB_SUCCESS;      
-      
-    TokenCacheKey key(token, MTL_ID());  
-         
-    ObTextRetrievalScanIterParam new_param = orig_param;      
-    new_param.allocator_ = &allocator_;      
-      
-    // 创建新迭代器      
-    void *buf = allocator_.alloc(sizeof(ObTextRetrievalTokenIter));      
-    if (OB_ISNULL(buf)) {      
-      ret = OB_ALLOCATE_MEMORY_FAILED;      
-    } else {      
-      auto && new_iter = new(buf) ObTextRetrievalTokenIter();      
-      if (OB_FAIL(new_iter->init(new_param))) {      
-        LOG_WARN("failed to init token iter", K(ret));  
-      } else {  
-        handle.origin_iter_ = new_iter;  
-          
-        const ObTextRetrievalTokenIter *stored_iter = nullptr;  
-        if (OB_FAIL(iter_cache_.put_and_fetch(key, *new_iter, stored_iter, handle))) {  
-          LOG_WARN("failed to put origin iter", K(ret));  
-        }  
-      }  
-    }      
-    return ret;   
+    }  
+    origin_iter_map_.destroy();
+  }  
+    
+  static TokenCacheManager& get_instance() {  
+    static TokenCacheManager instance;  
+    return instance;  
+  }  
+    
+  TokenCacheData* get_cache_data(const ObString &token) {  
+    TokenCacheData *cached_data = nullptr;  
+    cache_map_.get_refactored(token, cached_data);  
+    return cached_data;  
+  }  
+    
+  int create_cache_data(const ObString &token, TokenCacheData *&cached_data) {  
+    int ret = OB_SUCCESS;  
+    void *buf = allocator_.alloc(sizeof(TokenCacheData));  
+    if (OB_ISNULL(buf)) {  
+      ret = OB_ALLOCATE_MEMORY_FAILED;  
+    } else {  
+      cached_data = new(buf) TokenCacheData();  
+      ret = cache_map_.set_refactored(token, cached_data);  
+    }  
+    return ret;  
   }
-    
-  private:  
-    TokenCacheManager() {}  
-    ~TokenCacheManager() {}  
-      
-    ObKVCache<TokenCacheKey, TokenCacheData> token_cache_;  
-    ObKVCache<TokenCacheKey, ObTextRetrievalTokenIter> iter_cache_;  
-    common::ObArenaAllocator allocator_;    
 
-  };
+  ObTextRetrievalTokenIter* get_origin_iter(const ObString &token) {  
+    ObTextRetrievalTokenIter *cached_data = nullptr;  
+    origin_iter_map_.get_refactored(token, cached_data);  
+    return cached_data;  
+  }  
+    
+  int push_origin_iter(const ObString &token, ObTextRetrievalTokenIter *&cached_data) {  
+    int ret = OB_SUCCESS;  
+      
+    ret = origin_iter_map_.set_refactored(token, cached_data);  
+    
+    return ret;
+  }
+
+  int create_token_iter(const ObString &token, const ObTextRetrievalScanIterParam &orig_param) {  
+    int ret = OB_SUCCESS;  
+
+    // 创建新的param，使用Manager的分配器  
+    ObTextRetrievalScanIterParam new_param = orig_param;  
+    new_param.allocator_ = &allocator_;  // 替换分配器  
+
+    // 创建新迭代器  
+    void *buf = allocator_.alloc(sizeof(ObTextRetrievalTokenIter));  
+    if (OB_ISNULL(buf)) {  
+      ret = OB_ALLOCATE_MEMORY_FAILED;  
+    } else {  
+      auto && new_iter = new(buf) ObTextRetrievalTokenIter();  
+      if (OB_FAIL(new_iter->init(new_param))) {  
+        LOG_WARN("failed to init token iter", K(ret));  
+      } else if (OB_FAIL(origin_iter_map_.set_refactored(token, new_iter))) {  
+        LOG_WARN("failed to store iter", K(ret));  
+      }  
+    }  
+    return ret;  
+  }
+
+};
+
+
+
+
+// class TokenCacheManager {    
+//   public:    
+//     struct CacheNode : public common::ObDLinkBase<CacheNode> {  
+//       ObString token_;  
+//       TokenCacheData *cache_data_;  
+//       ObTextRetrievalTokenIter *origin_iter_;  
+//       common::ObIAllocator *allocator_;
+//       CacheNode() : cache_data_(nullptr), origin_iter_(nullptr) {}  
+//       ~CacheNode() {  
+//         if (cache_data_) {  
+//           cache_data_->~TokenCacheData();  
+//           allocator_->free(cache_data_);
+//           cache_data_ = nullptr;  
+//         }  
+//         if (origin_iter_) {  
+//           origin_iter_->~ObTextRetrievalTokenIter();  
+//           allocator_->free(origin_iter_);
+//           origin_iter_ = nullptr;  
+//         }  
+//       }  
+//     };  
+      
+//     using LRUList = common::ObDList<CacheNode>;  
+      
+//     hash::ObHashMap<ObString, CacheNode*> cache_map_;    
+//     hash::ObHashMap<ObString, ObTextRetrievalTokenIter*> origin_iter_map_;    
+//     common::ObArenaAllocator allocator_;    
+//     LRUList lru_list_;  
+//     int64_t max_cache_size_;  
+      
+//   public:    
+//     TokenCacheManager() : allocator_(ObMemAttr(MTL_ID(), "TokenCacheAlloc")), max_cache_size_(5) {  
+//       cache_map_.create(5, "TokenCache", "TokenCache");  
+//       origin_iter_map_.create(5,"Iter","TokenIter");  
+//     }    
+        
+//     ~TokenCacheManager() {    
+//       // 清理LRU列表中的所有节点  
+//       CacheNode *node = lru_list_.get_first();  
+//       while (node != lru_list_.get_header()) {  
+//         CacheNode *next = node->get_next();
+//         lru_list_.remove(node);
+//         node->~CacheNode();  
+//         allocator_.free(node);  
+//         node = next;  
+//       }  
+        
+//       // 清理hash map  
+//       cache_map_.destroy();    
+//       origin_iter_map_.destroy();    
+//     }    
+        
+//     static TokenCacheManager& get_instance() {    
+//       static TokenCacheManager instance;    
+//       return instance;    
+//     }    
+        
+//     TokenCacheData* get_cache_data(const ObString &token) {    
+//       CacheNode *node = nullptr;    
+//       cache_map_.get_refactored(token, node);  
+//       if (node != nullptr) {  
+//         // LRU更新：移到链表头部  
+//         lru_list_.remove(node);  
+//         lru_list_.add_first(node);  
+//         return node->cache_data_;  
+//       }  
+//       return nullptr;    
+//     }    
+        
+//     int create_cache_data(const ObString &token, TokenCacheData *&cached_data) {    
+//       int ret = OB_SUCCESS;    
+        
+//       // 检查是否需要淘汰  
+//       if (lru_list_.get_size() >= max_cache_size_) {  
+//         evict_lru();  
+//       }  
+        
+//       void *buf = allocator_.alloc(sizeof(CacheNode));    
+//       if (OB_ISNULL(buf)) {    
+//         ret = OB_ALLOCATE_MEMORY_FAILED;    
+//       } else {    
+//         CacheNode *node = new(buf) CacheNode();    
+//         node->token_ = token;  
+          
+//         void *data_buf = allocator_.alloc(sizeof(TokenCacheData));    
+//         if (OB_ISNULL(data_buf)) {    
+//           ret = OB_ALLOCATE_MEMORY_FAILED;    
+//           node->~CacheNode();  
+//           allocator_.free(node);  
+//         } else {
+//           node->cache_data_ = new (data_buf) TokenCacheData();
+//           node->allocator_ = &allocator_; 
+//           if (OB_FAIL(cache_map_.set_refactored(token, node))) {    
+//             node->~CacheNode();  
+//             allocator_.free(node);  
+//           } else {    
+//             lru_list_.add_first(node);  
+//             cached_data = node->cache_data_;  
+//           }    
+//         }    
+//       }    
+//       return ret;    
+//     }  
+    
+//     ObTextRetrievalTokenIter* get_origin_iter(const ObString &token) {    
+//       ObTextRetrievalTokenIter *cached_iter = nullptr;    
+//       origin_iter_map_.get_refactored(token, cached_iter);    
+//       return cached_iter;    
+//     }    
+        
+//     int push_origin_iter(const ObString &token, ObTextRetrievalTokenIter *&cached_iter) {    
+//       int ret = OB_SUCCESS;    
+//       ret = origin_iter_map_.set_refactored(token, cached_iter);    
+//       return ret;    
+//     }  
+    
+//     int create_token_iter(const ObString &token, const ObTextRetrievalScanIterParam &orig_param) {    
+//       int ret = OB_SUCCESS;    
+    
+//       // 创建新的param，使用Manager的分配器    
+//       ObTextRetrievalScanIterParam new_param = orig_param;    
+//       new_param.allocator_ = &allocator_;    
+    
+//       // 创建新迭代器    
+//       void *buf = allocator_.alloc(sizeof(ObTextRetrievalTokenIter));    
+//       if (OB_ISNULL(buf)) {    
+//         ret = OB_ALLOCATE_MEMORY_FAILED;    
+//       } else {    
+//         auto && new_iter = new(buf) ObTextRetrievalTokenIter();    
+//         if (OB_FAIL(new_iter->init(new_param))) {    
+//           LOG_WARN("failed to init token iter", K(ret));    
+//         } else if (OB_FAIL(origin_iter_map_.set_refactored(token, new_iter))) {    
+//           LOG_WARN("failed to store iter", K(ret));    
+//         }    
+//       }    
+//       return ret;    
+//     }    
+      
+//   private:  
+//     void evict_lru() {  
+//       // 淘汰最久未使用的节点  
+//       CacheNode *last = lru_list_.get_last();  
+//       if (last != lru_list_.get_header()) {  
+//         lru_list_.remove(last);  
+//         cache_map_.erase_refactored(last->token_);  
+//         last->~CacheNode();  
+//         allocator_.free(last);  
+//       }  
+//     }  
+//   };
+
+
+    
+  // class TokenCacheManager {  
+  // public:  
+  //   static TokenCacheManager& get_instance() {  
+  //     static TokenCacheManager instance;  
+  //     return instance;  
+  //   }  
+      
+  //   int init() {  
+  //     iter_cache_.init("aaaaa",1,10);
+  //     return token_cache_.init("TokenCache", 1, 10);  
+  //   }  
+      
+  //   void destroy() {  
+  //     token_cache_.destroy();  
+  //     iter_cache_.destroy();
+  //   }  
+      
+  //   // 获取缓存数据，通过handle保护  
+  //   int get_cache_data(const ObString &token, TokenCacheHandle &handle) {  
+  //     int ret = OB_SUCCESS;  
+  //     const TokenCacheData *cache_data = nullptr;  
+        
+  //     if (OB_FAIL(token_cache_.get(token, cache_data, handle.hazptr_holder_))) {  
+  //       if (OB_ENTRY_NOT_EXIST != ret) {  
+  //         LOG_WARN("failed to get cache data", K(ret));  
+  //       }  
+  //     } else if (OB_NOT_NULL(cache_data)) {  
+  //       handle.cache_data_ = const_cast<TokenCacheData*>(cache_data);  
+  //     }  
+        
+  //     return ret;  
+  //   }  
+      
+  //   // 存储缓存数据  
+  //   int put_cache_data(const ObString &token, TokenCacheData *cache_data) {  
+  //     return token_cache_.put(token, *cache_data, true);  
+  //   }  
+      
+  //   // 获取原始迭代器，通过handle保护  
+  //   int get_origin_iter(const ObString &token, TokenCacheHandle &handle) {  
+  //     int ret = OB_SUCCESS;  
+  //     const ObTextRetrievalTokenIter *origin_iter = nullptr;  
+        
+  //     if (OB_FAIL(iter_cache_.get(token, origin_iter, handle.hazptr_holder_))) {  
+  //       if (OB_ENTRY_NOT_EXIST != ret) {  
+  //         LOG_WARN("failed to get origin iter", K(ret));  
+  //       }  
+  //     } else if (OB_NOT_NULL(origin_iter)) {  
+  //       handle.origin_iter_ = const_cast<ObTextRetrievalTokenIter*>(origin_iter);  
+  //     }  
+        
+  //     return ret;  
+  //   }  
+      
+  //   // 存储原始迭代器  
+  //   int put_origin_iter(const ObString &token, ObTextRetrievalTokenIter *origin_iter) {  
+  //     return iter_cache_.put(token, *origin_iter, true);
+  //   }
+
+  //   int create_cache_data(const ObString &token, TokenCacheHandle &handle) {  
+  //     int ret = OB_SUCCESS;  
+  //     void *buf = allocator_.alloc(sizeof(TokenCacheData));  
+  //     if (OB_ISNULL(buf)) {  
+  //       ret = OB_ALLOCATE_MEMORY_FAILED;  
+  //     } else {  
+  //       TokenCacheData* cached_data = new(buf) TokenCacheData();
+  //       handle.cache_data_ = cached_data;
+  //       put_cache_data(token, cached_data);
+  //     }  
+  //     return ret;  
+  //   }
+
+  //   int create_token_iter(const ObString &token,
+  //                         const ObTextRetrievalScanIterParam &orig_param,
+  //                         TokenCacheHandle &handle) {
+  //     int ret = OB_SUCCESS;    
+    
+  //     // 创建新的param，使用Manager的分配器    
+  //     ObTextRetrievalScanIterParam new_param = orig_param;    
+  //     new_param.allocator_ = &allocator_;    
+    
+  //     // 创建新迭代器    
+  //     void *buf = allocator_.alloc(sizeof(ObTextRetrievalTokenIter));    
+  //     if (OB_ISNULL(buf)) {    
+  //       ret = OB_ALLOCATE_MEMORY_FAILED;    
+  //     } else {    
+  //       auto && new_iter = new(buf) ObTextRetrievalTokenIter();    
+  //       if (OB_FAIL(new_iter->init(new_param))) {    
+  //         LOG_WARN("failed to init token iter", K(ret));
+  //       } else {
+  //         handle.origin_iter_ = new_iter;
+  //         put_origin_iter(token, new_iter);
+  //       }
+  //     }    
+  //     return ret; 
+  //   }
+    
+  // private:  
+  //   TokenCacheManager() {}  
+  //   ~TokenCacheManager() {}  
+      
+  //   ObKVCache<ObString, TokenCacheData> token_cache_;  
+  //   ObKVCache<ObString, ObTextRetrievalTokenIter> iter_cache_;  
+  // };
 
 using TCManager = TokenCacheManager;
 

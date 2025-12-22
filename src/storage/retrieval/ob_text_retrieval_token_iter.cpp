@@ -421,15 +421,10 @@ int ObTextRetrievalTokenIter::get_next_batch_with_cache(const int64_t capacity,
                                                         int64_t &count) {
   int ret = OB_SUCCESS;  
   count = 0;
-  // TokenCacheHandle handle;  // 局部变量
-  // if (!own_cache_data_) {
-  //   auto && cache_data = cache_mgr.get_cache_data(token_name_);
-  //   if (cache_data) {
-  //     own_cache_data_ = cache_data;
-  //   }
-  // }
   
-  int64_t available_count = own_cache_data_->total_count_ - (cache_read_idx_ + last_read_count_ - 1 + 1);
+  
+  int64_t available_count =
+  own_cache_data_->total_count_ - (cache_read_idx_ + last_read_count_ - 1 + 1);
   adlog::DEBUG("ObTextRetrievalTokenIter::get_next_batch_with_cache start");
   adlog::DEBUG("available_count: ", available_count);
   
@@ -463,11 +458,10 @@ int ObTextRetrievalTokenIter::load_more_data_to_cache(int64_t need_data_cnt) {
   // 获取缓存管理器实例
   adlog::DEBUG("开始尝试让缓存追加数据");
   int ret = OB_SUCCESS;
-  // TokenCacheHandle handle;  // 局部变量 
-  // TokenCacheManager &cache_mgr = TokenCacheManager::get_instance();  
+  TokenCacheManager &cache_mgr = TokenCacheManager::get_instance();  
     
   // 获取存储的原始迭代器  
-  ObTextRetrievalTokenIter *origin_iter = handle_.get_origin_iter();  
+  ObTextRetrievalTokenIter *origin_iter = cache_mgr.get_origin_iter(token_name_);  
   if (OB_ISNULL(origin_iter)) {  
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("failed to get origin iter from cache manager", K(ret),
@@ -475,7 +469,7 @@ int ObTextRetrievalTokenIter::load_more_data_to_cache(int64_t need_data_cnt) {
     adlog::DEBUG("怎么会 origin_iter 会 空指针");
   } else {  
     // 获取或创建缓存数据  
-    TokenCacheData *cache_data = handle_.get_cache_data();  
+    TokenCacheData *cache_data = cache_mgr.get_cache_data(token_name_);  
     if (OB_ISNULL(cache_data)) {
 
       adlog::DEBUG("ERROR! 竟然没有cache_data");
@@ -555,28 +549,89 @@ int ObTextRetrievalTokenIter::extract_and_add_data_to_cache(
 
 
 //ADVISE
+int ObTextRetrievalTokenIter::force_build_cache() {  
+  int ret = OB_SUCCESS;  
+    
+  // TokenCacheData *new_cache_data = nullptr;  
+  // if (OB_FAIL(TCManager::get_instance().create_cache_data(token_name_, new_cache_data))) {  
+  //   return ret;  
+  // }  
+    
+  // while (OB_SUCC(ret)) {  
+  //   int64_t batch_count = 0;  
+  //   if (OB_FAIL(get_next_batch(max_batch_size_,batch_count ))) {  
+  //     if (OB_ITER_END == ret) {  
+  //       ret = OB_SUCCESS;  
+  //       break;  
+  //     }  
+  //   } else if (batch_count > 0) {   
+  //     // 关键：添加缺失的预处理步骤  
+  //     if (need_calc_relevance()) {  
+  //       const ObBitVector *skip = NULL;  
+  //       PRINT_VECTORIZED_ROWS(SQL, DEBUG, *eval_ctx_, *inv_idx_scan_param_->output_exprs_, batch_count, skip);  
+  //       clear_batch_wise_evaluated_flag(batch_count);  
+  //       if (OB_FAIL(batch_fill_token_cnt_with_doc_len(batch_count))) {  
+  //         LOG_WARN("failed to fill batch token cnt with document length", K(ret));  
+  //       } else if (OB_FAIL(fill_token_doc_cnt())) {  
+  //         LOG_WARN("failed to get token doc cnt", K(ret));  
+  //       } else if (OB_FAIL(batch_eval_relevance_expr(batch_count))) {  
+  //         LOG_WARN("failed to evaluate relevance expr", K(ret));  
+  //       }  
+  //     }  
+        
+  //     // 提取数据到缓存  
+  //     if (OB_SUCC(ret)) {  
+  //       ObExpr *relevance_expr = relevance_expr_;    
+  //       ObExpr *doc_id_expr = inv_scan_domain_id_col_;   
+          
+  //       const ObDatumVector &relevance_datum = relevance_expr->locate_expr_datumvector(*eval_ctx_);  
+  //       const ObDatumVector &doc_id_datum = doc_id_expr->locate_expr_datumvector(*eval_ctx_);  
+          
+  //       for (int64_t i = 0; OB_SUCC(ret) && i < batch_count; ++i) {  
+  //         if (OB_LIKELY(!skip_->at(i))) {  
+  //           double relevance = relevance_datum.at(i)->get_double();  
+  //           ObDocIdExt doc_id;  
+  //           if (OB_FAIL(doc_id.from_datum(*doc_id_datum.at(i)))) {  
+  //             LOG_WARN("failed to get doc id", K(ret));  
+  //           } else if (OB_FAIL(new_cache_data->add_data(relevance, doc_id, 1))) {  
+  //             LOG_WARN("failed to add data to cache", K(ret));  
+  //           }  
+  //         }  
+  //       }  
+  //     }  
+  //   }  
+  // }  
+    
+  // if (OB_SUCC(ret)) {  
+  //   new_cache_data->is_completed_ = true;  
+  // }  
+  return ret;  
+}
 
 
 int ObTextRetrievalTokenIter::init_with_cache() {
   adlog::DEBUG("初始化缓存 开始");
-  int ret = OB_SUCCESS;
-
-  TCManager::get_instance().get_cache_data(token_name_, handle_);
-  
-  auto &&cache_data = handle_.get_cache_data();
+  int ret = OB_SUCCESS;  
+      
+  TCManager &cache_mgr = TCManager::get_instance();  
+  auto && cache_data = cache_mgr.get_cache_data(token_name_);
 
   if (cache_data == nullptr) {
     adlog::DEBUG("之前没有过 缓存迭代器");
-    // TokenCacheData *new_cache_data = nullptr;  
-    if (OB_FAIL(TCManager::get_instance().create_cache_data(token_name_, handle_))) {  
-      return ret;
-    }
-    own_cache_data_ = handle_.get_cache_data();
-    // new一个新的token_iter，用于推进缓存
-    TCManager::get_instance().create_token_iter(token_name_, tem_param_, handle_);
-    // auto && origin_iter = TCManager::get_instance().get_origin_iter(token_name_);
-    auto &&origin_iter = handle_.get_origin_iter();
-    if (origin_iter) { 
+
+    // 这里考虑一下要不要用缓存
+    if (cache_mgr.cache_map_.size() >= cache_mgr.map_max_size_) {
+      //不用缓存了
+    } else {
+      
+      
+      TokenCacheData *new_cache_data = nullptr;  
+      TCManager::get_instance().create_cache_data(token_name_, new_cache_data);  
+        
+      own_cache_data_ = new_cache_data;
+      // new一个新的token_iter，用于推进缓存
+      TCManager::get_instance().create_token_iter(token_name_, tem_param_);
+      auto && origin_iter = TCManager::get_instance().get_origin_iter(token_name_);
       origin_iter->first_init_flag_ = true;
       origin_iter->use_cache_ = false;
     }
@@ -586,12 +641,32 @@ int ObTextRetrievalTokenIter::init_with_cache() {
   }
   cache_read_idx_ = 0;
   last_read_count_ = 0;
-  if(own_cache_data_ and handle_.get_origin_iter()){
+  if(own_cache_data_){
     use_cache_ = true;
   } else {
     use_cache_ = false;
-  }
 
+  }
+  // if (cache_data && cache_data->is_completed_) {  
+  //   use_cache_ = true;
+  //   cache_read_idx_ = 0;
+  //   last_read_count_ = 0;
+  //   own_cache_data_ = cache_data;
+  //   adlog::DEBUG("原本有好了的缓存 直接使用");
+  // } else {
+
+  //   if (cache_data == nullptr) {
+  //     force_build_cache();
+  //     use_cache_ = true;
+  //     cache_read_idx_ = 0;
+  //     last_read_count_ = 0;
+  //     own_cache_data_ = cache_mgr.get_cache_data(token_name_);
+  //     adlog::DEBUG("初始化缓存 结束");
+  //     return ret;
+  //   }
+  //   use_cache_ = false;
+  //   adlog::DEBUG("没有使用缓存");
+  // }
   adlog::DEBUG("初始化缓存 结束");
   return ret;
 }
@@ -606,6 +681,10 @@ int ObTextRetrievalTokenIter::get_next_batch(const int64_t capacity,
     first_init_flag_ = true;
   }
 
+  // if (use_cache_) {
+
+  //   return get_next_batch_with_cache(capacity, count);
+  // }
 
   if(use_cache_){
     // 判断一下在map里面存的是不是自己
