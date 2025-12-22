@@ -7,7 +7,7 @@
 #include <unordered_map>
 
 namespace {
-bool g_debug_enabled = false;
+bool g_debug_enabled = fals;
 std::mutex g_log_mutex;
 std::unordered_map<std::string, int> g_debug_once_counters;
 std::ofstream g_log_file;
